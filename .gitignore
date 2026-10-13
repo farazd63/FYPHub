@@ -1,0 +1,34 @@
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# Node dependencies and build output
+node_modules/
+dist/
+build/
+.vite/
+
+# Local environment files (example files remain tracked)
+.env
+.env.*
+!.env.example
+!*.env.example
+
+# Logs and coverage
+*.log
+logs/
+coverage/
+.coverage
+htmlcov/
+
+# Runtime uploads
+uploads/
+runtime/uploads/
