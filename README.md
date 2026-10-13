@@ -22,4 +22,4 @@ FYPHub is a final-year-project platform being established in small, verifiable i
 
 ## Status
 
-Application implementation has not started. Checkpoint 2A has created the isolated PostgreSQL + pgvector configuration; runtime startup and verification are pending.
+The isolated PostgreSQL + pgvector configuration has been verified. Checkpoint 3B provides a minimal FastAPI backend foundation with a liveness-only health endpoint; backend runtime verification is pending.

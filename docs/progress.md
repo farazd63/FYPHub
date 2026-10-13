@@ -33,6 +33,17 @@ The isolated PostgreSQL + pgvector configuration was created.
 - SQL connection verification passed.
 - The `vector` extension was verified at version `0.8.6`.
 
+## Checkpoint 3B
+
+- Minimal FastAPI backend foundation created using `backend/.venv`.
+- `GET /health` provides application liveness only and does not claim database connectivity.
+- Default Swagger documentation remains available at `/docs`.
+- Backend liveness and Swagger/OpenAPI verification passed:
+  - `GET /health` returned HTTP 200 with `{"status":"ok","service":"fyphub-p1-api"}`.
+  - `GET /docs` returned HTTP 200.
+  - `GET /openapi.json` returned HTTP 200, confirmed title `FYPHub API`, and confirmed `GET /health` registration.
+- This verification does not verify or claim database connectivity.
+
 ## Deadline
 
 Before the 6th; month and year are not yet confirmed.

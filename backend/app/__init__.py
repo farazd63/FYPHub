@@ -1,0 +1,1 @@
+"""FYPHub backend application package."""
