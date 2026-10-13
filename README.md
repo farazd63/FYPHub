@@ -22,4 +22,4 @@ FYPHub is a final-year-project platform being established in small, verifiable i
 
 ## Status
 
-Application implementation has not started. This repository currently contains only the initial project foundation for Checkpoint 1.
+Application implementation has not started. Checkpoint 2A has created the isolated PostgreSQL + pgvector configuration; runtime startup and verification are pending.
