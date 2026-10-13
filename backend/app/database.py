@@ -1,9 +1,15 @@
 """Synchronous SQLAlchemy database resources."""
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import settings
+
+
+class Base(DeclarativeBase):
+    """Shared declarative base for future application models."""
+
+    pass
 
 engine = create_engine(
     settings.database_url,

@@ -55,6 +55,16 @@ The isolated PostgreSQL + pgvector configuration was created.
 - Runtime endpoint verification passed: `/health` and `/health/ready` both returned HTTP 200.
 - An isolated mocked database-failure ASGI request returned the expected sanitized HTTP 503 response; no Docker service or credentials were changed.
 
+## Checkpoint 4B
+
+- Added Alembic migration infrastructure under `backend/alembic` and `backend/alembic.ini`.
+- Added the shared SQLAlchemy `Base` and exposed its metadata to Alembic for future models.
+- Alembic reuses the application database configuration without storing credentials in `alembic.ini` and supports online and offline modes.
+- Python compilation and dependency integrity checks passed.
+- Alembic `heads`, `history`, and `current` were verified with no revisions present.
+- Database inspection found no public application tables and no `alembic_version` infrastructure table was created.
+- Running `/health` and `/health/ready` checks both returned HTTP 200 after the infrastructure changes.
+
 ## Deadline
 
 Before the 6th; month and year are not yet confirmed.
