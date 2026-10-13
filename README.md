@@ -22,4 +22,4 @@ FYPHub is a final-year-project platform being established in small, verifiable i
 
 ## Status
 
-The isolated PostgreSQL + pgvector configuration has been verified. Checkpoint 3B provides a minimal FastAPI backend foundation with a liveness-only health endpoint; backend runtime verification is pending.
+The isolated PostgreSQL + pgvector configuration has been verified. The FastAPI backend now has two health endpoints: `/health` is application liveness only and does not access the database, while `/health/ready` verifies database connectivity and the pgvector extension. Both endpoints have been runtime-verified for the local P1 environment.

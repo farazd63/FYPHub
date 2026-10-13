@@ -44,6 +44,17 @@ The isolated PostgreSQL + pgvector configuration was created.
   - `GET /openapi.json` returned HTTP 200, confirmed title `FYPHub API`, and confirmed `GET /health` registration.
 - This verification does not verify or claim database connectivity.
 
+## Checkpoint 4A
+
+- Added the PostgreSQL connection foundation using synchronous SQLAlchemy and `postgresql+psycopg`.
+- Root `.env` is loaded with an explicit path; its existing password is reused and remains private.
+- `GET /health` remains liveness only and does not access the database.
+- Added `GET /health/ready`, which verifies `SELECT 1` and the installed `vector` extension, returning a sanitized HTTP 503 response if either check fails.
+- Python compilation and dependency integrity checks passed.
+- A read-only database check confirmed `fyphub_p1` and `vector` extension version `0.8.6`.
+- Runtime endpoint verification passed: `/health` and `/health/ready` both returned HTTP 200.
+- An isolated mocked database-failure ASGI request returned the expected sanitized HTTP 503 response; no Docker service or credentials were changed.
+
 ## Deadline
 
 Before the 6th; month and year are not yet confirmed.
