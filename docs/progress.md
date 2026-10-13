@@ -65,6 +65,16 @@ The isolated PostgreSQL + pgvector configuration was created.
 - Database inspection found no public application tables and no `alembic_version` infrastructure table was created.
 - Running `/health` and `/health/ready` checks both returned HTTP 200 after the infrastructure changes.
 
+## Checkpoint 5A
+
+- Added the `users` and `user_role` database foundation through Alembic revision `9c227dc337bf`.
+- Database rules enforce canonical normalized email and registration-number storage, case-insensitive email uniqueness, registration-number uniqueness when present, valid roles, and required student registration numbers.
+- The migration contains no pgvector extension changes and pgvector remains at version `0.8.6`.
+- Alembic current matches head; a second autogenerate check found no pending changes.
+- Users schema columns, constraints, and indexes were verified. No accounts have been created.
+- Running `/health` and `/health/ready` checks both returned HTTP 200 after the migration.
+- Authentication, password hashing, account creation, and frontend work remain unimplemented.
+
 ## Deadline
 
 Before the 6th; month and year are not yet confirmed.

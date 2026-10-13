@@ -10,6 +10,7 @@ if str(BACKEND_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIRECTORY))
 
 from app.database import Base, engine  # noqa: E402
+from app.models import User  # noqa: F401, E402
 
 config = context.config
 target_metadata = Base.metadata

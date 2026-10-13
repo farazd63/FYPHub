@@ -35,4 +35,6 @@ When a future model change is ready, generate a migration, inspect the generated
 
 ## Verified initial state
 
-The initial Alembic checks completed with empty `heads`, `history`, and `current` output. No `alembic_version` table was created during these inspections, and the `public` schema contains no application tables. No revisions were generated or applied.
+The initial Alembic checks completed with empty `heads`, `history`, and `current` output. No `alembic_version` table was created during those initial inspections, and the `public` schema contained no application tables.
+
+The first reviewed migration is `9c227dc337bf` (`create users foundation`). It is applied to `fyphub_p1`, creates only the users-and-roles foundation, and is the current Alembic head. The expected `alembic_version` table now tracks that revision. A follow-up Alembic autogenerate check found no pending schema changes.

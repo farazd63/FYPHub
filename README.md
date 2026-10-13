@@ -22,4 +22,4 @@ FYPHub is a final-year-project platform being established in small, verifiable i
 
 ## Status
 
-The isolated PostgreSQL + pgvector configuration has been verified. The FastAPI backend now has two health endpoints: `/health` is application liveness only and does not access the database, while `/health/ready` verifies database connectivity and the pgvector extension. Both endpoints have been runtime-verified for the local P1 environment. Alembic migration infrastructure is also in place for future models, with no migration revisions or application tables yet.
+The isolated PostgreSQL + pgvector configuration has been verified. The FastAPI backend now has two health endpoints: `/health` is application liveness only and does not access the database, while `/health/ready` verifies database connectivity and the pgvector extension. Both endpoints have been runtime-verified for the local P1 environment. Alembic now manages the initial users-and-roles database foundation; authentication implementation has not started.
