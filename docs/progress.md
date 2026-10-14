@@ -85,6 +85,13 @@ The isolated PostgreSQL + pgvector configuration was created.
 - Running `/health` and `/health/ready` checks both returned HTTP 200 after the registration changes.
 - Sign-in, tokens/sessions, authorization, staff creation, and frontend work remain unimplemented.
 
+## Frontend account-flow correction
+
+- Implemented the Create Team Account visual flow with React, Vite, TypeScript, and Tailwind CSS.
+- Added local member controls and client-only validation while keeping final submission disabled pending backend team-registration support.
+- This supports the P1 Modules 1–3 scope but does not complete any module.
+- Added the three-step frontend registration flow and display-only Sign In navigation; API integration remains pending.
+
 ## Deadline
 
 Before the 6th; month and year are not yet confirmed.

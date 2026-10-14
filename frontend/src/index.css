@@ -1,0 +1,4 @@
+@import "tailwindcss";
+:root { font-family: ui-sans-serif, system-ui, sans-serif; color: #243746; background: #F7F5EF; }
+* { box-sizing: border-box; } body { margin: 0; min-width: 320px; }
+button:focus-visible,input:focus-visible { outline: 3px solid rgb(23 107 102 / .28); outline-offset: 2px; }
