@@ -102,6 +102,13 @@ The isolated PostgreSQL + pgvector configuration was created.
 - Read-only cycle and policy APIs are available; no cycle or policy data was seeded.
 - Module 1 cycle/policy functionality is partial, not complete.
 
+## Team/member schema verification
+
+- Alembic revision `ce964120f177` is both current and head; `alembic check` found no pending operations.
+- The `teams` and `team_members` schema constraints were verified with 9 rollback-isolated constraint tests; the 6 existing registration tests also passed (15 total).
+- Test execution targeted `fyphub_p1` and left no test fixture records. The existing demo user remains present.
+- Shared-team registration API work is pending. Exactly-one-creator and creator/User consistency will be enforced by that future registration service.
+
 ## Deadline
 
 Before the 6th; month and year are not yet confirmed.
