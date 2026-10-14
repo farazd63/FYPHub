@@ -62,6 +62,47 @@ def request_json(payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     return start["status"], json.loads(body)
 
 
+def cors_preflight(origin: str) -> tuple[int, dict[str, str]]:
+    """Exercise CORS without a running HTTP server."""
+
+    async def invoke() -> list[dict[str, Any]]:
+        messages: list[dict[str, Any]] = []
+
+        async def receive() -> dict[str, Any]:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message: dict[str, Any]) -> None:
+            messages.append(message)
+
+        await app(
+            {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "OPTIONS",
+                "scheme": "http",
+                "path": "/api/v1/team-registration",
+                "raw_path": b"/api/v1/team-registration",
+                "query_string": b"",
+                "headers": [
+                    (b"origin", origin.encode()),
+                    (b"access-control-request-method", b"POST"),
+                    (b"access-control-request-headers", b"content-type"),
+                ],
+                "client": ("127.0.0.1", 0),
+                "server": ("testserver", 80),
+            },
+            receive,
+            send,
+        )
+        return messages
+
+    messages = asyncio.run(invoke())
+    start = next(message for message in messages if message["type"] == "http.response.start")
+    headers = {key.decode(): value.decode() for key, value in start["headers"]}
+    return start["status"], headers
+
+
 class TeamRegistrationApiTests(unittest.TestCase):
     """API writes share an outer transaction and never retain fixture data."""
 
@@ -188,6 +229,16 @@ class TeamRegistrationApiTests(unittest.TestCase):
         self.assertEqual(member_count, 2)
         self.assertNotEqual(password_hash, password)
         self.assertTrue(verify_password(password, password_hash))
+
+    def test_cors_allows_only_the_configured_frontend_origin(self) -> None:
+        allowed_status, allowed_headers = cors_preflight("http://127.0.0.1:5174")
+        self.assertEqual(allowed_status, 200)
+        self.assertEqual(allowed_headers.get("access-control-allow-origin"), "http://127.0.0.1:5174")
+        self.assertNotIn("access-control-allow-credentials", allowed_headers)
+
+        denied_status, denied_headers = cors_preflight("http://localhost:5174")
+        self.assertEqual(denied_status, 400)
+        self.assertNotIn("access-control-allow-origin", denied_headers)
 
     def test_unknown_closed_and_missing_policy_cycles_return_safe_errors(self) -> None:
         unknown_status, unknown_response = request_json(self.payload(999999999))

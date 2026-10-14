@@ -88,7 +88,7 @@ The database enforces *at most* one creator. Inserting exactly one creator, and 
 
 ## Verified tests
 
-The database target was confirmed as `fyphub_p1`. The complete test suite passed: 23 tests total (8 team-registration API tests, 9 team/member constraint tests, and 6 existing registration tests). API tests cover successful creation and Argon2id hashing, exactly one user/creator, unknown/closed/missing-policy cycles, configured maximum/excess size, request/existing-record conflicts, individual-account creator conflicts, invalid/privileged fields, forced late member-insert rollback, and safe responses. The constraint tests cover duplicate registrations within a team and active cycle, duplicate active contact email, noncanonical values, same-name students with distinct identifiers, cycle mismatch, a second creator, duplicate shared-user linkage, and identifier reuse in another academic cycle.
+The database target was confirmed as `fyphub_p1`. The complete test suite passed: 24 tests total (9 team-registration API tests, 9 team/member constraint tests, and 6 existing registration tests). API tests cover successful creation and Argon2id hashing, exactly one user/creator, unknown/closed/missing-policy cycles, configured maximum/excess size, request/existing-record conflicts, individual-account creator conflicts, invalid/privileged fields, forced late member-insert rollback, safe responses, and exact-origin CORS preflight. The constraint tests cover duplicate registrations within a team and active cycle, duplicate active contact email, noncanonical values, same-name students with distinct identifiers, cycle mismatch, a second creator, duplicate shared-user linkage, and identifier reuse in another academic cycle.
 
 Run the tests from the `backend` working directory:
 
@@ -98,8 +98,20 @@ Run the tests from the `backend` working directory:
 
 All test writes run in an outer transaction and are rolled back. Post-test verification found no retained test cycle, user, or member records.
 
+## Manual registration verification
+
+The manually created Team ID `81` was verified with read-only queries against `fyphub_p1`.
+
+- The team belongs to `FALL-2026`.
+- It links to one active `STUDENT` account (user ID `122`).
+- It has exactly three active member records and exactly one active creator.
+- The creator registration number matches the linked user's registration number.
+- The existing demo user ID `6` remains an active `STUDENT` account.
+
+No passwords, password hashes, or credentials were inspected or recorded. Sign In and session handling remain pending.
+
 ## Remaining work
 
-- Integrate field-level validation and submission with the existing frontend.
-- Add authenticated Admin configuration for cycles and group policies; no real cycle or policy data has been seeded.
+- Complete manual browser verification of frontend submission and responsive error placement.
+- Add authenticated Admin configuration for cycles and group policies; the local `FALL-2026` bootstrap is not a replacement for Admin configuration.
 - Implement sign-in, sessions, and authorization. Shared-account use limits attribution to the shared team account.

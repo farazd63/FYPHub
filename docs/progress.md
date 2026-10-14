@@ -125,6 +125,20 @@ The isolated PostgreSQL + pgvector configuration was created.
 - Python compilation, `pip check`, Alembic current/head at `ce964120f177`, and `alembic check` all passed.
 - Frontend integration, Admin cycle/policy configuration, sign-in, sessions, and authorization remain pending.
 
+## Shared-team registration frontend integration
+
+- Added non-secret `VITE_API_BASE_URL` configuration and exact-origin backend CORS for `http://127.0.0.1:5174`; wildcard origins and credential support are not enabled.
+- The existing three-step form now loads cycles and selected group policies, uses the fetched group maximum including the creator, validates normalized duplicate member identifiers, and submits the exact shared-team registration payload.
+- Submission prevents duplicate requests, preserves values after failures, maps safe backend field errors to the affected step and stable member row, and shows a real HTTP `201` confirmation while clearing password fields.
+- Sign In remains disabled; no session or automatic login is created.
+- Frontend lint and production build passed. Backend tests passed: 24 total, including allowed/disallowed CORS verification. Live browser submission and responsive visual verification remain pending.
+
+## Manual shared-team registration verification
+
+- Read-only verification confirmed Team ID `81` in `fyphub_p1` belongs to `FALL-2026`, links to one active `STUDENT` account, and has exactly three active members with one creator.
+- The creator registration matches the linked user registration; demo user ID `6` remains active.
+- Sign In and session handling remain pending.
+
 ## Deadline
 
 Before the 6th; month and year are not yet confirmed.

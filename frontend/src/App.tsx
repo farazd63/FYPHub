@@ -1,570 +1,83 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
-type Member = {
-  id: string;
-  name: string;
-  registration: string;
-  email: string;
-};
-
-type Details = {
-  name: string;
-  registration: string;
-  email: string;
-};
+type Member = { id: string; name: string; registration: string; email: string };
+type Details = { name: string; registration: string; email: string };
+type Cycle = { id: number; code: string; display_name: string; registration_open: boolean };
+type Policy = { max_group_size: number };
+type FieldErrors = Record<string, string>;
+type ApiDetail = { code?: string; message?: string; field?: string; fields?: { path: string }[] };
 
 const STEPS = ["Account Details", "Login Details", "Team Members"];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const API = (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8010").replace(/\/$/, "");
+const INPUT = "w-full rounded-lg border border-[#cbd6d0] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#176B66] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
+const PRIMARY = "rounded-lg bg-[#176B66] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#125650] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";
 
-const INPUT =
-  "w-full rounded-lg border border-[#cbd6d0] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#176B66]";
-
-const PRIMARY =
-  "rounded-lg bg-[#176B66] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#125650]";
-
-function newMember(): Member {
-  return {
-    id: crypto.randomUUID(),
-    name: "",
-    registration: "",
-    email: "",
-  };
-}
+const newMember = (): Member => ({ id: crypto.randomUUID(), name: "", registration: "", email: "" });
+const registration = (value: string) => value.trim().toUpperCase();
+const email = (value: string) => value.trim().toLowerCase();
+const memberKey = (id: string, field: keyof Details) => `member.${id}.${field}`;
 
 function Logo() {
-  return (
-    <div className="flex items-center gap-2">
-      <svg
-        aria-hidden="true"
-        className="h-9 w-10 text-[#176B66]"
-        viewBox="0 0 56 40"
-        fill="none"
-      >
-        <path
-          d="m4 14 24-10 24 10-24 10L4 14Z"
-          fill="currentColor"
-        />
-        <path
-          d="M15 20v8c5 5 21 5 26 0v-8M49 16v11"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        <circle
-          cx="49"
-          cy="30"
-          r="3"
-          fill="#E4EEE7"
-          stroke="currentColor"
-          strokeWidth="2"
-        />
-      </svg>
-      <span className="text-xl font-bold tracking-tight">FYPHub</span>
-    </div>
-  );
+  return <div className="flex items-center gap-2"><svg aria-hidden="true" className="h-9 w-10 text-[#176B66]" viewBox="0 0 56 40" fill="none"><path d="m4 14 24-10 24 10-24 10L4 14Z" fill="currentColor" /><path d="M15 20v8c5 5 21 5 26 0v-8M49 16v11" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /><circle cx="49" cy="30" r="3" fill="#E4EEE7" stroke="currentColor" strokeWidth="2" /></svg><span className="text-xl font-bold tracking-tight">FYPHub</span></div>;
 }
 
-type FieldProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: "text" | "email";
-  autoComplete?: string;
-};
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  autoComplete,
-}: FieldProps) {
-  const id = useId();
-
-  return (
-    <div className="grid gap-2">
-      <label htmlFor={id} className="text-sm font-semibold">
-        {label}
-      </label>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        autoComplete={autoComplete}
-        className={INPUT}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </div>
-  );
+function Field({ label, value, onChange, type = "text", autoComplete, disabled, error }: { label: string; value: string; onChange: (value: string) => void; type?: "text" | "email"; autoComplete?: string; disabled?: boolean; error?: string }) {
+  const id = useId(); const errorId = `${id}-error`;
+  return <div className="grid gap-2"><label htmlFor={id} className="text-sm font-semibold">{label}</label><input id={id} type={type} value={value} autoComplete={autoComplete} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} className={`${INPUT} ${error ? "border-[#a43a33]" : ""}`} onChange={(event) => onChange(event.target.value)} />{error && <p id={errorId} className="text-sm text-[#a43a33]">{error}</p>}</div>;
 }
 
-function PasswordField({
-  label,
-  value,
-  onChange,
-  autoComplete = "new-password",
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  autoComplete?: string;
-}) {
-  const id = useId();
-  const [visible, setVisible] = useState(false);
-
-  return (
-    <div className="grid gap-2">
-      <label htmlFor={id} className="text-sm font-semibold">
-        {label}
-      </label>
-
-      <div className="relative">
-        <input
-          id={id}
-          className={`${INPUT} pr-16`}
-          type={visible ? "text" : "password"}
-          value={value}
-          autoComplete={autoComplete}
-          onChange={(event) => onChange(event.target.value)}
-        />
-        <button
-          type="button"
-          aria-controls={id}
-          aria-pressed={visible}
-          aria-label={`${visible ? "Hide" : "Show"} ${label.toLowerCase()}`}
-          onClick={() => setVisible((current) => !current)}
-          className="absolute inset-y-0 right-3 text-xs font-semibold text-[#176B66]"
-        >
-          {visible ? "Hide" : "Show"}
-        </button>
-      </div>
-    </div>
-  );
+function PasswordField({ label, value, onChange, autoComplete = "new-password", disabled, error }: { label: string; value: string; onChange: (value: string) => void; autoComplete?: string; disabled?: boolean; error?: string }) {
+  const id = useId(); const errorId = `${id}-error`; const [visible, setVisible] = useState(false);
+  return <div className="grid gap-2"><label htmlFor={id} className="text-sm font-semibold">{label}</label><div className="relative"><input id={id} className={`${INPUT} pr-16 ${error ? "border-[#a43a33]" : ""}`} type={visible ? "text" : "password"} value={value} autoComplete={autoComplete} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => onChange(event.target.value)} /><button type="button" disabled={disabled} aria-controls={id} aria-pressed={visible} aria-label={`${visible ? "Hide" : "Show"} ${label.toLowerCase()}`} onClick={() => setVisible((current) => !current)} className="absolute inset-y-0 right-3 text-xs font-semibold text-[#176B66] disabled:text-[#4f6470]">{visible ? "Hide" : "Show"}</button></div>{error && <p id={errorId} className="text-sm text-[#a43a33]">{error}</p>}</div>;
 }
 
 function StepProgress({ step }: { step: number }) {
-  return (
-    <div className="mb-7">
-      <div className="relative mx-auto max-w-[280px]">
-        <div
-          aria-hidden="true"
-          className="absolute left-[16.666%] right-[16.666%] top-4 h-[2px] overflow-hidden bg-[#d8e2dc]"
-        >
-          <div
-            className="h-full bg-[#176B66] transition-[width] duration-300 ease-in-out motion-reduce:transition-none"
-            style={{ width: `${((step - 1) / 2) * 100}%` }}
-          />
-        </div>
-
-        <ol
-          aria-label="Registration progress"
-          className="relative grid grid-cols-3"
-        >
-          {STEPS.map((label, index) => {
-            const number = index + 1;
-            const current = number === step;
-            const completed = number < step;
-
-            return (
-              <li
-                key={label}
-                aria-current={current ? "step" : undefined}
-                className="flex justify-center"
-              >
-                <span
-                  aria-hidden="true"
-                  className={[
-                    "flex h-8 w-8 items-center justify-center",
-                    "rounded-full border text-xs font-bold",
-                    "transition-colors duration-300",
-                    "motion-reduce:transition-none",
-                    current
-                      ? "border-[#176B66] bg-[#176B66] text-white"
-                      : completed
-                        ? "border-[#176B66] bg-[#E4EEE7] text-[#176B66]"
-                        : "border-[#c5d1ca] bg-white text-[#64766d]",
-                  ].join(" ")}
-                >
-                  {completed ? (
-                    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-                      <path
-                        d="m5 12 4 4 10-10"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  ) : (
-                    number
-                  )}
-                </span>
-                <span className="sr-only">
-                  Step {number}: {label}
-                  {completed ? ", completed" : ""}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-
-      <h2 className="mt-5 text-center text-xl font-bold">
-        {STEPS[step - 1]}
-      </h2>
-    </div>
-  );
+  return <div className="mb-7"><div className="relative mx-auto max-w-[280px]"><div aria-hidden="true" className="absolute left-[16.666%] right-[16.666%] top-4 h-[2px] overflow-hidden bg-[#d8e2dc]"><div className="h-full bg-[#176B66] transition-[width] duration-300 ease-in-out motion-reduce:transition-none" style={{ width: `${((step - 1) / 2) * 100}%` }} /></div><ol aria-label="Registration progress" className="relative grid grid-cols-3">{STEPS.map((label, index) => { const number = index + 1; const current = number === step; const completed = number < step; return <li key={label} aria-current={current ? "step" : undefined} className="flex justify-center"><span aria-hidden="true" className={["flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition-colors duration-300 motion-reduce:transition-none", current ? "border-[#176B66] bg-[#176B66] text-white" : completed ? "border-[#176B66] bg-[#E4EEE7] text-[#176B66]" : "border-[#c5d1ca] bg-white text-[#64766d]"].join(" ")}>{completed ? <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="m5 12 4 4 10-10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg> : number}</span><span className="sr-only">Step {number}: {label}{completed ? ", completed" : ""}</span></li>; })}</ol></div><h2 className="mt-5 text-center text-xl font-bold">{STEPS[step - 1]}</h2></div>;
 }
 
 export default function App() {
   const [page, setPage] = useState<"in" | "up">("up");
   const [step, setStep] = useState(1);
-  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [account, setAccount] = useState<Details>({ name: "", registration: "", email: "" });
+  const [login, setLogin] = useState({ email: "", password: "", confirm: "" });
+  const [members, setMembers] = useState<Member[]>(() => [newMember(), newMember()]);
+  const [signIn, setSignIn] = useState({ email: "", password: "" });
+  const [cycles, setCycles] = useState<Cycle[]>([]);
+  const [cyclesState, setCyclesState] = useState<"loading" | "ready" | "error">("loading");
+  const [cycleId, setCycleId] = useState("");
+  const [policy, setPolicy] = useState<Policy | null>(null);
+  const [policyState, setPolicyState] = useState<"idle" | "loading" | "ready" | "unavailable" | "error">("idle");
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState<{ teamId: number; cycle: string } | null>(null);
 
-  const [account, setAccount] = useState<Details>({
-    name: "",
-    registration: "",
-    email: "",
-  });
+  useEffect(() => { const controller = new AbortController(); void (async () => { try { const response = await fetch(`${API}/api/v1/academic-cycles`, { signal: controller.signal }); if (!response.ok) throw new Error(); const data: Cycle[] = await response.json(); if (!controller.signal.aborted) { setCycles(data); setCyclesState("ready"); } } catch { if (!controller.signal.aborted) setCyclesState("error"); } })(); return () => controller.abort(); }, []);
+  useEffect(() => { if (!cycleId) { queueMicrotask(() => { setPolicy(null); setPolicyState("idle"); }); return; } const controller = new AbortController(); queueMicrotask(() => { setPolicy(null); setPolicyState("loading"); }); void (async () => { try { const response = await fetch(`${API}/api/v1/academic-cycles/${cycleId}/group-policy`, { signal: controller.signal }); if (response.status === 404) { if (!controller.signal.aborted) setPolicyState("unavailable"); return; } if (!response.ok) throw new Error(); const data: Policy = await response.json(); if (!controller.signal.aborted) { setPolicy(data); setPolicyState("ready"); } } catch { if (!controller.signal.aborted) setPolicyState("error"); } })(); return () => controller.abort(); }, [cycleId]);
 
-  const [login, setLogin] = useState({
-    email: "",
-    password: "",
-    confirm: "",
-  });
+  const selectedCycle = cycles.find((cycle) => String(cycle.id) === cycleId);
+  const maximum = policy?.max_group_size;
+  const teamSize = members.length + 1;
+  const clear = (key: string) => { setErrors((current) => { const next = { ...current }; delete next[key]; return next; }); setNotice(""); };
+  const updateAccount = (field: keyof Details, value: string) => { setAccount((current) => ({ ...current, [field]: value })); clear(`account.${field}`); };
+  const updateLogin = (field: keyof typeof login, value: string) => { setLogin((current) => ({ ...current, [field]: value })); clear(`login.${field}`); };
+  const updateMember = (id: string, field: keyof Details, value: string) => { setMembers((current) => current.map((member) => member.id === id ? { ...member, [field]: value } : member)); clear(memberKey(id, field)); };
 
-  const [members, setMembers] = useState<Member[]>(() => [
-    newMember(),
-    newMember(),
-  ]);
-
-  const [signIn, setSignIn] = useState({
-    email: "",
-    password: "",
-  });
-
-  function changePage(value: "in" | "up") {
-    setPage(value);
-    setError("");
+  function validate(target: number): FieldErrors {
+    const next: FieldErrors = {};
+    if (target === 1 || target === 0) { if (!account.name.trim()) next["account.name"] = "Enter the creator's full name."; if (!registration(account.registration)) next["account.registration"] = "Enter the creator's registration number."; if (!EMAIL.test(email(account.email))) next["account.email"] = "Enter a valid university email."; if (!cycleId) next["account.cycle"] = "Choose an academic cycle."; else if (!selectedCycle?.registration_open) next["account.cycle"] = "Registration is closed for this cycle."; else if (policyState === "loading") next["account.cycle"] = "Group policy is still loading."; else if (policyState === "unavailable") next["account.cycle"] = "This cycle has no group policy yet."; else if (policyState === "error") next["account.cycle"] = "Group policy could not be loaded."; }
+    if (target === 2 || target === 0) { if (!EMAIL.test(email(login.email))) next["login.email"] = "Enter a valid shared login email."; if (login.password.length < 8 || login.password.length > 128) next["login.password"] = "Password must contain 8-128 characters."; if (login.password !== login.confirm) next["login.confirm"] = "Passwords do not match."; }
+    if (target === 3 || target === 0) { const registrations = new Map<string, string>(); const emails = new Map<string, string>(); [{ id: "creator", ...account }, ...members].forEach((member) => { const prefix = member.id === "creator" ? "account" : `member.${member.id}`; const reg = registration(member.registration); const address = email(member.email); if (!member.name.trim()) next[`${prefix}.name`] = "Enter a full name."; if (!reg) next[`${prefix}.registration`] = "Enter a registration number."; if (!EMAIL.test(address)) next[`${prefix}.email`] = "Enter a valid university email."; if (reg && registrations.has(reg)) { next[`${prefix}.registration`] = "Registration number is already used in this team."; next[registrations.get(reg)!] = "Registration number is already used in this team."; } if (address && emails.has(address)) { next[`${prefix}.email`] = "University email is already used in this team."; next[emails.get(address)!] = "University email is already used in this team."; } if (reg) registrations.set(reg, `${prefix}.registration`); if (address) emails.set(address, `${prefix}.email`); }); if (!maximum) next["members.configuration"] = "Choose a cycle with an available group policy."; if (maximum && teamSize > maximum) next["members.configuration"] = `This team has ${teamSize} members; the selected cycle allows ${maximum}. Remove members before submitting.`; }
+    return next;
   }
+  const stepFor = (key?: string) => !key || key.startsWith("member") || key.startsWith("members") ? 3 : key.startsWith("login") ? 2 : 1;
+  function nextStep() { const next = validate(step); setErrors(next); if (Object.keys(next).length) { setNotice("Please correct the highlighted fields."); return; } setNotice(""); setStep((current) => Math.min(3, current + 1)); }
+  function mapPath(path?: string) { if (!path) return undefined; const basic: Record<string, string> = { "creator.full_name": "account.name", "creator.registration_number": "account.registration", "creator.university_email": "account.email", shared_login_email: "login.email", password: "login.password", academic_cycle_id: "account.cycle", members: "members.configuration" }; if (basic[path]) return basic[path]; const match = path.match(/^members\.(\d+)\.(full_name|registration_number|university_email)$/); if (!match || !members[Number(match[1])]) return undefined; const field = { full_name: "name", registration_number: "registration", university_email: "email" }[match[2]] as keyof Details; return memberKey(members[Number(match[1])].id, field); }
+  function applyError(detail: ApiDetail) { const fields = [detail.field, ...(detail.fields?.map((item) => item.path) ?? [])].map(mapPath).filter((value): value is string => Boolean(value)); if (fields.length) { setErrors(Object.fromEntries(fields.map((field) => [field, detail.message ?? "Check this field."]))); setStep(Math.min(...fields.map(stepFor))); } setNotice(detail.message ?? "Team account could not be created."); }
+  const canSubmit = Boolean(selectedCycle?.registration_open && policyState === "ready" && maximum && teamSize <= maximum && Object.keys(validate(0)).length === 0);
+  async function submit() { const next = validate(0); if (Object.keys(next).length) { setErrors(next); setStep(stepFor(Object.keys(next)[0])); setNotice("Please correct the highlighted fields."); return; } if (submitting || !cycleId) return; setSubmitting(true); setNotice(""); setErrors({}); const payload = { academic_cycle_id: Number(cycleId), creator: { full_name: account.name.trim(), registration_number: registration(account.registration), university_email: email(account.email) }, shared_login_email: email(login.email), password: login.password, members: members.map((member) => ({ full_name: member.name.trim(), registration_number: registration(member.registration), university_email: email(member.email) })) }; try { const response = await fetch(`${API}/api/v1/team-registration`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const data = await response.json().catch(() => ({})); if (!response.ok) { applyError((data.detail ?? {}) as ApiDetail); return; } setSuccess({ teamId: data.team.id as number, cycle: data.cycle.display_name as string }); setLogin((current) => ({ ...current, password: "", confirm: "" })); } catch { setNotice("The registration service is unavailable. Your entered details were kept."); } finally { setSubmitting(false); } }
 
-  function nextStep() {
-    let message = "";
-
-    if (step === 1) {
-      if (!account.name.trim() || !account.registration.trim()) {
-        message = "Enter your full name and registration number.";
-      } else if (!EMAIL.test(account.email.trim())) {
-        message = "Enter a valid university email.";
-      }
-    }
-
-    if (step === 2) {
-      if (!EMAIL.test(login.email.trim())) {
-        message = "Enter a valid shared login email.";
-      } else if (
-        login.password.length < 8 ||
-        login.password.length > 128
-      ) {
-        message = "Password must contain 8–128 characters.";
-      } else if (login.password !== login.confirm) {
-        message = "Passwords do not match.";
-      }
-    }
-
-    setError(message);
-
-    if (!message) {
-      setStep((current) => Math.min(3, current + 1));
-    }
-  }
-
-  function updateMember(
-    id: string,
-    field: keyof Details,
-    value: string,
-  ) {
-    setMembers((current) =>
-      current.map((member) =>
-        member.id === id ? { ...member, [field]: value } : member,
-      ),
-    );
-  }
-
-  return (
-    <main className="min-h-screen bg-[#F7F5EF] px-4 py-6 text-[#243746] sm:py-8">
-      <div className="mx-auto max-w-[640px]">
-        <header className="mb-7 flex items-center justify-between gap-3">
-          <Logo />
-
-          <nav aria-label="Account navigation" className="flex gap-1">
-            {(["in", "up"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-current={page === value ? "page" : undefined}
-                onClick={() => changePage(value)}
-                className={[
-                  "rounded-lg px-3 py-2 text-sm font-semibold",
-                  page === value
-                    ? "bg-[#E4EEE7] text-[#176B66]"
-                    : "text-[#4f6470] hover:text-[#176B66]",
-                ].join(" ")}
-              >
-                {value === "in" ? "Sign In" : "Sign Up"}
-              </button>
-            ))}
-          </nav>
-        </header>
-
-        <section className="rounded-2xl border border-[#dce4de] bg-white p-5 shadow-[0_8px_30px_rgba(36,55,70,0.04)] sm:p-8">
-          {page === "in" ? (
-            <>
-              <h1 className="mb-7 text-center text-2xl font-bold">
-                Sign In
-              </h1>
-
-              <div className="space-y-5">
-                <Field
-                  label="Shared login email"
-                  type="email"
-                  autoComplete="username"
-                  value={signIn.email}
-                  onChange={(email) =>
-                    setSignIn({ ...signIn, email })
-                  }
-                />
-
-                <PasswordField
-                  label="Password"
-                  autoComplete="current-password"
-                  value={signIn.password}
-                  onChange={(password) =>
-                    setSignIn({ ...signIn, password })
-                  }
-                />
-
-                <button
-                  type="button"
-                  disabled
-                  className="w-full cursor-not-allowed rounded-lg bg-[#cddfd3] py-3 text-sm font-semibold text-[#4f6470]"
-                >
-                  Sign In
-                </button>
-
-                <p className="text-center text-sm text-[#4f6470]">
-                  Need a team account?{" "}
-                  <button
-                    type="button"
-                    onClick={() => changePage("up")}
-                    className="font-semibold text-[#176B66] underline"
-                  >
-                    Sign Up
-                  </button>
-                </p>
-              </div>
-            </>
-          ) : (
-            <>
-              <h1 className="text-center text-lg font-bold">
-                Create Team Account
-              </h1>
-
-              <p className="mt-2 mb-6 text-center text-sm text-[#4f6470]">
-                Your team will use one email and password.
-              </p>
-
-              <StepProgress step={step} />
-
-              {step === 1 && (
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <Field
-                      label="Full name"
-                      autoComplete="name"
-                      value={account.name}
-                      onChange={(name) =>
-                        setAccount({ ...account, name })
-                      }
-                    />
-                  </div>
-
-                  <Field
-                    label="Registration number"
-                    value={account.registration}
-                    onChange={(registration) =>
-                      setAccount({ ...account, registration })
-                    }
-                  />
-
-                  <Field
-                    label="University email"
-                    type="email"
-                    value={account.email}
-                    onChange={(email) =>
-                      setAccount({ ...account, email })
-                    }
-                  />
-                </div>
-              )}
-
-              {step === 2 && (
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <Field
-                      label="Shared login email"
-                      type="email"
-                      autoComplete="username"
-                      value={login.email}
-                      onChange={(email) =>
-                        setLogin({ ...login, email })
-                      }
-                    />
-                  </div>
-
-                  <PasswordField
-                    label="Password"
-                    value={login.password}
-                    onChange={(password) =>
-                      setLogin({ ...login, password })
-                    }
-                  />
-
-                  <PasswordField
-                    label="Confirm password"
-                    value={login.confirm}
-                    onChange={(confirm) =>
-                      setLogin({ ...login, confirm })
-                    }
-                  />
-                </div>
-              )}
-
-              {step === 3 && (
-                <div className="space-y-4">
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMembers((current) => [
-                          ...current,
-                          newMember(),
-                        ])
-                      }
-                      className="rounded-lg border border-[#176B66] px-3 py-2 text-sm font-semibold text-[#176B66]"
-                    >
-                      + Add Member
-                    </button>
-                  </div>
-
-                  {members.map((member, index) => (
-                    <article
-                      key={member.id}
-                      className="rounded-xl border border-[#dce4de] bg-[#f4f8f5] p-4"
-                    >
-                      <div className="mb-4 flex items-center justify-between">
-                        <h3 className="text-sm font-bold">
-                          Member {index + 2}
-                        </h3>
-
-                        <button
-                          type="button"
-                          aria-label={`Remove Member ${index + 2}`}
-                          onClick={() =>
-                            setMembers((current) =>
-                              current.filter(
-                                (item) => item.id !== member.id,
-                              ),
-                            )
-                          }
-                          className="text-xs font-semibold text-[#176B66] underline"
-                        >
-                          Remove
-                        </button>
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="sm:col-span-2">
-                          <Field
-                            label="Full name"
-                            value={member.name}
-                            onChange={(value) =>
-                              updateMember(member.id, "name", value)
-                            }
-                          />
-                        </div>
-
-                        <Field
-                          label="Registration number"
-                          value={member.registration}
-                          onChange={(value) =>
-                            updateMember(
-                              member.id,
-                              "registration",
-                              value,
-                            )
-                          }
-                        />
-
-                        <Field
-                          label="University email"
-                          type="email"
-                          value={member.email}
-                          onChange={(value) =>
-                            updateMember(member.id, "email", value)
-                          }
-                        />
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-
-              {error && (
-                <p
-                  role="alert"
-                  className="mt-5 rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]"
-                >
-                  {error}
-                </p>
-              )}
-
-              <div className="mt-7 flex items-center justify-between gap-3 border-t border-[#e8ede9] pt-5">
-                {step > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setError("");
-                      setStep((current) => current - 1);
-                    }}
-                    className="rounded-lg border border-[#cbd6d0] px-5 py-2.5 text-sm font-semibold"
-                  >
-                    Back
-                  </button>
-                )}
-
-                {step < 3 ? (
-                  <button
-                    type="button"
-                    onClick={nextStep}
-                    className={`${PRIMARY} ml-auto`}
-                  >
-                    Next →
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled
-                    className="ml-auto cursor-not-allowed rounded-lg bg-[#cddfd3] px-5 py-2.5 text-sm font-semibold text-[#4f6470]"
-                  >
-                    Create Team Account
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-        </section>
-      </div>
-    </main>
-  );
+  const changePage = (value: "in" | "up") => { setPage(value); setNotice(""); setErrors({}); };
+  return <main className="min-h-screen bg-[#F7F5EF] px-4 py-6 text-[#243746] sm:py-8"><div className="mx-auto max-w-[640px]"><header className="mb-7 flex items-center justify-between gap-3"><Logo /><nav aria-label="Account navigation" className="flex gap-1">{(["in", "up"] as const).map((value) => <button key={value} type="button" aria-current={page === value ? "page" : undefined} disabled={submitting} onClick={() => changePage(value)} className={["rounded-lg px-3 py-2 text-sm font-semibold", page === value ? "bg-[#E4EEE7] text-[#176B66]" : "text-[#4f6470] hover:text-[#176B66]"].join(" ")}>{value === "in" ? "Sign In" : "Sign Up"}</button>)}</nav></header><section className="rounded-2xl border border-[#dce4de] bg-white p-5 shadow-[0_8px_30px_rgba(36,55,70,0.04)] sm:p-8">{page === "in" ? <><h1 className="mb-7 text-center text-2xl font-bold">Sign In</h1><div className="space-y-5"><Field label="Shared login email" type="email" autoComplete="username" value={signIn.email} onChange={(value) => setSignIn((current) => ({ ...current, email: value }))} /><PasswordField label="Password" autoComplete="current-password" value={signIn.password} onChange={(value) => setSignIn((current) => ({ ...current, password: value }))} /><button type="button" disabled className="w-full cursor-not-allowed rounded-lg bg-[#cddfd3] py-3 text-sm font-semibold text-[#4f6470]">Sign In</button><p className="text-center text-sm text-[#4f6470]">Need a team account? <button type="button" onClick={() => changePage("up")} className="font-semibold text-[#176B66] underline">Sign Up</button></p></div></> : success ? <div className="space-y-5 py-5 text-center"><h1 className="text-2xl font-bold text-[#176B66]">Team account created</h1><p className="text-sm text-[#4f6470]">Your shared team account for {success.cycle} was created. Team ID: {success.teamId}.</p><p className="text-sm text-[#4f6470]">Sign In will be available when authentication is implemented.</p></div> : <><h1 className="text-center text-lg font-bold">Create Team Account</h1><p className="mt-2 mb-6 text-center text-sm text-[#4f6470]">Your team will use one email and password.</p><StepProgress step={step} />{step === 1 && <div className="grid gap-5 sm:grid-cols-2"><div className="sm:col-span-2 grid gap-2"><label htmlFor="academic-cycle" className="text-sm font-semibold">Academic cycle</label><select id="academic-cycle" value={cycleId} disabled={submitting || cyclesState === "loading"} aria-invalid={Boolean(errors["account.cycle"])} className={`${INPUT} ${errors["account.cycle"] ? "border-[#a43a33]" : ""}`} onChange={(event) => { setCycleId(event.target.value); clear("account.cycle"); }}><option value="">{cyclesState === "loading" ? "Loading cycles..." : "Select a cycle"}</option>{cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.display_name} ({cycle.code}){cycle.registration_open ? "" : " — closed"}</option>)}</select>{cyclesState === "error" && <p className="text-sm text-[#a43a33]">Academic cycles could not be loaded.</p>}{cyclesState === "ready" && cycles.length === 0 && <p className="text-sm text-[#a43a33]">No academic cycles are available.</p>}{errors["account.cycle"] && <p className="text-sm text-[#a43a33]">{errors["account.cycle"]}</p>}{selectedCycle && policyState === "ready" && maximum && <p className="text-sm text-[#4f6470]">This cycle allows up to {maximum} members, including the creator.</p>}</div><div className="sm:col-span-2"><Field label="Full name" autoComplete="name" value={account.name} disabled={submitting} error={errors["account.name"]} onChange={(value) => updateAccount("name", value)} /></div><Field label="Registration number" value={account.registration} disabled={submitting} error={errors["account.registration"]} onChange={(value) => updateAccount("registration", value)} /><Field label="University email" type="email" value={account.email} disabled={submitting} error={errors["account.email"]} onChange={(value) => updateAccount("email", value)} /></div>}{step === 2 && <div className="grid gap-5 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Shared login email" type="email" autoComplete="username" value={login.email} disabled={submitting} error={errors["login.email"]} onChange={(value) => updateLogin("email", value)} /></div><PasswordField label="Password" value={login.password} disabled={submitting} error={errors["login.password"]} onChange={(value) => updateLogin("password", value)} /><PasswordField label="Confirm password" value={login.confirm} disabled={submitting} error={errors["login.confirm"]} onChange={(value) => updateLogin("confirm", value)} /></div>}{step === 3 && <div className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-[#4f6470]">Creator is Member 1. {maximum ? `${teamSize} of ${maximum} members.` : "Choose a cycle to see the team limit."}</p><button type="button" disabled={submitting || !maximum || teamSize >= maximum} onClick={() => setMembers((current) => [...current, newMember()])} className="rounded-lg border border-[#176B66] px-3 py-2 text-sm font-semibold text-[#176B66] disabled:cursor-not-allowed disabled:border-[#cbd6d0] disabled:text-[#4f6470]">+ Add Member</button></div>{errors["members.configuration"] && <p className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{errors["members.configuration"]}</p>}{members.map((member, index) => <article key={member.id} className="rounded-xl border border-[#dce4de] bg-[#f4f8f5] p-4"><div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-bold">Member {index + 2}</h3><button type="button" disabled={submitting} aria-label={`Remove Member ${index + 2}`} onClick={() => setMembers((current) => current.filter((item) => item.id !== member.id))} className="text-xs font-semibold text-[#176B66] underline disabled:text-[#4f6470]">Remove</button></div><div className="grid gap-4 sm:grid-cols-2"><div className="sm:col-span-2"><Field label="Full name" value={member.name} disabled={submitting} error={errors[memberKey(member.id, "name")]} onChange={(value) => updateMember(member.id, "name", value)} /></div><Field label="Registration number" value={member.registration} disabled={submitting} error={errors[memberKey(member.id, "registration")]} onChange={(value) => updateMember(member.id, "registration", value)} /><Field label="University email" type="email" value={member.email} disabled={submitting} error={errors[memberKey(member.id, "email")]} onChange={(value) => updateMember(member.id, "email", value)} /></div></article>)}</div>}{notice && <p role="alert" className="mt-5 rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{notice}</p>}<div className="mt-7 flex items-center justify-between gap-3 border-t border-[#e8ede9] pt-5">{step > 1 && <button type="button" disabled={submitting} onClick={() => { setNotice(""); setErrors({}); setStep((current) => current - 1); }} className="rounded-lg border border-[#cbd6d0] px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed">Back</button>}{step < 3 ? <button type="button" disabled={submitting} onClick={nextStep} className={`${PRIMARY} ml-auto`}>Next →</button> : <button type="button" disabled={submitting || !canSubmit} onClick={() => void submit()} className={`${PRIMARY} ml-auto`}>{submitting ? "Creating..." : "Create Team Account"}</button>}</div></>}</section></div></main>;
 }
