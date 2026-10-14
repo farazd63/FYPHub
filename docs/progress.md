@@ -92,6 +92,12 @@ The isolated PostgreSQL + pgvector configuration was created.
 - This supports the P1 Modules 1–3 scope but does not complete any module.
 - Added the three-step frontend registration flow and display-only Sign In navigation; API integration remains pending.
 
+## Checkpoint 6A.1
+
+- Added academic cycles and one positive group-size policy per cycle through Alembic revision `3a1f53f17b1c`.
+- Read-only cycle and policy APIs are available; no cycle or policy data was seeded.
+- Module 1 cycle/policy functionality is partial, not complete.
+
 ## Deadline
 
 Before the 6th; month and year are not yet confirmed.

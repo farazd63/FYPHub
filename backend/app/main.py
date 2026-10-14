@@ -5,10 +5,23 @@ from sqlalchemy.orm import Session
 
 from .database import engine, get_db
 from .models import User, UserRole
+from .models import AcademicCycle, AcademicGroupPolicy
+from .schemas.academic import CycleOut, PolicyOut
 from .schemas.auth import RegistrationRequest, RegistrationResponse
 from .security import hash_password
 
 app = FastAPI(title="FYPHub API")
+
+@app.get("/api/v1/academic-cycles",response_model=list[CycleOut])
+def list_cycles(session:Session=Depends(get_db))->list[AcademicCycle]:
+ return list(session.query(AcademicCycle).order_by(AcademicCycle.id).all())
+
+@app.get("/api/v1/academic-cycles/{cycle_id}/group-policy",response_model=PolicyOut)
+def get_group_policy(cycle_id:int,session:Session=Depends(get_db))->AcademicGroupPolicy:
+ cycle=session.get(AcademicCycle,cycle_id)
+ if cycle is None: raise HTTPException(status_code=404,detail="Academic cycle not found.")
+ if cycle.group_policy is None: raise HTTPException(status_code=404,detail="Academic group policy not configured.")
+ return cycle.group_policy
 
 
 @app.get("/health")
