@@ -109,6 +109,15 @@ The isolated PostgreSQL + pgvector configuration was created.
 - Test execution targeted `fyphub_p1` and left no test fixture records. The existing demo user remains present.
 - Shared-team registration API work is pending. Exactly-one-creator and creator/User consistency will be enforced by that future registration service.
 
+## Shared-team registration API
+
+- Added `POST /api/v1/team-registration` using the applied team/member schema. It locks the selected cycle and policy, validates the actual configured maximum, and commits the shared `STUDENT` user, team, creator, and additional contact-only members atomically.
+- Existing users are not adopted or modified. Failures, including a forced late member-insert failure, roll back all newly created records.
+- The API returns safe account/team/cycle/member fields and structured, sanitized error codes with field paths where known; passwords, hashes, tokens, and SQL details are never returned.
+- All 23 backend tests passed (8 new API tests plus the existing 15); fixture verification confirmed no retained test records in `fyphub_p1`.
+- Python compilation, `pip check`, Alembic current/head at `ce964120f177`, and `alembic check` all passed.
+- Frontend integration, Admin cycle/policy configuration, sign-in, sessions, and authorization remain pending.
+
 ## Deadline
 
 Before the 6th; month and year are not yet confirmed.
