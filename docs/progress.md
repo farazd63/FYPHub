@@ -99,8 +99,15 @@ The isolated PostgreSQL + pgvector configuration was created.
 ## Checkpoint 6A.1
 
 - Added academic cycles and one positive group-size policy per cycle through Alembic revision `3a1f53f17b1c`.
-- Read-only cycle and policy APIs are available; no cycle or policy data was seeded.
+- Read-only cycle and policy APIs are available.
 - Module 1 cycle/policy functionality is partial, not complete.
+
+## Local academic configuration bootstrap
+
+- Configured the approved local `FALL-2026` cycle (ID `79`): display name `Fall 2026`, registration open, and maximum group size `3` including the creator.
+- The idempotent `scripts/configure_p1_cycle.py` script confirmed target database `fyphub_p1`; a second run made no duplicate records.
+- Direct persistence and the running read-only cycle/policy APIs were verified.
+- This is local development bootstrap only and does not replace future authenticated Admin configuration.
 
 ## Team/member schema verification
 
