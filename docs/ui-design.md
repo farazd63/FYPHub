@@ -34,3 +34,7 @@ The existing student-registration API creates an individual `STUDENT` record onl
 The visual mockup is now a responsive React, Vite, TypeScript, and Tailwind CSS screen with a centered form card, original logo, stable member rows, local validation, and show/hide password controls. It remains frontend work awaiting backend integration and does not submit or create accounts.
 
 The Sign Up flow now presents Account Details, Login Details, and Team Members one step at a time with Back/Next navigation. Sign In remains display-only pending authentication integration.
+
+### Registration progress indicator
+
+The compact three-step form uses a numbered progress indicator for Account Details, Login Details, and Team Members. Completed steps use checkmarks; the connecting CSS progress line transitions as the user moves forward or back. Back is hidden on Step 1 so Next remains aligned to the right. Shared-team registration and Sign In remain disabled pending backend integration. Password-strength feedback is also pending.

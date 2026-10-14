@@ -91,6 +91,10 @@ The isolated PostgreSQL + pgvector configuration was created.
 - Added local member controls and client-only validation while keeping final submission disabled pending backend team-registration support.
 - This supports the P1 Modules 1–3 scope but does not complete any module.
 - Added the three-step frontend registration flow and display-only Sign In navigation; API integration remains pending.
+- Frontend lint and production build checks passed, and screenshots were reviewed.
+- The registration form has a compact numbered three-step progress indicator with completed checkmarks, CSS progress transitions, and a hidden Back button on Step 1.
+- Shared-team registration and Sign In remain disabled. Password-strength feedback and backend integration remain pending.
+- Animation smoothness remains pending manual confirmation.
 
 ## Checkpoint 6A.1
 
