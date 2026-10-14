@@ -1,6 +1,8 @@
 """Synchronous SQLAlchemy database resources."""
 
 from sqlalchemy import create_engine
+from collections.abc import Generator
+
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import settings
@@ -23,3 +25,12 @@ engine = create_engine(
     },
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, class_=Session)
+
+
+def get_db() -> Generator[Session, None, None]:
+    """Provide a request-scoped session that is always closed."""
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()

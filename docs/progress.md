@@ -75,6 +75,16 @@ The isolated PostgreSQL + pgvector configuration was created.
 - Running `/health` and `/health/ready` checks both returned HTTP 200 after the migration.
 - Authentication, password hashing, account creation, and frontend work remain unimplemented.
 
+## Checkpoint 5B
+
+- Added public `POST /api/v1/auth/register` for student registration only; it cannot assign privileged roles or account activity.
+- Added Argon2id password hashing and verification utilities. Passwords are stored only as hashes and are never normalized.
+- Duplicate normalized email or registration number handling returns a sanitized HTTP 409 response and rolls back the failed transaction.
+- Six database integration tests passed against `fyphub_p1` using rollback-only test transactions; the users table had zero rows before and after the test suite.
+- Python compilation and dependency integrity checks passed.
+- Running `/health` and `/health/ready` checks both returned HTTP 200 after the registration changes.
+- Sign-in, tokens/sessions, authorization, staff creation, and frontend work remain unimplemented.
+
 ## Deadline
 
 Before the 6th; month and year are not yet confirmed.

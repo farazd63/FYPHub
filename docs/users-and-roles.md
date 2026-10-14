@@ -49,4 +49,4 @@ erDiagram
 
 Migration `9c227dc337bf` created only the `users` table, its constraints/indexes, and the `user_role` enum. Alembic current matches head and a second autogenerate check found no pending changes. The table currently contains zero rows, and pgvector remains installed at version `0.8.6`.
 
-Remaining work includes secure password hashing services, account-creation flows, authentication and authorization endpoints, token/session handling, and frontend screens.
+Public student registration now creates only `STUDENT` records, normalizes the supported identifiers, and stores Argon2id password hashes only. Remaining work includes sign-in, authorization enforcement, controlled staff creation, token/session handling, password recovery, and frontend screens.
