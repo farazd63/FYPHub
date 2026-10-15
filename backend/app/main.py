@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from .database import engine, get_db
 from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
 from .models import AcademicCycle, AcademicGroupPolicy
-from .schemas.academic import CycleOut, PolicyOut
+from .schemas.academic import CycleCreate, CycleOut, CycleUpdate, PolicyOut, PolicyUpdate
 from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
 from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange
 from .schemas.team_registration import TeamMemberInput, TeamRegistrationRequest, TeamRegistrationResponse
@@ -33,7 +33,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:5174"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH"],
+    allow_methods=["GET", "POST", "PATCH", "PUT"],
     allow_headers=["Content-Type"],
 )
 
@@ -113,6 +113,76 @@ def get_group_policy(cycle_id:int,session:Session=Depends(get_db))->AcademicGrou
  if cycle is None: raise HTTPException(status_code=404,detail="Academic cycle not found.")
  if cycle.group_policy is None: raise HTTPException(status_code=404,detail="Academic group policy not configured.")
  return cycle.group_policy
+
+
+def cycle_error(status_code: int, code: str, message: str) -> HTTPException:
+    return HTTPException(status_code=status_code, detail={"code": code, "message": message})
+
+
+def locked_cycle_and_policy(session: Session, cycle_id: int) -> tuple[AcademicCycle, AcademicGroupPolicy | None]:
+    """Use the same cycle-then-policy lock order as team registration."""
+    cycle = session.execute(select(AcademicCycle).where(AcademicCycle.id == cycle_id).with_for_update()).scalar_one_or_none()
+    if cycle is None:
+        raise cycle_error(status.HTTP_404_NOT_FOUND, "cycle_not_found", "Academic cycle was not found.")
+    policy = session.execute(select(AcademicGroupPolicy).where(AcademicGroupPolicy.academic_cycle_id == cycle.id).with_for_update()).scalar_one_or_none()
+    return cycle, policy
+
+
+def largest_active_team_size(session: Session, cycle_id: int) -> int:
+    sizes = session.execute(select(func.count(TeamMember.id)).where(TeamMember.academic_cycle_id == cycle_id, TeamMember.is_active.is_(True)).group_by(TeamMember.team_id)).scalars().all()
+    return max(sizes, default=0)
+
+
+@app.post("/api/v1/admin/academic-cycles", status_code=status.HTTP_201_CREATED, response_model=CycleOut)
+def create_cycle(payload: CycleCreate, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> AcademicCycle:
+    validate_mutating_origin(request)
+    cycle = AcademicCycle(code=payload.code, display_name=payload.display_name, registration_open=False)
+    session.add(cycle)
+    try:
+        session.flush()
+        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_CYCLE", target_id=cycle.id, action="academic_cycle_created", changed_values={"code": cycle.code, "display_name": cycle.display_name, "registration_open": False})
+        session.commit(); session.refresh(cycle)
+    except IntegrityError as error:
+        session.rollback()
+        raise cycle_error(status.HTTP_409_CONFLICT, "duplicate_cycle_code", "An academic cycle with that code already exists.") from error
+    return cycle
+
+
+@app.patch("/api/v1/admin/academic-cycles/{cycle_id}", response_model=CycleOut)
+def update_cycle(cycle_id: int, payload: CycleUpdate, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> AcademicCycle:
+    validate_mutating_origin(request)
+    cycle, policy = locked_cycle_and_policy(session, cycle_id)
+    values = payload.model_dump(exclude_unset=True)
+    if values.get("registration_open") and policy is None:
+        raise cycle_error(status.HTTP_409_CONFLICT, "group_policy_required", "Registration cannot open without a group-size policy.")
+    if not values:
+        return cycle
+    before = {key: getattr(cycle, key) for key in values}
+    for key, value in values.items(): setattr(cycle, key, value)
+    try:
+        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_CYCLE", target_id=cycle.id, action="academic_cycle_updated", changed_values={"before": before, "after": values})
+        session.commit(); session.refresh(cycle)
+    except IntegrityError as error:
+        session.rollback()
+        raise cycle_error(status.HTTP_409_CONFLICT, "duplicate_cycle_code", "An academic cycle with that code already exists.") from error
+    return cycle
+
+
+@app.put("/api/v1/admin/academic-cycles/{cycle_id}/group-policy", response_model=PolicyOut)
+def set_group_policy(cycle_id: int, payload: PolicyUpdate, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> AcademicGroupPolicy:
+    validate_mutating_origin(request)
+    cycle, policy = locked_cycle_and_policy(session, cycle_id)
+    largest = largest_active_team_size(session, cycle.id)
+    if payload.max_group_size < largest:
+        raise cycle_error(status.HTTP_409_CONFLICT, "existing_team_exceeds_limit", "Existing active team membership exceeds that maximum.")
+    created = policy is None
+    if policy is None:
+        policy = AcademicGroupPolicy(academic_cycle_id=cycle.id, max_group_size=payload.max_group_size); session.add(policy); session.flush()
+    else:
+        previous = policy.max_group_size; policy.max_group_size = payload.max_group_size
+    add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_GROUP_POLICY", target_id=policy.id, action="group_policy_created" if created else "group_policy_updated", changed_values={"academic_cycle_id": cycle.id, "max_group_size": payload.max_group_size, "previous_max_group_size": None if created else previous})
+    session.commit(); session.refresh(policy)
+    return policy
 
 
 @app.get("/health")
@@ -214,13 +284,13 @@ def admin_user_error(status_code: int, code: str, message: str) -> HTTPException
 
 
 def add_admin_audit_event(
-    session: Session, *, actor_id: int, affected_user_id: int, action: str, changed_values: dict[str, object]
+    session: Session, *, actor_id: int, affected_user_id: int | None, action: str, changed_values: dict[str, object], target_type: str = "USER", target_id: int | None = None
 ) -> None:
     """Append only non-sensitive account metadata; never credentials or sessions."""
     session.add(
         AdminAuditEvent(
             actor_id=actor_id,
-            affected_user_id=affected_user_id,
+            affected_user_id=affected_user_id, target_type=target_type, target_id=target_id if target_id is not None else affected_user_id,
             action=action,
             changed_values=changed_values,
         )

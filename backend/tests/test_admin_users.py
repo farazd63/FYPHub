@@ -149,7 +149,7 @@ class AdminUserTests(unittest.TestCase):
         status, body = request("PATCH", f"/api/v1/admin/users/{self.student_id}/role", {"role": "SUPERVISOR"}, token=self.token)
         self.assertEqual((status, body["detail"]["code"]), (409, "shared_team_account"))
         self.assertEqual(request("PATCH", f"/api/v1/admin/users/{self.student_id}/status", {"is_active": False}, token=self.token)[0], 409)
-        event = AdminAuditEvent(actor_id=self.admin_id, affected_user_id=self.user_id, action="test", changed_values={"safe": True})
+        event = AdminAuditEvent(actor_id=self.admin_id, affected_user_id=self.user_id, target_type="USER", target_id=self.user_id, action="test", changed_values={"safe": True})
         session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
         session.add(event)
         session.commit()
@@ -166,3 +166,15 @@ class AdminUserTests(unittest.TestCase):
         finally:
             nested.rollback()
         session.close()
+
+    def test_cycle_policy_management_and_audit_target(self) -> None:
+        code = f"TEST-{uuid4().hex[:8]}"
+        status, cycle = request("POST", "/api/v1/admin/academic-cycles", {"code": code.lower(), "display_name": " Isolated cycle "}, token=self.token)
+        self.assertEqual((status, cycle["code"], cycle["registration_open"]), (201, code.upper(), False))
+        self.assertEqual(request("PATCH", f"/api/v1/admin/academic-cycles/{cycle['id']}", {"registration_open": True}, token=self.token)[0], 409)
+        self.assertEqual(request("PUT", f"/api/v1/admin/academic-cycles/{cycle['id']}/group-policy", {"max_group_size": 0}, token=self.token)[0], 422)
+        status, policy = request("PUT", f"/api/v1/admin/academic-cycles/{cycle['id']}/group-policy", {"max_group_size": 3}, token=self.token)
+        self.assertEqual((status, policy["max_group_size"]), (200, 3))
+        self.assertEqual(request("PATCH", f"/api/v1/admin/academic-cycles/{cycle['id']}", {"registration_open": True}, token=self.token)[0], 200)
+        target = self.connection.execute(text("SELECT target_type, affected_user_id FROM admin_audit_events WHERE target_id = :id ORDER BY id DESC LIMIT 1"), {"id": policy["id"]}).one()
+        self.assertEqual((target.target_type, target.affected_user_id), ("ACADEMIC_GROUP_POLICY", None))
