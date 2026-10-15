@@ -35,6 +35,37 @@ The visual mockup is now a responsive React, Vite, TypeScript, and Tailwind CSS 
 
 The Sign Up flow now presents Account Details, Login Details, and Team Members one step at a time with Back/Next navigation. Sign In remains display-only pending authentication integration.
 
+## Role-based account interface
+
+- Login now has the FYPHub brand, four accessible role cards (Student, Supervisor, Evaluator, Coordinator), registered email/creator ID, show/hide password, recovery link, loading/error states, and a Create Account link.
+- Login sends the selected role and either the registered login email or creator registration number to the backend with cookie credentials. It restores a real session via `/api/v1/auth/me` and provides an authenticated account view plus logout until real dashboards exist.
+- Signup starts with matching role cards. Student continues into the existing shared-team multistep registration unchanged. Staff, evaluator, and coordinator registrations show a restricted invitation/approval message rather than collecting unsupported public credentials.
+- The displayed session policy is eight hours. There is intentionally no “Remember Me” checkbox because no alternate persistence lifetime has been approved.
+
 ### Registration progress indicator
 
 The compact three-step form uses a numbered progress indicator for Account Details, Login Details, and Team Members. Completed steps use checkmarks; the connecting CSS progress line transitions as the user moves forward or back. Back is hidden on Step 1 so Next remains aligned to the right. Shared-team registration and Sign In remain disabled pending backend integration. Password-strength feedback is also pending.
+
+## Administrator portal layout
+
+The M1-A Administrator portal now uses a compact academic-administration layout: cream canvas, deep-teal actions, sage active state, navy text, a 240px desktop sidebar, and a keyboard-accessible mobile menu. The header retains the logo, Administrator badge, authenticated user, and Logout without repeating a dominant account card. Overview presents the existing academic-cycle and group-policy data in a responsive table-like list with honest loading, empty, missing-policy, and failure states. Future M1 entries remain semantic disabled labels.
+
+The implementation adds a 300ms page opacity/8px transform entrance, an Academic Cycles entrance delayed by 80ms, a 250ms mobile menu/overlay transition, and 150–200ms button feedback. The Academic Cycles entrance is attached to its stable section, so API state updates do not replay it. The global reduced-motion rule removes these transitions for users who request it. This redesign is implemented but awaits user visual approval; no screenshots or browser review are claimed here.
+
+## Shared role-portal standard
+
+The Administrator portal is the current visual and interaction baseline for future Student, Supervisor, Coordinator, and Panel Member portals. It does not make their information architecture identical and remains subject to user visual approval.
+
+- Use the same full-width responsive shell: compact branded header, authenticated user identity, Logout, 240px desktop sidebar, accessible mobile menu, cream canvas, navy text, teal actions, sage active state, subtle borders, and restrained shadows.
+- Use the same accessible primitives for navigation, forms, feedback states, cards, tables, buttons, focus treatment, and responsive padding. Reuse shared portal components where their behavior is genuinely shared.
+- Give each role only proposal-defined navigation and content backed by authorized APIs. Role permissions are enforced by the backend; a visually shared component never implies a shared privilege.
+- Render unimplemented areas as clearly disabled labels or omit them. Do not create empty dashboards, dummy records, statistics, charts, notifications, or inactive controls that look operational.
+- Preserve real loading, empty, error, and success states, and use credentialed requests for authenticated data.
+
+| Role | Future portal focus | Current portal state |
+| --- | --- | --- |
+| Administrator | Academic management and M1 administration | Partial: M1-A shell and real cycle overview only |
+| Student | Team/collaboration and proposal lifecycle | Not implemented |
+| Supervisor | Supervision and allocation responsibilities | Not implemented |
+| Coordinator | Programme/cycle coordination responsibilities | Not implemented |
+| Panel Member | Evaluation responsibilities | Not implemented |

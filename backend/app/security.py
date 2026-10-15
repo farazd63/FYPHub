@@ -1,4 +1,7 @@
-"""Password hashing utilities for authentication features."""
+"""Password and opaque-session security utilities."""
+
+import hashlib
+import secrets
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
@@ -18,3 +21,13 @@ def verify_password(password: str, password_hash: str) -> bool:
         return _password_hasher.verify(password_hash, password)
     except (InvalidHashError, VerificationError):
         return False
+
+
+def generate_session_token() -> str:
+    """Return an opaque, URL-safe session bearer value; never persist this value."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_session_token(token: str) -> str:
+    """Return the deterministic database representation of an opaque session token."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

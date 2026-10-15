@@ -1,27 +1,43 @@
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from datetime import timedelta
+
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import or_, select, text
+from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .database import engine, get_db
-from .models import Team, TeamMember, User, UserRole
+from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
 from .models import AcademicCycle, AcademicGroupPolicy
 from .schemas.academic import CycleOut, PolicyOut
-from .schemas.auth import RegistrationRequest, RegistrationResponse
+from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
+from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange
 from .schemas.team_registration import TeamMemberInput, TeamRegistrationRequest, TeamRegistrationResponse
-from .security import hash_password
+from .security import generate_session_token, hash_password, hash_session_token, verify_password
+from .auth import (
+    ALLOWED_BROWSER_ORIGIN,
+    SESSION_COOKIE_NAME,
+    SESSION_LIFETIME_HOURS,
+    clear_session_cookie,
+    get_current_user,
+    require_roles,
+    set_session_cookie,
+    utc_now,
+    validate_mutating_origin,
+)
 
 app = FastAPI(title="FYPHub API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:5174"],
-    allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["Content-Type"],
 )
+
+_DUMMY_PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=4$FkrCX/M1V29q1Jj4yMHSiw$rONBAdg5KlI9DhIbVoDaHB3lM5HJXojJYVeAaLlbGwI"
 
 
 @app.exception_handler(RequestValidationError)
@@ -127,6 +143,274 @@ def readiness() -> dict[str, str]:
         )
 
     return {"status": "ready", "service": "fyphub-p1-api"}
+
+
+@app.post("/api/v1/auth/login", response_model=CurrentUserResponse)
+def login(
+    credentials: LoginRequest,
+    request: Request,
+    response: Response,
+    session: Session = Depends(get_db),
+) -> User:
+    """Authenticate an active account and issue a new opaque cookie session."""
+    validate_mutating_origin(request)
+    if credentials.email is not None:
+        user = session.execute(
+            select(User).where(User.email == str(credentials.email).strip().lower())
+        ).scalar_one_or_none()
+    else:
+        user = session.execute(
+            select(User).where(User.registration_number == credentials.registration_number)
+        ).scalar_one_or_none()
+    password_hash = user.password_hash if user is not None else _DUMMY_PASSWORD_HASH
+    password_valid = verify_password(credentials.password, password_hash)
+    if (
+        user is None
+        or not password_valid
+        or not user.is_active
+        or (credentials.requested_role is not None and user.role != credentials.requested_role)
+    ):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
+
+    now = utc_now()
+    presented_token = request.cookies.get(SESSION_COOKIE_NAME)
+    if presented_token:
+        existing = session.execute(
+            select(AuthSession).where(AuthSession.token_hash == hash_session_token(presented_token))
+        ).scalar_one_or_none()
+        if existing is not None and existing.revoked_at is None:
+            existing.revoked_at = now
+
+    raw_token = generate_session_token()
+    session.add(
+        AuthSession(
+            user_id=user.id,
+            token_hash=hash_session_token(raw_token),
+            expires_at=now + timedelta(hours=SESSION_LIFETIME_HOURS),
+        )
+    )
+    session.commit()
+    set_session_cookie(request, response, raw_token)
+    return user
+
+
+@app.get("/api/v1/auth/me", response_model=CurrentUserResponse)
+def current_user(current_user: User = Depends(get_current_user)) -> User:
+    """Return the authenticated active account's safe fields."""
+    return current_user
+
+
+@app.get("/api/v1/admin/me", response_model=CurrentUserResponse)
+def admin_current_user(
+    current_user: User = Depends(require_roles(UserRole.ADMIN)),
+) -> User:
+    """Return the current account only when its persisted role is ADMIN."""
+    return current_user
+
+
+def admin_user_error(status_code: int, code: str, message: str) -> HTTPException:
+    """Return a safe management failure without leaking persistence details."""
+    return HTTPException(status_code=status_code, detail={"code": code, "message": message})
+
+
+def add_admin_audit_event(
+    session: Session, *, actor_id: int, affected_user_id: int, action: str, changed_values: dict[str, object]
+) -> None:
+    """Append only non-sensitive account metadata; never credentials or sessions."""
+    session.add(
+        AdminAuditEvent(
+            actor_id=actor_id,
+            affected_user_id=affected_user_id,
+            action=action,
+            changed_values=changed_values,
+        )
+    )
+
+
+def shared_team_account(session: Session, user_id: int) -> bool:
+    return session.execute(select(Team.id).where(Team.shared_user_id == user_id)).scalar_one_or_none() is not None
+
+
+def lock_and_protect_last_active_admin(session: Session, user: User, *, will_remain_active_admin: bool) -> None:
+    """Serialize changes that could remove the final active ADMIN account."""
+    if user.role != UserRole.ADMIN or will_remain_active_admin:
+        return
+    # PostgreSQL transaction advisory lock closes the count-then-change race across requests.
+    session.execute(text("SELECT pg_advisory_xact_lock(98137241)"))
+    active_admins = session.execute(
+        select(func.count(User.id)).where(User.role == UserRole.ADMIN, User.is_active.is_(True))
+    ).scalar_one()
+    if user.is_active and active_admins <= 1:
+        raise admin_user_error(
+            status.HTTP_409_CONFLICT,
+            "last_active_admin",
+            "At least one active ADMIN account must remain.",
+        )
+
+
+def revoke_user_sessions(session: Session, user_id: int) -> None:
+    session.execute(
+        update(AuthSession)
+        .where(AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None))
+        .values(revoked_at=utc_now())
+    )
+
+
+@app.get("/api/v1/admin/users", response_model=AdminUserPage)
+def list_admin_users(
+    search: str | None = Query(default=None, max_length=320),
+    role: UserRole | None = None,
+    is_active: bool | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    statement = select(User)
+    count_statement = select(func.count(User.id))
+    filters = []
+    if search and search.strip():
+        needle = f"%{search.strip()}%"
+        filters.append(or_(User.full_name.ilike(needle), User.email.ilike(needle), User.registration_number.ilike(needle)))
+    if role is not None:
+        filters.append(User.role == role)
+    if is_active is not None:
+        filters.append(User.is_active.is_(is_active))
+    if filters:
+        statement = statement.where(*filters)
+        count_statement = count_statement.where(*filters)
+    total = session.execute(count_statement).scalar_one()
+    users = session.execute(
+        statement.order_by(User.id).offset((page - 1) * page_size).limit(page_size)
+    ).scalars().all()
+    return {"items": users, "page": page, "page_size": page_size, "total": total}
+
+
+@app.post("/api/v1/admin/users", status_code=status.HTTP_201_CREATED, response_model=AdminUserResponse)
+def create_admin_user(
+    payload: AdminUserCreate,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> User:
+    validate_mutating_origin(request)
+    user = User(
+        full_name=payload.full_name,
+        email=str(payload.email).strip().lower(),
+        registration_number=payload.registration_number,
+        password_hash=hash_password(payload.password),
+        role=payload.role,
+    )
+    session.add(user)
+    try:
+        session.flush()
+        add_admin_audit_event(
+            session,
+            actor_id=actor.id,
+            affected_user_id=user.id,
+            action="account_created",
+            changed_values={"email": user.email, "role": user.role.value, "is_active": True},
+        )
+        session.commit()
+        session.refresh(user)
+    except IntegrityError as error:
+        session.rollback()
+        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_account", "An account with that email or registration number already exists.") from error
+    return user
+
+
+@app.patch("/api/v1/admin/users/{user_id}/status", response_model=AdminUserResponse)
+def change_admin_user_status(
+    user_id: int,
+    payload: AdminUserStatusChange,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> User:
+    validate_mutating_origin(request)
+    user = session.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one_or_none()
+    if user is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "account_not_found", "Account was not found.")
+    if user.is_active == payload.is_active:
+        return user
+    if not payload.is_active and shared_team_account(session, user.id):
+        raise admin_user_error(status.HTTP_409_CONFLICT, "shared_team_account", "Shared team accounts cannot be deactivated here.")
+    lock_and_protect_last_active_admin(
+        session, user, will_remain_active_admin=payload.is_active and user.role == UserRole.ADMIN
+    )
+    previous = user.is_active
+    user.is_active = payload.is_active
+    if not payload.is_active:
+        revoke_user_sessions(session, user.id)
+    add_admin_audit_event(
+        session, actor_id=actor.id, affected_user_id=user.id, action="account_status_changed",
+        changed_values={"is_active": payload.is_active, "previous_is_active": previous},
+    )
+    try:
+        session.commit()
+        session.refresh(user)
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+    return user
+
+
+@app.patch("/api/v1/admin/users/{user_id}/role", response_model=AdminUserResponse)
+def change_admin_user_role(
+    user_id: int,
+    payload: AdminUserRoleChange,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> User:
+    validate_mutating_origin(request)
+    user = session.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one_or_none()
+    if user is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "account_not_found", "Account was not found.")
+    if user.role == payload.role:
+        return user
+    if shared_team_account(session, user.id):
+        raise admin_user_error(status.HTTP_409_CONFLICT, "shared_team_account", "Shared team account roles cannot be changed here.")
+    if payload.role == UserRole.STUDENT and user.registration_number is None:
+        raise admin_user_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "student_registration_required", "A STUDENT account requires a registration number.")
+    lock_and_protect_last_active_admin(
+        session, user, will_remain_active_admin=user.is_active and payload.role == UserRole.ADMIN
+    )
+    previous = user.role
+    user.role = payload.role
+    revoke_user_sessions(session, user.id)
+    add_admin_audit_event(
+        session, actor_id=actor.id, affected_user_id=user.id, action="account_role_changed",
+        changed_values={"role": payload.role.value, "previous_role": previous.value},
+    )
+    try:
+        session.commit()
+        session.refresh(user)
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+    return user
+
+
+@app.post("/api/v1/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    request: Request,
+    response: Response,
+    session: Session = Depends(get_db),
+) -> Response:
+    """Revoke the presented session when present and always clear its browser cookie."""
+    validate_mutating_origin(request)
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if token:
+        record = session.execute(
+            select(AuthSession).where(AuthSession.token_hash == hash_session_token(token))
+        ).scalar_one_or_none()
+        if record is not None and record.revoked_at is None:
+            record.revoked_at = utc_now()
+            session.commit()
+    clear_session_cookie(request, response)
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
 
 
 @app.post(

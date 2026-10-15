@@ -18,6 +18,7 @@ class Settings:
     postgres_database: str
     postgres_user: str
     postgres_password: str
+    session_lifetime_hours: int = 8
 
     @property
     def database_url(self) -> URL:

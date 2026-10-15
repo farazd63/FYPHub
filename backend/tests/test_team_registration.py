@@ -234,7 +234,7 @@ class TeamRegistrationApiTests(unittest.TestCase):
         allowed_status, allowed_headers = cors_preflight("http://127.0.0.1:5174")
         self.assertEqual(allowed_status, 200)
         self.assertEqual(allowed_headers.get("access-control-allow-origin"), "http://127.0.0.1:5174")
-        self.assertNotIn("access-control-allow-credentials", allowed_headers)
+        self.assertEqual(allowed_headers.get("access-control-allow-credentials"), "true")
 
         denied_status, denied_headers = cors_preflight("http://localhost:5174")
         self.assertEqual(denied_status, 400)

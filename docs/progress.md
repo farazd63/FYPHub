@@ -142,3 +142,34 @@ The isolated PostgreSQL + pgvector configuration was created.
 ## Deadline
 
 Before the 6th; month and year are not yet confirmed.
+
+## Checkpoint 7A
+
+- Added database-backed, opaque browser sessions through Alembic revision `f7a1c3d9e2b4`; only SHA-256 token hashes are persisted, with UTC-aware timestamps, expiry, and revocation.
+- Added login, current-user, and idempotent logout APIs. Login uses existing Argon2id verification, a dummy verification for unknown accounts, and session rotation.
+- Cookie/CORS/Origin protections are documented in `docs/authentication.md`; the configured lifetime is eight hours and credentialed CORS is exactly `http://127.0.0.1:5174`.
+- Added rollback-isolated authentication integration coverage for credentials, cookies, session validation, rotation, logout, origins/CORS, deactivation, and reusable role checks. Pending frontend integration remains intentionally out of scope.
+
+## Role-based login/signup interface
+
+- Implemented the approved role-card login and signup entry screens without replacing the existing shared-team student registration flow.
+- Login uses credentialed cookie requests, supports registered email or creator registration number, restores `/auth/me`, validates the selected role against the database role, and offers logout from a minimal authenticated account view. It does not fabricate dashboards.
+- Public staff/evaluator/coordinator signup is deliberately restricted pending invitation/admin workflow. Password recovery is displayed but unavailable because email delivery is not configured.
+- Frontend lint and production build passed. The later authentication test-repair checkpoint verified the database migration and full backend suite.
+
+## Authentication test repair
+
+- Fixed test-only detached fixture access and Content-Type-aware ASGI response parsing.
+- Fixed the logout endpoint to explicitly set its HTTP `204` status when returning FastAPI's injected response object; session revocation and cookie deletion are unchanged.
+- Migration `f7a1c3d9e2b4` is applied, `alembic check` passes, the focused authentication suite passed 6/6 tests, and the full backend suite passed 30/30 tests. All suite fixtures remain rollback-isolated.
+
+## M1-A: Admin access and portal shell
+
+- Added `GET /api/v1/admin/me`, protected by the persisted `ADMIN` role, and added rollback-isolated tests proving Students receive `403` while a real Admin session succeeds.
+- Added a deliberately interactive `scripts/bootstrap_first_admin.py` helper. It prompts locally with `getpass`, refuses unexpected databases, existing Admin accounts, and conflicting emails; it has not been run and created no account.
+- Added the protected administrator shell, actual account/logout controls, and an Administrator login entry. The shell deliberately has no fake management data or inactive management actions.
+- Added `docs/p1-feature-tracker.md` and `docs/admin-portal.md`; M1-A remains Partial pending a manually provisioned Admin and browser verification. M1-B through M1-I remain unimplemented.
+- Refined the Admin shell into a responsive full-width layout with a 240px desktop sidebar, mobile navigation control, teal/sage active state, and real Academic Cycles overview data fetched from existing APIs. No management actions or synthetic statistics were added.
+- Established the finalized Admin portal as the visual baseline for future role portals while preserving role-specific navigation, backend authorization, and honest incomplete states. No additional role portal was created before its real functionality exists.
+- Implemented a further Admin visual correction in source: compact shell/header, refined sidebar and cycle list, responsive mobile overlay, and reduced-motion-safe micro-interactions. Visual review remains pending user approval.
+- M1-B now provides ADMIN-only paginated account listing, controlled account creation, role/status mutation, active-session revocation, shared-team protection, and concurrent last-active-ADMIN protection. Migration `b8d2e4f6a9c1` adds append-only audit events with PostgreSQL UPDATE/DELETE trigger protection. Six rollback-isolated M1-B tests and the complete 37-test backend suite pass; browser review remains pending. Shared-team deactivation is currently rejected as an implementation safeguard; its intended lifecycle behavior remains an unresolved policy decision.
