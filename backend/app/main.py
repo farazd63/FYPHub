@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from .database import engine, get_db
 from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
 from .models import AcademicCycle, AcademicGroupPolicy
+from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
+from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
 from .schemas.academic import CycleCreate, CycleOut, CycleUpdate, PolicyOut, PolicyUpdate
 from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
 from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange
@@ -131,6 +133,67 @@ def locked_cycle_and_policy(session: Session, cycle_id: int) -> tuple[AcademicCy
 def largest_active_team_size(session: Session, cycle_id: int) -> int:
     sizes = session.execute(select(func.count(TeamMember.id)).where(TeamMember.academic_cycle_id == cycle_id, TeamMember.is_active.is_(True)).group_by(TeamMember.team_id)).scalars().all()
     return max(sizes, default=0)
+
+@app.get("/api/v1/admin/template-references", response_model=list[TemplateListOut])
+def list_template_references(_: User=Depends(require_roles(UserRole.ADMIN)), session: Session=Depends(get_db)):
+ return [
+  {"reference_id": reference_id, **TemplateOut.model_validate(version).model_dump()}
+  for version, reference_id in session.execute(
+   select(TemplateReferenceVersion, TemplateReference.id)
+   .join(TemplateReference, TemplateReference.id == TemplateReferenceVersion.template_reference_id)
+   .order_by(TemplateReference.id, TemplateReferenceVersion.version_number)
+  ).all()
+ ]
+@app.get("/api/v1/admin/template-references/{reference_id}",response_model=TemplateDetail)
+def template_reference_detail(
+    reference_id: int,
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    reference = session.get(TemplateReference, reference_id)
+    if reference is None:
+        raise cycle_error(404, "template_reference_not_found", "Template reference was not found.")
+    versions = session.execute(
+        select(TemplateReferenceVersion)
+        .where(TemplateReferenceVersion.template_reference_id == reference.id)
+        .order_by(TemplateReferenceVersion.version_number)
+    ).scalars().all()
+    return {
+        "reference_id": reference.id,
+        "template_type": reference.template_type,
+        "versions": [
+            {
+                "template": version,
+                "rules": session.execute(
+                    select(AcademicRuleVersion)
+                    .where(AcademicRuleVersion.template_reference_version_id == version.id)
+                    .order_by(AcademicRuleVersion.version_number)
+                ).scalars().all(),
+            }
+            for version in versions
+        ],
+    }
+@app.post("/api/v1/admin/template-references",status_code=201,response_model=TemplateDetail)
+def create_template_reference(payload:TemplateCreate,request:Request,actor:User=Depends(require_roles(UserRole.ADMIN)),session:Session=Depends(get_db)):
+ validate_mutating_origin(request)
+ try:
+  session.execute(text("SELECT pg_advisory_xact_lock(98137242)")); root=TemplateReference(template_type=payload.template_type); session.add(root); session.flush(); ref=TemplateReferenceVersion(template_reference_id=root.id,version_number=1,title=payload.title.strip(),provenance=payload.provenance,source_note=payload.source_note.strip(),created_by_id=actor.id); session.add(ref); session.flush(); rule=AcademicRuleVersion(template_reference_version_id=ref.id,version_number=1,provenance=payload.provenance,rules=payload.rules.model_dump(exclude_none=True),created_by_id=actor.id); session.add(rule); add_admin_audit_event(session,actor_id=actor.id,affected_user_id=None,target_type="TEMPLATE_REFERENCE",target_id=ref.id,action="template_reference_version_created",changed_values={"template_type":payload.template_type.value,"version":1,"provenance":payload.provenance}); session.commit(); session.refresh(ref); session.refresh(rule); return {"reference_id":root.id,"template_type":root.template_type,"versions":[{"template":ref,"rules":[rule]}]}
+ except Exception as error:
+  session.rollback(); raise HTTPException(status_code=500,detail="Template reference could not be saved.") from error
+@app.post("/api/v1/admin/template-references/{reference_id}/versions",status_code=201,response_model=TemplateOut)
+def create_template_version(reference_id:int,payload:TemplateVersionCreate,request:Request,actor:User=Depends(require_roles(UserRole.ADMIN)),session:Session=Depends(get_db)):
+ validate_mutating_origin(request); root=session.get(TemplateReference,reference_id)
+ if root is None: raise cycle_error(404,"template_reference_not_found","Template reference was not found.")
+ try:
+  session.execute(text("SELECT pg_advisory_xact_lock(98137242)")); number=(session.execute(select(func.max(TemplateReferenceVersion.version_number)).where(TemplateReferenceVersion.template_reference_id==root.id)).scalar_one() or 0)+1; ref=TemplateReferenceVersion(template_reference_id=root.id,version_number=number,title=payload.title.strip(),provenance=payload.provenance,source_note=payload.source_note.strip(),created_by_id=actor.id); session.add(ref); session.flush(); add_admin_audit_event(session,actor_id=actor.id,affected_user_id=None,target_type="TEMPLATE_REFERENCE",target_id=ref.id,action="template_reference_version_created",changed_values={"version":number}); session.commit(); session.refresh(ref); return ref
+ except Exception as error: session.rollback(); raise HTTPException(status_code=500,detail="Template reference could not be saved.") from error
+@app.post("/api/v1/admin/template-reference-versions/{version_id}/rules",status_code=201,response_model=RuleOut)
+def create_rule_version(version_id:int,payload:RuleCreate,request:Request,actor:User=Depends(require_roles(UserRole.ADMIN)),session:Session=Depends(get_db)):
+ validate_mutating_origin(request); ref=session.get(TemplateReferenceVersion,version_id)
+ if ref is None: raise cycle_error(404,"template_version_not_found","Template version was not found.")
+ try:
+  number=(session.execute(select(func.max(AcademicRuleVersion.version_number)).where(AcademicRuleVersion.template_reference_version_id==ref.id)).scalar_one() or 0)+1; rule=AcademicRuleVersion(template_reference_version_id=ref.id,version_number=number,provenance=payload.provenance,rules=payload.rules.model_dump(exclude_none=True),created_by_id=actor.id); session.add(rule); session.flush(); add_admin_audit_event(session,actor_id=actor.id,affected_user_id=None,target_type="ACADEMIC_RULE_VERSION",target_id=rule.id,action="academic_rule_version_created",changed_values={"version":number,"provenance":payload.provenance}); session.commit(); session.refresh(rule); return rule
+ except Exception as error: session.rollback(); raise HTTPException(status_code=500,detail="Academic rule version could not be saved.") from error
 
 
 @app.post("/api/v1/admin/academic-cycles", status_code=status.HTTP_201_CREATED, response_model=CycleOut)

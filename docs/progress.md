@@ -1,5 +1,21 @@
 # Project Progress
 
+## M1-D.2 Admin UI (2026-10-15)
+
+- `AdminTemplateReferences.tsx` enables the Proposal Templates destination for ADMIN users. It creates initial references, displays typed supported rule controls, and—after a newly created reference is selected—creates metadata/rule versions and refreshes its returned history. Blank values remain unset and read views show “Not configured”.
+- Browser verification remains pending. The list API now returns the stable parent `reference_id` for every metadata-version item, so complete server history can be opened after reload as well as immediately after creation. M1-D remains Partial because publication, storage/download, activation/retirement, and M3 compliance are not implemented.
+
+## M1-D.1 verification (2026-10-15)
+
+- Internal ADMIN-only template-reference and academic-rule versioning is covered by six dedicated tests: strict validation/history, three audit-failure rollbacks, and two-connection metadata allocation.
+- The allocation test preserves version 1 and obtains distinct versions 2 and 3 through the production allocator. It stubs audit insertion only for removable concurrency fixtures; audit rollback is tested separately by injected failures.
+
+## Checkpoint finalization (2026-10-16)
+
+- The full backend suite passed 46/46 against `fyphub_p1`; Alembic current and heads are `d5e6f7a8b9c0`, `alembic check` reports no pending operations, and `pip check` passes.
+- Frontend lint and production build passed through the installed Node npm executable. Browser interaction and visual verification remain pending; M1-D and P1 remain Partial. No template publication, upload/download, activation/retirement, or M3 compliance checking is implemented.
+- The complete backend suite passed: 46 tests. Compilation, Alembic current/heads/check, `pip check`, and `git diff --check` also passed. UI, publication, storage/download, activation/retirement, and M3 compliance remain pending.
+
 ## Verified setup
 
 - Project directory created.
@@ -15,6 +31,13 @@
 ## Current target
 
 P1 Mid, Modules 1–3.
+
+## Proposal-source reconciliation
+
+- The original `long proposal.pdf` (17 PDF pages) and `short proposal.pdf` (3 PDF pages) were read from `D:\FYP Project` on 2026-10-15.
+- The authoritative P1 Mid scope is M1 Admin Dashboard & Academic Management, M2 Student Team & Collaboration Hub, and M3 Student Proposal & AI Compliance Check (long proposal section 9.3, pp9-10; section 10, p14).
+- `docs/p1-feature-tracker.md` records every individual M1-M3 proposal feature with source page, implementation/test evidence, gaps, and decisions. `docs/p1-workflows.md` supplies report-ready explanations, actual-versus-proposed workflows, demonstrations, and M1-D blockers.
+- M1 and P1 remain incomplete. No screenshots or browser-verification claims were added.
 
 ## Implementation status
 
@@ -130,7 +153,7 @@ The isolated PostgreSQL + pgvector configuration was created.
 - Added non-secret `VITE_API_BASE_URL` configuration and exact-origin backend CORS for `http://127.0.0.1:5174`; wildcard origins and credential support are not enabled.
 - The existing three-step form now loads cycles and selected group policies, uses the fetched group maximum including the creator, validates normalized duplicate member identifiers, and submits the exact shared-team registration payload.
 - Submission prevents duplicate requests, preserves values after failures, maps safe backend field errors to the affected step and stable member row, and shows a real HTTP `201` confirmation while clearing password fields.
-- Sign In remains disabled; no session or automatic login is created.
+- Sign In now uses the existing cookie-backed session flow; no automatic login is created.
 - Frontend lint and production build passed. Backend tests passed: 24 total, including allowed/disallowed CORS verification. Live browser submission and responsive visual verification remain pending.
 
 ## Manual shared-team registration verification
@@ -156,6 +179,25 @@ Before the 6th; month and year are not yet confirmed.
 - Login uses credentialed cookie requests, supports registered email or creator registration number, restores `/auth/me`, validates the selected role against the database role, and offers logout from a minimal authenticated account view. It does not fabricate dashboards.
 - Public staff/evaluator/coordinator signup is deliberately restricted pending invitation/admin workflow. Password recovery is displayed but unavailable because email delivery is not configured.
 - Frontend lint and production build passed. The later authentication test-repair checkpoint verified the database migration and full backend suite.
+
+## Auth navigation and password-feedback refinement
+
+- Connected public Sign In, signup role selection, and the shared-team registration steps to the browser History API using navigation identifiers only. Browser and in-form Back/Forward restore the mounted screen and step without storing form values; later registration steps revalidate earlier required fields before rendering.
+- Refined password creation guidance to show only missing recommendations while retaining the local strength estimate. Sign In remains free of creation guidance.
+
+## Sign In workspace illustration
+
+- Replaced the abstract Sign In background with a balanced image-led layout: branding and the preserved working form are on the desktop left, while a local WebP photo panel with a navy/teal overlay and scoped entrance motion is on the right. The photo is “Students Studying Together while Looking at the Screen of a Laptop” by Yan Krukau, downloaded from Pexels under the Pexels License: https://www.pexels.com/photo/students-studying-together-while-looking-at-the-screen-of-a-laptop-8199761/ . The panel is hidden on narrow screens so the form stays first and scrollable.
+- Responsive browser verification at the specified desktop, tablet, and mobile viewports remains manually pending; lint and production-build success are not treated as visual verification.
+
+## Shared public authentication layout
+
+- Added `AuthLayout` to give Sign In, signup selection, restricted-registration, recovery, confirmation, and all team-registration steps one warm-ivory desktop/tablet/mobile shell. It keeps the original brand and form column aligned with the existing local photo panel, while mobile hides the panel and preserves natural form scrolling.
+- Compressed the shared five-role selector into consistent horizontal 64px cards; Administrator spans the final row. Existing role values, icons, selections, navigation, and permissions are unchanged. Browser visual verification of every auth state and requested viewport remains manually pending.
+
+## Glass authentication presentation
+
+- Updated the shared `AuthLayout` from separate photo/form panels to a full-photo background with a navy overlay and frosted, fallback-opaque authentication card. Desktop keeps brand and approved copy left of the card; mobile hides that copy and retains the brand/form order. Selected roles and public authentication actions use `#4663FF`; Admin presentation remains unchanged. Browser visual verification remains manually pending.
 
 ## Authentication test repair
 

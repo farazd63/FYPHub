@@ -14,13 +14,19 @@ button:focus-visible,input:focus-visible { outline: 3px solid rgb(23 107 102 / .
 .admin-sidebar { transition-duration: 250ms; }
 .admin-sidebar + button { transition-duration: 250ms; }
 
+@keyframes auth-photo-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.auth-card { border: 1px solid rgb(255 255 255 / .62); background: rgb(248 251 253 / .78); box-shadow: 0 18px 45px rgb(8 35 51 / .28); backdrop-filter: blur(14px); animation: auth-photo-enter 360ms ease-out both; }
+@supports not (backdrop-filter: blur(1px)) { .auth-card { background: rgb(248 251 253 / .94); } }
+
 /* M1-B keeps a compact sidebar form on desktop while retaining a single mobile column. */
 @media (min-width: 1024px) {
   section[aria-labelledby="users-heading"] form.h-fit > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   section[aria-labelledby="users-heading"] form.h-fit > div > p,
   section[aria-labelledby="users-heading"] form.h-fit > div > button { grid-column: 1 / -1; }
 }
+@media (max-width: 1023px) { .auth-photo-background > div { background: linear-gradient(125deg, rgb(10 40 55 / .8), rgb(18 92 98 / .68)); }.auth-card { backdrop-filter: blur(8px); } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 1ms !important; }
   .admin-enter, .admin-enter > section[aria-labelledby="cycles-heading"] { animation: none; }
+  .auth-card { animation: none; }
 }

@@ -1,0 +1,10 @@
+"""add internal template reference and rule versions"""
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+revision="d5e6f7a8b9c0"; down_revision="c4e7f1a2b9d3"; branch_labels=None; depends_on=None
+def upgrade():
+ op.create_table("template_references",sa.Column("id",sa.Integer,primary_key=True),sa.Column("template_type",sa.Enum("SHORT","LONG",name="template_type"),nullable=False,unique=True),sa.Column("created_at",sa.DateTime(timezone=True),server_default=sa.text("now()"),nullable=False))
+ op.create_table("template_reference_versions",sa.Column("id",sa.Integer,primary_key=True),sa.Column("template_reference_id",sa.Integer,sa.ForeignKey("template_references.id",ondelete="RESTRICT"),nullable=False),sa.Column("version_number",sa.Integer,nullable=False),sa.Column("title",sa.String(160),nullable=False),sa.Column("provenance",sa.String(32),nullable=False),sa.Column("source_note",sa.String(500),nullable=False),sa.Column("created_by_id",sa.Integer,sa.ForeignKey("users.id",ondelete="RESTRICT"),nullable=False),sa.Column("created_at",sa.DateTime(timezone=True),server_default=sa.text("now()"),nullable=False),sa.UniqueConstraint("template_reference_id","version_number",name="uq_template_reference_version"))
+ op.create_table("academic_rule_versions",sa.Column("id",sa.Integer,primary_key=True),sa.Column("template_reference_version_id",sa.Integer,sa.ForeignKey("template_reference_versions.id",ondelete="RESTRICT"),nullable=False),sa.Column("version_number",sa.Integer,nullable=False),sa.Column("provenance",sa.String(32),nullable=False),sa.Column("rules",postgresql.JSONB,nullable=False),sa.Column("created_by_id",sa.Integer,sa.ForeignKey("users.id",ondelete="RESTRICT"),nullable=False),sa.Column("created_at",sa.DateTime(timezone=True),server_default=sa.text("now()"),nullable=False),sa.UniqueConstraint("template_reference_version_id","version_number",name="uq_academic_rule_version"))
+def downgrade(): op.drop_table("academic_rule_versions"); op.drop_table("template_reference_versions"); op.drop_table("template_references"); op.execute("DROP TYPE template_type")
