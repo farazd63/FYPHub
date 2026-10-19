@@ -33,7 +33,7 @@ This companion explains the source-cited matrix in [p1-feature-tracker.md](p1-fe
 
 ### M1 - academic governance
 
-M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, and internal template-reference metadata with immutable academic-rule versions are present. The template work is Partial: it has no official files, publication, storage/download, activation/retirement, or compliance checking. Workflow policies, rubrics, criteria, deadlines, reminders, escalations, and audit-history viewing remain absent.
+M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, and internal evaluation-rubric drafts with immutable ordered criteria are present. Template and rubric work remain Partial: neither provides an approved publication/activation lifecycle, and rubric drafts intentionally contain no academic scoring values. Workflow policies, deadlines, reminders, escalations, and audit-history viewing remain absent.
 
 ### M2 - team formation and collaboration
 
@@ -57,7 +57,8 @@ flowchart TD
     D -->|cycle and group maximum| F[Lock cycle then policy; validate positive limit]
     D -->|internal template references and rules| P[Implemented partial: immutable internal metadata/rule versions]
     D -->|supervisor capacity| R[Lock capacity writer, account and cycle; save positive unique policy plus audit]
-    D -->|rubrics, deadlines, reminders| Q[Proposed only: no implementation]
+    D -->|internal rubric drafts| S[Lock allocator; save immutable version, ordered criteria, and audit]
+    D -->|deadlines and reminders| Q[Proposed only: no implementation]
     E --> G{last active ADMIN or shared-team guard fails?}
     G -- yes --> X
     G -- no --> H[Mutate account; revoke sessions where required]
@@ -69,7 +70,48 @@ flowchart TD
     K --> L[Safe response and UI refresh]
 ```
 
-Actual implementation is in `backend/app/main.py`, backed by `User`, `AcademicCycle`, `AcademicGroupPolicy`, `SupervisorCapacityPolicy`, and `AdminAuditEvent`. Proposed-only nodes are intentionally not interactive in the Admin navigation.
+Actual implementation is in `backend/app/main.py`, backed by the account, academic, capacity, rubric-version, and audit models. Proposed-only destinations remain disabled in the Admin navigation.
+
+## M1-F.1 internal evaluation-rubric draft pipeline
+
+```mermaid
+flowchart TD
+    A[ADMIN opens Evaluation Rubrics] --> B[Load draft list and complete version history]
+    B --> C[Enter name, optional description, and ordered criteria]
+    C --> D[Validate Origin, strict structure, nonblank names, and unique orders]
+    D -->|invalid| E[Return field-addressable error without writing]
+    D -->|valid| F[Acquire rubric writer lock]
+    F --> G[Allocate next version number]
+    G --> H[Insert complete immutable version and criteria]
+    H --> I[Insert audit event in the same transaction]
+    I -->|failure| J[Rollback version, criteria, and audit]
+    I -->|success| K[Return ordered draft history]
+    K -. future M9 boundary .-> L[Panel evaluation references a policy-approved version]
+```
+
+The current screen and API create internal **Draft** configurations only. They do not make a rubric approved, published, active, or available to evaluators. They contain no marks, weights, thresholds, evaluation stages, result formula, or score submission. Those values and lifecycle rules must come from authorized university policy rather than software defaults.
+
+### M1-F.1 manual demonstration
+
+Use an isolated Admin/test environment; do not alter real academic records.
+
+1. Sign in with an active persisted `ADMIN` account and open **Evaluation Rubrics**.
+2. Confirm the empty or existing draft list loads and every configuration is labelled **Draft**.
+3. Enter a rubric name, optional description, and at least one criterion. Add, remove, and reorder rows; confirm entered row values move with their rows.
+4. Save the initial rubric once and confirm duplicate clicks are disabled while the request is pending.
+5. Open its history, change the complete draft, and create the next version.
+6. Confirm versions are numbered in order and the earlier version and its criterion order remain unchanged.
+7. Confirm validation remains attached to the relevant criterion after row movement and service failures show a safe error.
+
+Automated checks cover authorization, foreign-Origin rejection, validation, ordered history, historical preservation, audit-failure rollback, and concurrent version allocation. The manual browser demonstration and desktop/mobile visual inspection remain pending.
+
+### Remaining M1-F scoring-policy decisions
+
+- Official rubric definitions and criterion wording.
+- Permitted marks or scoring scales, weights, total constraints, aggregation, precision, and thresholds.
+- Official evaluation-stage names and applicability.
+- Draft review, approval, publication, activation, retirement, correction, and version-selection authority.
+- Rules connecting a future panel evaluation to an immutable approved rubric version.
 
 ## M1-E.1 supervisor capacity pipeline
 

@@ -12,7 +12,9 @@ from .database import engine, get_db
 from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
 from .models import AcademicCycle, AcademicGroupPolicy, SupervisorCapacityPolicy
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
+from .models import EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion
 from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
+from .schemas.evaluation_rubrics import RubricDetailOut, RubricListOut, RubricVersionOut, RubricVersionWrite
 from .schemas.academic import CycleCreate, CycleOut, CycleUpdate, PolicyOut, PolicyUpdate
 from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
 from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange
@@ -195,6 +197,189 @@ def create_rule_version(version_id:int,payload:RuleCreate,request:Request,actor:
  try:
   number=(session.execute(select(func.max(AcademicRuleVersion.version_number)).where(AcademicRuleVersion.template_reference_version_id==ref.id)).scalar_one() or 0)+1; rule=AcademicRuleVersion(template_reference_version_id=ref.id,version_number=number,provenance=payload.provenance,rules=payload.rules.model_dump(exclude_none=True),created_by_id=actor.id); session.add(rule); session.flush(); add_admin_audit_event(session,actor_id=actor.id,affected_user_id=None,target_type="ACADEMIC_RULE_VERSION",target_id=rule.id,action="academic_rule_version_created",changed_values={"version":number,"provenance":payload.provenance}); session.commit(); session.refresh(rule); return rule
  except Exception as error: session.rollback(); raise HTTPException(status_code=500,detail="Academic rule version could not be saved.") from error
+
+
+def rubric_version_out(session: Session, version: EvaluationRubricVersion) -> dict[str, object]:
+    criteria = session.execute(
+        select(EvaluationRubricCriterion)
+        .where(EvaluationRubricCriterion.rubric_version_id == version.id)
+        .order_by(EvaluationRubricCriterion.display_order, EvaluationRubricCriterion.id)
+    ).scalars().all()
+    return {
+        "id": version.id,
+        "version_number": version.version_number,
+        "name": version.name,
+        "description": version.description,
+        "created_at": version.created_at,
+        "criteria": [
+            {"id": item.id, "name": item.name, "description": item.description, "order": item.display_order}
+            for item in criteria
+        ],
+    }
+
+
+def rubric_detail_out(session: Session, rubric: EvaluationRubric) -> dict[str, object]:
+    versions = session.execute(
+        select(EvaluationRubricVersion)
+        .where(EvaluationRubricVersion.rubric_id == rubric.id)
+        .order_by(EvaluationRubricVersion.version_number)
+    ).scalars().all()
+    return {
+        "id": rubric.id,
+        "created_at": rubric.created_at,
+        "versions": [rubric_version_out(session, version) for version in versions],
+    }
+
+
+def save_rubric_version(
+    session: Session,
+    rubric: EvaluationRubric,
+    payload: RubricVersionWrite,
+    actor: User,
+    version_number: int,
+) -> EvaluationRubricVersion:
+    version = EvaluationRubricVersion(
+        rubric_id=rubric.id,
+        version_number=version_number,
+        name=payload.name,
+        description=payload.description,
+        created_by_id=actor.id,
+    )
+    session.add(version)
+    session.flush()
+    session.add_all([
+        EvaluationRubricCriterion(
+            rubric_version_id=version.id,
+            name=criterion.name,
+            description=criterion.description,
+            display_order=criterion.order,
+        )
+        for criterion in payload.criteria
+    ])
+    session.flush()
+    add_admin_audit_event(
+        session,
+        actor_id=actor.id,
+        affected_user_id=None,
+        target_type="EVALUATION_RUBRIC",
+        target_id=rubric.id,
+        action="evaluation_rubric_version_created",
+        changed_values={
+            "version": version_number,
+            "name": payload.name,
+            "criteria": [{"name": item.name, "order": item.order} for item in payload.criteria],
+            "status": "DRAFT",
+        },
+    )
+    return version
+
+
+@app.get("/api/v1/admin/evaluation-rubrics", response_model=list[RubricListOut])
+def list_evaluation_rubrics(
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    latest = (
+        select(
+            EvaluationRubricVersion.rubric_id,
+            func.max(EvaluationRubricVersion.version_number).label("latest_version_number"),
+        )
+        .group_by(EvaluationRubricVersion.rubric_id)
+        .subquery()
+    )
+    rows = session.execute(
+        select(EvaluationRubric, EvaluationRubricVersion, latest.c.latest_version_number)
+        .join(latest, latest.c.rubric_id == EvaluationRubric.id)
+        .join(
+            EvaluationRubricVersion,
+            (EvaluationRubricVersion.rubric_id == EvaluationRubric.id)
+            & (EvaluationRubricVersion.version_number == latest.c.latest_version_number),
+        )
+        .order_by(EvaluationRubric.id)
+    ).all()
+    return [
+        {
+            "id": rubric.id,
+            "name": version.name,
+            "description": version.description,
+            "latest_version_number": number,
+            "created_at": rubric.created_at,
+        }
+        for rubric, version, number in rows
+    ]
+
+
+@app.get("/api/v1/admin/evaluation-rubrics/{rubric_id}", response_model=RubricDetailOut)
+def evaluation_rubric_detail(
+    rubric_id: int,
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    rubric = session.get(EvaluationRubric, rubric_id)
+    if rubric is None:
+        raise cycle_error(status.HTTP_404_NOT_FOUND, "rubric_not_found", "Evaluation rubric was not found.")
+    return rubric_detail_out(session, rubric)
+
+
+@app.post("/api/v1/admin/evaluation-rubrics", status_code=status.HTTP_201_CREATED, response_model=RubricDetailOut)
+def create_evaluation_rubric(
+    payload: RubricVersionWrite,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    validate_mutating_origin(request)
+    try:
+        rubric = EvaluationRubric()
+        session.add(rubric)
+        session.flush()
+        save_rubric_version(session, rubric, payload, actor, 1)
+        session.commit()
+        session.refresh(rubric)
+        return rubric_detail_out(session, rubric)
+    except (IntegrityError, SQLAlchemyError) as error:
+        session.rollback()
+        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation rubric could not be saved.") from error
+    except Exception as error:
+        session.rollback()
+        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation rubric could not be saved.") from error
+
+
+@app.post("/api/v1/admin/evaluation-rubrics/{rubric_id}/versions", status_code=status.HTTP_201_CREATED, response_model=RubricVersionOut)
+def create_evaluation_rubric_version(
+    rubric_id: int,
+    payload: RubricVersionWrite,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    validate_mutating_origin(request)
+    try:
+        session.execute(text("SELECT pg_advisory_xact_lock(98137, :rubric_id)"), {"rubric_id": rubric_id})
+        rubric = session.execute(
+            select(EvaluationRubric).where(EvaluationRubric.id == rubric_id).with_for_update()
+        ).scalar_one_or_none()
+        if rubric is None:
+            raise cycle_error(status.HTTP_404_NOT_FOUND, "rubric_not_found", "Evaluation rubric was not found.")
+        version_number = (
+            session.execute(
+                select(func.max(EvaluationRubricVersion.version_number)).where(EvaluationRubricVersion.rubric_id == rubric.id)
+            ).scalar_one()
+            or 0
+        ) + 1
+        version = save_rubric_version(session, rubric, payload, actor, version_number)
+        session.commit()
+        session.refresh(version)
+        return rubric_version_out(session, version)
+    except HTTPException:
+        session.rollback()
+        raise
+    except (IntegrityError, SQLAlchemyError) as error:
+        session.rollback()
+        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation rubric version could not be saved.") from error
+    except Exception as error:
+        session.rollback()
+        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation rubric version could not be saved.") from error
 
 
 @app.post("/api/v1/admin/academic-cycles", status_code=status.HTTP_201_CREATED, response_model=CycleOut)

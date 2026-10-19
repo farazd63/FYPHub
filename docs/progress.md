@@ -1,5 +1,13 @@
 # Project Progress
 
+## M1-F.1 Internal Evaluation Rubric Draft Configuration (2026-10-19)
+
+- Added stable rubric identities with immutable numbered versions and ordered criterion snapshots under Alembic revision `f1a2b3c4d5e6`. Names are required and descriptions optional; no rubric or academic values are seeded.
+- Added ADMIN-only list, complete-history, initial-create, and subsequent-version APIs. Mutations enforce browser Origin checks, strict request structure, nonblank names, unique explicit criterion orders, serialized version allocation, and atomic audit persistence.
+- Enabled the existing **Evaluation Rubrics** navigation destination and added a focused Draft-labelled Admin screen. It supports history, initial and subsequent versions, criterion add/remove/reorder controls, stable row values and validation mapping, loading/empty/error feedback, and duplicate-submit prevention.
+- Verified 5 focused rubric tests and the complete 55-test backend suite. Alembic current/head are `f1a2b3c4d5e6`, schema check is clean, `pip check` passes, and frontend lint/build pass. Browser interaction, responsive visual verification, and the manual demonstration remain pending.
+- This is an internal draft-configuration foundation only. Marks, weights, thresholds, evaluation stages, approval/publication/activation/retirement, and panel scoring remain unimplemented pending academic-policy decisions. M1 and P1 remain Partial.
+
 ## M1-E.1 Supervisor Capacity Management (verified evidence)
 
 - Added the supervisor-capacity policy model and Alembic revision `e8f9a0b1c2d3`; it has one positive group maximum per supervisor and academic cycle.
