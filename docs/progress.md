@@ -1,5 +1,25 @@
 # Project Progress
 
+## M1-E.1 Supervisor Capacity Management (verified evidence)
+
+- Added the supervisor-capacity policy model and Alembic revision `e8f9a0b1c2d3`; it has one positive group maximum per supervisor and academic cycle.
+- Added ADMIN-only listing, create, and update routes with browser-Origin validation, persisted-role/activity checks, database uniqueness, advisory and row locking, safe failures, and audit events in the same transaction.
+- Added the Admin **Supervisor Capacity** screen. User screenshots verify successful policy creation and correct edit-form population, including separate ID-backed supervisor-name selection and read-only supervisor-email display.
+- PostgreSQL confirms the applied named `UNIQUE (supervisor_id, academic_cycle_id)` constraint; ORM metadata now declares the same constraint. Alembic current/head are `e8f9a0b1c2d3` and schema check is clean. Capacity tests pass 4/4, the full backend suite passes 50/50, and frontend lint/build pass. Update-save, refreshed-policy persistence, and mobile browser verification remain pending; M1 and P1 remain Partial.
+
+## Admin overview mount (2026-10-16)
+
+- Mounted `AdminOverview` in the existing ADMIN Overview branch. It reads real academic cycles and per-cycle group policies, distinguishes missing policies (`Not configured`) from request failures, and includes loading, empty, retry, and stale-response handling. Browser verification remains pending.
+
+## Admin palette correction (2026-10-16)
+
+- Applied a scoped blue Admin colour system across existing management screens and added a narrower-breakpoint Create Account grid fallback to prevent compressed labels and role text. Browser desktop/mobile verification remains pending.
+
+## Shared theme correction (2026-10-16)
+
+- Added shared application theme tokens and updated shared input, button, focus, and password-strength primitives to use the blue action system. Browser visual verification remains pending; legacy action-colour review remains incomplete.
+
+
 ## M1-D.2 Admin UI (2026-10-15)
 
 - `AdminTemplateReferences.tsx` enables the Proposal Templates destination for ADMIN users. It creates initial references, displays typed supported rule controls, and—after a newly created reference is selected—creates metadata/rule versions and refreshes its returned history. Blank values remain unset and read views show “Not configured”.

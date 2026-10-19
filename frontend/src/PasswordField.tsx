@@ -52,7 +52,7 @@ export function getPasswordGuidance(password: string): {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-[#cbd6d0] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#176B66] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
+  "w-full rounded-lg border border-[#DCE3ED] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#4663FF] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
 
 function PasswordGuidance({ value, id }: { value: string; id: string }) {
   if (!value) return null;
@@ -62,7 +62,7 @@ function PasswordGuidance({ value, id }: { value: string; id: string }) {
       ? "bg-[#a43a33]"
       : strength === "Medium"
         ? "bg-[#a87518]"
-        : "bg-[#176B66]";
+    : "bg-[#4663FF]";
   const meterWidth = `${(score / criteria.length) * 100}%`;
   return (
     <div
@@ -138,7 +138,7 @@ export function PasswordField({
       .filter(Boolean)
       .join(" ") || undefined;
   const fieldClass = compact
-    ? "w-full rounded-lg border border-[#cbd6d0] bg-white px-3 py-2 text-sm text-[#243746] focus:border-[#176b66]"
+    ? "w-full rounded-lg border border-[#DCE3ED] bg-white px-3 py-2 text-sm text-[#243746] focus:border-[#4663FF]"
     : inputClass;
   return (
     <div className="grid gap-2">

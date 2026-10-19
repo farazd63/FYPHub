@@ -38,9 +38,9 @@ const API = (
   import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8010"
 ).replace(/\/$/, "");
 const INPUT =
-  "w-full rounded-lg border border-[#cbd6d0] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#176B66] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
+  "w-full rounded-lg border border-[#DCE3ED] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#4663FF] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
 const PRIMARY =
-  "rounded-lg bg-[#176B66] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#125650] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";
+  "rounded-lg bg-[#4663FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#354FE0] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";
 const AUTH_PRIMARY =
   "rounded-xl bg-[#4663FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#354ee0] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";
 
@@ -182,7 +182,7 @@ function RoleCards({
           aria-checked={value === role.value}
           disabled={disabled}
           onClick={() => onChange(role.value)}
-          className={`flex ${compact ? "min-h-[54px]" : "min-h-[64px]"} items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors ${role.value === "ADMIN" ? "col-span-2" : ""} ${value === role.value ? "border-[#4663FF] bg-[#eef0ff] ring-1 ring-[#4663FF]" : "border-[#dce4de] bg-white/75 hover:border-[#8b9aff]"}`}
+          className={`flex ${compact ? "min-h-[54px]" : "min-h-[64px]"} items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors ${value === role.value ? "border-[#4663FF] bg-[#eef0ff] ring-1 ring-[#4663FF]" : "border-[#dce4de] bg-white/75 hover:border-[#8b9aff]"}`}
         >
           <span className="block shrink-0 text-[#4663FF]">
             <RoleIcon role={role.value} />
@@ -309,6 +309,8 @@ export default function App() {
   const [loginRole, setLoginRole] = useState<LoginRole>("STUDENT");
   const [signupRole, setSignupRole] = useState<LoginRole | null>(null);
   const [authUser, setAuthUser] = useState<SafeUser | null>(null);
+  const authUserRef = useRef<SafeUser | null>(null);
+  useEffect(() => { authUserRef.current = authUser; }, [authUser]);
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [authError, setAuthError] = useState("");
   const [step, setStep] = useState(1);
@@ -560,7 +562,25 @@ export default function App() {
     const initial = readPublicRoute(window.history.state) ?? publicRoute("in");
     if (!readPublicRoute(window.history.state)) window.history.replaceState({ fyphubNavigation: initial }, "", window.location.href);
     publicNavigationRef.current(initial, "pop");
-    const onPopState = (event: PopStateEvent) => publicNavigationRef.current(readPublicRoute(event.state) ?? publicRoute("in"), "pop");
+    const onPopState = (event: PopStateEvent) => {
+      const destination = (event.state as { fyphubNavigation?: { page?: string } } | null)?.fyphubNavigation?.page;
+      if (destination === "admin-portal" && authUserRef.current?.role === "ADMIN") {
+        void fetch(`${API}/api/v1/admin/me`, { credentials: "include" }).then(async response => {
+          if (!response.ok) {
+            setAuthUser(null);
+            publicNavigationRef.current(publicRoute("in"), "pop");
+            return;
+          }
+          setAuthUser((await response.json()) as SafeUser);
+          setPage("admin-portal");
+        }).catch(() => {
+          setAuthUser(null);
+          publicNavigationRef.current(publicRoute("in"), "pop");
+        });
+        return;
+      }
+      publicNavigationRef.current(readPublicRoute(event.state) ?? publicRoute("in"), "pop");
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -704,9 +724,12 @@ export default function App() {
         );
         return;
       }
-      setAuthUser((await response.json()) as SafeUser);
+      const user = (await response.json()) as SafeUser;
+      setAuthUser(user);
       setSignIn((current) => ({ ...current, password: "" }));
-      setPage("account");
+      const destination = user.role === "ADMIN" ? "admin-portal" : "account";
+      window.history.pushState({ fyphubNavigation: { page: destination } }, "", window.location.href);
+      setPage(destination);
     } catch {
       setAuthError(
         "The sign-in service is unavailable. Please try again shortly.",

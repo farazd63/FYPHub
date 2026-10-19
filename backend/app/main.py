@@ -10,12 +10,13 @@ from sqlalchemy.orm import Session
 
 from .database import engine, get_db
 from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
-from .models import AcademicCycle, AcademicGroupPolicy
+from .models import AcademicCycle, AcademicGroupPolicy, SupervisorCapacityPolicy
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
 from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
 from .schemas.academic import CycleCreate, CycleOut, CycleUpdate, PolicyOut, PolicyUpdate
 from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
 from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange
+from .schemas.supervisor_capacity import SupervisorCapacityOut, SupervisorCapacityWrite
 from .schemas.team_registration import TeamMemberInput, TeamRegistrationRequest, TeamRegistrationResponse
 from .security import generate_session_token, hash_password, hash_session_token, verify_password
 from .auth import (
@@ -389,6 +390,36 @@ def revoke_user_sessions(session: Session, user_id: int) -> None:
     )
 
 
+def supervisor_capacity_out(policy: SupervisorCapacityPolicy) -> dict[str, object]:
+    supervisor = policy.supervisor
+    cycle = policy.academic_cycle
+    return {
+        "id": policy.id,
+        "supervisor_id": supervisor.id,
+        "supervisor_name": supervisor.full_name,
+        "supervisor_email": supervisor.email,
+        "supervisor_is_eligible": supervisor.is_active and supervisor.role == UserRole.SUPERVISOR,
+        "academic_cycle_id": cycle.id,
+        "academic_cycle_name": cycle.display_name,
+        "max_group_capacity": policy.max_group_capacity,
+        "created_at": policy.created_at,
+        "updated_at": policy.updated_at,
+    }
+
+
+def locked_eligible_supervisor_and_cycle(session: Session, supervisor_id: int, cycle_id: int) -> tuple[User, AcademicCycle]:
+    """Lock eligibility records so role/status changes cannot race capacity writes."""
+    supervisor = session.execute(select(User).where(User.id == supervisor_id).with_for_update()).scalar_one_or_none()
+    if supervisor is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "supervisor_not_found", "Supervisor account was not found.")
+    cycle = session.execute(select(AcademicCycle).where(AcademicCycle.id == cycle_id).with_for_update()).scalar_one_or_none()
+    if cycle is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "academic_cycle_not_found", "Academic cycle was not found.")
+    if not supervisor.is_active or supervisor.role != UserRole.SUPERVISOR:
+        raise admin_user_error(status.HTTP_409_CONFLICT, "supervisor_ineligible", "Capacity can be configured only for an active SUPERVISOR account.")
+    return supervisor, cycle
+
+
 @app.get("/api/v1/admin/users", response_model=AdminUserPage)
 def list_admin_users(
     search: str | None = Query(default=None, max_length=320),
@@ -497,6 +528,11 @@ def change_admin_user_role(
     session: Session = Depends(get_db),
 ) -> User:
     validate_mutating_origin(request)
+    raise admin_user_error(
+        status.HTTP_409_CONFLICT,
+        "assigned_role_locked",
+        "An account's assigned role is fixed after creation.",
+    )
     user = session.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one_or_none()
     if user is None:
         raise admin_user_error(status.HTTP_404_NOT_FOUND, "account_not_found", "Account was not found.")
@@ -523,6 +559,90 @@ def change_admin_user_role(
         session.rollback()
         raise
     return user
+
+
+@app.get("/api/v1/admin/supervisor-capacities", response_model=list[SupervisorCapacityOut])
+def list_supervisor_capacities(
+    _: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)
+) -> list[dict[str, object]]:
+    policies = session.execute(
+        select(SupervisorCapacityPolicy).order_by(SupervisorCapacityPolicy.id)
+    ).scalars().all()
+    return [supervisor_capacity_out(policy) for policy in policies]
+
+
+@app.get("/api/v1/admin/supervisor-capacities/{policy_id}", response_model=SupervisorCapacityOut)
+def read_supervisor_capacity(
+    policy_id: int, _: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)
+) -> dict[str, object]:
+    policy = session.get(SupervisorCapacityPolicy, policy_id)
+    if policy is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "capacity_policy_not_found", "Supervisor capacity policy was not found.")
+    return supervisor_capacity_out(policy)
+
+
+@app.post("/api/v1/admin/supervisor-capacities", status_code=status.HTTP_201_CREATED, response_model=SupervisorCapacityOut)
+def create_supervisor_capacity(
+    payload: SupervisorCapacityWrite, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)
+) -> dict[str, object]:
+    validate_mutating_origin(request)
+    # Serialize capacity writes before taking row locks. This prevents a
+    # create and an update from acquiring policy/account locks in a cycle.
+    session.execute(text("SELECT pg_advisory_xact_lock(98137243)"))
+    locked_eligible_supervisor_and_cycle(session, payload.supervisor_id, payload.academic_cycle_id)
+    existing = session.execute(select(SupervisorCapacityPolicy).where(
+        SupervisorCapacityPolicy.supervisor_id == payload.supervisor_id,
+        SupervisorCapacityPolicy.academic_cycle_id == payload.academic_cycle_id,
+    )).scalar_one_or_none()
+    if existing is not None:
+        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and cycle.")
+    policy = SupervisorCapacityPolicy(**payload.model_dump())
+    session.add(policy)
+    try:
+        session.flush()
+        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=payload.supervisor_id, target_type="SUPERVISOR_CAPACITY_POLICY", target_id=policy.id, action="supervisor_capacity_created", changed_values={"academic_cycle_id": payload.academic_cycle_id, "max_group_capacity": payload.max_group_capacity})
+        session.commit(); session.refresh(policy)
+    except IntegrityError as error:
+        session.rollback()
+        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and cycle.") from error
+    except SQLAlchemyError as error:
+        session.rollback()
+        raise admin_user_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "capacity_save_failed", "Supervisor capacity could not be saved.") from error
+    return supervisor_capacity_out(policy)
+
+
+@app.put("/api/v1/admin/supervisor-capacities/{policy_id}", response_model=SupervisorCapacityOut)
+def update_supervisor_capacity(
+    policy_id: int, payload: SupervisorCapacityWrite, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)
+) -> dict[str, object]:
+    validate_mutating_origin(request)
+    # Match create's advisory-lock-first order. The account row lock below
+    # serializes an eligibility check with activation or deactivation.
+    session.execute(text("SELECT pg_advisory_xact_lock(98137243)"))
+    policy = session.execute(select(SupervisorCapacityPolicy).where(SupervisorCapacityPolicy.id == policy_id).with_for_update()).scalar_one_or_none()
+    if policy is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "capacity_policy_not_found", "Supervisor capacity policy was not found.")
+    locked_eligible_supervisor_and_cycle(session, payload.supervisor_id, payload.academic_cycle_id)
+    duplicate = session.execute(select(SupervisorCapacityPolicy.id).where(
+        SupervisorCapacityPolicy.supervisor_id == payload.supervisor_id,
+        SupervisorCapacityPolicy.academic_cycle_id == payload.academic_cycle_id,
+        SupervisorCapacityPolicy.id != policy.id,
+    )).scalar_one_or_none()
+    if duplicate is not None:
+        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and cycle.")
+    previous = {"supervisor_id": policy.supervisor_id, "academic_cycle_id": policy.academic_cycle_id, "max_group_capacity": policy.max_group_capacity}
+    policy.supervisor_id = payload.supervisor_id; policy.academic_cycle_id = payload.academic_cycle_id; policy.max_group_capacity = payload.max_group_capacity
+    try:
+        session.flush()
+        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=payload.supervisor_id, target_type="SUPERVISOR_CAPACITY_POLICY", target_id=policy.id, action="supervisor_capacity_updated", changed_values={"before": previous, "after": payload.model_dump()})
+        session.commit(); session.refresh(policy)
+    except IntegrityError as error:
+        session.rollback()
+        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and cycle.") from error
+    except SQLAlchemyError as error:
+        session.rollback()
+        raise admin_user_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "capacity_save_failed", "Supervisor capacity could not be saved.") from error
+    return supervisor_capacity_out(policy)
 
 
 @app.post("/api/v1/auth/logout", status_code=status.HTTP_204_NO_CONTENT)

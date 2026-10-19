@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from ..database import Base
 
@@ -27,3 +27,18 @@ class AcademicGroupPolicy(Base):
     created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False,server_default=func.now())
     updated_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False,server_default=func.now(),onupdate=func.now())
     academic_cycle:Mapped[AcademicCycle]=relationship(back_populates="group_policy")
+
+class SupervisorCapacityPolicy(Base):
+    __tablename__="supervisor_capacity_policies"
+    __table_args__=(
+        CheckConstraint("max_group_capacity > 0",name="ck_supervisor_capacity_policies_capacity_positive"),
+        UniqueConstraint("supervisor_id", "academic_cycle_id", name="uq_supervisor_capacity_policies_supervisor_cycle"),
+    )
+    id:Mapped[int]=mapped_column(primary_key=True)
+    supervisor_id:Mapped[int]=mapped_column(ForeignKey("users.id",ondelete="RESTRICT"),nullable=False)
+    academic_cycle_id:Mapped[int]=mapped_column(ForeignKey("academic_cycles.id",ondelete="RESTRICT"),nullable=False)
+    max_group_capacity:Mapped[int]=mapped_column(Integer,nullable=False)
+    created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False,server_default=func.now())
+    updated_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False,server_default=func.now(),onupdate=func.now())
+    supervisor:Mapped["User"]=relationship("User")
+    academic_cycle:Mapped[AcademicCycle]=relationship("AcademicCycle")

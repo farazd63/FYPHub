@@ -33,7 +33,7 @@ This companion explains the source-cited matrix in [p1-feature-tracker.md](p1-fe
 
 ### M1 - academic governance
 
-M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, append-only audit writing, and internal template-reference metadata with immutable academic-rule versions are present. The template work is Partial: it has no official files, publication, storage/download, activation/retirement, or compliance checking. Workflow policies, capacity, rubrics, criteria, deadlines, reminders, escalations, and audit-history viewing remain absent.
+M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, and internal template-reference metadata with immutable academic-rule versions are present. The template work is Partial: it has no official files, publication, storage/download, activation/retirement, or compliance checking. Workflow policies, rubrics, criteria, deadlines, reminders, escalations, and audit-history viewing remain absent.
 
 ### M2 - team formation and collaboration
 
@@ -56,7 +56,8 @@ flowchart TD
     D -->|users and roles| E[Validate normalized account data and relationship guards]
     D -->|cycle and group maximum| F[Lock cycle then policy; validate positive limit]
     D -->|internal template references and rules| P[Implemented partial: immutable internal metadata/rule versions]
-    D -->|capacity, rubrics, deadlines, reminders| Q[Proposed only: no implementation]
+    D -->|supervisor capacity| R[Lock capacity writer, account and cycle; save positive unique policy plus audit]
+    D -->|rubrics, deadlines, reminders| Q[Proposed only: no implementation]
     E --> G{last active ADMIN or shared-team guard fails?}
     G -- yes --> X
     G -- no --> H[Mutate account; revoke sessions where required]
@@ -68,7 +69,25 @@ flowchart TD
     K --> L[Safe response and UI refresh]
 ```
 
-Actual implementation is in `backend/app/main.py`, backed by `User`, `AcademicCycle`, `AcademicGroupPolicy`, and `AdminAuditEvent`. Proposed-only nodes are intentionally not interactive in the Admin navigation.
+Actual implementation is in `backend/app/main.py`, backed by `User`, `AcademicCycle`, `AcademicGroupPolicy`, `SupervisorCapacityPolicy`, and `AdminAuditEvent`. Proposed-only nodes are intentionally not interactive in the Admin navigation.
+
+## M1-E.1 supervisor capacity pipeline
+
+```mermaid
+flowchart TD
+    A[ADMIN opens Supervisor Capacity] --> B[Load active SUPERVISOR accounts, cycles, and saved policies]
+    B --> C[Submit a new supervisor, cycle, positive integer maximum]
+    C --> D{Persisted active SUPERVISOR?}
+    D -->|no| X[Safe 404 or 409; no write]
+    D -->|yes| E[Acquire capacity advisory lock, then account and cycle row locks]
+    E --> F{One policy already exists for supervisor and cycle?}
+    F -->|yes| G[409 duplicate policy]
+    F -->|no| H[Insert policy and append audit event in one transaction]
+    H -->|failure| I[Rollback policy and audit together]
+    H -->|commit| J[Return safe policy]
+```
+
+This is configuration, not allocation enforcement. A policy is retained and labelled historical if its supervisor later becomes inactive, but new or edited policies require an active account whose persisted role is `SUPERVISOR`. Verified evidence covers backend tests, migration/schema checks, frontend lint/build, successful policy creation, and edit-form population with separate supervisor name/email fields. Update-save, post-save refresh persistence, and mobile browser verification are pending. There is intentionally no supervisor assignment workflow, no group count, and no filled/remaining capacity display; those require a later allocation model and enforcement checkpoint.
 
 ### M2 pipeline
 

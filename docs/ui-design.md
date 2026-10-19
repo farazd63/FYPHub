@@ -1,5 +1,13 @@
 # UI Design Decisions
 
+## Admin colour system
+
+Implemented Admin screens use scoped primary `#4663FF`, hover `#354FE0`, selected `#EEF1FF`, text `#183047`, muted text `#607087`, page `#F4F6FB`, white surfaces, and `#DCE3ED` borders. Semantic success, error, and warning colours remain distinct. Public-auth styling is not affected. Browser visual verification remains pending.
+
+## Shared application theme
+
+The application-level theme tokens are the authority for public authentication and implemented post-login screens: primary `#4663FF`, hover `#354FE0`, selected `#EEF1FF`, text `#243746`, muted `#607087`, page `#F4F6FB`, solid surface `#FFFFFF`, and border `#DCE3ED`. Future Student, Supervisor, Coordinator, Panel, and Admin screens must reuse these tokens. Semantic success, error, and warning colours remain exceptions rather than separate themes.
+
 ## F1: Create Team Account
 
 The F1 registration screen is labelled **Create Team Account**. It is a visual-only mockup and has no submission, API, or database behavior.

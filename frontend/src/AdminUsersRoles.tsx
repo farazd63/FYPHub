@@ -18,6 +18,13 @@ const roles: Role[] = [
   "PANEL_MEMBER",
   "ADMIN",
 ];
+const roleLabel: Record<Role, string> = {
+  STUDENT: "Student",
+  SUPERVISOR: "Supervisor",
+  COORDINATOR: "Coordinator",
+  PANEL_MEMBER: "Panel Member",
+  ADMIN: "Administrator",
+};
 const input =
   "w-full rounded-lg border border-[#cbd6d0] bg-white px-3 py-2 text-sm text-[#243746] focus:border-[#176b66]";
 const detail = (value: unknown) =>
@@ -40,7 +47,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
   const [busy, setBusy] = useState<number | "create" | null>(null);
   const [confirm, setConfirm] = useState<{
     user: User;
-    type: "role" | "status";
+    type: "status";
     value: string;
   } | null>(null);
   const [form, setForm] = useState({
@@ -129,11 +136,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            confirm.type === "role"
-              ? { role: confirm.value }
-              : { is_active: confirm.value === "true" },
-          ),
+          body: JSON.stringify({ is_active: confirm.value === "true" }),
         },
       );
       const body = await response.json().catch(() => ({}));
@@ -163,7 +166,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
             Users &amp; Roles
           </h1>
           <p className="mt-1 text-sm text-[#60716b]">
-            Manage user accounts, roles, and access.
+            View assigned roles and manage account status.
           </p>
         </div>
         <p className="text-sm text-[#60716b]">
@@ -282,23 +285,9 @@ export function AdminUsersRoles({ api }: { api: string }) {
                         </p>
                       </td>
                       <td className="px-3 py-3">
-                        <select
-                          aria-label={`Role for ${user.full_name}`}
-                          className="w-full rounded border border-[#cbd6d0] px-2 py-1 text-xs"
-                          value={user.role}
-                          disabled={busy === user.id}
-                          onChange={(event) =>
-                            setConfirm({
-                              user,
-                              type: "role",
-                              value: event.target.value,
-                            })
-                          }
-                        >
-                          {roles.map((item) => (
-                            <option key={item}>{item}</option>
-                          ))}
-                        </select>
+                        <span className="inline-flex rounded-full bg-[#eef0ff] px-2 py-1 text-xs font-bold text-[#263fae]">
+                          {user.role}
+                        </span>
                       </td>
                       <td className="px-3 py-3">
                         <span
@@ -387,21 +376,20 @@ export function AdminUsersRoles({ api }: { api: string }) {
             <PasswordField
               label="Password"
               value={form.password}
-              compact
               error={fieldError.startsWith("Use at least") || fieldError.includes("no more than") ? fieldError : undefined}
               onChange={(password) => { setForm({ ...form, password }); setFieldError(""); }}
             />
-            <label className="grid gap-1 text-sm font-semibold">
+            <label className="admin-create-role grid min-w-0 gap-1 text-sm font-semibold">
               Role
               <select
-                className={input}
+                className={`${input} min-w-0 pr-10`}
                 value={form.role}
                 onChange={(event) =>
                   setForm({ ...form, role: event.target.value as Role })
                 }
               >
                 {roles.map((item) => (
-                  <option key={item}>{item}</option>
+                  <option key={item} value={item}>{roleLabel[item]}</option>
                 ))}
               </select>
             </label>
@@ -447,9 +435,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
               Confirm account change
             </h2>
             <p className="mt-2 text-sm text-[#60716b]">
-              {confirm.type === "role"
-                ? `Change ${confirm.user.full_name}'s role to ${confirm.value}? Their active sessions will be revoked.`
-                : `${confirm.value === "true" ? "Activate" : "Deactivate"} ${confirm.user.full_name}?`}
+              {`${confirm.value === "true" ? "Activate" : "Deactivate"} ${confirm.user.full_name}?`}
             </p>
             <div className="mt-5 flex justify-end gap-3">
               <button

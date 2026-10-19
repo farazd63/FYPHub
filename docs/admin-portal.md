@@ -4,7 +4,11 @@
 
 The portal shell is available only after an authenticated `ADMIN` account successfully calls `GET /api/v1/admin/me`. It presents a responsive full-width application shell with a 240px desktop sidebar, a mobile menu, compact verified account/logout controls, and no placeholder counts, fake charts, or management controls.
 
-The Overview reads the existing public academic-cycle and group-policy APIs with credentialed requests. It displays only actual cycles, their registration state, and their configured group-size policy. Loading, empty, missing-policy, and request-failure states are explicit. Other M1 navigation items are visibly disabled until their authorized APIs and screens exist.
+The Overview reads the existing public academic-cycle and group-policy APIs with credentialed requests. It displays only actual cycles, their registration state, and their configured group-size policy. Loading, empty, missing-policy, and request-failure states are explicit. Other M1 navigation items are visibly disabled until their authorized APIs and screens exist, except the implemented Supervisor Capacity destination.
+
+## Supervisor Capacity
+
+The ADMIN-only **Supervisor Capacity** screen fetches active persisted SUPERVISOR accounts, academic cycles, and stored capacity policies. It creates or edits one positive whole-number maximum per supervisor/cycle, shows saved values, labels a policy as historical if its supervisor has since become ineligible, and handles loading, empty, error, and save feedback. User screenshots verify successful creation and edit-form population, including separate supervisor-name selection and read-only supervisor-email display. Update-save, post-save refresh persistence, and mobile browser verification remain pending. It does not allocate supervisors to teams or display filled/remaining counts.
 
 The public login screen includes an Administrator role card. Selecting it does not create or elevate an account: login sends `requested_role: "ADMIN"`, and the backend compares it to the persisted role. Public signup routes Administrator selection to the existing restricted-registration message.
 
@@ -33,7 +37,7 @@ flowchart LR
 
 ## M1-B users and roles
 
-`GET /api/v1/admin/users` supports ADMIN-only pagination, search, role, and active-status filters. `POST /api/v1/admin/users` creates a validated account using the existing Argon2id utility. `PATCH /api/v1/admin/users/{id}/role` and `/status` make confirmed role/status changes. All mutations validate browser Origin, require a persisted ADMIN session, return safe account data, and never expose password hashes or session data.
+`GET /api/v1/admin/users` supports ADMIN-only pagination, search, role, and active-status filters. `POST /api/v1/admin/users` creates a validated account using the existing Argon2id utility and assigns its initial role. Existing roles are fixed: `PATCH /api/v1/admin/users/{id}/role` returns `assigned_role_locked` without mutation. Status changes remain available through `/status`. All mutations validate browser Origin, require a persisted ADMIN session, return safe account data, and never expose password hashes or session data.
 
 Every successful account creation, role change, or status change writes an `admin_audit_events` row in the same database transaction. It records actor, affected account, action, timestamp, and safe metadata only. Migration `b8d2e4f6a9c1` adds a PostgreSQL trigger which rejects ordinary `UPDATE` and `DELETE` against that table. Database owners or privileged maintenance operations can still alter/drop that protection; it is not an immutable external ledger.
 
