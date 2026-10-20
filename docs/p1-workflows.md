@@ -33,7 +33,7 @@ This companion explains the source-cited matrix in [p1-feature-tracker.md](p1-fe
 
 ### M1 - academic governance
 
-M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, internal evaluation-rubric drafts with immutable ordered criteria, and non-operational deadline configuration are present. Template and rubric work remain Partial: neither provides an approved publication/activation lifecycle, and rubric drafts intentionally contain no academic scoring values. Workflow policies, deadline enforcement, reminders, escalations, and audit-history viewing remain absent.
+M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, internal evaluation-rubric drafts with immutable ordered criteria, non-operational deadline configuration, and non-operational reminder/escalation rule configuration are present. Template and rubric work remain Partial: neither provides an approved publication/activation lifecycle, and rubric drafts intentionally contain no academic scoring values. Workflow policies, deadline enforcement, reminder delivery, escalation execution, and audit-history viewing remain absent.
 
 ### M2 - team formation and collaboration
 
@@ -59,7 +59,7 @@ flowchart TD
     D -->|supervisor capacity| R[Lock capacity writer, account and cycle; save positive unique policy plus audit]
     D -->|internal rubric drafts| S[Lock allocator; save immutable version, ordered criteria, and audit]
     D -->|academic deadline configuration| T[Resolve timezone; save immutable version and audit]
-    D -->|reminders and escalations| Q[Proposed only: no implementation]
+    D -->|reminders and escalations| Q[Record non-operational rule version and audit]
     E --> G{last active ADMIN or shared-team guard fails?}
     G -- yes --> X
     G -- no --> H[Mutate account; revoke sessions where required]
@@ -72,6 +72,20 @@ flowchart TD
 ```
 
 Actual implementation is in `backend/app/main.py`, backed by the account, academic, capacity, rubric-version, and audit models. Proposed-only destinations remain disabled in the Admin navigation.
+
+## M1-H.1 reminder and escalation configuration
+
+```mermaid
+flowchart TD
+    A[ADMIN chooses cycle and exact deadline version] --> B[Enter category and elapsed minutes before or after]
+    B --> C[Server calculates UTC and localized preview]
+    C --> D[Save rule version and audit atomically]
+    D --> E[Ordered configuration history]
+    E -. separate future decisions .-> F[Scheduling and delivery]
+    E -. separate future decisions .-> G[Escalation execution]
+```
+
+The calculation adds or subtracts elapsed minutes from the exact referenced deadline instant in UTC, then displays the result in its stored IANA zone. This is not a local calendar-day rule. Later deadline versions never silently change an existing reference. Both rule identity and its versions are non-operational configuration; no job or message is created. Scheduling, delivery, recipient eligibility and channels, trigger and submission-status dependencies, stopping conditions, retry policy, and escalation authority and execution require future decisions. Four focused tests and 67 backend tests pass; Alembic current/head/check, pip check and frontend lint/build pass. Browser preview invalidation, save/history and mobile checks remain pending. M1 and P1 remain Partial.
 
 ## M1-G.1 academic deadline configuration pipeline
 

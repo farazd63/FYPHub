@@ -1,5 +1,13 @@
 # Project Progress
 
+## M1-H.1 Reminder and Escalation Rule Configuration
+
+- Added cycle-fixed rule identities and numbered configuration versions linked to exact deadline versions, under migration `b3c4d5e6f7a8`. No rules are seeded; recording a newer deadline does not relink existing rules.
+- ADMIN-only list, history, create, version and preview use explicit BEFORE/AFTER positive elapsed minutes, calculated in UTC and displayed in the deadline timezone. Elapsed minutes are durations, not local calendar days or university policy. Writes and audit events commit atomically.
+- Added the existing Admin navigation destination with configuration, server preview, history and stale-preview protection. No recipients, channels, jobs, delivery or escalation actions are implemented.
+- Verified four focused tests, 67 full backend tests, Alembic current/head `b3c4d5e6f7a8` and clean schema check, pip check, frontend lint/build, and git diff check. Browser preview invalidation, save/history and mobile checks remain pending.
+- Scheduling, delivery, recipients, operational authority, triggers, stopping conditions, retries and escalation execution remain pending. M1 and P1 remain Partial.
+
 ## M1-G.1 Academic Deadline Configuration (2026-10-19)
 
 - Added cycle-fixed `AcademicDeadline` identities and immutable numbered `AcademicDeadlineVersion` records under migration `a2b3c4d5e6f7`. Each version stores an administrator-supplied name, optional description, canonical timezone-aware due instant, IANA timezone, creator, and timestamp; no deadlines were seeded.

@@ -1354,3 +1354,119 @@ def register_team(
         "cycle": cycle,
         "members": created_members,
     }
+
+
+# Non-operational reminder/escalation configuration.
+from .models.reminder_rule import ReminderRule, ReminderRuleVersion
+from .schemas.reminder_rules import RuleCreate as ReminderCreate, RuleWrite as ReminderWrite, RulePreview as ReminderPreview
+
+
+def reminder_calculation(session: Session, payload: ReminderPreview, cycle_id: int | None = None) -> dict[str, object]:
+    version = session.get(AcademicDeadlineVersion, payload.deadline_version_id)
+    if version is None:
+        raise deadline_error(404, "deadline_version_not_found", "Deadline version was not found.")
+    deadline = session.get(AcademicDeadline, version.academic_deadline_id)
+    if cycle_id is not None and deadline.academic_cycle_id != cycle_id:
+        raise deadline_error(422, "deadline_cycle_mismatch", "Deadline version must belong to the rule's academic cycle.")
+    require_timezone_data()
+    try:
+        zone = ZoneInfo(version.time_zone)
+        due = version.due_at_utc.astimezone(timezone.utc)
+        delta = timedelta(minutes=payload.elapsed_minutes)
+        calculated = due - delta if payload.direction == "BEFORE" else due + delta
+        local = calculated.astimezone(zone)
+        due_local = due.astimezone(zone)
+    except ZoneInfoNotFoundError as error:
+        raise deadline_error(503, "timezone_data_unavailable", "Timezone data is unavailable; contact the service administrator.") from error
+    except (OverflowError, ValueError) as error:
+        raise deadline_error(422, "calculation_out_of_range", "Calculated time is outside the supported date range.") from error
+    return {"deadline_version_id": version.id, "deadline_id": deadline.id, "deadline_version_number": version.version_number, "academic_cycle_id": deadline.academic_cycle_id, "deadline_name": version.name, "due_at_utc": due, "due_local": due_local.isoformat(), "time_zone": version.time_zone, "direction": payload.direction, "elapsed_minutes": payload.elapsed_minutes, "calculated_at_utc": calculated, "calculated_local": local.isoformat(), "utc_offset": formatted_utc_offset(local.utcoffset() or timedelta())}
+
+
+def reminder_version_out(session: Session, version: ReminderRuleVersion) -> dict[str, object]:
+    calculation = reminder_calculation(session, ReminderPreview(deadline_version_id=version.deadline_version_id, direction=version.direction, elapsed_minutes=version.elapsed_minutes))
+    return {**calculation, "id": version.id, "version_number": version.version_number, "name": version.name, "description": version.description, "category": version.category, "created_at": version.created_at}
+
+
+def reminder_detail(session: Session, rule: ReminderRule) -> dict[str, object]:
+    versions = session.execute(select(ReminderRuleVersion).where(ReminderRuleVersion.rule_id == rule.id).order_by(ReminderRuleVersion.version_number)).scalars().all()
+    cycle = session.get(AcademicCycle, rule.academic_cycle_id)
+    return {"id": rule.id, "academic_cycle_id": rule.academic_cycle_id, "academic_cycle_name": cycle.display_name, "created_at": rule.created_at, "versions": [reminder_version_out(session, version) for version in versions]}
+
+
+def save_reminder_version(session: Session, rule: ReminderRule, payload: ReminderWrite, actor: User, number: int) -> ReminderRuleVersion:
+    reminder_calculation(session, payload, rule.academic_cycle_id)
+    version = ReminderRuleVersion(rule_id=rule.id, version_number=number, deadline_version_id=payload.deadline_version_id, name=payload.name, description=payload.description, category=payload.category, direction=payload.direction, elapsed_minutes=payload.elapsed_minutes, created_by_id=actor.id)
+    session.add(version)
+    session.flush()
+    add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="REMINDER_RULE", target_id=rule.id, action="reminder_rule_version_created", changed_values={"version": number, "academic_cycle_id": rule.academic_cycle_id, "deadline_version_id": payload.deadline_version_id, "category": payload.category, "direction": payload.direction, "elapsed_minutes": payload.elapsed_minutes, "operational": False})
+    return version
+
+
+@app.post("/api/v1/admin/reminder-rules/preview")
+def preview_reminder_rule(payload: ReminderPreview, request: Request, _: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    return reminder_calculation(session, payload)
+
+
+@app.get("/api/v1/admin/reminder-rules")
+def list_reminder_rules(academic_cycle_id: int | None = None, _: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
+    if academic_cycle_id is not None and session.get(AcademicCycle, academic_cycle_id) is None:
+        raise deadline_error(404, "cycle_not_found", "Academic cycle was not found.")
+    stmt = select(ReminderRule).order_by(ReminderRule.id)
+    if academic_cycle_id is not None:
+        stmt = stmt.where(ReminderRule.academic_cycle_id == academic_cycle_id)
+    return [reminder_detail(session, rule) for rule in session.execute(stmt).scalars().all()]
+
+
+@app.get("/api/v1/admin/reminder-rules/{rule_id}")
+def read_reminder_rule(rule_id: int, _: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
+    rule = session.get(ReminderRule, rule_id)
+    if rule is None:
+        raise deadline_error(404, "rule_not_found", "Rule was not found.")
+    return reminder_detail(session, rule)
+
+
+@app.post("/api/v1/admin/reminder-rules", status_code=201)
+def create_reminder_rule(payload: ReminderCreate, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    cycle = session.execute(select(AcademicCycle).where(AcademicCycle.id == payload.academic_cycle_id).with_for_update()).scalar_one_or_none()
+    if cycle is None:
+        raise deadline_error(404, "cycle_not_found", "Academic cycle was not found.")
+    try:
+        rule = ReminderRule(academic_cycle_id=cycle.id)
+        session.add(rule)
+        session.flush()
+        save_reminder_version(session, rule, payload, actor, 1)
+        result = reminder_detail(session, rule)
+        session.commit()
+        return result
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as error:
+        session.rollback()
+        raise deadline_error(500, "rule_save_failed", "Rule configuration could not be saved.") from error
+
+
+@app.post("/api/v1/admin/reminder-rules/{rule_id}/versions", status_code=201)
+def create_reminder_rule_version(rule_id: int, payload: ReminderWrite, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    identity = session.get(ReminderRule, rule_id)
+    if identity is None:
+        raise deadline_error(404, "rule_not_found", "Rule was not found.")
+    try:
+        session.execute(select(AcademicCycle).where(AcademicCycle.id == identity.academic_cycle_id).with_for_update()).scalar_one()
+        session.execute(text("SELECT pg_advisory_xact_lock(98139, :rule_id)"), {"rule_id": rule_id})
+        rule = session.execute(select(ReminderRule).where(ReminderRule.id == rule_id).with_for_update()).scalar_one()
+        number = (session.execute(select(func.max(ReminderRuleVersion.version_number)).where(ReminderRuleVersion.rule_id == rule_id)).scalar_one() or 0) + 1
+        version = save_reminder_version(session, rule, payload, actor, number)
+        result = reminder_version_out(session, version)
+        session.commit()
+        return result
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as error:
+        session.rollback()
+        raise deadline_error(500, "rule_save_failed", "Rule configuration could not be saved.") from error
