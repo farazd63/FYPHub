@@ -218,6 +218,27 @@ flowchart TD
 
 The lower proposed branch is not connected to the current shared-account flow. Its design must decide how requests, invitations, chat authorship, and acceptance work without silently changing the approved shared-login model.
 
+### Approved roster import and registration eligibility
+
+Roster import and eligibility checks for new team registration are implemented. An active persisted ADMIN selects a cycle and uploads an explicitly approved Excel roster. The server previews parsed rows and validates required fields, cycle, semesters 7/8, normalized identifiers and conflicts. The operator explicitly confirms that exact validated preview; the server revalidates against current data and imports the entire batch and a non-sensitive audit event atomically. Coordinator import access is deferred until its department/cycle scope is defined. No external university-system integration is needed.
+
+Roster records are cycle-scoped; group code is recorded as source data, with no unapproved group-composition enforcement. Existing accounts and teams are not automatically verified, deleted, or deactivated. At new team registration, the creator and every contact member must each match registration number and university email on the same approved record for the selected cycle, in addition to existing cycle, size and duplicate checks. A failed check gives a safe field-addressable error and creates no account or team. Shared-team login remains unchanged; member emails are contact identifiers only.
+
+```mermaid
+flowchart TD
+    A[ADMIN uploads approved roster for cycle] --> B[Parse and validate preview]
+    B -->|errors or conflicts| C[Show safe row errors; no import]
+    B -->|valid| D[ADMIN confirms exact preview]
+    D --> E[Lock cycle and revalidate current roster]
+    E -->|conflict or failure| C
+    E -->|valid| F[Atomically import records and audit]
+    F --> G[Registration checks each member against same cycle record]
+    G -->|any mismatch| H[Safe field error; no team created]
+    G -->|all match and existing checks pass| I[Create shared account and team]
+```
+
+Duplicate or conflicting rows and collisions with existing roster records are rejected for the batch; no silent replacement or partial import. Reimports with existing identifiers require resolution outside this first import path. Confirmation is bound to the exact uploaded bytes, actor and cycle, expires after ten minutes, and is replay-protected; a server restart or another worker invalidates the process-local preview token. Imports lock the cycle consistently with registration, and audit records contain only the cycle and count. How roster corrections, revocations or replacement operate later remains undecided; they are not implied by the initial append-only import proposal.
+
 ### M3 pipeline
 
 ```mermaid
@@ -230,11 +251,19 @@ flowchart TD
     F --> G{Student revises or authorized staff reviews?}
     G -->|revise| H[Create next version and AI change summary]
     H --> C
-    G -->|review| I[Role-scoped supervisor/coordinator/panel view]
+    G -->|first academic review| I[Assigned Supervisor reviews]
+    B -. explicit early panel routing may be permitted .-> P[Assigned Panel review]
+    B -. defense proposal .-> P
+    P --> V[Feedback visible to owning student or team, assigned Supervisor, responsible Coordinator]
+    K[Coordinator manages routing, assignments and oversight] -. authorized workflow .-> B
     D --> X[Failure: precise unmet rule or safe processing error]
 ```
 
-This entire M3 pipeline is proposed only. It cannot begin responsibly until M1-D has official templates and versioned academic rules, and the proposal lifecycle is approved.
+This entire M3 pipeline is proposed only. The assigned Supervisor exclusively owns the first academic review; the Coordinator is not a mandatory reviewer or approver at that stage. Assigned Panel members review defense proposals, and explicit routing may permit panel review before defense. Panel feedback is visible to the owning student/team, assigned Supervisor, and responsible Coordinator. The Coordinator manages workflow, routing, assignments, and oversight without impersonating reviewers, changing authorship, bypassing authorization, or altering immutable history. Panel chat/channels are outside this checkpoint.
+
+Future M1 configuration must supply applicable approved template/rule and workflow settings to M3; M3 must bind proposal versions, assignments, routing and reviewer-authored feedback to the applicable configuration and enforce the decided role boundaries. The current M1 reference records do not constitute approved publication or implement M3 review. Official templates and versioned academic rules, as well as the remaining proposal lifecycle decisions, are prerequisites for complete compliance and review flows.
+
+Still undecided: who may initiate early panel routing, correction/resubmission rules, final approval authority, and Coordinator department/cycle scope. The diagram does not imply an approval chain or resolve those choices.
 
 ## Evidence and manual demonstration steps
 
@@ -270,7 +299,7 @@ This implements the M1 template/rules foundation without claiming M3 format chec
 
 ### Subsequent source-dependent decisions
 
-- Define semester/workflow states before M1 workflow policy work.
+- Define semester/workflow states; review ownership is decided, while the early-routing initiator, correction/resubmission rules, final approval authority, and Coordinator department/cycle scope remain open.
 - Provide capacity, rubric/scoring, deadline, reminder, and escalation policies before their M1 checkpoints.
 - Resolve shared-login attribution for M2 matching, invitations, requests, chat, and collaboration before building those flows.
 - Define M3 lifecycle, upload/storage, role visibility, AI model/grounding/disclosure, and human-review rules before implementation.

@@ -1,5 +1,19 @@
 # Project Progress
 
+## M1-J.2 New Team Registration Eligibility
+
+- New team registration checks the creator and every member against one approved roster row in the selected cycle, using their normalized registration number and university contact email; semester must be 7 or 8. The shared login email remains separate. Mismatches return a safe member-specific error before any account, team or member is created.
+- Registration and roster import serialize on the cycle lock; existing cycle, group-size and duplicate checks remain in force. Existing accounts and teams are not retroactively verified, and group codes do not constrain team composition. No migration was added.
+- Thirty focused registration, roster and concurrency tests passed; the full backend suite passed 90 tests. Alembic current/head `c4d5e6f7a8b9`, schema check and pip check passed. Frontend lint and production build passed. Browser/mobile checks remain pending. M1 and P1 remain Partial.
+
+## M1-J.1 Approved Student Roster Import
+
+- Added ADMIN-only cycle-scoped XLSX preview, explicit confirmation, atomic import with safe audit, and paginated roster listing. Preview confirmation is bound to exact bytes, cycle and administrator, expires after 10 minutes, and is replay-protected. Tokens use a process-local key, so restart or another worker invalidates a preview.
+- Headers are `name`, `registration_number`, `university_email`, `semester`, `academic_cycle`, `group_code`, and optional `project_topic`. Registration identifiers must be Excel text without surrounding whitespace, preserving case and leading zeros; duplicate matching is case-insensitive. Numeric identifiers are rejected. Formula cells are rejected. Semester must be 7 or 8 and the sheet cycle must match the selected cycle code.
+- Technical limits, not academic policy: one worksheet, up to 2,000 data rows and seven columns; 2 MiB upload, 20 MiB total expanded ZIP content, and 256 ZIP entries. No raw workbook is retained. Invalid rows, conflicts and concurrent collisions prevent the complete import. `openpyxl==3.1.5` is pinned.
+- Five focused tests and the 76-test full backend suite passed; Alembic current/head `c4d5e6f7a8b9`, schema check, pip check, frontend lint/build and git diff check passed. Browser/mobile checks are pending.
+- At the M1-J.1 checkpoint registration and login were unchanged; M1-J.2 subsequently added new-team roster enforcement. Existing users/teams are not automatically verified. Group code is stored without enforcing team composition. M1 and P1 remain Partial.
+
 ## M1-I.1 Audit History Viewer
 
 - Added active persisted ADMIN-only, read-only list/detail endpoints with bounded pagination, deterministic newest-first ordering, actor/action/target and aware date-range filters. Count and page use one statement snapshot. Existing audit table and append-only trigger remain unchanged; no migration was added.

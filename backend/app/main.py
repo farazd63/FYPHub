@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from .database import engine, get_db
 from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
-from .models import AcademicCycle, AcademicGroupPolicy, SupervisorCapacityPolicy
+from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, SupervisorCapacityPolicy
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
 from .models import EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion
 from .models import AcademicDeadline, AcademicDeadlineVersion
@@ -42,7 +42,7 @@ app.add_middleware(
     allow_origins=["http://127.0.0.1:5174"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "PUT"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "X-File-Name", "X-Preview-Token"],
 )
 
 _DUMMY_PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=4$FkrCX/M1V29q1Jj4yMHSiw$rONBAdg5KlI9DhIbVoDaHB3lM5HJXojJYVeAaLlbGwI"
@@ -1303,6 +1303,31 @@ def register_team(
                     f"{email_paths[university_email]}.university_email",
                 )
 
+        # Import confirmation takes this same cycle lock before inserting roster rows.
+        # Keep it until registration commits so the eligibility decision is stable.
+        roster = session.execute(
+            select(ApprovedStudent.registration_number, ApprovedStudent.university_email, ApprovedStudent.semester)
+            .where(
+                ApprovedStudent.academic_cycle_id == cycle.id,
+                func.lower(ApprovedStudent.registration_number).in_(
+                    [member["registration_number"].lower() for member in all_members]
+                ),
+            )
+        ).all()
+        eligible = {
+            (number.lower(), email.lower())
+            for number, email, semester in roster if semester in (7, 8)
+        }
+        for index, member in enumerate(all_members):
+            if (member["registration_number"].lower(), member["university_email"].lower()) not in eligible:
+                prefix = "creator" if index == 0 else f"members.{index - 1}"
+                raise registration_error(
+                    status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    "student_not_eligible",
+                    "Registration number and university email could not be verified for this academic cycle.",
+                    f"{prefix}.registration_number",
+                )
+
         user = User(
             full_name=creator["full_name"],
             email=shared_login_email,
@@ -1474,3 +1499,6 @@ def create_reminder_rule_version(rule_id: int, payload: ReminderWrite, request: 
 
 from .audit_history import router as audit_history_router
 app.include_router(audit_history_router)
+
+from .student_roster import router as student_roster_router
+app.include_router(student_roster_router)

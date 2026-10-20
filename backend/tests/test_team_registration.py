@@ -149,7 +149,7 @@ class TeamRegistrationApiTests(unittest.TestCase):
     def registration(self, suffix: str) -> str:
         return f"{self.prefix}_{suffix}".upper()
 
-    def create_cycle(self, *, open_for_registration: bool, with_policy: bool = True, max_size: int = 3) -> int:
+    def create_cycle(self, *, open_for_registration: bool, with_policy: bool = True, max_size: int = 3, seed_roster: bool = True) -> int:
         self.cycle_index += 1
         cycle_id = self.connection.execute(
             text(
@@ -175,7 +175,28 @@ class TeamRegistrationApiTests(unittest.TestCase):
                 ),
                 {"cycle_id": cycle_id, "max_size": max_size},
             )
+        if seed_roster:
+            self.seed_roster(cycle_id, [
+                (self.registration("creator"), self.email("creator-contact")),
+                (self.registration("member"), self.email("member-contact")),
+            ])
         return cycle_id
+
+    def seed_roster(self, cycle_id: int, entries: list[tuple[str, str]]) -> None:
+        actor = self.connection.execute(text("""
+            INSERT INTO users (full_name, email, password_hash, role, is_active)
+            VALUES ('Roster fixture', :email, 'test-hash', CAST('ADMIN' AS user_role), true)
+            RETURNING id
+        """), {"email": self.email(f"roster-admin-{uuid4().hex}")}).scalar_one()
+        batch = self.connection.execute(text("""
+            INSERT INTO roster_imports (academic_cycle_id, imported_by_id, confirmation_hash)
+            VALUES (:cycle, :actor, :hash) RETURNING id
+        """), {"cycle": cycle_id, "actor": actor, "hash": uuid4().hex}).scalar_one()
+        for number, email in entries:
+            self.connection.execute(text("""
+                INSERT INTO approved_students (academic_cycle_id, import_id, name, registration_number, university_email, semester, group_code)
+                VALUES (:cycle, :batch, 'Fixture student', :number, :email, 7, 'fixture')
+            """), {"cycle": cycle_id, "batch": batch, "number": number, "email": email.lower()})
 
     def payload(self, cycle_id: int, **overrides: Any) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -382,3 +403,62 @@ class TeamRegistrationApiTests(unittest.TestCase):
         self.assertEqual(self.detail_code(response), "shared_login_email_exists")
         self.assertNotIn("password", response)
         self.assertNotIn("password_hash", response)
+
+
+class TeamEligibilityTests(TeamRegistrationApiTests):
+    """Roster enforcement uses the selected cycle and each member's contact email."""
+
+    def assert_no_registration(self, cycle_id: int, payload: dict[str, Any]) -> None:
+        self.assertEqual(self.connection.execute(text("SELECT count(*) FROM users WHERE email=:email"), {"email": payload["shared_login_email"]}).scalar_one(), 0)
+        self.assertEqual(self.connection.execute(text("SELECT count(*) FROM teams WHERE academic_cycle_id=:id"), {"id": cycle_id}).scalar_one(), 0)
+        self.assertEqual(self.connection.execute(text("SELECT count(*) FROM team_members WHERE academic_cycle_id=:id"), {"id": cycle_id}).scalar_one(), 0)
+
+    def test_missing_creator_and_member_are_field_specific_and_atomic(self) -> None:
+        for missing in ("creator", "member"):
+            with self.subTest(missing=missing):
+                cycle = self.create_cycle(open_for_registration=True, seed_roster=False)
+                payload = self.payload(cycle)
+                selected = payload["members"][0] if missing == "creator" else payload["creator"]
+                self.seed_roster(cycle, [(selected["registration_number"], selected["university_email"])])
+                status, response = request_json(payload)
+                self.assertEqual(status, 422)
+                self.assertEqual(response["detail"]["code"], "student_not_eligible")
+                self.assertEqual(response["detail"]["field"], "creator.registration_number" if missing == "creator" else "members.0.registration_number")
+                self.assertNotIn(selected["university_email"], str(response))
+                self.assert_no_registration(cycle, payload)
+
+    def test_wrong_cycle_and_mismatched_pair_are_rejected(self) -> None:
+        other = self.create_cycle(open_for_registration=True)
+        cycle = self.create_cycle(open_for_registration=True, seed_roster=False)
+        payload = self.payload(cycle)
+        status, _ = request_json(payload)
+        self.assertEqual(status, 422)
+        self.assert_no_registration(cycle, payload)
+        self.seed_roster(cycle, [(payload["creator"]["registration_number"], payload["members"][0]["university_email"]), (payload["members"][0]["registration_number"], payload["creator"]["university_email"])])
+        status, response = request_json(payload)
+        self.assertEqual(status, 422)
+        self.assertEqual(response["detail"]["field"], "creator.registration_number")
+        self.assert_no_registration(cycle, payload)
+        self.assertNotEqual(other, cycle)
+
+    def test_normalization_and_shared_login_is_not_contact_email(self) -> None:
+        cycle = self.create_cycle(open_for_registration=True, seed_roster=False)
+        payload = self.payload(cycle)
+        self.seed_roster(cycle, [("001abc", payload["creator"]["university_email"]), ("002abc", payload["members"][0]["university_email"])])
+        payload["creator"]["registration_number"] = " 001ABC "
+        payload["members"][0]["registration_number"] = "002AbC"
+        payload["creator"]["university_email"] = payload["creator"]["university_email"].upper()
+        self.assertNotEqual(payload["shared_login_email"], payload["creator"]["university_email"].lower())
+        self.assertEqual(request_json(payload)[0], 201)
+
+    def test_invalid_semester_is_rejected_by_roster_constraint(self) -> None:
+        from sqlalchemy.exc import IntegrityError
+        cycle = self.create_cycle(open_for_registration=True)
+        payload = self.payload(cycle)
+        savepoint = self.connection.begin_nested()
+        try:
+            with self.assertRaises(IntegrityError):
+                self.connection.execute(text("UPDATE approved_students SET semester=6 WHERE academic_cycle_id=:id"), {"id": cycle})
+        finally:
+            savepoint.rollback()
+        self.assertEqual(request_json(payload)[0], 201)

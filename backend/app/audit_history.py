@@ -11,6 +11,7 @@ from .models import AdminAuditEvent, User, UserRole
 router = APIRouter(prefix="/api/v1/admin/audit-events")
 # Historical and current writers' documented scalar keys; unknown data is withheld.
 SAFE_KEYS = {
+    "student_roster_imported": {"academic_cycle_id", "record_count"},
     "account_created": {"email", "role", "is_active"},
     "account_status_changed": {"is_active", "previous_is_active"},
     "account_role_changed": {"role", "previous_role"},

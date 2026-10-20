@@ -12,3 +12,5 @@ from .academic_deadline import AcademicDeadline, AcademicDeadlineVersion
 __all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion", "AcademicDeadline", "AcademicDeadlineVersion"]
 
 from .reminder_rule import ReminderRule, ReminderRuleVersion
+
+from .student_roster import ApprovedStudent, RosterImport
