@@ -33,7 +33,7 @@ This companion explains the source-cited matrix in [p1-feature-tracker.md](p1-fe
 
 ### M1 - academic governance
 
-M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, and internal evaluation-rubric drafts with immutable ordered criteria are present. Template and rubric work remain Partial: neither provides an approved publication/activation lifecycle, and rubric drafts intentionally contain no academic scoring values. Workflow policies, deadlines, reminders, escalations, and audit-history viewing remain absent.
+M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, internal evaluation-rubric drafts with immutable ordered criteria, and non-operational deadline configuration are present. Template and rubric work remain Partial: neither provides an approved publication/activation lifecycle, and rubric drafts intentionally contain no academic scoring values. Workflow policies, deadline enforcement, reminders, escalations, and audit-history viewing remain absent.
 
 ### M2 - team formation and collaboration
 
@@ -58,7 +58,8 @@ flowchart TD
     D -->|internal template references and rules| P[Implemented partial: immutable internal metadata/rule versions]
     D -->|supervisor capacity| R[Lock capacity writer, account and cycle; save positive unique policy plus audit]
     D -->|internal rubric drafts| S[Lock allocator; save immutable version, ordered criteria, and audit]
-    D -->|deadlines and reminders| Q[Proposed only: no implementation]
+    D -->|academic deadline configuration| T[Resolve timezone; save immutable version and audit]
+    D -->|reminders and escalations| Q[Proposed only: no implementation]
     E --> G{last active ADMIN or shared-team guard fails?}
     G -- yes --> X
     G -- no --> H[Mutate account; revoke sessions where required]
@@ -71,6 +72,45 @@ flowchart TD
 ```
 
 Actual implementation is in `backend/app/main.py`, backed by the account, academic, capacity, rubric-version, and audit models. Proposed-only destinations remain disabled in the Admin navigation.
+
+## M1-G.1 academic deadline configuration pipeline
+
+```mermaid
+flowchart TD
+    A[ADMIN opens Academic Deadlines] --> B[Load real cycles, IANA zones, and recorded versions]
+    B --> C[Enter name, local date/time, and explicit timezone]
+    C --> D[Server resolves valid UTC offset candidates]
+    D -->|gap or invalid zone| E[Safe validation error; no write]
+    D -->|ambiguous| F[Require explicit valid offset]
+    D -->|one valid offset| G[Return local/UTC preview]
+    F --> G
+    G --> H[ADMIN reviews preview and saves]
+    H --> I[Lock cycle, then deadline allocator]
+    I --> J[Insert immutable version and audit event atomically]
+    J -->|failure| K[Rollback both]
+    J -->|success| L[Return ordered configuration history]
+    L -. separate future work .-> M[Submission enforcement]
+    L -. separate future work .-> N[Reminder delivery and escalation execution]
+```
+
+The server uses the installed IANA timezone database. It accepts a local wall time plus an explicit IANA zone, detects daylight-saving gaps and overlaps by round-trip resolution, and requires an offset choice only when more than one instant is valid. The final write includes the server-previewed UTC instant and is rejected if it no longer matches the local time, timezone, and offset. Both write endpoints reject naive timestamps. The runtime must provide IANA timezone data; unavailable data produces a sanitized service error. PostgreSQL stores the canonical instant as timezone-aware data and retains the IANA zone for faithful display.
+
+The latest version means only the most recently recorded configuration. It is not approved, published, active, enforced, or scheduled. The deadline identity remains fixed to its original academic cycle, and earlier versions are never rewritten.
+
+### M1-G.1 manual verification
+
+Use an isolated Admin/test context and administrator-supplied values; do not alter real academic configuration.
+
+1. Sign in as an active persisted `ADMIN` and open **Deadlines**.
+2. Filter by a real academic cycle and confirm empty/existing states load correctly.
+3. Enter a name, optional description, local date/time, and explicit IANA timezone.
+4. Validate the time and review both the resolved local value and canonical UTC value before saving.
+5. Change the local time or timezone and confirm the preview is invalidated and saving remains unavailable until revalidation.
+6. For an ambiguous local time, select one of the server-returned offsets; confirm a nonexistent local time is rejected.
+7. Create an initial configuration, then a subsequent version; confirm the cycle remains fixed and earlier history is unchanged.
+8. Confirm no submission action, reminder, delivery schedule, escalation, approval, penalty, or grace-period control is shown.
+
+Reported automated coverage includes authorization, Origin rejection, unknown cycles, strict requests, naive timestamps, timezone conversion/mismatch/gap/overlap behavior, historical preservation, atomic audit rollback, and bounded concurrent allocation: 8 deadline tests and 63 full backend tests. Alembic current/head are `a2b3c4d5e6f7`; schema check, `pip check` passed; frontend lint/build were previously reported as passed. Screenshot evidence shows the server preview converting 20 October 2026, 17:00 Asia/Karachi to 12:00 UTC. Browser preview invalidation, save/version-history interactions, and responsive/mobile visual verification remain pending.
 
 ## M1-F.1 internal evaluation-rubric draft pipeline
 

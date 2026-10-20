@@ -1,4 +1,5 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
@@ -13,8 +14,10 @@ from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRo
 from .models import AcademicCycle, AcademicGroupPolicy, SupervisorCapacityPolicy
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
 from .models import EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion
+from .models import AcademicDeadline, AcademicDeadlineVersion
 from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
 from .schemas.evaluation_rubrics import RubricDetailOut, RubricListOut, RubricVersionOut, RubricVersionWrite
+from .schemas.academic_deadlines import DeadlineCreate, DeadlineDetailOut, DeadlineListOut, DeadlinePreviewOut, DeadlinePreviewRequest, DeadlineVersionOut, DeadlineWrite
 from .schemas.academic import CycleCreate, CycleOut, CycleUpdate, PolicyOut, PolicyUpdate
 from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
 from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange
@@ -136,6 +139,254 @@ def locked_cycle_and_policy(session: Session, cycle_id: int) -> tuple[AcademicCy
 def largest_active_team_size(session: Session, cycle_id: int) -> int:
     sizes = session.execute(select(func.count(TeamMember.id)).where(TeamMember.academic_cycle_id == cycle_id, TeamMember.is_active.is_(True)).group_by(TeamMember.team_id)).scalars().all()
     return max(sizes, default=0)
+
+
+def deadline_error(status_code: int, code: str, message: str, **extra: object) -> HTTPException:
+    return HTTPException(status_code=status_code, detail={"code": code, "message": message, **extra})
+
+
+def formatted_utc_offset(value: timedelta) -> str:
+    minutes = int(value.total_seconds() // 60)
+    sign = "+" if minutes >= 0 else "-"
+    minutes = abs(minutes)
+    return f"{sign}{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def require_timezone_data() -> None:
+    try:
+        ZoneInfo("UTC")
+    except ZoneInfoNotFoundError as error:
+        raise deadline_error(status.HTTP_503_SERVICE_UNAVAILABLE, "timezone_data_unavailable", "Timezone data is unavailable; contact the service administrator.") from error
+
+
+def resolve_deadline_time(payload: DeadlinePreviewRequest) -> tuple[datetime, str, str]:
+    """Resolve a wall time without guessing a zone, gap, or overlapping offset."""
+    require_timezone_data()
+    try:
+        zone = ZoneInfo(payload.time_zone)
+    except (ZoneInfoNotFoundError, ValueError) as error:
+        raise deadline_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid_time_zone", "Select a valid IANA time zone.") from error
+    wall = datetime.fromisoformat(payload.local_due_at)
+    candidates: dict[str, datetime] = {}
+    for fold in (0, 1):
+        localized = wall.replace(tzinfo=zone, fold=fold)
+        utc_value = localized.astimezone(timezone.utc)
+        round_trip = utc_value.astimezone(zone)
+        if round_trip.replace(tzinfo=None) == wall:
+            offset = formatted_utc_offset(localized.utcoffset() or timedelta())
+            candidates[offset] = utc_value
+    valid_offsets = sorted(candidates)
+    if not valid_offsets:
+        raise deadline_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "nonexistent_local_time", "That local time does not exist in the selected time zone.")
+    if len(valid_offsets) > 1 and payload.utc_offset is None:
+        raise deadline_error(status.HTTP_409_CONFLICT, "ambiguous_local_time", "Choose the intended UTC offset for this ambiguous local time.", valid_offsets=valid_offsets)
+    selected_offset = payload.utc_offset or valid_offsets[0]
+    if selected_offset not in candidates:
+        raise deadline_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "offset_timezone_mismatch", "The UTC offset does not match that local time and time zone.", valid_offsets=valid_offsets)
+    return candidates[selected_offset], selected_offset, wall.isoformat(timespec="minutes" if wall.second == 0 else "seconds")
+
+
+def deadline_version_out(version: AcademicDeadlineVersion) -> dict[str, object]:
+    require_timezone_data()
+    try:
+        zone = ZoneInfo(version.time_zone)
+    except ZoneInfoNotFoundError as error:
+        raise deadline_error(status.HTTP_503_SERVICE_UNAVAILABLE, "timezone_data_unavailable", "Timezone data is unavailable; contact the service administrator.") from error
+    local = version.due_at_utc.astimezone(zone)
+    return {
+        "id": version.id,
+        "version_number": version.version_number,
+        "name": version.name,
+        "description": version.description,
+        "due_at_utc": version.due_at_utc,
+        "local_due_at": local.replace(tzinfo=None).isoformat(timespec="minutes" if local.second == 0 else "seconds"),
+        "time_zone": version.time_zone,
+        "utc_offset": formatted_utc_offset(local.utcoffset() or timedelta()),
+        "created_at": version.created_at,
+    }
+
+
+def deadline_detail_out(session: Session, deadline: AcademicDeadline) -> dict[str, object]:
+    cycle = session.get(AcademicCycle, deadline.academic_cycle_id)
+    versions = session.execute(
+        select(AcademicDeadlineVersion)
+        .where(AcademicDeadlineVersion.academic_deadline_id == deadline.id)
+        .order_by(AcademicDeadlineVersion.version_number)
+    ).scalars().all()
+    return {
+        "id": deadline.id,
+        "academic_cycle_id": deadline.academic_cycle_id,
+        "academic_cycle_name": cycle.display_name if cycle else "Unavailable cycle",
+        "created_at": deadline.created_at,
+        "versions": [deadline_version_out(version) for version in versions],
+    }
+
+
+def validate_deadline_write(payload: DeadlineWrite) -> tuple[datetime, str]:
+    due_at_utc, selected_offset, _ = resolve_deadline_time(payload)
+    submitted_utc = payload.due_at_utc.astimezone(timezone.utc)
+    if submitted_utc != due_at_utc:
+        raise deadline_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "deadline_preview_mismatch", "The canonical due time no longer matches the local-time preview.")
+    return due_at_utc, selected_offset
+
+
+def save_deadline_version(session: Session, deadline: AcademicDeadline, payload: DeadlineWrite, actor: User, number: int) -> AcademicDeadlineVersion:
+    due_at_utc, selected_offset = validate_deadline_write(payload)
+    version = AcademicDeadlineVersion(
+        academic_deadline_id=deadline.id,
+        version_number=number,
+        name=payload.name,
+        description=payload.description,
+        due_at_utc=due_at_utc,
+        time_zone=payload.time_zone,
+        created_by_id=actor.id,
+    )
+    session.add(version)
+    session.flush()
+    add_admin_audit_event(
+        session,
+        actor_id=actor.id,
+        affected_user_id=None,
+        target_type="ACADEMIC_DEADLINE",
+        target_id=deadline.id,
+        action="academic_deadline_version_created",
+        changed_values={
+            "academic_cycle_id": deadline.academic_cycle_id,
+            "version": number,
+            "name": payload.name,
+            "due_at_utc": due_at_utc.isoformat(),
+            "time_zone": payload.time_zone,
+            "utc_offset": selected_offset,
+            "operational": False,
+        },
+    )
+    return version
+
+
+@app.get("/api/v1/admin/time-zones", response_model=list[str])
+def list_time_zones(_: User = Depends(require_roles(UserRole.ADMIN))) -> list[str]:
+    require_timezone_data()
+    return sorted(available_timezones())
+
+
+@app.post("/api/v1/admin/academic-deadlines/preview", response_model=DeadlinePreviewOut)
+def preview_academic_deadline(
+    payload: DeadlinePreviewRequest,
+    request: Request,
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+) -> dict[str, object]:
+    validate_mutating_origin(request)
+    due_at_utc, selected_offset, normalized_local = resolve_deadline_time(payload)
+    return {"local_due_at": normalized_local, "time_zone": payload.time_zone, "utc_offset": selected_offset, "due_at_utc": due_at_utc}
+
+
+@app.get("/api/v1/admin/academic-deadlines", response_model=list[DeadlineListOut])
+def list_academic_deadlines(
+    academic_cycle_id: int | None = None,
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    if academic_cycle_id is not None and session.get(AcademicCycle, academic_cycle_id) is None:
+        raise deadline_error(status.HTTP_404_NOT_FOUND, "cycle_not_found", "Academic cycle was not found.")
+    latest = (
+        select(AcademicDeadlineVersion.academic_deadline_id, func.max(AcademicDeadlineVersion.version_number).label("number"))
+        .group_by(AcademicDeadlineVersion.academic_deadline_id)
+        .subquery()
+    )
+    statement = (
+        select(AcademicDeadline, AcademicDeadlineVersion, AcademicCycle, latest.c.number)
+        .join(AcademicCycle, AcademicCycle.id == AcademicDeadline.academic_cycle_id)
+        .join(latest, latest.c.academic_deadline_id == AcademicDeadline.id)
+        .join(AcademicDeadlineVersion, (AcademicDeadlineVersion.academic_deadline_id == AcademicDeadline.id) & (AcademicDeadlineVersion.version_number == latest.c.number))
+        .order_by(AcademicDeadline.id)
+    )
+    if academic_cycle_id is not None:
+        statement = statement.where(AcademicDeadline.academic_cycle_id == academic_cycle_id)
+    rows = session.execute(statement).all()
+    return [
+        {
+            "id": deadline.id,
+            "academic_cycle_id": deadline.academic_cycle_id,
+            "academic_cycle_name": cycle.display_name,
+            "latest_version_number": number,
+            **{key: value for key, value in deadline_version_out(version).items() if key not in {"id", "version_number", "created_at"}},
+        }
+        for deadline, version, cycle, number in rows
+    ]
+
+
+@app.get("/api/v1/admin/academic-deadlines/{deadline_id}", response_model=DeadlineDetailOut)
+def academic_deadline_detail(
+    deadline_id: int,
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    deadline = session.get(AcademicDeadline, deadline_id)
+    if deadline is None:
+        raise deadline_error(status.HTTP_404_NOT_FOUND, "deadline_not_found", "Academic deadline was not found.")
+    return deadline_detail_out(session, deadline)
+
+
+@app.post("/api/v1/admin/academic-deadlines", status_code=status.HTTP_201_CREATED, response_model=DeadlineDetailOut)
+def create_academic_deadline(
+    payload: DeadlineCreate,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    validate_mutating_origin(request)
+    cycle = session.execute(select(AcademicCycle).where(AcademicCycle.id == payload.academic_cycle_id).with_for_update()).scalar_one_or_none()
+    if cycle is None:
+        raise deadline_error(status.HTTP_404_NOT_FOUND, "cycle_not_found", "Academic cycle was not found.")
+    try:
+        deadline = AcademicDeadline(academic_cycle_id=cycle.id)
+        session.add(deadline)
+        session.flush()
+        save_deadline_version(session, deadline, payload, actor, 1)
+        session.commit()
+        session.refresh(deadline)
+        return deadline_detail_out(session, deadline)
+    except HTTPException:
+        session.rollback()
+        raise
+    except SQLAlchemyError as error:
+        session.rollback()
+        raise deadline_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "deadline_save_failed", "Academic deadline could not be saved.") from error
+    except Exception as error:
+        session.rollback()
+        raise deadline_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "deadline_save_failed", "Academic deadline could not be saved.") from error
+
+
+@app.post("/api/v1/admin/academic-deadlines/{deadline_id}/versions", status_code=status.HTTP_201_CREATED, response_model=DeadlineVersionOut)
+def create_academic_deadline_version(
+    deadline_id: int,
+    payload: DeadlineWrite,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    validate_mutating_origin(request)
+    identity = session.get(AcademicDeadline, deadline_id)
+    if identity is None:
+        raise deadline_error(status.HTTP_404_NOT_FOUND, "deadline_not_found", "Academic deadline was not found.")
+    session.execute(select(AcademicCycle).where(AcademicCycle.id == identity.academic_cycle_id).with_for_update()).scalar_one()
+    session.execute(text("SELECT pg_advisory_xact_lock(98138, :deadline_id)"), {"deadline_id": deadline_id})
+    deadline = session.execute(select(AcademicDeadline).where(AcademicDeadline.id == deadline_id).with_for_update()).scalar_one()
+    number = (session.execute(select(func.max(AcademicDeadlineVersion.version_number)).where(AcademicDeadlineVersion.academic_deadline_id == deadline.id)).scalar_one() or 0) + 1
+    try:
+        version = save_deadline_version(session, deadline, payload, actor, number)
+        session.commit()
+        session.refresh(version)
+        return deadline_version_out(version)
+    except HTTPException:
+        session.rollback()
+        raise
+    except SQLAlchemyError as error:
+        session.rollback()
+        raise deadline_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "deadline_save_failed", "Academic deadline version could not be saved.") from error
+    except Exception as error:
+        session.rollback()
+        raise deadline_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "deadline_save_failed", "Academic deadline version could not be saved.") from error
 
 @app.get("/api/v1/admin/template-references", response_model=list[TemplateListOut])
 def list_template_references(_: User=Depends(require_roles(UserRole.ADMIN)), session: Session=Depends(get_db)):

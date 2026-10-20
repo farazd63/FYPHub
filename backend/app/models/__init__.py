@@ -7,5 +7,6 @@ from .auth_session import AuthSession
 from .audit_event import AdminAuditEvent
 from .template_reference import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
 from .evaluation_rubric import EvaluationRubric, EvaluationRubricVersion, EvaluationRubricCriterion
+from .academic_deadline import AcademicDeadline, AcademicDeadlineVersion
 
-__all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion"]
+__all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion", "AcademicDeadline", "AcademicDeadlineVersion"]

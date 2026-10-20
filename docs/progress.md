@@ -1,5 +1,14 @@
 # Project Progress
 
+## M1-G.1 Academic Deadline Configuration (2026-10-19)
+
+- Added cycle-fixed `AcademicDeadline` identities and immutable numbered `AcademicDeadlineVersion` records under migration `a2b3c4d5e6f7`. Each version stores an administrator-supplied name, optional description, canonical timezone-aware due instant, IANA timezone, creator, and timestamp; no deadlines were seeded.
+- Added ADMIN-only timezone listing, server-authoritative local/UTC preview, cycle-filtered listing, complete history, initial creation, and subsequent-version APIs. Validation rejects unknown zones, offset mismatches, nonexistent local times, and ambiguous local times without an explicit valid offset. Both write endpoints reject naive canonical timestamps without inferring the server timezone. Deployments must provide IANA timezone data; unavailable data yields a sanitized HTTP 503. This environment resolves Asia/Karachi and lists 598 zones using installed tzdata.
+- Added the focused **Academic Deadlines** screen in the existing Admin shell with real cycles/timezones, filtering, stale-response protection, required preview invalidation, version selection/history, safe feedback, and duplicate-submit prevention.
+- Verified after the timestamp fix: 8 focused deadline tests and 63 full backend tests passed; Alembic current/head are `a2b3c4d5e6f7`, schema check is clean, and `pip check` passed. Frontend lint/build were previously reported as passed. Screenshot evidence confirms the server preview converted **20 October 2026, 17:00 Asia/Karachi** to **12:00 UTC**.
+- Browser preview invalidation, save/version-history interactions, and mobile visual verification remain pending.
+- This is non-operational configuration only. No submission enforcement, deadline stages, default dates, penalties, grace periods, approval/publication states, reminders, delivery scheduling, or escalation execution exist. M1 and P1 remain Partial.
+
 ## M1-F.1 Internal Evaluation Rubric Draft Configuration (2026-10-19)
 
 - Added stable rubric identities with immutable numbered versions and ordered criterion snapshots under Alembic revision `f1a2b3c4d5e6`. Names are required and descriptions optional; no rubric or academic values are seeded.
