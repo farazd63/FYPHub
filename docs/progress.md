@@ -1,5 +1,12 @@
 # Project Progress
 
+## M1-I.1 Audit History Viewer
+
+- Added active persisted ADMIN-only, read-only list/detail endpoints with bounded pagination, deterministic newest-first ordering, actor/action/target and aware date-range filters. Count and page use one statement snapshot. Existing audit table and append-only trigger remain unchanged; no migration was added.
+- Explicit action and field allowlists expose supported recorded changes only, including safe nested values. Unknown legacy fields are omitted, and actor/target IDs are retained without requiring display records. No credentials or session tokens are returned.
+- Enabled the existing Audit History navigation and added UTC-labelled filters, rows, pagination and safe-text detail, including loading, errors and stale-response handling.
+- Four focused audit tests and the full 71-test backend suite pass against the final pagination implementation. Frontend lint/build and git diff check pass. Browser and mobile verification remain pending; M1 and P1 remain Partial.
+
 ## M1-H.1 Reminder and Escalation Rule Configuration
 
 - Added cycle-fixed rule identities and numbered configuration versions linked to exact deadline versions, under migration `b3c4d5e6f7a8`. No rules are seeded; recording a newer deadline does not relink existing rules.

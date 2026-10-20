@@ -10,6 +10,8 @@
 
 > **M1-H.1 update:** ADMIN-only, non-operational reminder/escalation rule versions and elapsed-minute previews reference exact deadline versions under migration `b3c4d5e6f7a8`. Four focused tests and 67 backend tests pass; Alembic current/head/check and pip check pass; frontend lint/build pass. Browser verification remains pending. Scheduling, delivery, recipients, authority, stopping conditions, retries, and escalation execution remain pending. M1 and P1 remain Partial.
 
+> **M1-I.1 update:** ADMIN-only read-only audit listing and detail support bounded pagination and filters, with explicitly allowlisted recorded changes. Four focused tests and the full 71-test backend suite pass against the final pagination implementation. Frontend lint/build pass; browser and mobile verification remain pending. M1 and P1 remain Partial.
+
 This is the source-of-truth P1 Mid coverage record. It was reconciled against the original proposals, not inferred from navigation or endpoint names.
 
 - **Primary requirement source:** *long proposal.pdf*, section 9.3, PDF pages 9-10.
@@ -34,7 +36,7 @@ Repository paths below are concrete implementation references. The full-suite re
 | M1-09 | Long 9.3 p9: scoring-criteria configuration. | Partial | Draft criterion names, optional descriptions, and explicit ordering are versioned and preserved historically. | Official criteria, marks/scales, weights, thresholds, aggregation, stages, and amendment/approval rules remain undecided and unimplemented. |
 | M1-10 | Long 9.3 p9: academic-deadline configuration. | Partial | Cycle-fixed deadline identities; immutable versions; UTC/IANA timezone validation and preview; ADMIN list/filter/history/create/version APIs; `AdminDeadlines.tsx`; migration `a2b3c4d5e6f7`; 8 focused tests and 63 full backend tests. Screenshot evidence: 20 Oct 2026 17:00 Asia/Karachi to 12:00 UTC. | Browser preview invalidation, save/version-history interactions, and mobile verification remain pending. No official deadline values/stages, operational activation, submission enforcement, exceptions, penalties, reminders, or escalation. |
 | M1-11 | Long 9.3 p9: deadline reminder and escalation rules. | Partial | ADMIN-only versioned non-operational configuration, exact deadline-version references, elapsed-minute calculation preview, audit, UI, and four focused tests. | Browser checks pending. Scheduling, recipients, channels, delivery, triggers, stopping conditions, retries, operational authority, and escalation execution remain undecided and unimplemented. |
-| M1-12 | Long 9.3 p9: immutable audit history of administrative changes. | Partial | `AdminAuditEvent`; migrations `b8d2e4f6a9c1`, `c4e7f1a2b9d3`; append-only trigger; writers in `main.py`; trigger/atomicity tests in `test_admin_users.py`. | No authorized audit-history reader UI/API. Database owners can alter protections; it is not an external immutable ledger. |
+| M1-12 | Long 9.3 p9: immutable audit history of administrative changes. | Partial | `AdminAuditEvent`, append-only trigger and atomic writers; ADMIN-only filtered, paginated reader and detail UI; four focused viewer tests. | Browser and mobile verification pending. Unsupported legacy change fields are omitted. Database owners can alter protections; it is not an external immutable ledger. |
 
 ## M2 - Student Team & Collaboration Hub
 

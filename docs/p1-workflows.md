@@ -33,7 +33,7 @@ This companion explains the source-cited matrix in [p1-feature-tracker.md](p1-fe
 
 ### M1 - academic governance
 
-M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, internal evaluation-rubric drafts with immutable ordered criteria, non-operational deadline configuration, and non-operational reminder/escalation rule configuration are present. Template and rubric work remain Partial: neither provides an approved publication/activation lifecycle, and rubric drafts intentionally contain no academic scoring values. Workflow policies, deadline enforcement, reminder delivery, escalation execution, and audit-history viewing remain absent.
+M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, internal evaluation-rubric drafts with immutable ordered criteria, non-operational deadline configuration, non-operational reminder/escalation rule configuration, and an ADMIN-only audit-history viewer are present. Template and rubric work remain Partial: neither provides an approved publication/activation lifecycle, and rubric drafts intentionally contain no academic scoring values. Workflow policies, deadline enforcement, reminder delivery, and escalation execution remain absent.
 
 ### M2 - team formation and collaboration
 
@@ -72,6 +72,19 @@ flowchart TD
 ```
 
 Actual implementation is in `backend/app/main.py`, backed by the account, academic, capacity, rubric-version, and audit models. Proposed-only destinations remain disabled in the Admin navigation.
+
+## M1-I.1 read-only audit history
+
+```mermaid
+flowchart TD
+    A[Active ADMIN opens audit history] --> B[Validate bounded filters and aware date range]
+    B --> C[Read count and newest-first page]
+    C --> D[Allowlist recorded change fields]
+    D --> E[Show UTC-labelled rows]
+    E --> F[Read selected event detail as safe text]
+```
+
+List and detail preserve recorded actor and target IDs even when related display information is unavailable. Unknown legacy change fields are omitted, not inferred. The reader does not modify events or add audit events; existing database append-only protections remain in place. Four focused tests and the full 71-test backend suite pass against the final pagination implementation. Frontend lint/build pass; browser and mobile verification are pending. M1 and P1 remain Partial.
 
 ## M1-H.1 reminder and escalation configuration
 

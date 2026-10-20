@@ -1470,3 +1470,7 @@ def create_reminder_rule_version(rule_id: int, payload: ReminderWrite, request: 
     except Exception as error:
         session.rollback()
         raise deadline_error(500, "rule_save_failed", "Rule configuration could not be saved.") from error
+
+
+from .audit_history import router as audit_history_router
+app.include_router(audit_history_router)
