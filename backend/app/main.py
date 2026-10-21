@@ -1502,3 +1502,6 @@ app.include_router(audit_history_router)
 
 from .student_roster import router as student_roster_router
 app.include_router(student_roster_router)
+
+from .workflow_policy import router as workflow_policy_router
+app.include_router(workflow_policy_router)

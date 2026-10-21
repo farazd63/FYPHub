@@ -33,7 +33,21 @@ This companion explains the source-cited matrix in [p1-feature-tracker.md](p1-fe
 
 ### M1 - academic governance
 
-M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, internal evaluation-rubric drafts with immutable ordered criteria, non-operational deadline configuration, non-operational reminder/escalation rule configuration, and an ADMIN-only audit-history viewer are present. Template and rubric work remain Partial: neither provides an approved publication/activation lifecycle, and rubric drafts intentionally contain no academic scoring values. Workflow policies, deadline enforcement, reminder delivery, and escalation execution remain absent.
+M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, internal evaluation-rubric drafts with immutable ordered criteria, non-operational deadline configuration, non-operational reminder/escalation rule configuration, and an ADMIN-only audit-history viewer are present. Template and rubric work remain Partial: neither provides an approved publication/activation lifecycle, and rubric drafts intentionally contain no academic scoring values. Workflow-policy drafts now record administrator-supplied state and transition labels; publication, execution, deadline enforcement, reminder delivery, and escalation execution remain absent.
+
+### M1-K.1 workflow-policy draft pipeline
+
+```mermaid
+flowchart TD
+    A[Active ADMIN enters draft labels] --> B[Validate unique states and transition references]
+    B -->|invalid| C[Safe validation error]
+    B -->|valid| D[Lock policy for next version]
+    D --> E[Save complete version and audit atomically]
+    E --> F[View ordered history]
+    F -. future decisions and implementation .-> G[M3 authorized review and routing]
+```
+
+Drafts are configuration only and do not execute transitions or create review authority. Existing proposal-review decisions continue to apply: the assigned Supervisor owns the first academic review, assigned Panel members review defense proposals, and the Coordinator manages routing and oversight subject to authorization and history boundaries. Early-routing initiator, corrections and resubmissions, final approval authority, and Coordinator department/cycle scope remain unresolved. Panel chat is outside scope. Browser and mobile verification remain pending.
 
 ### M2 - team formation and collaboration
 

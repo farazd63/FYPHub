@@ -14,3 +14,5 @@ __all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "Supervis
 from .reminder_rule import ReminderRule, ReminderRuleVersion
 
 from .student_roster import ApprovedStudent, RosterImport
+
+from .workflow_policy import WorkflowPolicy, WorkflowPolicyVersion

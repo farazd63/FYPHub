@@ -1,5 +1,11 @@
 # Project Progress
 
+## M1-K.1 Workflow-Policy Drafts
+
+- Added ADMIN-only configuration drafts with administrator-entered state and transition labels, strict same-version reference validation, stable identities and complete numbered history. Versions and audit events commit atomically; concurrent writers serialize on the policy row. No transition execution or default academic workflow is provided.
+- Added the Workflow Policies Admin screen. Four focused tests and the full 94-test backend suite passed. Alembic current/head `e5f6a7b8c9d0`, schema check and pip check passed. Frontend lint/build and git diff check passed. Browser/mobile verification remains pending; M1 and P1 remain Partial.
+- Publication, operational routing and workflow execution require future work. The existing Supervisor, Panel and Coordinator boundaries remain decisions for the future M3 workflow; early-routing initiator, resubmissions, final approval and Coordinator scope remain unresolved.
+
 ## M1-J.2 New Team Registration Eligibility
 
 - New team registration checks the creator and every member against one approved roster row in the selected cycle, using their normalized registration number and university contact email; semester must be 7 or 8. The shared login email remains separate. Mismatches return a safe member-specific error before any account, team or member is created.
