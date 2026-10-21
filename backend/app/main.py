@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from .database import engine, get_db
 from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
-from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, SupervisorCapacityPolicy
+from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, SupervisorCapacityPolicy, SupervisorAssignment
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
 from .models import EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion
 from .models import AcademicDeadline, AcademicDeadlineVersion
@@ -826,10 +826,12 @@ def revoke_user_sessions(session: Session, user_id: int) -> None:
     )
 
 
-def supervisor_capacity_out(policy: SupervisorCapacityPolicy) -> dict[str, object]:
+def supervisor_capacity_out(policy: SupervisorCapacityPolicy, session: Session) -> dict[str, object]:
     supervisor = policy.supervisor
     cycle = policy.academic_cycle
+    assigned = session.scalar(select(func.count(SupervisorAssignment.id)).where(SupervisorAssignment.supervisor_id == policy.supervisor_id, SupervisorAssignment.academic_cycle_id == policy.academic_cycle_id, SupervisorAssignment.ended_at.is_(None))) or 0
     return {
+        "assigned": assigned, "remaining": max(policy.max_group_capacity - assigned, 0), "full": assigned >= policy.max_group_capacity,
         "id": policy.id,
         "supervisor_id": supervisor.id,
         "supervisor_name": supervisor.full_name,
@@ -1004,7 +1006,7 @@ def list_supervisor_capacities(
     policies = session.execute(
         select(SupervisorCapacityPolicy).order_by(SupervisorCapacityPolicy.id)
     ).scalars().all()
-    return [supervisor_capacity_out(policy) for policy in policies]
+    return [supervisor_capacity_out(policy, session) for policy in policies]
 
 
 @app.get("/api/v1/admin/supervisor-capacities/{policy_id}", response_model=SupervisorCapacityOut)
@@ -1014,7 +1016,7 @@ def read_supervisor_capacity(
     policy = session.get(SupervisorCapacityPolicy, policy_id)
     if policy is None:
         raise admin_user_error(status.HTTP_404_NOT_FOUND, "capacity_policy_not_found", "Supervisor capacity policy was not found.")
-    return supervisor_capacity_out(policy)
+    return supervisor_capacity_out(policy, session)
 
 
 @app.post("/api/v1/admin/supervisor-capacities", status_code=status.HTTP_201_CREATED, response_model=SupervisorCapacityOut)
@@ -1044,7 +1046,7 @@ def create_supervisor_capacity(
     except SQLAlchemyError as error:
         session.rollback()
         raise admin_user_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "capacity_save_failed", "Supervisor capacity could not be saved.") from error
-    return supervisor_capacity_out(policy)
+    return supervisor_capacity_out(policy, session)
 
 
 @app.put("/api/v1/admin/supervisor-capacities/{policy_id}", response_model=SupervisorCapacityOut)
@@ -1066,6 +1068,9 @@ def update_supervisor_capacity(
     )).scalar_one_or_none()
     if duplicate is not None:
         raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and cycle.")
+    assigned = session.scalar(select(func.count(SupervisorAssignment.id)).where(SupervisorAssignment.supervisor_id == policy.supervisor_id, SupervisorAssignment.academic_cycle_id == policy.academic_cycle_id, SupervisorAssignment.ended_at.is_(None))) or 0
+    if assigned and (policy.supervisor_id != payload.supervisor_id or policy.academic_cycle_id != payload.academic_cycle_id or payload.max_group_capacity < assigned):
+        raise admin_user_error(status.HTTP_409_CONFLICT, "capacity_in_use", "The policy cannot be moved or reduced below its current assignments.")
     previous = {"supervisor_id": policy.supervisor_id, "academic_cycle_id": policy.academic_cycle_id, "max_group_capacity": policy.max_group_capacity}
     policy.supervisor_id = payload.supervisor_id; policy.academic_cycle_id = payload.academic_cycle_id; policy.max_group_capacity = payload.max_group_capacity
     try:
@@ -1078,7 +1083,7 @@ def update_supervisor_capacity(
     except SQLAlchemyError as error:
         session.rollback()
         raise admin_user_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "capacity_save_failed", "Supervisor capacity could not be saved.") from error
-    return supervisor_capacity_out(policy)
+    return supervisor_capacity_out(policy, session)
 
 
 @app.post("/api/v1/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -1505,3 +1510,6 @@ app.include_router(student_roster_router)
 
 from .workflow_policy import router as workflow_policy_router
 app.include_router(workflow_policy_router)
+
+from .supervisor_assignments import router as supervisor_assignments_router
+app.include_router(supervisor_assignments_router)

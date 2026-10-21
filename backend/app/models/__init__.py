@@ -16,3 +16,5 @@ from .reminder_rule import ReminderRule, ReminderRuleVersion
 from .student_roster import ApprovedStudent, RosterImport
 
 from .workflow_policy import WorkflowPolicy, WorkflowPolicyVersion
+
+from .supervisor_assignment import SupervisorAssignment

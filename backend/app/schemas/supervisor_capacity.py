@@ -18,5 +18,8 @@ class SupervisorCapacityOut(BaseModel):
     academic_cycle_id: int
     academic_cycle_name: str
     max_group_capacity: int
+    assigned: int
+    remaining: int
+    full: bool
     created_at: datetime
     updated_at: datetime

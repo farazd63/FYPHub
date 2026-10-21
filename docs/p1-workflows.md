@@ -35,6 +35,20 @@ This companion explains the source-cited matrix in [p1-feature-tracker.md](p1-fe
 
 M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, internal evaluation-rubric drafts with immutable ordered criteria, non-operational deadline configuration, non-operational reminder/escalation rule configuration, and an ADMIN-only audit-history viewer are present. Template and rubric work remain Partial: neither provides an approved publication/activation lifecycle, and rubric drafts intentionally contain no academic scoring values. Workflow-policy drafts now record administrator-supplied state and transition labels; publication, execution, deadline enforcement, reminder delivery, and escalation execution remain absent.
 
+### Supervisor allocation
+
+```mermaid
+flowchart TD
+    A[ADMIN selects cycle, supervisor and registered team] --> B[Lock capacity and validate eligibility]
+    B --> C{Team unassigned and capacity available?}
+    C -->|No| D[Reject without changes]
+    C -->|Yes| E[Save assignment and audit atomically]
+    E --> F[Update assigned and remaining counts]
+    F --> G[Ending an assignment retains history and records audit]
+```
+
+Only active ADMIN users can manage assignments. An active SUPERVISOR and a matching cycle capacity policy are required; one active supervisor assignment per team is allowed. Capacity changes cannot move an in-use policy or reduce it below active assignments. No Coordinator access or department scope is introduced.
+
 ### M1-K.1 workflow-policy draft pipeline
 
 ```mermaid
@@ -210,7 +224,7 @@ flowchart TD
     H -->|commit| J[Return safe policy]
 ```
 
-This is configuration, not allocation enforcement. A policy is retained and labelled historical if its supervisor later becomes inactive, but new or edited policies require an active account whose persisted role is `SUPERVISOR`. Verified evidence covers backend tests, migration/schema checks, frontend lint/build, successful policy creation, and edit-form population with separate supervisor name/email fields. Update-save, post-save refresh persistence, and mobile browser verification are pending. There is intentionally no supervisor assignment workflow, no group count, and no filled/remaining capacity display; those require a later allocation model and enforcement checkpoint.
+This is configuration, not allocation enforcement. A policy is retained and labelled historical if its supervisor later becomes inactive, but new or edited policies require an active account whose persisted role is `SUPERVISOR`. Verified evidence covers backend tests, migration/schema checks, frontend lint/build, successful policy creation, and edit-form population with separate supervisor name/email fields. Update-save, post-save refresh persistence, and mobile browser verification are pending. ADMIN-only supervisor-to-team assignment now enforces these limits using actual active assignments and displays assigned, remaining and full status. Assignment history is retained. Coordinator permissions and department/cycle scope remain undecided; matching and allocation workflows beyond manual ADMIN assignment remain future work. Browser and mobile checks for allocation remain pending.
 
 ### M2 pipeline
 

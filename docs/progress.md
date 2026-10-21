@@ -1,5 +1,11 @@
 # Project Progress
 
+## Supervisor-to-Team Allocation
+
+- Added ADMIN-only assignment and ending of a supervisor assignment for a registered team in the same cycle, with retained history and atomic audit. Active supervisor eligibility and an existing capacity policy are required. One active assignment per team is enforced; assignment, ending, and capacity updates share the existing capacity lock. In-use policies cannot move or be reduced below current assignments.
+- The Supervisor Capacity screen displays active assigned counts, remaining capacity and full status, and supports selecting real cycle teams and assignment history. Coordinator access and department/cycle scope remain undecided; automatic matching and reviewer workflows are not implemented.
+- Three focused allocation tests and the full 97-test backend suite passed; the backend test process emitted psycopg open-connection ResourceWarnings. Alembic current/head `f6a7b8c9d0e1` and schema check, pip check, frontend lint/build, and git diff check passed. Browser/mobile checks are pending. M1 and P1 remain Partial.
+
 ## M1-K.1 Workflow-Policy Drafts
 
 - Added ADMIN-only configuration drafts with administrator-entered state and transition labels, strict same-version reference validation, stable identities and complete numbered history. Versions and audit events commit atomically; concurrent writers serialize on the policy row. No transition execution or default academic workflow is provided.
