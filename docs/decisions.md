@@ -24,3 +24,15 @@
 - The roster includes student name, registration number, university email, semester, academic cycle, and group code; project topic is optional. Group code is recorded; no team-composition rule based on it is decided.
 - The initial import is ADMIN-only using existing permissions; registration eligibility enforcement remains a separate follow-up. Coordinator import access waits for a defined department/cycle permission scope.
 - Shared-team login remains unchanged. Member emails remain contact identities, not individual logins. Existing users and teams are not automatically eligibility-verified, deleted, or deactivated.
+
+## Team-side membership decisions
+
+- Only the recorded active team creator may authorize team-side join-request acceptance or rejection and send invitations. The shared-team session alone is insufficient; the creator must verify their individual identity using the approved roster-bound OTP flow. This decision does not establish individual login accounts.
+
+### M2 join-request authority
+
+Only the recorded team creator may accept or reject an incoming join request, using roster-bound OTP proof for the exact request and action. The shared team session alone is not identity proof. Invitation delivery and decisions remain a separate checkpoint.
+
+### M2 invitation authority
+
+Only the recorded team creator may send an invitation after roster email verification scoped to the recipient and team. The invitee verifies their own roster email for the exact invitation and decision; shared-team login is not individual identity proof.

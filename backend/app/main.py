@@ -1513,3 +1513,27 @@ app.include_router(workflow_policy_router)
 
 from .supervisor_assignments import router as supervisor_assignments_router
 app.include_router(supervisor_assignments_router)
+
+from .group_channels import router as group_channels_router
+app.include_router(group_channels_router)
+
+from .group_ai import router as group_ai_router
+app.include_router(group_ai_router)
+
+from .team_matching import router as team_matching_router
+app.include_router(team_matching_router)
+
+from .match_chat import router as match_chat_router
+app.include_router(match_chat_router)
+
+from .individual_verification import router as individual_verification_router
+app.include_router(individual_verification_router)
+
+from .anonymous_verification import router as anonymous_verification_router
+app.include_router(anonymous_verification_router)
+
+from .join_requests import router as join_requests_router
+app.include_router(join_requests_router)
+
+from .invitations import router as invitations_router
+app.include_router(invitations_router)

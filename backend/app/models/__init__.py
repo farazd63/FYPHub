@@ -18,3 +18,19 @@ from .student_roster import ApprovedStudent, RosterImport
 from .workflow_policy import WorkflowPolicy, WorkflowPolicyVersion
 
 from .supervisor_assignment import SupervisorAssignment
+
+from .group_message import GroupMessage
+
+from .team_preference import TeamPreference
+
+from .match_chat import MatchChat, MatchMessage, MatchConsent
+
+from .individual_verification import IdentityChallenge, IdentityProof
+
+from .anonymous_verification import AnonymousVerificationContext, AnonymousVerificationChallenge, AnonymousIdentityProof
+
+from .join_request import JoinRequest, JoinRequestAudit
+
+from .invitation import Invitation, InvitationAudit
+
+from .invitation import InvitationOutbox

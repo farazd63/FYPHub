@@ -1,3 +1,7 @@
+import { StudentMatching } from "./StudentMatching";
+import { InviteeResponse } from "./Invitations";
+import { JoinRequestForm } from "./JoinRequests";
+import { GroupChannels } from "./GroupChannels";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AdminPortal } from "./AdminPortal";
 import { PasswordField } from "./PasswordField";
@@ -793,6 +797,7 @@ export default function App() {
               Log out
             </button>
           </section>
+          {(authUser.role === "STUDENT" || authUser.role === "SUPERVISOR") && <GroupChannels api={API} role={authUser.role} />}
         </div>
       </main>
     );
@@ -1027,6 +1032,9 @@ export default function App() {
               >
                 {authSubmitting ? "Signing in..." : "Login"}
               </button>
+              <StudentMatching api={API} />
+              <JoinRequestForm api={API} />
+              <InviteeResponse api={API} />
               <p className="text-center text-sm text-[#4f6470]">
                 Don&apos;t have an account?{" "}
                 <button

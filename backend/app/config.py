@@ -19,6 +19,13 @@ class Settings:
     postgres_user: str
     postgres_password: str
     session_lifetime_hours: int = 8
+    ollama_url: str = ""
+    ollama_model: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
 
     @property
     def database_url(self) -> URL:
@@ -44,6 +51,13 @@ def get_settings() -> Settings:
         postgres_database=os.getenv("POSTGRES_DB", "fyphub_p1"),
         postgres_user=os.getenv("POSTGRES_USER", "fyphub_p1_user"),
         postgres_password=password,
+        ollama_url=os.getenv("OLLAMA_URL", ""),
+        ollama_model=os.getenv("OLLAMA_MODEL", ""),
+        smtp_host=os.getenv("SMTP_HOST", ""),
+        smtp_port=int(os.getenv("SMTP_PORT", "587")),
+        smtp_username=os.getenv("SMTP_USERNAME", ""),
+        smtp_password=os.getenv("SMTP_PASSWORD", ""),
+        smtp_from=os.getenv("SMTP_FROM", ""),
     )
 
 
