@@ -11,6 +11,16 @@ from .models import AdminAuditEvent, User, UserRole
 router = APIRouter(prefix="/api/v1/admin/audit-events")
 # Historical and current writers' documented scalar keys; unknown data is withheld.
 SAFE_KEYS = {
+    "supervisor_request_document_uploaded": {"document_version", "extraction_status", "file_size"},
+    "supervisor_request_extracted": {"document_version", "extraction_status", "file_size"},
+    "supervisor_request_extraction_confirmed": {"document_version", "extraction_status"},
+    "supervisor_request_draft_created": {"supervisor_id"},
+    "supervisor_request_submitted": {"previous_status"},
+    "supervisor_request_resubmitted": {"previous_status"},
+    "supervisor_request_withdrawn": {"previous_status"},
+    "supervisor_request_accepted": {"previous_status"},
+    "supervisor_request_rejected": {"previous_status"},
+    "supervisor_request_changes_requested": {"previous_status"},
     "supervisor_assignment_created": {"team_id", "academic_cycle_id", "supervisor_id"},
     "supervisor_assignment_ended": {"team_id", "academic_cycle_id", "supervisor_id"},
     "workflow_policy_version_created": {"version", "name", "state_count", "transition_count"},
@@ -29,8 +39,14 @@ SAFE_KEYS = {
     "evaluation_rubric_version_created": {"version", "name", "criteria"},
     "academic_deadline_version_created": {"academic_cycle_id", "version", "name", "due_at_utc", "time_zone", "utc_offset", "operational"},
     "reminder_rule_version_created": {"version", "academic_cycle_id", "deadline_version_id", "category", "direction", "elapsed_minutes", "operational"},
+    "archived_project_created": {"source_label", "title", "academic_year"},
+    "archived_project_updated": {"before", "after"},
+    "archived_project_metadata_rolled_back": {"source_event_id", "before", "after"},
+    "archived_project_activated": {"is_active"},
+    "archived_project_deactivated": {"is_active"},
+    "archived_project_document_uploaded": {"document_type", "version", "file_hash"},
 }
-NESTED_KEYS = {"academic_cycle_updated": {"code", "display_name", "registration_open"}, "supervisor_capacity_updated": {"academic_cycle_id", "supervisor_id", "max_group_capacity"}}
+NESTED_KEYS = {"academic_cycle_updated": {"code", "display_name", "registration_open"}, "supervisor_capacity_updated": {"academic_cycle_id", "supervisor_id", "max_group_capacity"}, "archived_project_updated": {"title", "abstract_summary", "keywords", "academic_year", "department_program", "project_scope", "completion_stage", "implemented_scope", "remaining_gaps", "future_work", "supervisor_display_reference", "source_label", "source_metadata"}, "archived_project_metadata_rolled_back": {"title", "abstract_summary", "keywords", "academic_year", "department_program", "project_scope", "completion_stage", "implemented_scope", "remaining_gaps", "future_work", "supervisor_display_reference", "source_label", "source_metadata"}}
 
 def scalar(value: Any) -> bool:
     return value is None or type(value) in (str, int, float, bool)

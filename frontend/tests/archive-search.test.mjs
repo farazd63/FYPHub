@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const here = path.dirname(fileURLToPath(import.meta.url));
+const read = (file) => fs.readFileSync(path.join(here, "..", "src", ...file.split("/")), "utf8");
+const search = read("portals/student/modules/KnowledgeSearch.tsx");
+const detail = read("portals/student/modules/ArchivedProjectDetail.tsx");
+const admin = read("portals/admin/modules/supervisor-requests/ArchiveManagementV2.tsx");
+const portal = read("portals/student/StudentPortal.tsx");
+for (const text of ["archived-projects/search", "rank", "match_reason", "semantic_search", "Open project details"]) assert.match(search, new RegExp(text.replace(/[/?]/g, "\\$&")));
+for (const text of ["View Short Proposal", "View Long Proposal", "View Chapter 1", "View Final Report", "document_url", "credentials: \"include\""]) assert.match(detail, new RegExp(text.replace(/[.?]/g, "\\$&")));
+for (const text of ["archived-projects/admin/list", "admin/audit-events", "documents", "documentTypes", "Deactivate", "immutable document-version"]) assert.match(admin, new RegExp(text.replace(/[.?]/g, "\\$&")));
+assert.match(portal, /KnowledgeSearch/);
+assert.match(portal, /phase\?\.id === "archive"/);
+console.log("archive-search.test.mjs: all assertions passed");
