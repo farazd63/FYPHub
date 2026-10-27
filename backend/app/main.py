@@ -25,7 +25,7 @@ from .schemas.supervisor_capacity import SupervisorCapacityOut, SupervisorCapaci
 from .schemas.team_registration import TeamMemberInput, TeamRegistrationRequest, TeamRegistrationResponse
 from .security import generate_session_token, hash_password, hash_session_token, verify_password
 from .auth import (
-    ALLOWED_BROWSER_ORIGIN,
+    ALLOWED_BROWSER_ORIGINS,
     SESSION_COOKIE_NAME,
     SESSION_LIFETIME_HOURS,
     clear_session_cookie,
@@ -39,7 +39,7 @@ from .auth import (
 app = FastAPI(title="FYPHub API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5174"],
+    allow_origins=list(ALLOWED_BROWSER_ORIGINS),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "PUT"],
     allow_headers=["Content-Type", "X-File-Name", "X-Preview-Token"],
