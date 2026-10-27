@@ -1,4 +1,4 @@
-import { StudentMatching } from "./StudentMatching";
+﻿import { StudentMatching } from "./StudentMatching";
 import { InviteeResponse } from "./Invitations";
 import { JoinRequestForm } from "./JoinRequests";
 import { GroupChannels } from "./GroupChannels";
@@ -39,7 +39,7 @@ type PublicRoute = { page: PublicPage; signupRole: LoginRole | null; step: 1 | 2
 const STEPS = ["Account Details", "Login Details", "Team Members"];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const API = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8010"
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8010"
 ).replace(/\/$/, "");
 const INPUT =
   "w-full rounded-lg border border-[#DCE3ED] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#4663FF] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
@@ -1141,7 +1141,7 @@ export default function App() {
                       {cycles.map((cycle) => (
                         <option key={cycle.id} value={cycle.id}>
                           {cycle.display_name} ({cycle.code})
-                          {cycle.registration_open ? "" : " — closed"}
+                          {cycle.registration_open ? "" : " â€” closed"}
                         </option>
                       ))}
                     </select>
@@ -1333,7 +1333,7 @@ export default function App() {
                     onClick={nextStep}
                     className={`${AUTH_PRIMARY} ml-auto`}
                   >
-                    Next →
+                    Next â†’
                   </button>
                 ) : (
                   <button
@@ -1351,3 +1351,4 @@ export default function App() {
     </AuthLayout>
   );
 }
+
