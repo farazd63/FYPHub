@@ -1,0 +1,2 @@
+import { GroupChannels } from "../../../GroupChannels";
+export function StudentTeamPhase({ api }: { api: string }) { return <section className="student-phase-page" aria-labelledby="student-team-heading"><div className="student-page-heading"><p className="student-overview__eyebrow">Partial Module 2 workspace</p><h1 id="student-team-heading">Student Team &amp; Collaboration Hub</h1><p>Use the existing team collaboration tools and channels. Access remains governed by the existing backend ownership rules.</p></div><GroupChannels api={api} role="STUDENT" /></section>; }

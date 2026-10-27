@@ -21,6 +21,22 @@ This is the source-of-truth P1 Mid coverage record. It was reconciled against th
 
 Repository paths below are concrete implementation references. The full-suite result is in `docs/progress.md`; each item cites its own evidence instead of relying on a count.
 
+## Module 1 end-to-end checklist (2026-10-27 audit)
+
+This checklist follows the eight Module 1 requirements in Long Proposal section 9.3 (PDF pp. 9-10). It separates implemented configuration behavior from proposal decisions that are not safe to invent.
+
+| Proposal requirement | Status | Verified implementation | Exact remaining gap or limitation |
+| --- | --- | --- | --- |
+| User and role management for Students, Supervisors, Coordinators, Panel Members, and Administrators. | Partial | ADMIN-only account listing, creation, role/status changes, session revocation, last-active-ADMIN protection, shared-team safeguards, audit writes, and focused tests. | Browser demonstration is not available in the current environment. Shared-team deactivation lifecycle is not defined by the proposal and remains deliberately rejected. |
+| Semester and FYP-cycle configuration, including group-size and workflow policies. | Partial | Cycle create/update, registration-open state, group-size policy, workflow-policy version drafts, cycle locking, concurrency protection, audit, and focused tests. | The proposal does not define a separate semester entity/semantics, approved workflow states, publication, or runtime transition authority. No rule is invented for those decisions. |
+| Official short- and long-proposal template management with versioned academic rules. | Partial | ADMIN-only internal SHORT/LONG reference metadata, immutable metadata/rule versions, ordered history, rollback, audit, strict validation, and concurrency tests/UI. | No official blank files, approval authority, storage/upload/download, publication, activation/retirement, or retention policy has been supplied. These are prerequisites for an official template lifecycle and for M3 compliance. |
+| Supervisor capacity, panel rubric, scoring criteria, and academic-deadline configuration. | Partial | Cycle-scoped supervisor capacity and assignment enforcement; immutable rubric drafts with ordered criteria; immutable timezone-validated deadline versions, previews, history, and audit; focused tests. | Approved scoring values, marks/weights/thresholds/stages, rubric approval/publication, official deadline values, activation, exceptions, penalties, and deadline enforcement are unspecified. |
+| Deadline reminder and escalation rules. | Partial | ADMIN-only versioned rules linked to exact deadline versions, elapsed-minute previews, cycle validation, audit, rollback, and concurrency tests. | Scheduling, recipients, channels, delivery, triggers, stopping conditions, retries, authority, and escalation execution are not specified or implemented. |
+| Immutable audit history of administrative changes. | Implemented with stated boundary | Append-only audit writes, database UPDATE/DELETE protections, allowlisted filtered/paginated ADMIN reader, detail view, rollback tests, and full-suite coverage. | The database owner can bypass trigger protections; an external tamper-evident ledger is outside the current architecture and proposal detail. |
+| Primary output: academic governance configuration and deadline action rules. | Partial | The defined governance configuration and non-operational deadline-action rule data are persisted, versioned, authorized, audited, and concurrency-safe. | Operational deadline actions require the unresolved policy inputs above; no enforcement or delivery behavior is claimed. |
+
+The audit found no additional Module 1 behavior that can be implemented safely without inventing academic policy, official source documents, or operational authority. Module 2 AI gaps and all Module 3 proposal/compliance work remain out of scope.
+
 ## M1 - Admin Dashboard & Academic Management
 
 | ID | Source and requirement | Status | Actual implementation / evidence | Missing work or decision |

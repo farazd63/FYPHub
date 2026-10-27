@@ -1,3 +1,12 @@
+## Module 1 end-to-end audit (2026-10-27)
+
+- Reconciled the eight Module 1 requirements in Long Proposal section 9.3 (PDF pp. 9-10) against `docs/p1-feature-tracker.md`, `docs/p1-workflows.md`, the current Admin route, models, migrations, routes, and tests.
+- Confirmed the current implementation covers the defined Module 1 configuration behavior: ADMIN account/role controls, cycle and group policies, workflow-policy drafts, internal template/rule versioning, supervisor capacity and assignment enforcement, rubric drafts, deadline versions/previews, reminder-rule previews, roster eligibility, and append-only audit history.
+- Recorded the exact unresolved gaps instead of inventing behavior: official template files and approval/storage lifecycle; approved scoring/rubric values and authority; separate semester semantics; operational deadline activation/enforcement; reminder delivery, recipients, scheduling, retries, and escalation authority; and the shared-team deactivation lifecycle.
+- No Module 2 AI gap or Module 3 feature was changed.
+- Verification from this checkpoint: 164 backend tests passed with `unittest`; Alembic current/head are `b2c3d4e5f6a7`, `alembic check` reports no pending operations, and `pip check` passes. Frontend lint and production build pass; `git diff --check` passes. The frontend API remains `http://localhost:8010`, with no `8011` reference.
+- Browser visual/interaction verification could not be run because no browser surface was available in the current environment. The Vite server remains running from the requested checkout at `http://localhost:5173`.
+
 # Project Progress
 
 ## Supervisor-to-Team Allocation
