@@ -16,6 +16,7 @@ SESSION_COOKIE_NAME = "fyphub_session"
 # Deliberately fixed for this checkpoint; changing it is a reviewed configuration change.
 SESSION_LIFETIME_HOURS = settings.session_lifetime_hours
 ALLOWED_BROWSER_ORIGIN = "http://127.0.0.1:5174"
+ALLOWED_BROWSER_ORIGINS = (ALLOWED_BROWSER_ORIGIN, "http://localhost:5173")
 
 
 def utc_now() -> datetime:
@@ -29,13 +30,13 @@ def authentication_error() -> HTTPException:
 def validate_mutating_origin(request: Request) -> None:
     """Allow same-origin/non-browser calls, but reject a supplied foreign browser Origin."""
     origin = request.headers.get("origin")
-    if origin is not None and origin != ALLOWED_BROWSER_ORIGIN:
+    if origin is not None and origin not in ALLOWED_BROWSER_ORIGINS:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Origin is not allowed.")
 
 
 def session_cookie_secure(request: Request) -> bool:
-    """Use Secure except for the explicit local HTTP loopback development case."""
-    return not (request.url.scheme == "http" and request.url.hostname == "127.0.0.1")
+    """Mark session cookies Secure exactly when the request is served over HTTPS."""
+    return request.url.scheme.lower() == "https"
 
 
 def set_session_cookie(request: Request, response, token: str) -> None:

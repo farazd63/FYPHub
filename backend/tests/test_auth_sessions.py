@@ -16,7 +16,7 @@ from app.auth import SESSION_COOKIE_NAME, get_current_user, require_roles, utc_n
 from app.database import engine, get_db
 from app.main import app
 from app.models import AuthSession, User, UserRole
-from app.security import hash_password, hash_session_token
+from app.security import generate_session_token, hash_password, hash_session_token
 
 
 def request(method: str, path: str, payload: dict[str, Any] | None = None, *, headers: dict[str, str] | None = None, scheme: str = "http") -> tuple[int, dict[str, str], Any]:
@@ -195,6 +195,58 @@ class AuthSessionTests(unittest.TestCase):
         self.assertEqual(request("GET", "/api/v1/auth/me", headers={"Cookie": f"{SESSION_COOKIE_NAME}={second}"})[0], 401)
         self.assertEqual(request("POST", "/api/v1/auth/logout", headers=headers)[0], 204)
 
+    def test_same_valid_session_supports_concurrent_requests(self) -> None:
+        _, headers, _ = self.login()
+        token = self.cookie_value(headers)
+        cookie = {"Cookie": f"{SESSION_COOKIE_NAME}={token}"}
+        self.assertEqual(request("GET", "/api/v1/auth/me", headers=cookie)[0], 200)
+        self.assertEqual(request("GET", "/api/v1/auth/me", headers=cookie)[0], 200)
+
+    def test_deactivation_revokes_every_active_session_for_the_user(self) -> None:
+        admin = User(
+            full_name="Session Admin",
+            email=f"admin_{uuid4().hex}@example.com",
+            registration_number=None,
+            password_hash=hash_password("Admin Password!"),
+            role=UserRole.ADMIN,
+        )
+        target = User(
+            full_name="Deactivated User",
+            email=f"target_{uuid4().hex}@example.com",
+            registration_number=f"TARGET{uuid4().hex[:10]}",
+            password_hash=hash_password("Target Password!"),
+            role=UserRole.STUDENT,
+        )
+        session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        session.add_all([admin, target])
+        session.flush()
+        first, second = generate_session_token(), generate_session_token()
+        session.add_all([
+            AuthSession(user_id=target.id, token_hash=hash_session_token(first), expires_at=utc_now() + timedelta(hours=1)),
+            AuthSession(user_id=target.id, token_hash=hash_session_token(second), expires_at=utc_now() + timedelta(hours=1)),
+        ])
+        session.commit()
+        target_id = target.id
+        session.close()
+        status, admin_headers, _ = request(
+            "POST", "/api/v1/auth/login",
+            {"email": admin.email, "password": "Admin Password!", "requested_role": "ADMIN"},
+        )
+        self.assertEqual(status, 200)
+        admin_cookie = self.cookie_value(admin_headers)
+        status, _, _ = request(
+            "PATCH", f"/api/v1/admin/users/{target_id}/status", {"is_active": False},
+            headers={"Cookie": f"{SESSION_COOKIE_NAME}={admin_cookie}", "Origin": "http://localhost:5173"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(request("GET", "/api/v1/auth/me", headers={"Cookie": f"{SESSION_COOKIE_NAME}={first}"})[0], 401)
+        self.assertEqual(request("GET", "/api/v1/auth/me", headers={"Cookie": f"{SESSION_COOKIE_NAME}={second}"})[0], 401)
+        active_sessions = self.connection.execute(
+            text("SELECT count(*) FROM auth_sessions WHERE user_id = :user_id AND revoked_at IS NULL"),
+            {"user_id": target_id},
+        ).scalar_one()
+        self.assertEqual(active_sessions, 0)
+
     def test_origin_cors_and_role_helpers(self) -> None:
         self.assertEqual(self.login(Origin="https://evil.example")[0], 403)
         self.assertEqual(request("POST", "/api/v1/auth/logout", headers={"Origin": "https://evil.example"})[0], 403)
@@ -202,6 +254,14 @@ class AuthSessionTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(headers["access-control-allow-origin"], "http://127.0.0.1:5174")
         self.assertEqual(headers["access-control-allow-credentials"], "true")
+        origin = "http://localhost:5173"
+        status, headers, _ = request("OPTIONS", "/api/v1/auth/login", headers={"Origin": origin, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type"})
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["access-control-allow-origin"], origin)
+        status, headers, _ = self.login(Origin=origin)
+        self.assertEqual(status, 200)
+        self.assertNotIn("secure", headers["set-cookie"].lower())
+        self.assertEqual(self.login(Origin="http://localhost:5174")[0], 403)
         student_guard = require_roles(UserRole.ADMIN)
         fixture_user = User(full_name="Role Test", email="role@example.com", registration_number="ROLE-TEST", password_hash="test", role=UserRole.STUDENT)
         with self.assertRaises(HTTPException) as denied:
