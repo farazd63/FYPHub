@@ -1,10 +1,12 @@
-﻿import { StudentMatching } from "./StudentMatching";
-import { InviteeResponse } from "./Invitations";
-import { JoinRequestForm } from "./JoinRequests";
 import { GroupChannels } from "./GroupChannels";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AdminPortal } from "./AdminPortal";
 import { PasswordField } from "./PasswordField";
+import { passwordPolicyError } from "./passwordPolicy";
+import { StudentPortal } from "./portals/student/StudentPortal";
+import { SupervisorPortal } from "./portals/supervisor/SupervisorPortal";
+import { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";
+import { EvaluatorPortal } from "./portals/evaluator/EvaluatorPortal";
 import signInStudentsImage from "./assets/sign-in-students.webp";
 
 type Member = { id: string; name: string; registration: string; email: string };
@@ -34,7 +36,8 @@ type SafeUser = {
   is_active: boolean;
 };
 type PublicPage = "in" | "up" | "recover";
-type PublicRoute = { page: PublicPage; signupRole: LoginRole | null; step: 1 | 2 | 3 };
+type StudentSignupMode = "single" | "group";
+type PublicRoute = { page: PublicPage; signupRole: LoginRole | null; step: 1 | 2 | 3; studentMode: StudentSignupMode | null };
 
 const STEPS = ["Account Details", "Login Details", "Team Members"];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -58,11 +61,11 @@ const registration = (value: string) => value.trim().toUpperCase();
 const email = (value: string) => value.trim().toLowerCase();
 const memberKey = (id: string, field: keyof Details) => `member.${id}.${field}`;
 const isLoginRole = (value: unknown): value is LoginRole => typeof value === "string" && ["STUDENT", "SUPERVISOR", "PANEL_MEMBER", "COORDINATOR", "ADMIN"].includes(value);
-const publicRoute = (page: PublicPage, signupRole: LoginRole | null = null, step: 1 | 2 | 3 = 1): PublicRoute => ({ page, signupRole: page === "up" ? signupRole : null, step: page === "up" && signupRole === "STUDENT" ? step : 1 });
+const publicRoute = (page: PublicPage, signupRole: LoginRole | null = null, step: 1 | 2 | 3 = 1, studentMode: StudentSignupMode | null = null): PublicRoute => ({ page, signupRole: page === "up" ? signupRole : null, step: page === "up" && signupRole === "STUDENT" && studentMode === "group" ? step : 1, studentMode: page === "up" && signupRole === "STUDENT" ? studentMode : null });
 const readPublicRoute = (value: unknown): PublicRoute | null => {
   const route = (value as { fyphubNavigation?: unknown } | null)?.fyphubNavigation as Partial<PublicRoute> | undefined;
-  if (!route || (route.page !== "in" && route.page !== "up" && route.page !== "recover") || (route.signupRole !== null && !isLoginRole(route.signupRole)) || (route.step !== 1 && route.step !== 2 && route.step !== 3)) return null;
-  return publicRoute(route.page, route.signupRole, route.step);
+  if (!route || (route.page !== "in" && route.page !== "up" && route.page !== "recover") || (route.signupRole !== null && !isLoginRole(route.signupRole)) || (route.step !== 1 && route.step !== 2 && route.step !== 3) || (route.studentMode !== undefined && route.studentMode !== null && route.studentMode !== "single" && route.studentMode !== "group")) return null;
+  return publicRoute(route.page, route.signupRole, route.step, route.studentMode === "single" || route.studentMode === "group" ? route.studentMode : null);
 };
 
 function Logo({ compact = false, auth = false, authMobile = false }: { compact?: boolean; auth?: boolean; authMobile?: boolean }) {
@@ -312,6 +315,7 @@ export default function App() {
   const [page, setPage] = useState<string>("in");
   const [loginRole, setLoginRole] = useState<LoginRole>("STUDENT");
   const [signupRole, setSignupRole] = useState<LoginRole | null>(null);
+  const [studentMode, setStudentMode] = useState<StudentSignupMode | null>(null);
   const [authUser, setAuthUser] = useState<SafeUser | null>(null);
   const authUserRef = useRef<SafeUser | null>(null);
   useEffect(() => { authUserRef.current = authUser; }, [authUser]);
@@ -325,6 +329,7 @@ export default function App() {
     registration: "",
     email: "",
   });
+  const [single, setSingle] = useState({ name: "", registration: "", email: "", password: "", confirm: "" });
   const [login, setLogin] = useState({ email: "", password: "", confirm: "" });
   const [members, setMembers] = useState<Member[]>(() => [
     newMember(),
@@ -345,6 +350,7 @@ export default function App() {
     teamId: number;
     cycle: string;
   } | null>(null);
+  const [individualSuccess, setIndividualSuccess] = useState(false);
   const publicNavigationRef = useRef<(route: PublicRoute, mode?: "push" | "replace" | "pop") => void>(() => undefined);
 
   useEffect(() => {
@@ -452,6 +458,11 @@ export default function App() {
     setAccount((current) => ({ ...current, [field]: value }));
     clear(`account.${field}`);
   };
+  const updateSingle = (field: keyof Details | "password" | "confirm", value: string) => {
+    setSingle((current) => ({ ...current, [field]: value }));
+    clear(`single.${field}`);
+    setNotice("");
+  };
   const updateLogin = (field: keyof typeof login, value: string) => {
     setLogin((current) => ({ ...current, [field]: value }));
     clear(`login.${field}`);
@@ -488,11 +499,8 @@ export default function App() {
     if (target === 2 || target === 0) {
       if (!EMAIL.test(email(login.email)))
         next["login.email"] = "Enter a valid shared login email.";
-      if (login.password.length < 8 || login.password.length > 128)
-        next["login.password"] =
-          login.password.length < 8
-            ? "Use at least 8 characters."
-            : "Password must be no more than 128 characters.";
+      const groupPasswordError = passwordPolicyError(login.password);
+      if (groupPasswordError) next["login.password"] = groupPasswordError;
       if (login.password !== login.confirm)
         next["login.confirm"] = "Passwords do not match.";
     }
@@ -533,6 +541,16 @@ export default function App() {
     }
     return next;
   }
+  function validateSingle(): FieldErrors {
+    const next: FieldErrors = {};
+    if (!single.name.trim()) next["single.name"] = "Enter your full name.";
+    if (!registration(single.registration)) next["single.registration"] = "Enter your registration number.";
+    if (!EMAIL.test(email(single.email))) next["single.email"] = "Enter a valid university email.";
+    const singlePasswordError = passwordPolicyError(single.password);
+    if (singlePasswordError) next["single.password"] = singlePasswordError;
+    if (single.password !== single.confirm) next["single.confirm"] = "Passwords do not match.";
+    return next;
+  }
   const stepFor = (key?: string) =>
     !key || key.startsWith("member") || key.startsWith("members")
       ? 3
@@ -540,22 +558,23 @@ export default function App() {
         ? 2
         : 1;
   function navigatePublic(route: PublicRoute, mode: "push" | "replace" | "pop" = "push") {
-    let next = publicRoute(route.page, route.signupRole, route.step);
+    let next = publicRoute(route.page, route.signupRole, route.step, route.studentMode);
     let nextErrors: FieldErrors = {};
-    if (next.page === "up" && next.signupRole === "STUDENT" && next.step > 1) {
+    if (next.page === "up" && next.signupRole === "STUDENT" && next.studentMode === "group" && next.step > 1) {
       nextErrors = validate(1);
       if (!Object.keys(nextErrors).length && next.step > 2) nextErrors = validate(2);
       if (Object.keys(nextErrors).length) {
-        next = publicRoute("up", "STUDENT", Math.min(...Object.keys(nextErrors).map(stepFor)) as 1 | 2 | 3);
+        next = publicRoute("up", "STUDENT", Math.min(...Object.keys(nextErrors).map(stepFor)) as 1 | 2 | 3, "group");
       }
     }
     setPage(next.page);
     setSignupRole(next.signupRole);
+    setStudentMode(next.studentMode);
     setStep(next.step);
     setErrors(nextErrors);
     setNotice(Object.keys(nextErrors).length ? "Please correct the highlighted fields." : "");
     const current = readPublicRoute(window.history.state);
-    const changed = !current || current.page !== next.page || current.signupRole !== next.signupRole || current.step !== next.step;
+    const changed = !current || current.page !== next.page || current.signupRole !== next.signupRole || current.step !== next.step || current.studentMode !== next.studentMode;
     if (mode === "push" && changed) window.history.pushState({ fyphubNavigation: next }, "", window.location.href);
     if ((mode === "replace" || (mode === "pop" && changed)) && changed) window.history.replaceState({ fyphubNavigation: next }, "", window.location.href);
   }
@@ -595,7 +614,7 @@ export default function App() {
       setNotice("Please correct the highlighted fields.");
       return;
     }
-    navigatePublic(publicRoute("up", "STUDENT", Math.min(3, step + 1) as 1 | 2 | 3));
+    navigatePublic(publicRoute("up", "STUDENT", Math.min(3, step + 1) as 1 | 2 | 3, "group"));
   }
   function mapPath(path?: string) {
     if (!path) return undefined;
@@ -696,6 +715,43 @@ export default function App() {
     }
   }
 
+  async function submitSingle() {
+    const next = validateSingle();
+    if (Object.keys(next).length) {
+      setErrors(next);
+      setNotice("Please correct the highlighted fields.");
+      return;
+    }
+    if (submitting) return;
+    setSubmitting(true);
+    setErrors({});
+    setNotice("");
+    try {
+      const response = await fetch(`${API}/api/v1/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: single.name.trim(),
+          registration_number: registration(single.registration),
+          email: email(single.email),
+          password: single.password,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const detail = data.detail;
+        setNotice(typeof detail === "string" ? detail : "Student account could not be created.");
+        return;
+      }
+      setIndividualSuccess(true);
+      setSingle((current) => ({ ...current, password: "", confirm: "" }));
+    } catch {
+      setNotice("The registration service is unavailable. Your entered details were kept.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function performLogin() {
     if (authSubmitting) return;
     const identifier = signIn.email.trim();
@@ -757,6 +813,20 @@ export default function App() {
   const changePage = (value: "in" | "up") => {
     navigatePublic(publicRoute(value));
   };
+  if (page === "account" && authUser?.role === "STUDENT")
+    return (
+      <StudentPortal api={API} user={authUser} onLogout={() => void signOut()} />
+    );
+  if (page === "account" && authUser?.role === "SUPERVISOR")
+    return (
+      <SupervisorPortal api={API} user={authUser} onLogout={() => void signOut()} />
+    );
+  if (page === "account" && authUser?.role === "COORDINATOR")
+    return (
+      <CoordinatorPortal api={API} user={authUser} onLogout={() => void signOut()} />
+    );
+  if (page === "account" && authUser?.role === "PANEL_MEMBER")
+    return <EvaluatorPortal user={authUser} onLogout={() => void signOut()} />;
   if (page === "account" && authUser)
     return (
       <main className="min-h-screen bg-[#F7F5EF] px-4 py-8 text-[#243746]">
@@ -902,6 +972,16 @@ export default function App() {
           </div>
       </AuthLayout>
     );
+  if (page === "up" && studentMode === "single" && individualSuccess)
+    return (
+      <AuthLayout>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-[#176B66]">Student account created</h1>
+          <p className="mt-3 text-sm text-[#4f6470]">Your individual student account is ready. You can now sign in.</p>
+          <button type="button" onClick={() => navigatePublic(publicRoute("in"))} className={`${AUTH_PRIMARY} mt-6 w-full`}>Go to Login</button>
+        </div>
+      </AuthLayout>
+    );
   if (page === "up" && success)
     return (
       <AuthLayout>
@@ -943,6 +1023,47 @@ export default function App() {
               </button>
             </p>
           </div>
+      </AuthLayout>
+    );
+  if (page === "up" && signupRole === "STUDENT" && studentMode === null)
+    return (
+      <AuthLayout>
+        <div>
+          <h1 className="text-2xl font-bold">Choose a Student Account</h1>
+          <p className="mt-2 mb-6 text-sm text-[#4f6470]">Select how you want to join FYPHub.</p>
+          <div className="grid gap-3">
+            <button type="button" onClick={() => { setIndividualSuccess(false); setSuccess(null); navigatePublic(publicRoute("up", "STUDENT", 1, "single")); }} className="rounded-xl border border-[#dce4de] bg-white p-4 text-left transition-colors hover:border-[#4663FF] hover:bg-[#eef0ff]">
+              <span className="block text-base font-bold">Single Student</span>
+              <span className="mt-1 block text-sm text-[#4f6470]">Create an individual student account.</span>
+            </button>
+            <button type="button" onClick={() => { setIndividualSuccess(false); setSuccess(null); navigatePublic(publicRoute("up", "STUDENT", 1, "group")); }} className="rounded-xl border border-[#dce4de] bg-white p-4 text-left transition-colors hover:border-[#4663FF] hover:bg-[#eef0ff]">
+              <span className="block text-base font-bold">Group</span>
+              <span className="mt-1 block text-sm text-[#4f6470]">Create a shared group account.</span>
+            </button>
+          </div>
+          <button type="button" onClick={() => navigatePublic(publicRoute("up"))} className="mt-6 w-full text-sm font-semibold text-[#176B66] underline">Choose another account type</button>
+        </div>
+      </AuthLayout>
+    );
+  if (page === "up" && signupRole === "STUDENT" && studentMode === "single")
+    return (
+      <AuthLayout>
+        <form onSubmit={(event) => { event.preventDefault(); void submitSingle(); }}>
+          <h1 className="text-2xl font-bold">Create Single Student Account</h1>
+          <p className="mt-2 mb-6 text-sm text-[#4f6470]">Use your university details to create an individual student account.</p>
+          <div className="grid gap-4">
+            <Field label="Full name" autoComplete="name" value={single.name} disabled={submitting} error={errors["single.name"]} onChange={(value) => updateSingle("name", value)} />
+            <Field label="Registration number" value={single.registration} disabled={submitting} error={errors["single.registration"]} onChange={(value) => updateSingle("registration", value)} />
+            <Field label="University email" type="email" value={single.email} disabled={submitting} error={errors["single.email"]} onChange={(value) => updateSingle("email", value)} />
+            <PasswordField label="Password" value={single.password} disabled={submitting} error={errors["single.password"]} onChange={(value) => updateSingle("password", value)} />
+            <PasswordField label="Confirm password" value={single.confirm} confirm disabled={submitting} error={errors["single.confirm"]} onChange={(value) => updateSingle("confirm", value)} />
+          </div>
+          {notice && <p role="alert" className="mt-4 rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{notice}</p>}
+          <div className="mt-6 grid gap-3">
+            <button type="submit" disabled={submitting} className={`${AUTH_PRIMARY} min-h-[46px] w-full`}>{submitting ? "Creating account..." : "Create Account"}</button>
+            <button type="button" disabled={submitting} onClick={() => navigatePublic(publicRoute("up", "STUDENT", 1, null))} className="w-full text-sm font-semibold text-[#176B66] underline">Back to Student options</button>
+          </div>
+        </form>
       </AuthLayout>
     );
   if (page === "up" && signupRole !== "STUDENT")
@@ -1000,6 +1121,7 @@ export default function App() {
               <PasswordField
                 label="Password"
                 autoComplete="current-password"
+                guidance
                 value={signIn.password}
                 disabled={authSubmitting}
                 onChange={(value) => {
@@ -1032,9 +1154,6 @@ export default function App() {
               >
                 {authSubmitting ? "Signing in..." : "Login"}
               </button>
-              <StudentMatching api={API} />
-              <JoinRequestForm api={API} />
-              <InviteeResponse api={API} />
               <p className="text-center text-sm text-[#4f6470]">
                 Don&apos;t have an account?{" "}
                 <button
@@ -1067,6 +1186,7 @@ export default function App() {
                 <PasswordField
                   label="Password"
                   autoComplete="current-password"
+                  guidance
                   value={signIn.password}
                   onChange={(value) =>
                     setSignIn((current) => ({ ...current, password: value }))
@@ -1141,7 +1261,7 @@ export default function App() {
                       {cycles.map((cycle) => (
                         <option key={cycle.id} value={cycle.id}>
                           {cycle.display_name} ({cycle.code})
-                          {cycle.registration_open ? "" : " â€” closed"}
+                          {cycle.registration_open ? "" : " — closed"}
                         </option>
                       ))}
                     </select>
@@ -1333,7 +1453,7 @@ export default function App() {
                     onClick={nextStep}
                     className={`${AUTH_PRIMARY} ml-auto`}
                   >
-                    Next â†’
+                    Next →
                   </button>
                 ) : (
                   <button
@@ -1351,4 +1471,3 @@ export default function App() {
     </AuthLayout>
   );
 }
-

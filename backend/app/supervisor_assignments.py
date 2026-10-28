@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from .auth import require_roles, utc_now, validate_mutating_origin
 from .database import get_db
-from .models import SupervisorAssignment, SupervisorCapacityPolicy, Team, User, UserRole
+from .models import SupervisorAssignment, SupervisorCapacityPolicy, SupervisorRequest, SupervisorRequestStatus, Team, User, UserRole
 
 router = APIRouter(prefix="/api/v1/admin/supervisor-assignments")
 class AssignmentWrite(BaseModel):
@@ -38,6 +38,7 @@ def assign(payload: AssignmentWrite, request: Request, actor: User = Depends(req
         if team.academic_cycle_id != payload.academic_cycle_id: raise failure("cycle_mismatch", "Team does not belong to the selected cycle.")
         if session.scalar(select(SupervisorAssignment.id).where(SupervisorAssignment.team_id == team.id, SupervisorAssignment.ended_at.is_(None))) is not None: raise failure("team_already_assigned", "Team already has an active supervisor assignment.")
         count = session.scalar(select(func.count(SupervisorAssignment.id)).where(SupervisorAssignment.supervisor_id == payload.supervisor_id, SupervisorAssignment.academic_cycle_id == payload.academic_cycle_id, SupervisorAssignment.ended_at.is_(None))) or 0
+        count += session.scalar(select(func.count(SupervisorRequest.id)).where(SupervisorRequest.supervisor_id == payload.supervisor_id, SupervisorRequest.academic_cycle_id == payload.academic_cycle_id, SupervisorRequest.status == SupervisorRequestStatus.ACCEPTED.value, SupervisorRequest.assignment_id.is_(None))) or 0
         if count >= policy.max_group_capacity: raise failure("capacity_full", "Supervisor capacity is full for this cycle.")
         assignment = SupervisorAssignment(**payload.model_dump(), assigned_by_id=actor.id); session.add(assignment); session.flush()
         add_admin_audit_event(session, actor_id=actor.id, affected_user_id=payload.supervisor_id, target_type="SUPERVISOR_ASSIGNMENT", target_id=assignment.id, action="supervisor_assignment_created", changed_values=payload.model_dump())

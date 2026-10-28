@@ -21,6 +21,22 @@ This is the source-of-truth P1 Mid coverage record. It was reconciled against th
 
 Repository paths below are concrete implementation references. The full-suite result is in `docs/progress.md`; each item cites its own evidence instead of relying on a count.
 
+## Module 1 end-to-end checklist (2026-10-27 audit)
+
+This checklist follows the eight Module 1 requirements in Long Proposal section 9.3 (PDF pp. 9-10). It separates implemented configuration behavior from proposal decisions that are not safe to invent.
+
+| Proposal requirement | Status | Verified implementation | Exact remaining gap or limitation |
+| --- | --- | --- | --- |
+| User and role management for Students, Supervisors, Coordinators, Panel Members, and Administrators. | Partial | ADMIN-only account listing, creation, role/status changes, session revocation, last-active-ADMIN protection, shared-team safeguards, audit writes, and focused tests. | Browser demonstration is not available in the current environment. Shared-team deactivation lifecycle is not defined by the proposal and remains deliberately rejected. |
+| Semester and FYP-cycle configuration, including group-size and workflow policies. | Partial | Cycle create/update, registration-open state, group-size policy, workflow-policy version drafts, cycle locking, concurrency protection, audit, and focused tests. | The proposal does not define a separate semester entity/semantics, approved workflow states, publication, or runtime transition authority. No rule is invented for those decisions. |
+| Official short- and long-proposal template management with versioned academic rules. | Partial | ADMIN-only internal SHORT/LONG reference metadata, immutable metadata/rule versions, ordered history, rollback, audit, strict validation, and concurrency tests/UI. | No official blank files, approval authority, storage/upload/download, publication, activation/retirement, or retention policy has been supplied. These are prerequisites for an official template lifecycle and for M3 compliance. |
+| Supervisor capacity, panel rubric, scoring criteria, and academic-deadline configuration. | Partial | Cycle-scoped supervisor capacity and assignment enforcement; immutable rubric drafts with ordered criteria; immutable timezone-validated deadline versions, previews, history, and audit; focused tests. | Approved scoring values, marks/weights/thresholds/stages, rubric approval/publication, official deadline values, activation, exceptions, penalties, and deadline enforcement are unspecified. |
+| Deadline reminder and escalation rules. | Partial | ADMIN-only versioned rules linked to exact deadline versions, elapsed-minute previews, cycle validation, audit, rollback, and concurrency tests. | Scheduling, recipients, channels, delivery, triggers, stopping conditions, retries, authority, and escalation execution are not specified or implemented. |
+| Immutable audit history of administrative changes. | Implemented with stated boundary | Append-only audit writes, database UPDATE/DELETE protections, allowlisted filtered/paginated ADMIN reader, detail view, rollback tests, and full-suite coverage. | The database owner can bypass trigger protections; an external tamper-evident ledger is outside the current architecture and proposal detail. |
+| Primary output: academic governance configuration and deadline action rules. | Partial | The defined governance configuration and non-operational deadline-action rule data are persisted, versioned, authorized, audited, and concurrency-safe. | Operational deadline actions require the unresolved policy inputs above; no enforcement or delivery behavior is claimed. |
+
+The audit found no additional Module 1 behavior that can be implemented safely without inventing academic policy, official source documents, or operational authority. Module 2 AI gaps and all Module 3 proposal/compliance work remain out of scope.
+
 ## M1 - Admin Dashboard & Academic Management
 
 | ID | Source and requirement | Status | Actual implementation / evidence | Missing work or decision |
@@ -71,6 +87,8 @@ Repository paths below are concrete implementation references. The full-suite re
 
 > **M1-J.1 update:** ADMIN-only approved XLSX roster preview, confirmation, atomic import, audit and cycle-filtered list are implemented under migration `c4d5e6f7a8b9`. New team registration now enforces roster eligibility under M1-J.2. Browser/mobile verification is pending. M1 and P1 remain Partial.
 
+> **SUPERVISOR checkpoint update (2026-10-27):** Cycle-scoped supervisor selection and PDF-backed proposal requests are implemented under migrations `c5d6e7f8a9b0` and `d6e7f8a9b0c1`. Student requests use exactly one immutable one-page PDF, deterministic local extraction with source-page fields, explicit extraction confirmation, lifecycle statuses, locked capacity/duplicate/team checks, immutable status history, selected-supervisor decisions, and atomic audit events. Supervisor, Admin, and Coordinator views are role-authorized and can access the same original document/extracted preview within their scope; AI compliance and final academic review remain later checkpoints. Browser verification remains pending.
+
 ## Approved roster eligibility direction
 
 Only semesters 7 and 8 are eligible. The ADMIN-only import of an explicitly approved Excel roster supplies cycle-scoped records with name, registration number, university email, semester, cycle, group code and optional topic. Every creator and member must match both normalized registration number and email to the same approved record in the selected cycle. No university-system integration is required. Existing teams/accounts are not automatically verified; shared-login and contact-email decisions remain unchanged. Group code is recorded; enforcement of team composition by group code is not decided. Roster import and new team registration eligibility checks are implemented; existing accounts and teams are not retroactively verified.
@@ -87,3 +105,7 @@ The assigned Supervisor alone owns the first proposal academic review; the Coord
 - No status here claims screenshots. Browser validation is pending unless a later checkpoint records captured evidence.
 
 Report-ready explanations, workflows, demonstrations, source-dependent blockers, and M1-D scope are in [p1-workflows.md](p1-workflows.md).
+
+> **SUPERVISOR-H update (2026-10-27):** Decision follow-up, advisory proposal-reference search, separate reference PDFs, and authorized request conversations are implemented under migration `e7f8a9b0c1d2`. Exact-title, possible-similar-title, and no-close-match results are explicit and never block submission; semantic/AI analysis is labelled unavailable. Student/team owner, selected Supervisor, Coordinator, and Admin can access the request conversation, while cross-student access and Panel access are rejected server-side. Browser verification remains pending; the opt-in fixture seed is not run against the project database.
+
+> **ARCHIVE checkpoint update (2026-10-27):** Separate logical archive metadata and immutable PDF document versions are implemented under migrations `f9a0b1c2d3e4` and `fa0b1c2d3e4`. Admin-only create/edit/upload/activation routes write audit events and reject duplicate active title/year records. Student search is read-only and deterministically ranked by exact/normalized title, keywords, summary, and scope; secure document access exposes active PDFs only. Supervisor and Coordinator reads are authorized; Panel access is denied. Semantic ranking is explicitly unavailable, the eight-project `SAMPLE_DATA` seed is opt-in, and browser verification remains pending.

@@ -34,3 +34,8 @@ from .join_request import JoinRequest, JoinRequestAudit
 from .invitation import Invitation, InvitationAudit
 
 from .invitation import InvitationOutbox
+
+from .supervisor_request import SupervisorRequest, SupervisorRequestDocument, SupervisorRequestExtractionStatus, SupervisorRequestStatus, SupervisorRequestStatusHistory
+from .proposal_reference import ProposalReference, ProposalReferenceDocument
+from .supervisor_request_conversation import SupervisorRequestMessage
+from .archived_project import ArchivedProject, ArchivedProjectDocument, ArchivedProjectDocumentType

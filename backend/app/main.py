@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from .database import engine, get_db
 from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
-from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, SupervisorCapacityPolicy, SupervisorAssignment
+from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, SupervisorCapacityPolicy, SupervisorAssignment, SupervisorRequest, SupervisorRequestStatus
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
 from .models import EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion
 from .models import AcademicDeadline, AcademicDeadlineVersion
@@ -25,7 +25,7 @@ from .schemas.supervisor_capacity import SupervisorCapacityOut, SupervisorCapaci
 from .schemas.team_registration import TeamMemberInput, TeamRegistrationRequest, TeamRegistrationResponse
 from .security import generate_session_token, hash_password, hash_session_token, verify_password
 from .auth import (
-    ALLOWED_BROWSER_ORIGIN,
+    ALLOWED_BROWSER_ORIGINS,
     SESSION_COOKIE_NAME,
     SESSION_LIFETIME_HOURS,
     clear_session_cookie,
@@ -39,7 +39,7 @@ from .auth import (
 app = FastAPI(title="FYPHub API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5174"],
+    allow_origins=list(ALLOWED_BROWSER_ORIGINS),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "PUT"],
     allow_headers=["Content-Type", "X-File-Name", "X-Preview-Token"],
@@ -830,6 +830,7 @@ def supervisor_capacity_out(policy: SupervisorCapacityPolicy, session: Session) 
     supervisor = policy.supervisor
     cycle = policy.academic_cycle
     assigned = session.scalar(select(func.count(SupervisorAssignment.id)).where(SupervisorAssignment.supervisor_id == policy.supervisor_id, SupervisorAssignment.academic_cycle_id == policy.academic_cycle_id, SupervisorAssignment.ended_at.is_(None))) or 0
+    assigned += session.scalar(select(func.count(SupervisorRequest.id)).where(SupervisorRequest.supervisor_id == policy.supervisor_id, SupervisorRequest.academic_cycle_id == policy.academic_cycle_id, SupervisorRequest.status == SupervisorRequestStatus.ACCEPTED.value, SupervisorRequest.assignment_id.is_(None))) or 0
     return {
         "assigned": assigned, "remaining": max(policy.max_group_capacity - assigned, 0), "full": assigned >= policy.max_group_capacity,
         "id": policy.id,
@@ -1537,3 +1538,15 @@ app.include_router(join_requests_router)
 
 from .invitations import router as invitations_router
 app.include_router(invitations_router)
+
+from .supervisor_requests import router as supervisor_requests_router
+app.include_router(supervisor_requests_router)
+
+from .proposal_reference import router as proposal_reference_router
+app.include_router(proposal_reference_router)
+
+from .supervisor_request_conversations import router as supervisor_request_conversations_router
+app.include_router(supervisor_request_conversations_router)
+
+from .archived_projects import router as archived_projects_router
+app.include_router(archived_projects_router)

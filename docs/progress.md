@@ -1,3 +1,12 @@
+## Module 1 end-to-end audit (2026-10-27)
+
+- Reconciled the eight Module 1 requirements in Long Proposal section 9.3 (PDF pp. 9-10) against `docs/p1-feature-tracker.md`, `docs/p1-workflows.md`, the current Admin route, models, migrations, routes, and tests.
+- Confirmed the current implementation covers the defined Module 1 configuration behavior: ADMIN account/role controls, cycle and group policies, workflow-policy drafts, internal template/rule versioning, supervisor capacity and assignment enforcement, rubric drafts, deadline versions/previews, reminder-rule previews, roster eligibility, and append-only audit history.
+- Recorded the exact unresolved gaps instead of inventing behavior: official template files and approval/storage lifecycle; approved scoring/rubric values and authority; separate semester semantics; operational deadline activation/enforcement; reminder delivery, recipients, scheduling, retries, and escalation authority; and the shared-team deactivation lifecycle.
+- No Module 2 AI gap or Module 3 feature was changed.
+- Verification from this checkpoint: 164 backend tests passed with `unittest`; Alembic current/head are `b2c3d4e5f6a7`, `alembic check` reports no pending operations, and `pip check` passes. Frontend lint and production build pass; `git diff --check` passes. The frontend API remains `http://localhost:8010`, with no `8011` reference.
+- Browser visual/interaction verification could not be run because no browser surface was available in the current environment. The Vite server remains running from the requested checkout at `http://localhost:5173`.
+
 # Project Progress
 
 ## Supervisor-to-Team Allocation
@@ -244,6 +253,16 @@ The isolated PostgreSQL + pgvector configuration was created.
 
 Before the 6th; month and year are not yet confirmed.
 
+## Supervisor selection and proposal request checkpoint
+
+- **SUPERVISOR-A:** audited the proposal/tracker boundary and recorded the requirement/workflow matrix in `docs/supervisor-selection-matrix.md`.
+- **SUPERVISOR-B:** added cycle-scoped supervisor request records, immutable status history, optimistic revision checks, capacity/duplicate/cycle/team locking, selected-supervisor decisions, and atomic audit writes under migration `c5d6e7f8a9b0`.
+- **SUPERVISOR-C:** added Student Portal supervisor discovery, minimal request draft/submit/status/history/withdraw UI, and resubmission support after `CHANGES_REQUESTED`.
+- **SUPERVISOR-D/E:** added separate Supervisor queue/decision UI, Admin read-only monitoring, and Coordinator read-only monitoring. These views do not override reviewer decisions or expose private supervisor data.
+- **SUPERVISOR-F:** focused workflow tests (6) and the full backend suite (170) pass; frontend focused tests (3), lint, production build, Alembic check, `pip check`, and `git diff --check` pass. Database current/head is `c5d6e7f8a9b0`. No browser surface was available for visual verification.
+- **SUPERVISOR-G:** replaced manual request title/summary entry with one-page PDF upload and deterministic local `pypdf` extraction. Immutable original document versions, extracted text/structured fields, source-page references, extraction runtime/timestamps, confirmation gating, authorized PDF viewing, and upload/extraction/confirmation audit events are implemented under migration `d6e7f8a9b0c1`. Focused document workflow tests cover valid extraction, multi-page/non-PDF/oversized/unreadable files, missing fields, confirmation, authorization, rollback, and revision-safe submission.
+- Proposal uploads, AI compliance, proposal versioning, final approvals, panel scheduling/evaluation, and analytics remain later checkpoints. Browser verification remains pending where no browser surface is available.
+
 ## Checkpoint 7A
 
 - Added database-backed, opaque browser sessions through Alembic revision `f7a1c3d9e2b4`; only SHA-256 token hashes are persisted, with UTC-aware timestamps, expiry, and revocation.
@@ -294,3 +313,5 @@ Before the 6th; month and year are not yet confirmed.
 - Implemented a further Admin visual correction in source: compact shell/header, refined sidebar and cycle list, responsive mobile overlay, and reduced-motion-safe micro-interactions. Visual review remains pending user approval.
 - M1-B now provides ADMIN-only paginated account listing, controlled account creation, role/status mutation, active-session revocation, shared-team protection, and concurrent last-active-ADMIN protection. Migration `b8d2e4f6a9c1` adds append-only audit events with PostgreSQL UPDATE/DELETE trigger protection. Six rollback-isolated M1-B tests and the complete 37-test backend suite pass; browser review remains pending. Shared-team deactivation is currently rejected as an implementation safeguard; its intended lifecycle behavior remains an unresolved policy decision.
 - M1-C.1 adds ADMIN cycle and policy management with audit targets under `c4e7f1a2b9d3`; no real configuration was changed during isolated tests. Two controlled, bounded tests now use separate database sessions to prove registration precedes a waiting closure and that a waiting policy reduction rejects after seeing the committed team without partial account/team/member/audit writes. Semester and unspecified workflow policies remain separate; browser review remains pending.
+- **SUPERVISOR-H:** completed the decision/reference/conversation follow-up under migration `e7f8a9b0c1d2`. The selected Supervisor decision path remains revision-checked and capacity-locked; proposal reference search now provides exact, advisory similar, and explicit no-close-match outcomes with separate authorized reference PDFs; request conversations are append-only, audited, and limited to the owning Student/team, selected Supervisor, Coordinator, and Admin. Added focused backend coverage for search, PDF authorization, conversation visibility, cross-student denial, and Panel denial. The opt-in fixture seed (`scripts/seed_proposal_references.py`) was not run. Browser verification remains pending because no browser surface is available.
+- **ARCHIVE checkpoint:** added the separate logical FYP archive and immutable document-version workflow under migrations `f9a0b1c2d3e4` and `fa0b1c2d3e4`. Admin archive management supports metadata edits, PDF-only uploads, version history, non-destructive activation, duplicate-title protection, hashes, and audit events. Student knowledge search/detail uses deterministic ranked results and secure read-only PDF links; Supervisor and Coordinator reads are authorized and Panel access is denied. Focused archive tests (2) and the full backend suite (182) pass; frontend lint/build and Alembic/pip/diff checks pass. The eight-project seed (`scripts/seed_archived_projects.py`) was not run. Browser verification and semantic/embedding ranking remain pending/unavailable.

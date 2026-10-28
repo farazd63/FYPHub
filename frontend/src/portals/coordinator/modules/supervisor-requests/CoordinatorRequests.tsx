@@ -1,0 +1,17 @@
+/*
+import { useEffect, useMemo, useState } from "react";
+import { CoordinatorRequestsPdf } from "./CoordinatorRequestsPdf";
+
+type RequestRecord = { id: number; requester_name: string; team_id: number | null; academic_cycle_name: string; supervisor_name: string; title: string; status: string; updated_at: string };
+export function LegacyCoordinatorRequests({ api }: { api: string }) {
+  const [rows, setRows] = useState<RequestRecord[]>([]), [status, setStatus] = useState(""), [loading, setLoading] = useState(true), [message, setMessage] = useState("");
+  useEffect(() => { const controller = new AbortController(); void (async () => { setLoading(true); try { const query = status ? `?status=${encodeURIComponent(status)}` : ""; const response = await fetch(`${api}/api/v1/supervisor-requests/coordinator/monitor${query}`, { credentials: "include", signal: controller.signal }); if (!response.ok) throw new Error(); setRows(await response.json() as RequestRecord[]); } catch { if (!controller.signal.aborted) setMessage("Supervisor monitoring data could not be loaded."); } finally { if (!controller.signal.aborted) setLoading(false); } })(); return () => controller.abort(); }, [api, status]);
+  const counts = useMemo(() => rows.reduce<Record<string, number>>((result, row) => { result[row.status] = (result[row.status] ?? 0) + 1; return result; }, {}), [rows]);
+  return <section className="supervisor-page" aria-labelledby="coordinator-requests-heading"><div className="supervisor-page-heading"><p>Coordinator / PM workspace</p><h1 id="coordinator-requests-heading">Supervisor Request Monitoring</h1><span>Read-only cycle monitoring and capacity-impact visibility. Decisions remain with the selected supervisor.</span></div>{message && <p className="supervisor-alert" role="status">{message}</p>}<div className="supervisor-monitor-summary"><span><strong>{counts.SUBMITTED ?? 0}</strong> submitted</span><span><strong>{counts.CHANGES_REQUESTED ?? 0}</strong> changes requested</span><span><strong>{counts.ACCEPTED ?? 0}</strong> accepted</span><span><strong>{counts.REJECTED ?? 0}</strong> rejected</span></div><div className="supervisor-card"><label className="supervisor-filter">Status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option><option value="SUBMITTED">Submitted</option><option value="CHANGES_REQUESTED">Changes requested</option><option value="ACCEPTED">Accepted</option><option value="REJECTED">Rejected</option><option value="WITHDRAWN">Withdrawn</option></select></label>{loading ? <p className="supervisor-empty">Loading monitoring data…</p> : !rows.length ? <p className="supervisor-empty">No supervisor requests match this filter.</p> : <div className="supervisor-monitor-table"><table><thead><tr><th>Request</th><th>Student / team</th><th>Supervisor</th><th>Cycle</th><th>Status</th><th>Updated</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.title}</strong></td><td>{row.requester_name}{row.team_id ? ` · Team ${row.team_id}` : ""}</td><td>{row.supervisor_name}</td><td>{row.academic_cycle_name}</td><td><span>{row.status}</span></td><td>{new Date(row.updated_at).toLocaleString()}</td></tr>)}</tbody></table></div>}</div></section>;
+}
+
+*/
+import { CoordinatorRequestsPdf } from "./CoordinatorRequestsPdf";
+export function CoordinatorRequests({ api }: { api: string }) {
+  return <CoordinatorRequestsPdf api={api} />;
+}

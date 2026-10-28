@@ -1,0 +1,1 @@
+export { KnowledgeSearch } from "../KnowledgeSearch";
