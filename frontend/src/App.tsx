@@ -1,8 +1,12 @@
-﻿import { GroupChannels } from "./GroupChannels";
+import { GroupChannels } from "./GroupChannels";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AdminPortal } from "./AdminPortal";
 import { PasswordField } from "./PasswordField";
+import { passwordPolicyError } from "./passwordPolicy";
 import { StudentPortal } from "./portals/student/StudentPortal";
+import { SupervisorPortal } from "./portals/supervisor/SupervisorPortal";
+import { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";
+import { EvaluatorPortal } from "./portals/evaluator/EvaluatorPortal";
 import signInStudentsImage from "./assets/sign-in-students.webp";
 
 type Member = { id: string; name: string; registration: string; email: string };
@@ -495,11 +499,8 @@ export default function App() {
     if (target === 2 || target === 0) {
       if (!EMAIL.test(email(login.email)))
         next["login.email"] = "Enter a valid shared login email.";
-      if (login.password.length < 8 || login.password.length > 128)
-        next["login.password"] =
-          login.password.length < 8
-            ? "Use at least 8 characters."
-            : "Password must be no more than 128 characters.";
+      const groupPasswordError = passwordPolicyError(login.password);
+      if (groupPasswordError) next["login.password"] = groupPasswordError;
       if (login.password !== login.confirm)
         next["login.confirm"] = "Passwords do not match.";
     }
@@ -545,9 +546,8 @@ export default function App() {
     if (!single.name.trim()) next["single.name"] = "Enter your full name.";
     if (!registration(single.registration)) next["single.registration"] = "Enter your registration number.";
     if (!EMAIL.test(email(single.email))) next["single.email"] = "Enter a valid university email.";
-    if (single.password.length < 8 || single.password.length > 128) {
-      next["single.password"] = single.password.length < 8 ? "Use at least 8 characters." : "Password must be no more than 128 characters.";
-    }
+    const singlePasswordError = passwordPolicyError(single.password);
+    if (singlePasswordError) next["single.password"] = singlePasswordError;
     if (single.password !== single.confirm) next["single.confirm"] = "Passwords do not match.";
     return next;
   }
@@ -817,6 +817,16 @@ export default function App() {
     return (
       <StudentPortal api={API} user={authUser} onLogout={() => void signOut()} />
     );
+  if (page === "account" && authUser?.role === "SUPERVISOR")
+    return (
+      <SupervisorPortal api={API} user={authUser} onLogout={() => void signOut()} />
+    );
+  if (page === "account" && authUser?.role === "COORDINATOR")
+    return (
+      <CoordinatorPortal api={API} user={authUser} onLogout={() => void signOut()} />
+    );
+  if (page === "account" && authUser?.role === "PANEL_MEMBER")
+    return <EvaluatorPortal user={authUser} onLogout={() => void signOut()} />;
   if (page === "account" && authUser)
     return (
       <main className="min-h-screen bg-[#F7F5EF] px-4 py-8 text-[#243746]">
@@ -1111,6 +1121,7 @@ export default function App() {
               <PasswordField
                 label="Password"
                 autoComplete="current-password"
+                guidance
                 value={signIn.password}
                 disabled={authSubmitting}
                 onChange={(value) => {
@@ -1175,6 +1186,7 @@ export default function App() {
                 <PasswordField
                   label="Password"
                   autoComplete="current-password"
+                  guidance
                   value={signIn.password}
                   onChange={(value) =>
                     setSignIn((current) => ({ ...current, password: value }))
@@ -1249,7 +1261,7 @@ export default function App() {
                       {cycles.map((cycle) => (
                         <option key={cycle.id} value={cycle.id}>
                           {cycle.display_name} ({cycle.code})
-                          {cycle.registration_open ? "" : " â€” closed"}
+                          {cycle.registration_open ? "" : " — closed"}
                         </option>
                       ))}
                     </select>
@@ -1441,7 +1453,7 @@ export default function App() {
                     onClick={nextStep}
                     className={`${AUTH_PRIMARY} ml-auto`}
                   >
-                    Next â†’
+                    Next →
                   </button>
                 ) : (
                   <button
