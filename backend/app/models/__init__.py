@@ -34,3 +34,5 @@ from .join_request import JoinRequest, JoinRequestAudit
 from .invitation import Invitation, InvitationAudit
 
 from .invitation import InvitationOutbox
+
+from .proposal import Proposal, ProposalVersion

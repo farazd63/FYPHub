@@ -39,7 +39,7 @@ class RubricVersionWrite(BaseModel):
     def nonblank_name(cls, value: str) -> str:
         value = value.strip()
         if not value:
-            raise ValueError("Rubric name must not be blank.")
+            raise ValueError("Evaluation criteria name must not be blank.")
         return value
 
     @field_validator("description")

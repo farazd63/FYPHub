@@ -49,7 +49,7 @@ Pipeline: authenticated ADMIN → input/relationship validation → locked accou
 
 M1-C.1 provides an ADMIN Academic Cycles & Policies destination. New cycles remain closed until a positive group-size policy is set; broader semester and workflow management are not implemented. Separate-connection backend tests hold an in-flight registration at its member insert, then verify closure waits for its commit and an invalid reduction rejects after observing the committed team. Browser verification remains pending.
 
-- M1-B account management is implemented, but audit-history viewing, academic policy mutation, templates, capacities, rubrics, deadlines, and reminders are not implemented yet.
+- M1-B account management is implemented, but audit-history viewing, academic policy mutation, templates, capacities, evaluation criteria, deadlines, and reminders are not implemented yet.
 - This checkpoint creates no first Admin automatically and does not claim browser testing until a local Admin is deliberately provisioned.
 - The current database model has no audit table. Audit logging begins with the first M1 mutation checkpoint, before any management mutation endpoint is added.
 - Manual responsive visual verification remains pending; restart the Vite development server after pulling this UI change if it is already running so Tailwind reloads the extracted component classes.

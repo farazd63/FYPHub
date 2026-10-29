@@ -2,7 +2,8 @@ import { StudentMatching } from "./StudentMatching";
 import { InviteeResponse } from "./Invitations";
 import { JoinRequestForm } from "./JoinRequests";
 import { GroupChannels } from "./GroupChannels";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { StudentModule3Actions } from "./StudentModule3Actions";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AdminPortal } from "./AdminPortal";
 import { PasswordField } from "./PasswordField";
 import signInStudentsImage from "./assets/sign-in-students.webp";
@@ -39,8 +40,25 @@ type PublicRoute = { page: PublicPage; signupRole: LoginRole | null; step: 1 | 2
 const STEPS = ["Account Details", "Login Details", "Team Members"];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const API = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8010"
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8010"
 ).replace(/\/$/, "");
+
+// TEMPORARY: safe post-login diagnostics. Do not add request payloads or cookie values here.
+async function logTemporaryAuthResponse(path: string, response: Response) {
+  let body: unknown;
+  try {
+    body = await response.clone().json();
+  } catch {
+    body = await response.clone().text();
+  }
+  console.info("TEMP_AUTH_DIAGNOSTIC", {
+    apiUrl: `${API}${path}`,
+    responseStatus: response.status,
+    responseBody: body,
+    documentOrigin: document.location.origin,
+    credentialsMode: "include",
+  });
+}
 const INPUT =
   "w-full rounded-lg border border-[#DCE3ED] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#4663FF] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
 const PRIMARY =
@@ -155,7 +173,7 @@ function AuthPhotoBackground() {
 }
 
 function AuthLayout({ children, actions, compact = false }: { children: ReactNode; actions?: ReactNode; compact?: boolean }) {
-  return <main className="relative min-h-screen overflow-x-hidden px-4 py-7 text-[#243746] sm:px-6 sm:py-10 lg:py-5"><AuthPhotoBackground /><div className="relative mx-auto grid max-w-[1280px] gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(460px,500px)] lg:items-center lg:gap-16"><section className="hidden max-w-lg self-center text-white lg:block"><Logo auth /><h1 className="mt-14 text-4xl font-bold leading-[1.15] tracking-tight">From Your First Idea to Your Final Defense.</h1><p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-white/90">Bring your team, proposals, feedback, and progress together in one FYP workspace.</p><p className="mt-6 text-[15px] font-medium tracking-wide text-[#b9ddcf]">Stay focused. Build together.</p></section><div className={`auth-card mx-auto w-full max-w-[500px] rounded-3xl p-5 ${compact ? "sm:p-6" : "sm:p-7"}`}><header className={`mb-6 flex gap-4 ${actions ? "flex-col items-start sm:flex-row sm:items-center sm:justify-between" : "items-center justify-between lg:hidden"}`}><div className="lg:hidden"><Logo authMobile /></div>{actions && <div className="sm:ml-auto">{actions}</div>}</header>{children}</div></div></main>;
+  return <main className="relative min-h-screen overflow-x-hidden px-4 py-7 text-[#243746] sm:px-6 sm:py-10 lg:py-5"><AuthPhotoBackground /><div className="relative mx-auto grid max-w-[1280px] gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(460px,500px)] lg:items-center lg:gap-16"><section className="hidden max-w-lg self-center text-white lg:block"><Logo auth /><h1 className="mt-14 text-4xl font-bold leading-[1.15] tracking-tight">From Your First Idea to Your Final Defense.</h1><p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-white/90">Bring your team, proposals, feedback, and progress together in one FYP workspace.</p><p className="mt-6 text-[15px] font-medium tracking-wide text-[#b9ddcf]">Stay focused. Build together.</p></section><div className={`auth-card ${compact ? "auth-sign-in-card" : ""} mx-auto w-full max-w-[500px] rounded-3xl p-5 ${compact ? "sm:p-6" : "sm:p-7"}`}><header className={`mb-6 flex gap-4 ${actions ? "flex-col items-start sm:flex-row sm:items-center sm:justify-between" : "items-center justify-between lg:hidden"}`}><div className="lg:hidden"><Logo authMobile /></div>{actions && <div className="sm:ml-auto">{actions}</div>}</header>{children}</div></div></main>;
 }
 
 function RoleCards({
@@ -407,36 +425,17 @@ export default function App() {
         const response = await fetch(`${API}/api/v1/auth/me`, {
           credentials: "include",
         });
+        void logTemporaryAuthResponse("/api/v1/auth/me", response);
         if (response.ok) {
-          setAuthUser((await response.json()) as SafeUser);
-          setPage("account");
+          const user = (await response.json()) as SafeUser;
+          setAuthUser(user);
+          setPage(user.role === "ADMIN" ? "admin-portal" : "account");
         }
       } catch {
         /* A local API may not be running while the public signup form is used. */
       }
     })();
   }, []);
-  useEffect(() => {
-    if (authUser?.role !== "ADMIN") return;
-    void (async () => {
-      try {
-        const response = await fetch(`${API}/api/v1/admin/me`, {
-          credentials: "include",
-        });
-        if (response.ok) setPage("admin-portal");
-        else {
-          setAuthUser(null);
-          setPage("in");
-          setAuthError(
-            "Administrator access is not available for this account.",
-          );
-        }
-      } catch {
-        setAuthError("Administrator access could not be verified.");
-      }
-    })();
-  }, [authUser]);
-
   const selectedCycle = cycles.find((cycle) => String(cycle.id) === cycleId);
   const maximum = policy?.max_group_size;
   const teamSize = members.length + 1;
@@ -569,18 +568,7 @@ export default function App() {
     const onPopState = (event: PopStateEvent) => {
       const destination = (event.state as { fyphubNavigation?: { page?: string } } | null)?.fyphubNavigation?.page;
       if (destination === "admin-portal" && authUserRef.current?.role === "ADMIN") {
-        void fetch(`${API}/api/v1/admin/me`, { credentials: "include" }).then(async response => {
-          if (!response.ok) {
-            setAuthUser(null);
-            publicNavigationRef.current(publicRoute("in"), "pop");
-            return;
-          }
-          setAuthUser((await response.json()) as SafeUser);
-          setPage("admin-portal");
-        }).catch(() => {
-          setAuthUser(null);
-          publicNavigationRef.current(publicRoute("in"), "pop");
-        });
+        setPage("admin-portal");
         return;
       }
       publicNavigationRef.current(readPublicRoute(event.state) ?? publicRoute("in"), "pop");
@@ -696,7 +684,8 @@ export default function App() {
     }
   }
 
-  async function performLogin() {
+  async function performLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (authSubmitting) return;
     const identifier = signIn.email.trim();
     if (!identifier || !signIn.password) {
@@ -720,6 +709,7 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      void logTemporaryAuthResponse("/api/v1/auth/login", response);
       if (!response.ok) {
         setAuthError(
           response.status === 401
@@ -797,6 +787,7 @@ export default function App() {
               Log out
             </button>
           </section>
+          {authUser.role === "STUDENT" && <StudentModule3Actions />}
           {(authUser.role === "STUDENT" || authUser.role === "SUPERVISOR") && <GroupChannels api={API} role={authUser.role} />}
         </div>
       </main>
@@ -831,7 +822,7 @@ export default function App() {
                 "Academic Cycles & Policies",
                 "Proposal Templates",
                 "Supervisor Capacity",
-                "Evaluation Rubrics",
+                "Evaluation Criteria",
                 "Deadlines",
                 "Reminders & Escalations",
                 "Audit History",
@@ -986,7 +977,7 @@ export default function App() {
               disabled={authSubmitting}
               compact
             />
-            <div className="mt-4 space-y-3">
+            <form className="mt-4 space-y-3" onSubmit={performLogin}>
               <Field
                 label="Email or Registration ID"
                 autoComplete="username"
@@ -1000,6 +991,7 @@ export default function App() {
               <PasswordField
                 label="Password"
                 autoComplete="current-password"
+                guidance
                 value={signIn.password}
                 disabled={authSubmitting}
                 onChange={(value) => {
@@ -1025,9 +1017,8 @@ export default function App() {
                 </p>
               )}
               <button
-                type="button"
+                type="submit"
                 disabled={authSubmitting}
-                onClick={() => void performLogin()}
                 className={`${AUTH_PRIMARY} min-h-[46px] w-full`}
               >
                 {authSubmitting ? "Signing in..." : "Login"}
@@ -1045,7 +1036,7 @@ export default function App() {
                   Create Account
                 </button>
               </p>
-            </div>
+            </form>
           </div>
       </AuthLayout>
     );
@@ -1067,6 +1058,7 @@ export default function App() {
                 <PasswordField
                   label="Password"
                   autoComplete="current-password"
+                  guidance
                   value={signIn.password}
                   onChange={(value) =>
                     setSignIn((current) => ({ ...current, password: value }))

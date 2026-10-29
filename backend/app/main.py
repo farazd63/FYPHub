@@ -25,21 +25,23 @@ from .schemas.supervisor_capacity import SupervisorCapacityOut, SupervisorCapaci
 from .schemas.team_registration import TeamMemberInput, TeamRegistrationRequest, TeamRegistrationResponse
 from .security import generate_session_token, hash_password, hash_session_token, verify_password
 from .auth import (
-    ALLOWED_BROWSER_ORIGIN,
+    ALLOWED_BROWSER_ORIGINS,
     SESSION_COOKIE_NAME,
     SESSION_LIFETIME_HOURS,
     clear_session_cookie,
     get_current_user,
     require_roles,
+    session_cookie_secure,
     set_session_cookie,
     utc_now,
     validate_mutating_origin,
+    log_temporary_auth_diagnostic,
 )
 
 app = FastAPI(title="FYPHub API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5174"],
+    allow_origins=list(ALLOWED_BROWSER_ORIGINS),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "PUT"],
     allow_headers=["Content-Type", "X-File-Name", "X-Preview-Token"],
@@ -568,7 +570,7 @@ def evaluation_rubric_detail(
 ) -> dict[str, object]:
     rubric = session.get(EvaluationRubric, rubric_id)
     if rubric is None:
-        raise cycle_error(status.HTTP_404_NOT_FOUND, "rubric_not_found", "Evaluation rubric was not found.")
+        raise cycle_error(status.HTTP_404_NOT_FOUND, "rubric_not_found", "Evaluation criteria were not found.")
     return rubric_detail_out(session, rubric)
 
 
@@ -590,10 +592,10 @@ def create_evaluation_rubric(
         return rubric_detail_out(session, rubric)
     except (IntegrityError, SQLAlchemyError) as error:
         session.rollback()
-        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation rubric could not be saved.") from error
+        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation criteria could not be saved.") from error
     except Exception as error:
         session.rollback()
-        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation rubric could not be saved.") from error
+        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation criteria could not be saved.") from error
 
 
 @app.post("/api/v1/admin/evaluation-rubrics/{rubric_id}/versions", status_code=status.HTTP_201_CREATED, response_model=RubricVersionOut)
@@ -611,7 +613,7 @@ def create_evaluation_rubric_version(
             select(EvaluationRubric).where(EvaluationRubric.id == rubric_id).with_for_update()
         ).scalar_one_or_none()
         if rubric is None:
-            raise cycle_error(status.HTTP_404_NOT_FOUND, "rubric_not_found", "Evaluation rubric was not found.")
+            raise cycle_error(status.HTTP_404_NOT_FOUND, "rubric_not_found", "Evaluation criteria were not found.")
         version_number = (
             session.execute(
                 select(func.max(EvaluationRubricVersion.version_number)).where(EvaluationRubricVersion.rubric_id == rubric.id)
@@ -627,10 +629,10 @@ def create_evaluation_rubric_version(
         raise
     except (IntegrityError, SQLAlchemyError) as error:
         session.rollback()
-        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation rubric version could not be saved.") from error
+        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation criteria version could not be saved.") from error
     except Exception as error:
         session.rollback()
-        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation rubric version could not be saved.") from error
+        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation criteria version could not be saved.") from error
 
 
 @app.post("/api/v1/admin/academic-cycles", status_code=status.HTTP_201_CREATED, response_model=CycleOut)
@@ -740,6 +742,12 @@ def login(
         or not user.is_active
         or (credentials.requested_role is not None and user.role != credentials.requested_role)
     ):
+        log_temporary_auth_diagnostic(
+            request,
+            "login_response",
+            response_status=status.HTTP_401_UNAUTHORIZED,
+            session_cookie_set=False,
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
 
     now = utc_now()
@@ -761,20 +769,50 @@ def login(
     )
     session.commit()
     set_session_cookie(request, response, raw_token)
+    log_temporary_auth_diagnostic(
+        request,
+        "login_response",
+        response_status=status.HTTP_200_OK,
+        session_cookie_set=True,
+        cookie_domain=None,
+        cookie_path="/",
+        cookie_secure=session_cookie_secure(request),
+        cookie_samesite="lax",
+        cookie_max_age=SESSION_LIFETIME_HOURS * 60 * 60,
+    )
     return user
 
 
 @app.get("/api/v1/auth/me", response_model=CurrentUserResponse)
-def current_user(current_user: User = Depends(get_current_user)) -> User:
+def current_user(request: Request, current_user: User = Depends(get_current_user)) -> User:
     """Return the authenticated active account's safe fields."""
+    log_temporary_auth_diagnostic(
+        request,
+        "auth_me_response",
+        user_id=current_user.id,
+        user_active=current_user.is_active,
+        persisted_role=current_user.role.value,
+        role_comparison="not applicable",
+        response_status=status.HTTP_200_OK,
+    )
     return current_user
 
 
 @app.get("/api/v1/admin/me", response_model=CurrentUserResponse)
 def admin_current_user(
+    request: Request,
     current_user: User = Depends(require_roles(UserRole.ADMIN)),
 ) -> User:
     """Return the current account only when its persisted role is ADMIN."""
+    log_temporary_auth_diagnostic(
+        request,
+        "admin_me_response",
+        user_id=current_user.id,
+        user_active=current_user.is_active,
+        persisted_role=current_user.role.value,
+        role_comparison="matched",
+        response_status=status.HTTP_200_OK,
+    )
     return current_user
 
 

@@ -57,20 +57,21 @@ const inputClass =
 function PasswordGuidance({ value, id }: { value: string; id: string }) {
   if (!value) return null;
   const { criteria, score, strength } = getPasswordGuidance(value);
-  const meterClass =
-    strength === "Weak"
-      ? "bg-[#a43a33]"
-      : strength === "Medium"
-        ? "bg-[#a87518]"
-    : "bg-[#4663FF]";
-  const meterWidth = `${(score / criteria.length) * 100}%`;
+  const strengthColors = {
+    Weak: "text-[#a43a33]",
+    Medium: "text-[#176B66]",
+    Strong: "text-[#4663FF]",
+  }[strength];
+  const progress = strength === "Strong" ? 1 : strength === "Weak" ? Math.min(score / criteria.length, 0.4) : score / criteria.length;
+  const meterColor = { Weak: "#a43a33", Medium: "#176B66", Strong: "#4663FF" }[strength];
+  const meterWidth = `${progress * 100}%`;
   return (
     <div
       id={id}
-      className="grid gap-2 rounded-lg bg-[#f4f8f5] px-3 py-2.5 text-xs text-[#4f6470]"
+      className="password-guidance grid gap-2 rounded-lg bg-[#f4f8f5] px-3 py-2.5 text-xs text-[#4f6470]"
     >
       <div className="flex items-center gap-2">
-        <span className="font-semibold text-[#243746]">
+        <span className={`font-semibold ${strengthColors}`}>
           Strength estimate: {strength}
         </span>
         <div
@@ -78,27 +79,23 @@ function PasswordGuidance({ value, id }: { value: string; id: string }) {
           aria-hidden="true"
         >
           <div
-            className={`h-full rounded-full ${meterClass}`}
-            style={{ width: meterWidth }}
+            className="h-full rounded-full transition-[width,background-color] duration-300 ease-out motion-reduce:transition-none"
+            style={{ width: meterWidth, backgroundColor: meterColor }}
           />
         </div>
       </div>
       <p>Strength is an estimate, not a security guarantee.</p>
-      {criteria.some((criterion) => !criterion.met) && <ul className="grid gap-1" aria-label="Password suggestions">
-        {criteria.filter((criterion) => !criterion.met).map((criterion) => (
-          <li
-            key={criterion.metLabel}
-            className={criterion.met ? "text-[#176B66]" : "text-[#4f6470]"}
-          >
-            <span aria-hidden="true" className="hidden">
-              {criterion.met ? "✓" : "○"}
-            </span>
-            {criterion.met
-              ? `Met: ${criterion.metLabel}`
-              : criterion.missingLabel}
+      <ul className="grid gap-1" aria-label="Password suggestions">
+        {criteria.map((criterion) => (
+          <li key={criterion.metLabel} className={`flex items-start gap-2 ${criterion.met ? "text-[#176B66]" : "text-[#4f6470]"}`}>
+            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-3.5 w-3.5 shrink-0">
+              <circle cx="10" cy="10" r="8" />
+              {criterion.met && <path d="m6.5 10 2.4 2.4 4.6-4.8" />}
+            </svg>
+            <span><span className="sr-only">{criterion.met ? "Satisfied: " : "Pending: "}</span>{criterion.met ? `Met: ${criterion.metLabel}` : criterion.missingLabel}</span>
           </li>
         ))}
-      </ul>}
+      </ul>
     </div>
   );
 }
@@ -131,8 +128,7 @@ export function PasswordField({
   const guidanceId = `${id}-guidance`;
   const [visible, setVisible] = useState(false);
   const isConfirmation = confirm ?? label.toLowerCase().includes("confirm");
-  const showGuidance =
-    guidance ?? (autoComplete === "new-password" && !isConfirmation);
+  const showGuidance = !isConfirmation && (guidance ?? autoComplete === "new-password");
   const describedBy =
     [error ? errorId : "", showGuidance && value ? guidanceId : ""]
       .filter(Boolean)
