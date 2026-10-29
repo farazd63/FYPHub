@@ -228,7 +228,6 @@ class AuthSessionTests(unittest.TestCase):
         session.commit()
         target_id = target.id
         session.close()
-
         status, admin_headers, _ = request(
             "POST", "/api/v1/auth/login",
             {"email": admin.email, "password": "Admin Password!", "requested_role": "ADMIN"},

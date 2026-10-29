@@ -308,6 +308,14 @@ Future M1 configuration must supply applicable approved template/rule and workfl
 
 Still undecided: who may initiate early panel routing, correction/resubmission rules, final approval authority, and Coordinator department/cycle scope. The diagram does not imply an approval chain or resolve those choices.
 
+### Supervisor selection and request workflow (SUPERVISOR-B through SUPERVISOR-E)
+
+The current implementation adds a separate, minimal supervisor-request workflow without claiming final short/long proposal submission. A student selects an open academic cycle and a configured active supervisor, uploads a one-page proposal PDF, reviews the deterministic extraction, confirms it, and submits the request after validation. Requests use explicit `DRAFT`, `SUBMITTED`, `CHANGES_REQUESTED`, `ACCEPTED`, `REJECTED`, and `WITHDRAWN` states with immutable status history, reviewer/comment fields, optimistic revision checks, and append-only audit events. Capacity, active assignment, duplicate, cycle, and team ownership checks are repeated inside locked transactions.
+
+The request draft now begins with exactly one uploaded, readable, one-page PDF. The deterministic local `pypdf` service validates PDF format, size, page count, and text readability, then stores the original bytes as an immutable document version together with extracted text, structured fields, source-page references, runtime, and timestamp. The student reviews and confirms the extracted preview; missing required title or purpose fields are shown as `Not detected in PDF` and block confirmation. No manual title, topic, purpose, or summary entry is used. Replacement uploads create a new immutable document version after `CHANGES_REQUESTED`; the request lifecycle remains separate from extraction status (`PENDING`, `EXTRACTED`, `FAILED`, `CONFIRMED`).
+
+Only the selected Supervisor may accept, reject, or request changes. Acceptance creates the existing team assignment when the request belongs to a team; individual requests consume capacity through the request record. Admin and Coordinator screens are read-only monitors. No role can impersonate another reviewer or silently override a decision. Detailed proposal fields, uploads, AI checks, versioning, and final academic approval remain in their later proposal checkpoints.
+
 ## Evidence and manual demonstration steps
 
 Automated evidence is listed per feature in the matrix. The following demonstrations use a deliberately provisioned test Admin and test data only; do not alter `FALL-2026`, Team 81, account 122, demo account 6, or real audit history.
@@ -346,3 +354,19 @@ This implements the M1 template/rules foundation without claiming M3 format chec
 - Provide capacity, evaluation criteria/scoring, deadline, reminder, and escalation policies before their M1 checkpoints.
 - Resolve individual attribution for M2 matching, invitations, requests and temporary chat; group-channel team posts use the shared account.
 - Define M3 lifecycle, upload/storage, role visibility, AI model/grounding/disclosure, and human-review rules before implementation.
+
+### SUPERVISOR-H: decision follow-up, reference search, and authorized conversation
+
+The selected Supervisor remains the only role that can accept, reject, or request changes. The decision endpoint requires the current request revision and a non-empty comment for rejection or requested changes; acceptance rechecks capacity and creates the existing assignment inside the same locked transaction. Admin and Coordinator monitor records and audit history without gaining decision authority. Students can withdraw their own active request and resubmit a replacement PDF only after `CHANGES_REQUESTED`.
+
+Proposal reference search is a separate, authorized read-only service under `/api/v1/proposal-references/search`. It normalizes titles, returns exact-title matches before token-similarity candidates, and explicitly reports `no_close_match` when none is found. Similarity is advisory only: it never blocks submission and does not claim semantic or AI analysis. Reference PDFs are stored in a separate document table and are available only to Student, Supervisor, Coordinator, and Admin roles; Panel Members are denied. Development fixtures are opt-in via `python scripts/seed_proposal_references.py` and are never inserted automatically.
+
+Request conversation is scoped to `/api/v1/supervisor-requests/{request_id}/conversation`. Only the owning Student/team, the selected Supervisor, an authorized Coordinator, or an Admin may read or append messages. Cross-student requests and Panel Members are denied server-side. Messages are append-only, contain no file/token/password data, and write their audit event in the same transaction. Existing team and match-chat channels remain unchanged. Migration `e7f8a9b0c1d2` adds the reference/document and request-message tables with restrictive foreign keys and an append-only database trigger.
+
+### Archive and knowledge search checkpoint
+
+The final FYP archive is a separate logical record set under migrations `f9a0b1c2d3e4` and `fa0b1c2d3e4`; it is not a physical duplicate database and it does not reuse supervisor-request documents. `ArchivedProject` stores searchable metadata independently from `ArchivedProjectDocument`, which stores immutable PDF versions by type: short proposal, long proposal, chapters 1–4, final report, final package, references, and other. Admin uploads create a new version and deactivate only the previous active version; metadata edits recalculate normalized titles and append an audit event. Deactivation is non-destructive, and title/year reuse is allowed only after deactivation.
+
+Students search only active archive records through deterministic ranking: exact title, normalized title, keyword, summary, then scope matches. Results include rank, match reason, summary, year, scope, completion stage, implemented-scope and remaining-gap previews, and active-document count. Semantic ranking is explicitly reported as unavailable because no approved archive embedding source is configured; no fabricated score or AI result is returned. Student detail is read-only and exposes only permitted metadata and secure active PDF links. Supervisors and Coordinators may read authorized active records; Admin is the only writer; Panel access is denied by default.
+
+Development fixtures are opt-in and idempotent: `python scripts/seed_archived_projects.py` creates eight `SAMPLE_DATA` projects with separate short-proposal, long-proposal, and final-report PDFs after a development Admin exists. The seed is never run at application startup or against production automatically.

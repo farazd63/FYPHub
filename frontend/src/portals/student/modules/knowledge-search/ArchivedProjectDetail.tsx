@@ -1,0 +1,1 @@
+export { ArchivedProjectDetail } from "../ArchivedProjectDetail";

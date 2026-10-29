@@ -1,4 +1,4 @@
-﻿/* Admin navigation only; specificity intentionally exceeds the legacy Admin rules. */
+/* Admin navigation only; specificity intentionally exceeds the legacy Admin rules. */
 main:has(.admin-sidebar) .admin-sidebar {
   border-color: #263e69;
   background: radial-gradient(circle at 10% 0%, rgba(79, 124, 225, .25), transparent 38%), linear-gradient(165deg, #101f3c, #172e54 65%, #1b3968);
@@ -95,4 +95,25 @@ main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"] { color:
 main:has(.admin-sidebar) .admin-sidebar .admin-nav-icon { color: #dce8ff; background: #1b3970; border-color: #4f7fd5; }
 main:has(.admin-sidebar) .admin-sidebar nav > span[aria-disabled="true"] .admin-nav-icon { color: #91a6c8; background: #182f59; border-color: #385887; opacity: .85; }
 .admin-sidebar-toggle { background: #214b9b; border-color: #78a4ff; color: #fff; box-shadow: 0 3px 12px rgba(3, 16, 45, .35); }
+.admin-sidebar-toggle:hover { background: #3567d6; }
+.admin-brand { color: #1e3965; }
+.admin-brand svg { color: #365fc0; }
+.admin-role { align-items: center; gap: 5px; padding: 5px 10px; border: 1px solid #c7d5f5; border-radius: 999px; background: linear-gradient(110deg, #eef5ff, #eeedff); color: #344f9b; font-size: .72rem; font-weight: 700; }
+.admin-account { align-items: center; gap: 10px; }
+.admin-account-name { color: #263d61; }
+.admin-logout { border-color: #bbcae6; background: #fff; color: #3659a0; }
+
+/* Approved Admin theme fallback: keep the portal styling independent of the
+   route-level :has() scope used by the legacy utility overrides. */
+.admin-sidebar {
+  border-color: #294777;
+  background: #10244a;
+}
+.admin-sidebar nav button { color: #dce8ff; }
+.admin-sidebar nav > span[aria-disabled="true"] { color: #91a6c8; }
+.admin-sidebar nav button:hover { color: #fff; background: #203d73; }
+.admin-sidebar nav button[aria-current="page"] { color: #fff; background: #3567d6; border-color: #78a4ff; }
+.admin-sidebar .admin-nav-icon { color: #dce8ff; background: #1b3970; border-color: #4f7fd5; }
+.admin-sidebar nav > span[aria-disabled="true"] .admin-nav-icon { color: #91a6c8; background: #182f59; border-color: #385887; opacity: .85; }
+.admin-sidebar-toggle { background: #214b9b; border-color: #78a4ff; color: #fff; }
 .admin-sidebar-toggle:hover { background: #3567d6; }

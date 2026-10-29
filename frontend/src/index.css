@@ -307,3 +307,33 @@ main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) table the
   background: #f5f8fd;
   color: #526b93;
 }
+/* Approved Admin surface fallback: these selectors target the shared portal
+   content directly so every Admin page keeps the same visual language even
+   when the surrounding :has() scope is unavailable or reordered. */
+.admin-enter > section[aria-labelledby],
+.admin-enter > section:not([aria-labelledby]) { color: #183047; }
+.admin-enter > section[aria-labelledby] > div:first-child h1,
+.admin-enter > section[aria-labelledby] > h1,
+.admin-enter > section:not([aria-labelledby]) > h1 {
+  color: #172b4d;
+  font-size: clamp(1.65rem, 2.2vw, 2.15rem);
+  line-height: 1.15;
+  letter-spacing: -.03em;
+}
+.admin-enter > section[aria-labelledby] .rounded-xl.border,
+.admin-enter > section[aria-labelledby] .rounded-2xl.border,
+.admin-enter > section[aria-labelledby] .users-table,
+.admin-enter > section:not([aria-labelledby]) .rounded-xl.border {
+  border-color: #dce5f2;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(24, 56, 112, .055);
+}
+.admin-enter > section[aria-labelledby] input:not([type="checkbox"]):not([type="radio"]),
+.admin-enter > section[aria-labelledby] select,
+.admin-enter > section[aria-labelledby] textarea,
+.admin-enter > section:not([aria-labelledby]) input:not([type="checkbox"]):not([type="radio"]),
+.admin-enter > section:not([aria-labelledby]) select {
+  border-color: #cfdbea;
+  background: #fbfdff;
+  color: #183047;
+}
