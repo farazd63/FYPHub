@@ -28,6 +28,6 @@ export function LegacyStudentSupervisorSelection({ api }: { api: string }) {
 */
 import { StudentSupervisorSelectionPdf } from "./StudentSupervisorSelectionPdf";
 import { ProposalReferenceSearch } from "./ProposalReferenceSearch";
-export function StudentSupervisorSelection({ api }: { api: string }) {
-  return <><ProposalReferenceSearch api={api} /><StudentSupervisorSelectionPdf api={api} /></>;
+export function StudentSupervisorSelection({ api, userId }: { api: string; userId: number }) {
+  return <><ProposalReferenceSearch api={api} /><StudentSupervisorSelectionPdf api={api} userId={userId} /></>;
 }

@@ -135,7 +135,7 @@ class StudentRosterTests(unittest.TestCase):
         email = f"student-{suffix}@example.com"
         data = workbook([self.row(code, registration="001A", email=email)])
         token = roster.sign(actor_id, cycle_id, data)
-        payload = TeamRegistrationRequest.model_validate({"academic_cycle_id": cycle_id, "shared_login_email": f"team-{suffix}@example.com", "password": "valid password", "creator": {"full_name": "Test", "registration_number": "001A", "university_email": email}, "members": []})
+        payload = TeamRegistrationRequest.model_validate({"academic_cycle_id": cycle_id, "shared_login_email": f"team-{suffix}@example.com", "password": "ValidPassword1!", "creator": {"full_name": "Test", "registration_number": "001A", "university_email": email}, "members": []})
         entered, release, registration_done = threading.Event(), threading.Event(), threading.Event()
         failures, result = [], []
         class FakeRequest:

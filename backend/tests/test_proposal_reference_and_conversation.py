@@ -115,6 +115,8 @@ class ProposalReferenceAndConversationTests(unittest.TestCase):
         self.assertEqual(request("GET", path, token=self.tokens["panel"])[0], 403)
         self.assertEqual(request("GET", path, token=self.tokens["admin"])[0], 200)
         self.assertEqual(request("GET", path, token=self.tokens["coordinator"])[0], 200)
+        self.assertEqual(request("POST", path, {"body": "Coordinator reply is not allowed."}, token=self.tokens["coordinator"])[0], 403)
+        self.assertEqual(request("POST", path, {"body": "Admin reply is not allowed."}, token=self.tokens["admin"])[0], 403)
 
 
 if __name__ == "__main__":

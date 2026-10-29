@@ -5,6 +5,7 @@ import json
 import unittest
 from collections.abc import Iterator
 from typing import Any
+from unittest.mock import patch
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -127,6 +128,18 @@ class RegistrationIntegrationTests(unittest.TestCase):
         self.assertNotEqual(user, password)
         self.assertTrue(verify_password(password, user))
 
+    def test_demo_mode_allows_unlisted_student_and_records_mode(self) -> None:
+        with patch.dict("os.environ", {"REGISTRATION_MODE": "demo"}):
+            status_code, response = request_json(
+                self.payload(email="demo-unlisted@example.com", registration_number="DEMO-UNLISTED")
+            )
+        self.assertEqual(status_code, 201)
+        mode = self.connection.execute(
+            text("SELECT changed_values->>'registration_mode' FROM admin_audit_events WHERE affected_user_id=:id AND action='student_registration_created'"),
+            {"id": response["id"]},
+        ).scalar_one()
+        self.assertEqual(mode, "demo")
+
     def test_duplicate_normalized_email_returns_conflict(self) -> None:
         self.assertEqual(
             request_json(self.payload(email="duplicate-email@example.com", registration_number="FYP-201"))[0],
@@ -138,6 +151,18 @@ class RegistrationIntegrationTests(unittest.TestCase):
         self.assertEqual(status_code, 409)
         self.assertNotIn("password", response)
         self.assertNotIn("password_hash", response)
+
+    def test_common_consumer_and_institutional_domains_are_accepted(self) -> None:
+        for index, address in enumerate(
+            ("person@gmail.com", "person@outlook.com", "person@yahoo.com", "person@szabist-isb.pk"),
+            start=1,
+        ):
+            with self.subTest(address=address):
+                status_code, response = request_json(
+                    self.payload(email=address, registration_number=f"FYP-COMMON-{index}")
+                )
+                self.assertEqual(status_code, 201)
+                self.assertEqual(response["email"], address)
 
     def test_duplicate_normalized_registration_number_returns_conflict(self) -> None:
         self.assertEqual(
@@ -152,7 +177,25 @@ class RegistrationIntegrationTests(unittest.TestCase):
         self.assertNotIn("password_hash", response)
 
     def test_invalid_email_missing_fields_and_password_lengths_are_rejected(self) -> None:
-        self.assertEqual(request_json(self.payload(email="not-an-email"))[0], 422)
+        for invalid_email in (
+            "not-an-email",
+            "missing-domain@",
+            "missing-dot@example",
+            "has space@example.com",
+            "double..dot@example.com",
+            ".leading@example.com",
+            "trailing.@example.com",
+            "user@.example.com",
+            "user@example.com.",
+            "two@@example.com",
+        ):
+            with self.subTest(invalid_email=invalid_email):
+                self.assertEqual(request_json(self.payload(email=invalid_email))[0], 422)
+        status_code, response = request_json(
+            self.payload(email=" Student@Szabist-Isb.Pk ", registration_number="FYP-150")
+        )
+        self.assertEqual(status_code, 201)
+        self.assertEqual(response["email"], "student@szabist-isb.pk")
         incomplete = self.payload()
         incomplete.pop("full_name")
         self.assertEqual(request_json(incomplete)[0], 422)

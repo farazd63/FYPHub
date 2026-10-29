@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { PasswordField } from "./PasswordField";
+import { passwordPolicyError } from "./passwordPolicy";
 
 type Role = "STUDENT" | "SUPERVISOR" | "COORDINATOR" | "PANEL_MEMBER" | "ADMIN";
 type User = {
@@ -22,7 +23,7 @@ const roleLabel: Record<Role, string> = {
   STUDENT: "Student",
   SUPERVISOR: "Supervisor",
   COORDINATOR: "Coordinator",
-  PANEL_MEMBER: "Panel Member",
+  PANEL_MEMBER: "Evaluator",
   ADMIN: "Administrator",
 };
 const input =
@@ -84,8 +85,9 @@ export function AdminUsersRoles({ api }: { api: string }) {
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
     if (busy) return;
-    if (form.password.length < 8 || form.password.length > 128) {
-      setFieldError(form.password.length < 8 ? "Use at least 8 characters." : "Password must be no more than 128 characters.");
+    const passwordError = passwordPolicyError(form.password);
+    if (passwordError) {
+      setFieldError(passwordError);
       return;
     }
     if (form.role === "STUDENT" && !form.registration_number.trim()) {
@@ -205,7 +207,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
             >
               <option value="">All roles</option>
               {roles.map((item) => (
-                <option key={item}>{item}</option>
+                <option key={item} value={item}>{roleLabel[item]}</option>
               ))}
             </select>
             <select
@@ -286,7 +288,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                       </td>
                       <td className="px-3 py-3">
                         <span className="inline-flex rounded-full bg-[#eef0ff] px-2 py-1 text-xs font-bold text-[#263fae]">
-                          {user.role}
+                          {roleLabel[user.role]}
                         </span>
                       </td>
                       <td className="px-3 py-3">

@@ -131,6 +131,41 @@ class AdminUserTests(unittest.TestCase):
         self.assertEqual(request("POST", "/api/v1/admin/users", payload, token=self.token)[0], 409)
         self.assertEqual(request("POST", "/api/v1/admin/users", {**payload, "email": "student-required@example.com", "role": "STUDENT"}, token=self.token)[0], 422)
 
+    def test_creation_rejects_malformed_email(self) -> None:
+        for malformed in ("missing-domain@", "missing-dot@example", "has space@example.com", "double..dot@example.com", "two@@example.com"):
+            with self.subTest(malformed=malformed):
+                status, _ = request(
+                    "POST",
+                    "/api/v1/admin/users",
+                    {
+                        "full_name": "Invalid Email User",
+                        "email": malformed,
+                        "password": "ValidPass123!",
+                        "role": "SUPERVISOR",
+                    },
+                    token=self.token,
+                )
+                self.assertEqual(status, 422)
+
+    def test_admin_can_create_each_fixed_non_public_role(self) -> None:
+        for role in ("SUPERVISOR", "COORDINATOR", "PANEL_MEMBER", "ADMIN"):
+            with self.subTest(role=role):
+                status, body = request(
+                    "POST",
+                    "/api/v1/admin/users",
+                    {
+                        "full_name": f"Created {role}",
+                        "email": f"created-{role.lower()}-{uuid4().hex}@example.com",
+                        "password": "ValidPass123!",
+                        "role": role,
+                    },
+                    token=self.token,
+                )
+                self.assertEqual(status, 201)
+                self.assertEqual(body["role"], role)
+                self.assertNotIn("password", body)
+                self.assertNotIn("password_hash", body)
+
     def test_role_status_session_revocation_and_last_admin_protection(self) -> None:
         user_token = generate_session_token()
         self.connection.execute(text("INSERT INTO auth_sessions (user_id, token_hash, expires_at) VALUES (:id, :token, :expires)"), {"id": self.user_id, "token": hash_session_token(user_token), "expires": utc_now().replace(year=utc_now().year + 1)})

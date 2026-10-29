@@ -26,6 +26,10 @@ class Settings:
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    smtp_from_email: str = ""
+    password_reset_base_url: str = "http://localhost:5173/reset-password"
+    app_env: str = "production"
+    registration_mode: str = "restricted"
 
     @property
     def database_url(self) -> URL:
@@ -57,7 +61,11 @@ def get_settings() -> Settings:
         smtp_port=int(os.getenv("SMTP_PORT", "587")),
         smtp_username=os.getenv("SMTP_USERNAME", ""),
         smtp_password=os.getenv("SMTP_PASSWORD", ""),
-        smtp_from=os.getenv("SMTP_FROM", ""),
+        smtp_from=os.getenv("SMTP_FROM", os.getenv("SMTP_FROM_EMAIL", "")),
+        smtp_from_email=os.getenv("SMTP_FROM_EMAIL", os.getenv("SMTP_FROM", "")),
+        password_reset_base_url=os.getenv("PASSWORD_RESET_BASE_URL", "http://localhost:5173/reset-password").rstrip("/"),
+        app_env=os.getenv("APP_ENV", "production").strip().lower(),
+        registration_mode=os.getenv("REGISTRATION_MODE", "restricted"),
     )
 
 

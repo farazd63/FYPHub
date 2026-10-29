@@ -23,7 +23,9 @@ from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest
 from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange
 from .schemas.supervisor_capacity import SupervisorCapacityOut, SupervisorCapacityWrite
 from .schemas.team_registration import TeamMemberInput, TeamRegistrationRequest, TeamRegistrationResponse
-from .security import generate_session_token, hash_password, hash_session_token, verify_password
+from .security import generate_session_token, hash_password, hash_session_token, validate_password, verify_password
+from .registration_policy import DEMO_MODE_WARNING, RegistrationMode, registration_mode, roster_validation_required
+from .project_workflow import router as project_workflow_router
 from .auth import (
     ALLOWED_BROWSER_ORIGINS,
     SESSION_COOKIE_NAME,
@@ -568,7 +570,7 @@ def evaluation_rubric_detail(
 ) -> dict[str, object]:
     rubric = session.get(EvaluationRubric, rubric_id)
     if rubric is None:
-        raise cycle_error(status.HTTP_404_NOT_FOUND, "rubric_not_found", "Evaluation rubric was not found.")
+        raise cycle_error(status.HTTP_404_NOT_FOUND, "rubric_not_found", "Evaluation criteria were not found.")
     return rubric_detail_out(session, rubric)
 
 
@@ -590,10 +592,10 @@ def create_evaluation_rubric(
         return rubric_detail_out(session, rubric)
     except (IntegrityError, SQLAlchemyError) as error:
         session.rollback()
-        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation rubric could not be saved.") from error
+        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation criteria could not be saved.") from error
     except Exception as error:
         session.rollback()
-        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation rubric could not be saved.") from error
+        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation criteria could not be saved.") from error
 
 
 @app.post("/api/v1/admin/evaluation-rubrics/{rubric_id}/versions", status_code=status.HTTP_201_CREATED, response_model=RubricVersionOut)
@@ -611,7 +613,7 @@ def create_evaluation_rubric_version(
             select(EvaluationRubric).where(EvaluationRubric.id == rubric_id).with_for_update()
         ).scalar_one_or_none()
         if rubric is None:
-            raise cycle_error(status.HTTP_404_NOT_FOUND, "rubric_not_found", "Evaluation rubric was not found.")
+            raise cycle_error(status.HTTP_404_NOT_FOUND, "rubric_not_found", "Evaluation criteria were not found.")
         version_number = (
             session.execute(
                 select(func.max(EvaluationRubricVersion.version_number)).where(EvaluationRubricVersion.rubric_id == rubric.id)
@@ -627,10 +629,10 @@ def create_evaluation_rubric_version(
         raise
     except (IntegrityError, SQLAlchemyError) as error:
         session.rollback()
-        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation rubric version could not be saved.") from error
+        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation criteria version could not be saved.") from error
     except Exception as error:
         session.rollback()
-        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation rubric version could not be saved.") from error
+        raise cycle_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "rubric_save_failed", "Evaluation criteria version could not be saved.") from error
 
 
 @app.post("/api/v1/admin/academic-cycles", status_code=status.HTTP_201_CREATED, response_model=CycleOut)
@@ -776,6 +778,18 @@ def admin_current_user(
 ) -> User:
     """Return the current account only when its persisted role is ADMIN."""
     return current_user
+
+
+@app.get("/api/v1/admin/registration-mode")
+def admin_registration_mode(
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+) -> dict[str, str | None]:
+    """Expose demo-mode status only to authenticated administrators."""
+    mode = registration_mode()
+    return {
+        "registration_mode": mode.value,
+        "demo_warning": DEMO_MODE_WARNING if mode is RegistrationMode.DEMO else None,
+    }
 
 
 def admin_user_error(status_code: int, code: str, message: str) -> HTTPException:
@@ -1136,11 +1150,13 @@ def register_student(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="email must not exceed 320 characters.",
         )
-    if not 8 <= len(registration.password) <= 128:
+    try:
+        validate_password(registration.password)
+    except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="password must be between 8 and 128 characters.",
-        )
+            detail=str(error),
+        ) from error
 
     user = User(
         full_name=full_name,
@@ -1151,6 +1167,16 @@ def register_student(
     )
     session.add(user)
     try:
+        session.flush()
+        add_admin_audit_event(
+            session,
+            actor_id=user.id,
+            affected_user_id=user.id,
+            target_type="REGISTRATION",
+            target_id=user.id,
+            action="student_registration_created",
+            changed_values={"registration_mode": registration_mode().value},
+        )
         session.commit()
         session.refresh(user)
     except IntegrityError as error:
@@ -1169,7 +1195,10 @@ def register_student(
     response_model=TeamRegistrationResponse,
 )
 def register_team(
-    registration: TeamRegistrationRequest, session: Session = Depends(get_db)
+    registration: TeamRegistrationRequest,
+    session: Session = Depends(get_db),
+    *,
+    request: Request = None,
 ) -> dict[str, object]:
     """Atomically create one shared student account, team, and member contacts."""
     creator = normalize_team_member(registration.creator, "creator")
@@ -1194,6 +1223,15 @@ def register_team(
             "Password must be between 8 and 128 characters.",
             "password",
         )
+    try:
+        validate_password(registration.password)
+    except ValueError as error:
+        raise registration_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "invalid_password_policy",
+            str(error),
+            "password",
+        ) from error
 
     registration_paths: dict[str, str] = {}
     email_paths: dict[str, str] = {}
@@ -1309,30 +1347,31 @@ def register_team(
                     f"{email_paths[university_email]}.university_email",
                 )
 
-        # Import confirmation takes this same cycle lock before inserting roster rows.
-        # Keep it until registration commits so the eligibility decision is stable.
-        roster = session.execute(
-            select(ApprovedStudent.registration_number, ApprovedStudent.university_email, ApprovedStudent.semester)
-            .where(
-                ApprovedStudent.academic_cycle_id == cycle.id,
-                func.lower(ApprovedStudent.registration_number).in_(
-                    [member["registration_number"].lower() for member in all_members]
-                ),
-            )
-        ).all()
-        eligible = {
-            (number.lower(), email.lower())
-            for number, email, semester in roster if semester in (7, 8)
-        }
-        for index, member in enumerate(all_members):
-            if (member["registration_number"].lower(), member["university_email"].lower()) not in eligible:
-                prefix = "creator" if index == 0 else f"members.{index - 1}"
-                raise registration_error(
-                    status.HTTP_422_UNPROCESSABLE_CONTENT,
-                    "student_not_eligible",
-                    "Registration number and university email could not be verified for this academic cycle.",
-                    f"{prefix}.registration_number",
+        if roster_validation_required():
+            # Import confirmation takes this same cycle lock before inserting roster rows.
+            # Keep it until registration commits so the eligibility decision is stable.
+            roster = session.execute(
+                select(ApprovedStudent.registration_number, ApprovedStudent.university_email, ApprovedStudent.semester)
+                .where(
+                    ApprovedStudent.academic_cycle_id == cycle.id,
+                    func.lower(ApprovedStudent.registration_number).in_(
+                        [member["registration_number"].lower() for member in all_members]
+                    ),
                 )
+            ).all()
+            eligible = {
+                (number.lower(), email.lower())
+                for number, email, semester in roster if semester in (7, 8)
+            }
+            for index, member in enumerate(all_members):
+                if (member["registration_number"].lower(), member["university_email"].lower()) not in eligible:
+                    prefix = "creator" if index == 0 else f"members.{index - 1}"
+                    raise registration_error(
+                        status.HTTP_422_UNPROCESSABLE_CONTENT,
+                        "student_not_eligible",
+                        "Registration number and university email could not be verified for this academic cycle.",
+                        f"{prefix}.registration_number",
+                    )
 
         user = User(
             full_name=creator["full_name"],
@@ -1358,6 +1397,21 @@ def register_team(
             for index, member in enumerate(all_members)
         ]
         session.add_all(created_members)
+        if request is not None:
+            add_admin_audit_event(
+                session,
+                actor_id=user.id,
+                affected_user_id=user.id,
+                target_type="REGISTRATION",
+                target_id=user.id,
+                action="team_registration_created",
+                changed_values={
+                    "registration_mode": registration_mode().value,
+                    "academic_cycle_id": cycle.id,
+                    "team_id": team.id,
+                    "member_count": len(created_members),
+                },
+            )
         session.commit()
         for record in (user, team, *created_members):
             session.refresh(record)
@@ -1550,3 +1604,11 @@ app.include_router(supervisor_request_conversations_router)
 
 from .archived_projects import router as archived_projects_router
 app.include_router(archived_projects_router)
+
+from .modules.module_03_proposal.router import router as module03_router
+app.include_router(module03_router)
+from .fyp_registry import router as fyp_registry_router
+app.include_router(fyp_registry_router)
+from .password_reset import router as password_reset_router
+app.include_router(password_reset_router)
+app.include_router(project_workflow_router)

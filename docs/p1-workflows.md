@@ -315,7 +315,11 @@ No screenshots were captured in this checkpoint. Browser verification remains pe
 
 ## Prioritized remaining checkpoints and blockers
 
-### Remaining M1-D decisions: official templates with versioned academic rules
+### Module 03 proposal compliance checkpoint
+
+Module 03 now stores dynamic Admin baseline document versions and extracted rule sets in `m03_` tables. Student proposal uploads are immutable versioned PDF/DOCX records. Tier 1 formatting and Tier 2 structural checks are deterministic; Tier 3 is an optional local Ollama advisory request using `OLLAMA_BASE_URL` and structured JSON mode. A missing or malformed local runtime returns `UNAVAILABLE` without fabricating findings. Reports are advisory only and never approve or reject a proposal. Student, assigned Supervisor, Coordinator, and Admin visibility is enforced server-side; Panel is denied by default.
+
+Remaining M1-D decisions: official templates with versioned academic rules
 
 The implemented administrative reference foundation still requires:
 
@@ -355,3 +359,7 @@ The final FYP archive is a separate logical record set under migrations `f9a0b1c
 Students search only active archive records through deterministic ranking: exact title, normalized title, keyword, summary, then scope matches. Results include rank, match reason, summary, year, scope, completion stage, implemented-scope and remaining-gap previews, and active-document count. Semantic ranking is explicitly reported as unavailable because no approved archive embedding source is configured; no fabricated score or AI result is returned. Student detail is read-only and exposes only permitted metadata and secure active PDF links. Supervisors and Coordinators may read authorized active records; Admin is the only writer; Panel access is denied by default.
 
 Development fixtures are opt-in and idempotent: `python scripts/seed_archived_projects.py` creates eight `SAMPLE_DATA` projects with separate short-proposal, long-proposal, and final-report PDFs after a development Admin exists. The seed is never run at application startup or against production automatically.
+
+### Evaluator portal mapping
+
+The existing `PANEL_MEMBER` database role is presented to users as **Evaluator** and routes to `EvaluatorPortal`. There is no separate user-facing Panel Member portal. Evaluator assignment, proposal review, defense scheduling, scoring, feedback, and decision-history APIs are not currently available, so the portal shows safe unavailable states and makes no fabricated requests or results.

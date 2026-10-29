@@ -2,9 +2,10 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 from ..models import UserRole
+from .email import normalize_email
 
 
 class TeamMemberInput(BaseModel):
@@ -15,6 +16,11 @@ class TeamMemberInput(BaseModel):
     full_name: str
     registration_number: str
     university_email: EmailStr
+
+    @field_validator("university_email", mode="before")
+    @classmethod
+    def normalized_email(cls, value: object) -> object:
+        return normalize_email(value)
 
 
 class TeamRegistrationRequest(BaseModel):
@@ -27,6 +33,11 @@ class TeamRegistrationRequest(BaseModel):
     shared_login_email: EmailStr
     password: str
     members: list[TeamMemberInput]
+
+    @field_validator("shared_login_email", mode="before")
+    @classmethod
+    def normalized_shared_email(cls, value: object) -> object:
+        return normalize_email(value)
 
 
 class SafeAccountOut(BaseModel):

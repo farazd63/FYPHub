@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import unittest
 from collections.abc import Iterator
 from typing import Any
 from uuid import uuid4
+from unittest.mock import patch
 
 from sqlalchemy import event, text
 from sqlalchemy.exc import IntegrityError
@@ -207,7 +209,7 @@ class TeamRegistrationApiTests(unittest.TestCase):
                 "university_email": self.email("creator-contact"),
             },
             "shared_login_email": self.email("shared-login"),
-            "password": "Case Sensitive Password!",
+            "password": "CaseSensitivePassword1!",
             "members": [
                 {
                     "full_name": "Member Student",
@@ -224,7 +226,7 @@ class TeamRegistrationApiTests(unittest.TestCase):
 
     def test_successful_team_registration_creates_one_user_and_one_creator(self) -> None:
         cycle_id = self.create_cycle(open_for_registration=True, max_size=3)
-        password = "Case Sensitive Password!"
+        password = "CaseSensitivePassword1!"
         status_code, response = request_json(self.payload(cycle_id))
 
         self.assertEqual(status_code, 201)
@@ -462,3 +464,60 @@ class TeamEligibilityTests(TeamRegistrationApiTests):
         finally:
             savepoint.rollback()
         self.assertEqual(request_json(payload)[0], 201)
+
+    def test_demo_mode_allows_unlisted_one_two_and_three_member_teams(self) -> None:
+        with patch.dict(os.environ, {"REGISTRATION_MODE": "demo"}):
+            one_cycle = self.create_cycle(open_for_registration=True, max_size=1, seed_roster=False)
+            one = self.payload(one_cycle, members=[])
+            self.assertEqual(request_json(one)[0], 201)
+
+            two_cycle = self.create_cycle(open_for_registration=True, max_size=2, seed_roster=False)
+            two = self.payload(two_cycle)
+            two["creator"]["registration_number"] = self.registration("creator-two")
+            two["creator"]["university_email"] = self.email("creator-two-contact")
+            two["shared_login_email"] = self.email("shared-login-two")
+            two["members"][0]["registration_number"] = self.registration("member-two")
+            two["members"][0]["university_email"] = self.email("member-two-contact")
+            self.assertEqual(request_json(two)[0], 201)
+
+            three_cycle = self.create_cycle(open_for_registration=True, max_size=3, seed_roster=False)
+            three = self.payload(three_cycle, members=[
+                {"full_name": "Second Student", "registration_number": self.registration("member-three"), "university_email": self.email("member-three-contact")},
+                {"full_name": "Third Student", "registration_number": self.registration("third"), "university_email": self.email("third-contact")},
+            ])
+            three["creator"]["registration_number"] = self.registration("creator-three")
+            three["creator"]["university_email"] = self.email("creator-three-contact")
+            three["shared_login_email"] = self.email("shared-login-three")
+            self.assertEqual(request_json(three)[0], 201)
+
+    def test_restricted_mode_and_invalid_mode_keep_roster_validation(self) -> None:
+        cycle = self.create_cycle(open_for_registration=True, seed_roster=False)
+        payload = self.payload(cycle, members=[])
+        for configured in ("restricted", "invalid", None):
+            environment = {} if configured is None else {"REGISTRATION_MODE": configured}
+            with self.subTest(configured=configured), patch.dict(os.environ, environment, clear=configured is None):
+                status_code, response = request_json(payload)
+                self.assertEqual(status_code, 422)
+                self.assertEqual(self.detail_code(response), "student_not_eligible")
+
+    def test_demo_mode_records_audit_metadata_without_changing_security_validation(self) -> None:
+        cycle = self.create_cycle(open_for_registration=True, seed_roster=False)
+        payload = self.payload(cycle, members=[])
+        with patch.dict(os.environ, {"REGISTRATION_MODE": "demo"}):
+            status_code, response = request_json(payload)
+        self.assertEqual(status_code, 201)
+        mode = self.connection.execute(text(
+            "SELECT changed_values->>'registration_mode' FROM admin_audit_events WHERE affected_user_id=:id AND action='team_registration_created'"
+        ), {"id": response["account"]["id"]}).scalar_one()
+        self.assertEqual(mode, "demo")
+
+    def test_demo_mode_still_enforces_group_limit(self) -> None:
+        cycle = self.create_cycle(open_for_registration=True, max_size=2, seed_roster=False)
+        payload = self.payload(cycle, members=[
+            self.payload(cycle)["members"][0],
+            {"full_name": "Third Student", "registration_number": self.registration("third-limit"), "university_email": self.email("third-limit")},
+        ])
+        with patch.dict(os.environ, {"REGISTRATION_MODE": "demo"}):
+            status_code, response = request_json(payload)
+        self.assertEqual(status_code, 422)
+        self.assertEqual(self.detail_code(response), "group_size_exceeded")

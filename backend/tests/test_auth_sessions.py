@@ -6,7 +6,10 @@ import unittest
 from collections.abc import Iterator
 from datetime import timedelta
 from typing import Any
+from types import SimpleNamespace
 from uuid import uuid4
+from unittest.mock import patch
+from urllib.parse import urlsplit
 
 from fastapi import HTTPException
 from sqlalchemy import text
@@ -15,11 +18,12 @@ from sqlalchemy.orm import Session
 from app.auth import SESSION_COOKIE_NAME, get_current_user, require_roles, utc_now
 from app.database import engine, get_db
 from app.main import app
-from app.models import AuthSession, User, UserRole
+from app.models import AuthSession, PasswordResetToken, User, UserRole
+from app.password_reset import PASSWORD_RESET_DEVELOPMENT_UNKNOWN_MESSAGE, PASSWORD_RESET_GENERIC_MESSAGE
 from app.security import generate_session_token, hash_password, hash_session_token
 
 
-def request(method: str, path: str, payload: dict[str, Any] | None = None, *, headers: dict[str, str] | None = None, scheme: str = "http") -> tuple[int, dict[str, str], Any]:
+def request(method: str, path: str, payload: dict[str, Any] | None = None, *, headers: dict[str, str] | None = None, scheme: str = "http", client_host: str = "127.0.0.1") -> tuple[int, dict[str, str], Any]:
     """Invoke ASGI without adding a test client dependency."""
     async def invoke() -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = []
@@ -38,7 +42,8 @@ def request(method: str, path: str, payload: dict[str, Any] | None = None, *, he
 
         raw_headers = [(b"content-type", b"application/json")] if payload is not None else []
         raw_headers.extend((key.lower().encode(), value.encode()) for key, value in (headers or {}).items())
-        await app({"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": method, "scheme": scheme, "path": path, "raw_path": path.encode(), "query_string": b"", "headers": raw_headers, "client": ("127.0.0.1", 0), "server": ("127.0.0.1", 80)}, receive, send)
+        parsed_path = urlsplit(path)
+        await app({"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": method, "scheme": scheme, "path": parsed_path.path, "raw_path": path.encode(), "query_string": parsed_path.query.encode(), "headers": raw_headers, "client": (client_host, 0), "server": ("127.0.0.1", 80)}, receive, send)
         return messages
 
     messages = asyncio.run(invoke())
@@ -84,6 +89,8 @@ class AuthSessionTests(unittest.TestCase):
             session.close()
 
     def setUp(self) -> None:
+        from app.password_reset import _requests_by_ip
+        _requests_by_ip.clear()
         self.email = f"auth_{uuid4().hex}@example.com"
         session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
         user = User(full_name="Auth Test", email=self.email, registration_number=f"AUTH{uuid4().hex[:12]}", password_hash=hash_password("Correct Password!"), role=UserRole.STUDENT)
@@ -128,6 +135,17 @@ class AuthSessionTests(unittest.TestCase):
         self.connection.execute(text("UPDATE users SET is_active = false WHERE id = :id"), {"id": self.user_id})
         status, _, body = self.login()
         self.assertEqual((status, body["detail"]), (401, "Invalid credentials."))
+
+    def test_malformed_email_login_is_rejected_before_authentication(self) -> None:
+        for malformed in ("missing-domain@", "missing-dot@example", "has space@example.com", "double..dot@example.com", "two@@example.com"):
+            with self.subTest(malformed=malformed):
+                status, _, body = request(
+                    "POST",
+                    "/api/v1/auth/login",
+                    {"email": malformed, "password": "Correct Password!"},
+                )
+                self.assertEqual(status, 422)
+                self.assertNotEqual(body.get("detail"), "Invalid credentials.")
 
     def test_creator_registration_login_and_selected_role_cannot_escalate(self) -> None:
         status, _, body = request(
@@ -269,3 +287,144 @@ class AuthSessionTests(unittest.TestCase):
         self.assertEqual(denied.exception.status_code, 403)
         fixture_user.role = UserRole.ADMIN
         self.assertIs(student_guard(fixture_user), fixture_user)
+
+    def test_forgot_password_is_generic_and_stores_only_a_hash(self) -> None:
+        sent: list[str] = []
+        with patch("app.password_reset._smtp_configured", return_value=True), patch("app.password_reset._send_reset_email", side_effect=lambda _address, link: sent.append(link) or True):
+            status, _, body = request("POST", "/api/v1/auth/forgot-password", {"email": self.email}, headers={"Origin": "http://localhost:5173"})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["message"], PASSWORD_RESET_GENERIC_MESSAGE)
+        self.assertEqual(len(sent), 1)
+        raw_token = sent[0].split("token=", 1)[1]
+        stored = self.connection.execute(text("SELECT token_hash FROM password_reset_tokens WHERE user_id=:id"), {"id": self.user_id}).scalar_one()
+        self.assertNotEqual(stored, raw_token)
+        self.assertEqual(stored, hash_session_token(raw_token))
+        unknown = request("POST", "/api/v1/auth/forgot-password", {"email": "unknown-reset@example.com"})
+        self.assertEqual(unknown[2], body)
+
+    def test_reset_password_rejects_weak_and_consumes_token_revoking_sessions(self) -> None:
+        sent: list[str] = []
+        with patch("app.password_reset._smtp_configured", return_value=True), patch("app.password_reset._send_reset_email", side_effect=lambda _address, link: sent.append(link) or True):
+            request("POST", "/api/v1/auth/forgot-password", {"email": self.email})
+        raw_token = sent[-1].split("token=", 1)[1]
+        weak = request("POST", "/api/v1/auth/reset-password", {"token": raw_token, "password": "weak"})
+        self.assertEqual(weak[0], 422)
+
+        first_status, first_headers, _ = self.login()
+        self.assertEqual(first_status, 200)
+        session_token = self.cookie_value(first_headers)
+        status, _, body = request("POST", "/api/v1/auth/reset-password", {"token": raw_token, "password": "New Secure Password!1"}, headers={"Origin": "http://localhost:5173"})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["message"], "Password reset successful. Please log in again.")
+        self.assertEqual(request("GET", "/api/v1/auth/me", headers={"Cookie": f"{SESSION_COOKIE_NAME}={session_token}"})[0], 401)
+        reused = request("POST", "/api/v1/auth/reset-password", {"token": raw_token, "password": "Another Secure Password!1"})
+        self.assertEqual(reused[0], 400)
+        self.assertEqual(reused[2]["detail"]["code"], "used_reset_token")
+        profile = self.connection.execute(text("SELECT email, registration_number, role, is_active FROM users WHERE id=:id"), {"id": self.user_id}).one()
+        self.assertEqual(profile.email, self.email)
+        self.assertEqual(profile.role, "STUDENT")
+        self.assertTrue(profile.is_active)
+
+    def test_new_request_invalidates_old_token_and_expired_token_is_rejected(self) -> None:
+        sent: list[str] = []
+        with patch("app.password_reset._smtp_configured", return_value=True), patch("app.password_reset._send_reset_email", side_effect=lambda _address, link: sent.append(link) or True):
+            request("POST", "/api/v1/auth/forgot-password", {"email": self.email})
+            request("POST", "/api/v1/auth/forgot-password", {"email": self.email})
+        old_token = sent[-2].split("token=", 1)[1]
+        new_token = sent[-1].split("token=", 1)[1]
+        self.assertEqual(request("POST", "/api/v1/auth/reset-password", {"token": old_token, "password": "New Secure Password!1"})[0], 400)
+        self.assertEqual(request("POST", "/api/v1/auth/reset-password", {"token": new_token, "password": "New Secure Password!1"})[0], 200)
+        expired = generate_session_token()
+        self.connection.execute(text("INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (:user_id, :token_hash, :expires_at)"), {"user_id": self.user_id, "token_hash": hash_session_token(expired), "expires_at": utc_now() - timedelta(minutes=1)})
+        response = request("POST", "/api/v1/auth/reset-password", {"token": expired, "password": "New Secure Password!1"})
+        self.assertEqual(response[0], 400)
+        self.assertEqual(response[2]["detail"]["code"], "expired_reset_token")
+
+    def test_development_without_smtp_exposes_only_loopback_reset_link(self) -> None:
+        from app.password_reset import _development_links
+
+        _development_links.clear()
+        development_settings = SimpleNamespace(
+            app_env="development",
+            smtp_host="",
+            smtp_port=587,
+            smtp_username="",
+            smtp_password="",
+            smtp_from="",
+            smtp_from_email="",
+            password_reset_base_url="http://localhost:5173/reset-password",
+        )
+        with patch("app.password_reset.settings", development_settings):
+            status, _, body = request("GET", "/api/v1/auth/password-reset-status")
+            self.assertEqual((status, body), (200, {"development_mode": True, "smtp_configured": False}))
+            status, _, body = request("POST", "/api/v1/auth/forgot-password", {"email": "unknown-development@example.com"})
+            self.assertEqual((status, body["detail"]["message"]), (404, PASSWORD_RESET_DEVELOPMENT_UNKNOWN_MESSAGE))
+            self.assertEqual(body["detail"]["code"], "account_not_found")
+            status, _, body = request("POST", "/api/v1/auth/forgot-password", {"email": self.email})
+            self.assertEqual((status, body["message"]), (200, PASSWORD_RESET_GENERIC_MESSAGE))
+            status, _, body = request("GET", f"/api/v1/auth/dev/password-reset-link?identifier={self.email}")
+            self.assertEqual(status, 200)
+            self.assertTrue(body["reset_link"].startswith("http://localhost:5173/reset-password?token="))
+            raw_token = body["reset_link"].split("token=", 1)[1]
+            stored_hash = self.connection.execute(text("SELECT token_hash FROM password_reset_tokens WHERE user_id=:id"), {"id": self.user_id}).scalar_one()
+            self.assertEqual(stored_hash, hash_session_token(raw_token))
+            self.assertEqual(request("GET", f"/api/v1/auth/dev/password-reset-link?identifier={self.email}", client_host="192.0.2.10")[0], 404)
+            _development_links[self.email] = (body["reset_link"], utc_now() - timedelta(seconds=1))
+            self.assertEqual(request("GET", f"/api/v1/auth/dev/password-reset-link?identifier={self.email}")[0], 404)
+
+    def test_development_with_smtp_never_exposes_local_link(self) -> None:
+        from app.password_reset import _development_links
+
+        _development_links.clear()
+        development_settings = SimpleNamespace(
+            app_env="development",
+            smtp_host="smtp.example.test",
+            smtp_port=587,
+            smtp_username="smtp-user",
+            smtp_password="smtp-password",
+            smtp_from="noreply@example.test",
+            smtp_from_email="noreply@example.test",
+            password_reset_base_url="http://localhost:5173/reset-password",
+        )
+        with patch("app.password_reset.settings", development_settings), patch("app.password_reset._send_reset_email", return_value=True):
+            status, _, body = request("GET", "/api/v1/auth/password-reset-status")
+            self.assertEqual((status, body), (200, {"development_mode": True, "smtp_configured": True}))
+            status, _, body = request("POST", "/api/v1/auth/forgot-password", {"email": "unknown-smtp@example.com"})
+            self.assertEqual((status, body["message"]), (200, PASSWORD_RESET_GENERIC_MESSAGE))
+            status, _, _ = request("POST", "/api/v1/auth/forgot-password", {"email": self.email})
+            self.assertEqual(status, 200)
+            self.assertEqual(request("GET", f"/api/v1/auth/dev/password-reset-link?identifier={self.email}")[0], 404)
+
+    def test_production_without_smtp_keeps_safe_unavailable_status(self) -> None:
+        production_settings = SimpleNamespace(
+            app_env="production",
+            smtp_host="",
+            smtp_port=587,
+            smtp_username="",
+            smtp_password="",
+            smtp_from="",
+            smtp_from_email="",
+            password_reset_base_url="http://localhost:5173/reset-password",
+        )
+        with patch("app.password_reset.settings", production_settings):
+            status, _, body = request("GET", "/api/v1/auth/password-reset-status")
+            self.assertEqual((status, body), (200, {"development_mode": False, "smtp_configured": False}))
+            status, _, body = request("POST", "/api/v1/auth/forgot-password", {"email": "unknown-production@example.com"})
+            self.assertEqual((status, body["message"]), (200, PASSWORD_RESET_GENERIC_MESSAGE))
+            self.assertEqual(request("GET", f"/api/v1/auth/dev/password-reset-link?identifier={self.email}")[0], 404)
+
+    def test_demo_mode_unknown_email_uses_development_message_without_smtp(self) -> None:
+        demo_settings = SimpleNamespace(
+            app_env="production",
+            registration_mode="demo",
+            smtp_host="",
+            smtp_port=587,
+            smtp_username="",
+            smtp_password="",
+            smtp_from="",
+            smtp_from_email="",
+            password_reset_base_url="http://localhost:5173/reset-password",
+        )
+        with patch("app.password_reset.settings", demo_settings):
+            status, _, body = request("POST", "/api/v1/auth/forgot-password", {"email": "unknown-demo@example.com"})
+            self.assertEqual((status, body["detail"]["message"]), (404, PASSWORD_RESET_DEVELOPMENT_UNKNOWN_MESSAGE))

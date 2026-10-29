@@ -2,9 +2,11 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
 
 from ..models import UserRole
+from ..security import validate_password
+from .email import normalize_email
 
 
 class RegistrationRequest(BaseModel):
@@ -16,6 +18,20 @@ class RegistrationRequest(BaseModel):
     email: EmailStr
     registration_number: str
     password: str
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalized_email(cls, value: object) -> object:
+        return normalize_email(value)
+
+    @field_validator("password")
+    @classmethod
+    def valid_password(cls, value: str) -> str:
+        try:
+            validate_password(value)
+        except ValueError as error:
+            raise ValueError(str(error)) from error
+        return value
 
 
 class RegistrationResponse(BaseModel):
@@ -41,6 +57,11 @@ class LoginRequest(BaseModel):
     registration_number: str | None = None
     password: str
     requested_role: UserRole | None = None
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalized_email(cls, value: object) -> object:
+        return normalize_email(value)
 
     @model_validator(mode="after")
     def exactly_one_login_identifier(self) -> "LoginRequest":
