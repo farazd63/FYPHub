@@ -9,3 +9,5 @@ Verification still needed: functional browser checks beyond the user-reported st
 Current checkpoint: the user reports that student discovery looked good in desktop and mobile views; functional browser checks remain pending where not explicitly confirmed. SMTP host/sender and local AI URL/model are not configured in the current environment; live email and AI remain unverified. See `verification.md` for manual discovery steps.
 
 Discovery follow-up: the user reports that the desktop and mobile views looked good. The report does not specify outcomes for all eight answers, live roster OTP delivery, filtering, result privacy, or expired/replayed or wrong-cycle rejection. Focused backend tests passed with mocked delivery; live SMTP remains unverified. See the manual steps in `verification.md`.
+
+Chatbot and email availability check: local AI URL/model and SMTP host/sender are not configured. Unavailable responses and mocked failure behavior passed; live AI operation and delivery to a controlled mailbox remain unverified.

@@ -1,0 +1,848 @@
+                 Final Year Project Long Proposal
+
+       FYPHub: An Agentic AI-Driven
+Platform for Intelligent Final Year Project
+
+                      Management
+
+                           Muhammad Maaz 23108179
+                              Zain Ali Kiani 23108197
+                              Danish Faraz 23108160
+
+                        Supervised by: Sir Hamza Imran
+
+              Department of Robotics & Artificial Intelligence
+              Faculty of Computing and Engineering Sciences
+
+                                SZABIST University
+                                Islamabad, Pakistan
+
+                                        Fall 2026
+                Revision History
+
+Compiled By     Checked By           Date     Description              Version
+Muhammad        Sir Hamza Imran  07-Oct-2026                              1.0
+Maaz            Sir Hamza Imran  07-Oct-2026  Long proposal structure     1.1
+Zain Ali Kiani  Sir Hamza Imran  07-Oct-2026  and content                 1.2
+                Sir Hamza Imran  07-Oct-2026  Module and feature          1.3
+Danish Faraz                                  review
+                                              Workflow and
+Project Team                                  technology review
+                                              Final 12-module draft
+1. Project Stream          Desktop Application
+                           Game
+ Web-Based FYP
+       Mobile Application
+       Hardware-Based
+
+2. Introduction
+
+    Final Year Project (FYP) management is a multi-stage academic process involving
+proposal processing, project allocation, collaboration, project completion, evaluation,
+and administrative coordination. Prior FYP-management research has shown that these
+activities benefit from centralized digital workflows and role-specific collaboration tools
+rather than disconnected manual processes [1, 2]. In many university environments,
+forms, spreadsheets, emails, messaging applications, and loosely organized digital records
+can make proposal tracking, supervisor coordination, evaluation, and reuse of previous
+project knowledge difficult.
+
+    FYPHub is proposed as a centralized, role-aware, AI-assisted platform for managing
+the complete FYP lifecycle. The platform is designed for five major roles: Student, Super-
+visor, FYP Coordinator, Panel Member, and Administrator. It combines deterministic
+academic rules with Large Language Models (LLMs), semantic embeddings, Retrieval-
+Augmented Generation (RAG), GraphRAG, machine-learning based risk analysis, opti-
+mization techniques, and agentic AI orchestration. RAG provides language models with
+retrieved external evidence for knowledge-intensive generation, while GraphRAG extends
+retrieval with graph-structured relationships for broader and multi-hop reasoning over
+document collections [3, 4]. AI is used for assistance, analysis, retrieval, explanation, and
+prediction, while final academic authority remains with authorized university personnel.
+
+    The FYP is organized into twelve clearly separated modules. Each module owns a
+distinct part of the FYP lifecycle so that proposal management, quality compliance, orig-
+inality checking, supervision, scheduling, evaluation, progress monitoring, institutional
+knowledge retrieval, and final archiving do not overlap unnecessarily.
+
+3. Project Description
+
+    FYPHub is a responsive web-based platform that digitizes and intelligently connects
+the complete Final Year Project process. Students can form groups, find compatible
+teammates, create and submit proposal versions, run AI-assisted compliance checks, com-
+pare proposals against previous FYPs, and request suitable supervisors. Supervisors can
+review proposals using structured comments and revision requests, while the Coordina-
+tor manages academic routing and panel readiness. The system also schedules defenses,
+supports structured panel evaluation, tracks project progress and supervision evidence,
+archives completed FYPs, and makes institutional project knowledge searchable through
+RAG and GraphRAG.
+
+    The platform follows a shared-module, role-based-access architecture. A feature is not
+duplicated into separate modules merely because different roles can view it. For example,
+the proposal compliance engine remains one module, but students, supervisors, coordina-
+tors, and panel members access different views according to their permissions. Similarly,
+the final archive creates and preserves institutional knowledge, while the knowledge-search
+module retrieves and reasons over that archived information.
+
+    The system is expected to provide a single source of truth for proposal versions,
+supervisor assignments, review comments, coordinator actions, panel evaluations, project
+progress, and final project outcomes. This improves traceability and supports data-driven
+academic decision making across the entire FYP lifecycle.
+
+4. Real World Problem
+
+    Universities generate a large amount of valuable FYP knowledge every semester, but
+that knowledge is often difficult to search, compare, and reuse. Students may not know
+whether an idea has already been implemented, what limitations previous projects had,
+which supervisor is most suitable, or which university formatting and proposal require-
+ments are still unmet. Group formation can also be difficult when students do not have
+suitable teammates, and duplicate membership can occur if group rules are not centrally
+enforced.
+
+    FYP administration also involves several academic actors. Students submit propos-
+als, supervisors review them, coordinators control academic routing, panels evaluate the
+work, and administrators configure academic rules and deadlines. When these activities
+are distributed across disconnected tools, important context is lost. Revision comments
+can become scattered, supervisor capacity may be unclear, panel scheduling can create
+conflicts, progress evidence may remain informal, and completed projects can become
+static files rather than reusable institutional knowledge.
+
+    The real-world challenge is therefore broader than simple proposal submission. The
+university needs an integrated system that manages the workflow, applies deterministic
+academic rules, provides AI-assisted analysis where appropriate, preserves an auditable
+history, and converts historical FYP records into an active knowledge base for future
+students and faculty.
+
+5. Problem Statement
+
+    Current FYP management practices may suffer from fragmented team formation,
+manual proposal submission, inconsistent formatting, weak originality checks, limited
+visibility of supervisor expertise and capacity, scattered review communication, man-
+ual defense scheduling, disconnected panel feedback, limited progress evidence, and
+poor reuse of completed-project knowledge. Existing generic learning-management,
+plagiarism-detection, and project-management tools can support individual parts of this
+process, but they do not provide a unified FYP-specific platform that connects academic
+workflow, proposal intelligence, supervisor allocation, panel evaluation, project progress,
+and institutional knowledge.
+
+    The proposed project aims to develop the FYPHub platform, which manages the
+complete FYP lifecycle through twelve integrated but non-overlapping modules. The
+system will combine role-based workflow control with AI-assisted proposal compliance,
+semantic originality analysis, supervisor matching, revision verification, scheduling opti-
+mization, progress and risk intelligence, RAG-based institutional knowledge search, and
+final project handover support.
+
+6. Names of Existing Similar FYPs (if repeated)
+
+    No exact repeated FYP has been confirmed in the current project records at proposal
+stage. However, the problem space overlaps partially with learning-management systems,
+plagiarism/similarity platforms, project-management tools, and institutional repositories.
+The proposed FYPHub differs by integrating the complete FYP lifecycle and by using
+archived institutional FYP data as an active source for similarity analysis, knowledge
+retrieval, extension guidance, and analytics.
+    The proposed system will also contain its own Proposal Similarity & Originality
+Check module. Once historical FYP records are available in the repository, this module
+will compare a new proposal against previous projects and provide evidence of semantic,
+functional, and methodological overlap rather than relying only on title similarity.
+
+7. New Functionalities (main) to be added Features
+
+    FYPHub introduces several capabilities that are not normally available together in a
+single FYP management platform:
+
+    · AI-assisted teammate discovery using compatibility questions, skills, availability,
+       work style, and role preferences, with duplicate-group membership prevention.
+
+    · University-template-aware proposal compliance checking for structure, headings,
+       margins, spacing, alignment, required sections, and academic consistency.
+
+    · Semantic and functional comparison of new proposals against archived FYPs, in-
+       cluding contribution boundaries and extension gaps.
+
+    · Expertise, workload, preference, and capacity-based supervisor recommendation
+       and allocation with slot enforcement.
+
+    · Structured supervisor comments, revision requests, two-way discussion, and AI-
+       assisted verification of whether requested revisions were resolved.
+
+    · Coordinator-controlled academic routing with delay and workflow-conformance
+       monitoring.
+
+    · Conflict-aware defense scheduling and panel assignment based on availability,
+       room/time constraints, and academic conflicts.
+
+    · Panel scoring and feedback with AI-generated viva questions, evaluator disagree-
+       ment detection, and feedback-resolution tracking.
+
+    · Supervision-meeting evidence, milestone tracking, project-health classification,
+       delay-risk analysis, and recovery recommendations.
+
+    · Final FYP archiving with implemented-scope extraction, limitations, future work,
+       reusable assets, and intelligent handover packages.
+
+    · RAG/GraphRAG-based institutional FYP search with evidence and multi-hop rea-
+       soning over archived projects.
+
+    · Institutional analytics for domain trends, workload, turnaround time, completion
+       patterns, and management insights.
+
+8. Application Review
+
+    This section reviews six existing platforms that address selected parts of the FYP
+lifecycle. Each application is summarized through two key characteristics and two limita-
+tions, followed by a feature-by-application comparison table in the same tabular pattern
+used throughout this proposal. The purpose is to show which capabilities already exist
+in established systems and which FYP-specific gaps remain.
+8.1 Moodle Assignment Activity [5]
+
+    Moodle provides structured assignment submission, group submissions, deadlines,
+grading, feedback, and rubric-based assessment within a learning-management environ-
+ment.
+
+    · Key characteristic 1: Students can submit files or online text individually or in
+       groups, with configurable availability and due dates.
+
+    · Key characteristic 2: Instructors can grade submissions, provide feedback, and
+       use rubrics or custom grading scales.
+
+The limitations of Moodle for the target FYP lifecycle are listed below.
+    · Limitation 1: It does not provide FYP-specific supervisor expertise/capacity
+       matching, allocation optimization, or defense-panel scheduling.
+
+    · Limitation 2: It does not provide institutional FYP semantic originality analysis,
+       GraphRAG reasoning, or intelligent handover/continuation support.
+
+8.2 Turnitin Similarity Report [6]
+
+    Turnitin compares submitted text against large source collections and produces a Sim-
+ilarity Report that highlights matching text, source information, and an overall similarity
+percentage.
+
+    · Key characteristic 1: Text matching against internet sources, publications, and
+       previously submitted work with source-level evidence.
+
+    · Key characteristic 2: Similarity reports support academic review by grouping
+       and presenting matched passages for human interpretation.
+
+The limitations of Turnitin for the target FYP lifecycle are listed below.
+    · Limitation 1: It primarily measures textual similarity and does not evaluate FYP
+       problem, objectives, modules/features, methodology, implemented scope, and con-
+       tribution boundaries as one semantic project comparison.
+
+    · Limitation 2: It does not manage FYP team formation, supervisor allocation,
+       coordinator routing, defense scheduling, project-progress intelligence, or final han-
+       dover.
+
+8.3 OpenProject [7]
+
+    OpenProject is a general project-management and collaboration platform supporting
+planning, tasks, milestones, workloads, timelines, and project progress.
+
+    · Key characteristic 1: Work packages, tasks, milestones, timelines, and responsi-
+       bilities can be planned and tracked across a project lifecycle.
+
+    · Key characteristic 2: Team collaboration, workload planning, project dash-
+       boards, and status tracking support coordinated project delivery.
+
+The limitations of OpenProject for the target FYP lifecycle are listed below.
+    · Limitation 1: It does not provide university-template proposal compliance, histor-
+       ical FYP originality intelligence, or formal supervisor revision-compliance checking.
+
+    · Limitation 2: It does not provide FYP-specific supervisor allocation, panel evalu-
+       ation, institutional FYP archive reasoning, or GraphRAG-based knowledge search.
+8.4 Microsoft Teams for Education [8]
+
+    Microsoft Teams for Education combines class communication, channels, assignments,
+due dates, resources, feedback, and rubric-based grading in one collaborative environ-
+ment.
+
+    · Key characteristic 1: Channels and class-team communication support collabo-
+       ration among students and educators.
+
+    · Key characteristic 2: Assignments support due dates, file submission, resubmis-
+       sion, resources, grades, and rubrics.
+
+The limitations of Microsoft Teams for Education for the target FYP lifecycle are listed
+below.
+
+    · Limitation 1: It does not provide FYP-specific teammate compatibility matching,
+       supervisor expertise/capacity allocation, or historical FYP originality analysis.
+
+    · Limitation 2: It does not manage coordinator academic routing, defense-panel
+       optimization, project handover intelligence, or RAG/GraphRAG reasoning over
+       FYP archives.
+
+8.5 GitHub Projects [9]
+
+    GitHub Projects supports software-team planning and tracking through issues, pull
+requests, project boards, tables, roadmaps, custom fields, and code-linked work items.
+
+    · Key characteristic 1: Issues and Projects can organize tasks, ideas, bugs, mile-
+       stones, and development work with configurable views and metadata.
+
+    · Key characteristic 2: Work tracking is closely linked with repositories, pull re-
+       quests, and software-development activity.
+
+The limitations of GitHub Projects for the target FYP lifecycle are listed below.
+    · Limitation 1: It is development-work oriented and does not provide university
+       proposal formatting/compliance, supervisor matching, or formal academic routing.
+
+    · Limitation 2: It does not provide defense scheduling, panel rubric evaluation,
+       semantic comparison with archived FYPs, or institutional FYP handover workflows.
+
+8.6 DSpace Institutional Repository [10]
+
+    DSpace is an institutional repository platform for managing, preserving, controlling
+access to, and searching digital content and metadata.
+
+    · Key characteristic 1: It preserves multiple digital formats and supports
+       metadata/full-text search for institutional collections.
+
+    · Key characteristic 2: Granular access control and repository organization sup-
+       port long-term institutional knowledge preservation.
+
+The limitations of DSpace for the target FYP lifecycle are listed below.
+    · Limitation 1: It is primarily a repository and does not manage active FYP team
+       formation, proposal review, supervisor allocation, progress, or defense workflows.
+
+    · Limitation 2: Standard repository search does not provide FYP-specific seman-
+       tic originality analysis, revision verification, or RAG/GraphRAG-based multi-hop
+       academic reasoning by itself.
+8.7 FYPHub (Our FYP)
+
+    FYPHub combines the complete university FYP lifecycle in one role-aware platform
+instead of treating submission, similarity checking, supervision, evaluation, progress, and
+institutional knowledge as disconnected activities.
+
+    · Key characteristic 1: Integrated 12-module workflow covering team formation,
+       proposal compliance/originality, supervisor allocation/revision, coordinator control,
+       defense/panel processes, project progress, final archive, and handover.
+
+    · Key characteristic 2: AI-assisted institutional intelligence using LLMs, embed-
+       dings, RAG/GraphRAG, optimization, and evidence-based analysis while retaining
+       human academic authority.
+
+                               Table 1: Applications Comparison
+
+Feature                        Moodle Turnitin OpenProjectMS     GitHub  DSpace
+                                         [7] Teams                  [9]    [10]  FYPHub
+Assignment/document            [5]  [6]    [8]                                       
+submission and deadlines                                                             
+Team collaboration and work                                                          
+tracking                                                                             
+Similarity/originality                                                               
+evidence
+Rubric-based                                                                         
+evaluation/feedback                                                                  
+Institutional                                                                        
+repository/archive
+preservation                                                                         
+University proposal                                                                  
+format/compliance analysis                                                           
+Supervisor expertise/capacity
+allocation                                 
+Historical FYP
+semantic/functional                        
+comparison
+Defense scheduling and panel               
+assignment
+RAG/GraphRAG reasoning                     
+over archived FYPs
+Final FYP                                  
+handover/continuation
+intelligence
+
+9. Scope
+
+    The scope of FYPHub covers the complete university FYP lifecycle through twelve
+integrated modules. The system is software-based and uses role-aware workflows, de-
+terministic academic rules, and AI-assisted analysis while preserving human academic
+authority.
+
+9.1 Included Aspects
+
+    · Role-based web access for Student, Supervisor, FYP Coordinator, Panel Member,
+       and Administrator users.
+    · Student team formation, proposal submission/versioning, university-format com-
+       pliance, and proposal originality analysis.
+
+    · Supervisor matching/allocation, supervisor-led proposal review/revision, coordina-
+       tor routing, defense scheduling, and panel evaluation.
+
+    · Supervision evidence, milestone/progress monitoring, project-risk assistance, and
+       recovery recommendations.
+
+    · Final FYP archiving, handover/continuation knowledge, RAG/GraphRAG search,
+       and institutional analytics.
+
+9.2 Excluded Aspects
+
+    · Automatic replacement of supervisor, coordinator, panel, or administrator academic
+       decisions by AI; authorized personnel retain final authority.
+
+    · University processes outside the FYP lifecycle such as general admissions, fee pro-
+       cessing, and non-FYP academic administration.
+
+    · Development of proprietary hardware or a native mobile application; the proposed
+       system is a web-based software platform.
+
+    · Use of confidential institutional or student data outside approved access permissions
+       and role-based policies.
+
+9.3 Modules Description
+
+Module 1: Admin Dashboard & Academic Management
+    Description: This module provides the administrative foundation of the platform.
+
+It allows authorized administrators to manage users, roles, academic cycles, proposal
+templates, supervisor capacity, evaluation rubrics, deadlines, reminders, escalation rules,
+and audit history.
+
+    · User and role management for Students, Supervisors, Coordinators, Panel Members,
+       and Administrators.
+
+    · Semester and FYP-cycle configuration including group-size and workflow policies.
+
+    · Official short-proposal and long-proposal template management with versioned aca-
+       demic rules.
+
+    · Supervisor capacity, panel rubric, scoring criteria, and academic-deadline configu-
+       ration.
+
+    · Deadline reminder/escalation rules and immutable audit history of administrative
+       changes.
+
+Primary Output: Academic governance configuration and deadline action rules.
+
+Module 2: Student Team & Collaboration Hub
+    Description: This module manages student group formation and project collabo-
+
+ration. It supports AI-assisted teammate discovery for students who do not yet have a
+complete group and enforces the university rule that a student cannot belong to more
+than one active FYP group in the same cycle.
+    · FYP group creation, leader/member rules, group-size enforcement, and verified
+       membership.
+
+    · Duplicate-group membership prevention using Student ID/Registration Number
+       and current FYP cycle.
+
+    · AI teammate compatibility matching using 8-10 questions covering skills, domain,
+       availability, working style, preferred role, and commitment.
+
+    · Join requests, invitations, accept/reject workflow, student-to-group matching, and
+       temporary match chat.
+
+    · Seven collaboration channels (General, Proposal, Research, Supervisor Discussion,
+       Tasks & Progress, Files & Resources, Announcements & Deadlines) plus a group
+       AI chatbot.
+
+Primary Output: Verified and compatible FYP team with a shared collaboration
+workspace.
+
+Module 3: Student Proposal & AI Compliance Check
+    Description: This module owns the official proposal record and validates a student's
+
+short or long proposal against the university template and academic-quality rules. The
+same analysis can be viewed by authorized supervisors, coordinators, and panel members
+according to role permissions.
+
+    · Short/long proposal creation, upload, draft, submit, resubmit, and lifecycle-status
+       management.
+
+    · Version history with AI-generated change summaries between proposal versions.
+
+    · University-format checking for font, font size, margins, alignment, line spacing,
+       heading styles, page numbering, tables, and figures.
+
+    · Structural validation for required sections, section order, headings, references, ap-
+       pendices, and captions.
+
+    · Academic consistency analysis across problem statement, objectives, methodology,
+       proposed solution, scope, and expected outcomes.
+
+Primary Output: Official proposal version and Proposal Compliance & Readiness Re-
+port.
+
+Module 4: Proposal Similarity & Originality Check
+    Description: This module compares a new proposal with archived FYPs to deter-
+
+mine how much of the idea, problem, implementation scope, and methodology overlaps
+with previous work and where a genuine contribution can begin.
+
+    · Semantic embedding search against historical FYP records.
+
+    · Multi-level comparison of title, problem statement, objectives, modules/features,
+       and methodology.
+
+    · Evidence showing the most related previous projects and their implemented scope.
+    · Contribution-boundary analysis separating inherited/overlapping work from gen-
+       uinely new work.
+
+    · Gap and extension analysis based on previous limitations, missing features, and
+       unfinished scope.
+
+Primary Output: Originality, duplication, and contribution-boundary report.
+
+Module 5: Supervisor Selection & Allocation
+    Description: This module identifies suitable supervisors and manages the complete
+
+assignment process using expertise relevance, research interests, current workload, capac-
+ity, and academic constraints.
+
+    · AI-based supervisor expertise matching using proposal content, research interests,
+       and previous supervision history.
+
+    · Ranked supervisor recommendations with explainable match reasons and expertise
+       gaps.
+
+    · Supervisor capacity and slot management showing total, filled, and available slots.
+
+    · Student request, supervisor accept/reject, duplicate-request protection, and final
+       assignment workflow.
+
+    · Fair allocation and conflict checking using workload, preferences, capacity, and
+       academic constraints.
+
+Primary Output: Explainable supervisor recommendation and valid final assignment.
+
+Module 6: Supervisor Proposal Review Dashboard
+    Description: After assignment, this module manages the formal supervisor-led pro-
+
+posal review process. Comments and requested changes remain linked to proposal versions
+so that the academic revision history is fully traceable.
+
+    · Paragraph-level, section-level, module-level, and full-proposal comments.
+
+    · Editing suggestions and formal revision requests from the assigned supervisor.
+
+    · Two-way student-supervisor discussion linked to the relevant proposal/revision
+       item.
+
+    · Semantic comparison between old and revised proposal versions.
+
+    · AI revision-compliance checking that classifies requested changes as Resolved, Par-
+       tially Resolved, or Unresolved while leaving final authority with the supervisor.
+
+Primary Output: Revision Resolution Report and approved/revised proposal history.
+
+Module 7: Coordinator Proposal Control
+    Description: This module gives the FYP Coordinator controlled academic routing
+
+over supervisor-approved proposals and provides visibility into delayed, incomplete, or
+workflow-inconsistent cases.
+
+    · Dedicated queue of supervisor-approved proposals ready for coordinator action.
+    · Hold, return-to-student, return-to-supervisor, and forward-to-panel actions.
+
+    · Version-aware, immutable history of coordinator decisions and reasons.
+
+    · Workflow bottleneck and abnormal-delay detection across proposal stages.
+
+    · Priority and conformance monitoring for urgent cases, skipped stages, unresolved
+       requirements, and deadline risk.
+
+Primary Output: Coordinator decision record and panel-ready proposal state.
+
+Module 8: Panel Scheduling & Defense
+    Description: This module manages defense logistics after a proposal/project be-
+
+comes eligible for panel evaluation. It allocates panel members, time slots, and rooms
+while preventing scheduling and academic conflicts.
+
+    · Panel-member assignment for eligible FYP groups.
+
+    · Availability management for panel members, supervisors, student groups, and
+       rooms.
+
+    · Defense date, time, room, or online-session scheduling.
+
+    · Automatic detection of panel, supervisor, student, room, and conflict-of-interest
+       clashes.
+
+    · Optimized scheduling and rescheduling to reduce conflicts and balance panel work-
+       load.
+
+Primary Output: Conflict-free defense schedule and panel assignment.
+
+Module 9: Panel Evaluation & Feedback
+    Description: This module manages formal panel evaluation using configured rubrics.
+
+It supports detailed feedback, AI-assisted defense preparation, evaluator-disagreement
+detection, and traceable feedback resolution.
+
+    · Criterion-based rubric scoring and recommendation by multiple panel members.
+
+    · Paragraph, section, module/feature, and overall proposal/project comments.
+
+    · AI-generated viva/defense questions based on proposal content and claimed contri-
+       bution.
+
+    · Detection of significant evaluator disagreement in scores or assessment dimensions.
+
+    · Feedback-resolution workflow: Panel Comment  Coordinator Resolution  Stu-
+       dent/Supervisor Revision  Panel Recheck, while preserving the original panel
+       comment.
+
+Primary Output: Structured panel evaluation, feedback history, and resolution status.
+
+Module 10: Project Progress & Supervision Dashboard
+    Description: This module combines formal supervision evidence with milestone and
+
+task progress to present the current health of an active FYP and identify delay or delivery
+risks.
+    · Supervision meeting records, minutes, decisions, action items, owners, and due
+       dates.
+
+    · AI extraction of tasks, owners, commitments, and deadlines from meeting notes.
+
+    · Milestone, task, completion-percentage, overdue-work, and scope-progress tracking.
+
+    · Project-health classification such as On Track, Attention Required, or Critical using
+       recorded evidence.
+
+    · Risk explanation and recovery recommendations; when sufficient labelled data be-
+       comes available, predictive ML models and explainability can be added for delay
+       probability estimation.
+
+Primary Output: Project Progress, Action Compliance, Risk, and Recovery Report.
+
+Module 11: Final FYP Archive & Handover
+    Description: This module creates the final institutional record of a completed FYP
+
+and prepares reusable knowledge for future students instead of treating the final report
+as a static file.
+
+    · Final project submission package containing report, proposal, source-code reposi-
+       tory, dataset/model information, and supporting files.
+
+    · Automatic extraction of project metadata including domain, technologies, datasets,
+       modules, and methodology.
+
+    · Classification of final scope as Completed, Partially Implemented, or Not Imple-
+       mented.
+
+    · Extraction of limitations, unresolved issues, technical debt, and future work.
+
+    · Intelligent handover/continuation package containing reusable assets, dependencies,
+       incomplete work, and recommended continuation points.
+
+Primary Output: Final Project Archive Package and Continuation/Handover Package.
+
+Module 12: FYP Knowledge Search & Analytics
+    Description: This module reads and reasons over archived institutional FYP knowl-
+
+edge. It provides evidence-based natural-language search for authorized users and pro-
+duces institutional analytics without editing the underlying archive.
+
+    · Natural-language semantic search over archived FYP titles, abstracts, modules,
+       technologies, datasets, outcomes, and limitations.
+
+    · RAG and GraphRAG-based question answering grounded in retrieved institutional
+       evidence.
+
+    · Multi-hop queries across relationships such as Project  Technology  Dataset 
+       Limitation  Supervisor.
+
+    · Source citations/evidence paths so generated answers can be traced to archived
+       FYP records.
+· Institutional analytics for domain trends, supervisor workload, approval turnaround,
+  completion/delay patterns, panel statistics, and technology usage over time.
+
+Primary Output: Evidence-Based FYP Knowledge Answers and Institutional Analyt-
+ics Report.
+
+10. Modules
+
+    Table 2 provides the module distribution and task allocation according to the four
+implementation checkpoints. The same pattern is used for each checkpoint: three modules
+are scheduled in P1 Mid, three in P1 Final, three in P2 Mid, and three in P2 Final.
+
+          Table 2: FYPHub Module Distribution and Task Allocation
+
+Deadline  Modules                                       Student
+P1 Mid
+          1: Admin Dashboard & Academic Management      Muhammad Maaz
+P1 Final                                                (23108179)
+
+P2 Mid    2: Student Team & Collaboration Hub           Zain Ali Kiani
+                                                        (23108197)
+P2 Final
+          3: Student Proposal & AI Compliance Check     Danish Faraz (23108160)
+
+          4: Proposal Similarity & Originality Check    Muhammad Maaz
+                                                        (23108179)
+
+          5: Supervisor Selection & Allocation          Zain Ali Kiani
+                                                        (23108197)
+
+          6: Supervisor Proposal Review & Revision      Danish Faraz (23108160)
+
+          7: Coordinator Proposal Control               Muhammad Maaz
+                                                        (23108179)
+
+          8: Defense & Panel Scheduling                 Zain Ali Kiani
+                                                        (23108197)
+
+          9: Panel Evaluation & Feedback                Danish Faraz (23108160)
+
+          10: Project Progress & Supervision Dashboard  Muhammad Maaz
+                                                        (23108179)
+
+          11: Final FYP Archive & Handover              Zain Ali Kiani
+                                                        (23108197)
+
+          12: FYP Knowledge Search & Analytics          Danish Faraz (23108160)
+11. Development Environment
+
+Tools:     Visual Studio Code, Git/GitHub, PowerShell, Docker, Docker
+           Compose, Swagger/OpenAPI, and Ollama for local AI model
+           execution.
+
+DBMS:      PostgreSQL with the pgvector extension for transactional
+           academic data, proposal/version history, workflow records, archive
+           metadata, and semantic vector search.
+
+Platform:  Web-Based; Front-End: React + Vite + TypeScript with
+           Tailwind CSS; Back-End: Python 3.12 with FastAPI for
+           authenticated REST APIs, academic workflow rules, and AI
+           service orchestration.
+
+AI Envi-   Local and/or approved language models through Ollama,
+ronment:   embedding models, RAG/GraphRAG pipelines, Python-based AI
+           orchestration, machine-learning libraries for risk analysis, and
+           optimization libraries for scheduling/allocation.
+
+12. Significance
+
+    FYPHub is significant because it transforms the university's FYP process from a
+collection of disconnected administrative tasks into a connected academic intelligence
+ecosystem. The platform does not only digitize proposal forms; it links team formation,
+proposal quality, originality, supervision, coordinator routing, scheduling, panel evalua-
+tion, progress evidence, final archiving, and institutional knowledge reuse.
+
+    The main expected benefits are:
+
+· Improved Proposal Quality: Students receive structured feedback on university
+  formatting, missing sections, academic consistency, and readiness before formal
+  review.
+
+· Reduced Duplication: Semantic and functional comparison against previous
+  FYPs reveals overlap and clarifies where genuine new contribution should begin.
+
+· Better Team Formation: AI teammate matching and duplicate-membership
+  rules support fair and compatible group creation.
+
+· Transparent Supervision: Supervisor selection considers expertise and capacity,
+  while revision comments and meeting actions remain traceable.
+
+· Efficient Academic Routing: Coordinators can monitor proposal states, delays,
+  and panel readiness from one controlled workflow.
+
+· Improved Defense Management: Panel assignments and defense schedules are
+  generated with conflict and availability checks.
+
+· Evidence-Based Progress Monitoring: Meeting actions, milestones, tasks, and
+  delays contribute to project-health and recovery recommendations.
+
+· Institutional Knowledge Reuse: Final FYPs become searchable, reusable
+  knowledge through RAG/GraphRAG and analytics rather than remaining isolated
+  documents.
+    · Human-Controlled AI: AI supports analysis, explanation, retrieval, prediction,
+       and recommendations, while authorized academic personnel retain final decision
+       authority.
+
+13. Tools and Techniques
+
+    FYPHub uses a modular web and AI architecture that separates deterministic aca-
+demic rules from probabilistic AI assistance. The major tools and techniques are listed
+below.
+
+    · Front-End: React + Vite + TypeScript with Tailwind CSS will provide responsive
+       role-specific interfaces for Student, Supervisor, Coordinator, Panel, and Adminis-
+       trator users [11].
+
+    · Back-End: Python 3.12 with FastAPI will provide authenticated REST APIs, role-
+       based authorization, academic workflow rules, AI-service endpoints, and integration
+       logic [12].
+
+    · Database: PostgreSQL will store users, teams, proposals, versions, assignments,
+       reviews, coordinator actions, schedules, evaluations, progress records, and archive
+       metadata [13]. The pgvector extension will support proposal embeddings, semantic
+       retrieval, and historical FYP similarity search [14].
+
+    · AI and Intelligence: LLMs and embeddings will support proposal-quality anal-
+       ysis, semantic revision checking, teammate explanations, viva-question generation,
+       summarization, and semantic search. RAG will ground generated answers in re-
+       trieved institutional evidence [3], while GraphRAG will add graph-structured re-
+       trieval for broader and multi-hop reasoning across archived FYP relationships [4].
+       Optimization techniques will support supervisor allocation and defense scheduling,
+       while project-risk analysis will begin with deterministic/hybrid evidence and may
+       later use supervised ML when sufficient labelled data becomes available.
+
+    · Security and Academic Rules: Role-Based Access Control (RBAC) and de-
+       terministic backend/database constraints will enforce group uniqueness, supervisor
+       slots, proposal-version eligibility, coordinator routing, panel permissions, and ad-
+       ministrative policies rather than delegating these controls to an LLM.
+
+    · Development Tools: Docker and Docker Compose will support reproducible
+       infrastructure [15]; Git/GitHub will support collaborative version control; Swag-
+       ger/OpenAPI will support API documentation and testing; Ollama will support
+       local AI model execution.
+
+    Overall Workflow: Admin Setup  Team Formation  Proposal Submission &
+AI Compliance  Similarity & Originality Check  Supervisor Selection & Allocation
+ Supervisor Review & Revision  Coordinator Proposal Control  Defense & Panel
+Scheduling  Panel Evaluation & Feedback  Project Progress & Supervision  Final
+FYP Archive & Handover  FYP Knowledge Search & Analytics.
+References
+
+ [1] R. Lounas, I. Hamzaoui, N. Bouguelmouna, and H. Mokrani, "An E-Collaboration
+      Application for Final-Year Project Management," International Journal of e-
+      Collaboration, vol. 19, no. 1, pp. 1-17, 2023. DOI: 10.4018/IJeC.315787.
+
+[2] A. S. Yusuf, "A Web-Based System for Final Year Student Project Allocation and
+    Management," Journal of Basics and Applied Sciences Research, vol. 4, no. 3, pp.
+    9-22, 2026. DOI: 10.4314/jobasr.v4i3.2.
+
+[3] P. Lewis et al., "Retrieval-Augmented Generation for Knowledge-Intensive NLP
+    Tasks," Advances in Neural Information Processing Systems (NeurIPS), 2020. Avail-
+    able: https://arxiv.org/abs/2005.11401.
+
+[4] D. Edge et al., "From Local to Global: A Graph RAG Approach to Query-Focused
+    Summarization," 2024. Available: https://arxiv.org/abs/2404.16130.
+
+[5] Moodle, "Assignment Activity," MoodleDocs. [Online]. Available: https://docs.
+    moodle.org/403/en/mod/assignment.
+
+[6] Turnitin, "Overview of the New Similarity Report Experience," Turnitin
+    Guides. [Online]. Available: https://guides.turnitin.com/hc/en-us/articles/
+    24194876779661-Overview-of-the-new-Similarity-Report-experience.
+
+[7] OpenProject, "Project Collaboration  Software Features," OpenProject
+    Documentation. [Online]. Available:       https://www.openproject.org/
+    collaboration-software-features/.
+
+[8] Microsoft, "Assignments and Grades in Your Class Team," Microsoft Sup-
+    port. [Online]. Available: https://support.microsoft.com/en-us/education/
+    assignments/assignments-and-grades-in-your-class-team.
+
+[9] GitHub, "Planning and Tracking with Projects," GitHub Docs.
+
+[Online].  Available:                    https://docs.github.com/en/issues/
+
+planning-and-tracking-with-projects.
+
+[10] DSpace, "DSpace Features," DSpace. [Online]. Available: https://dspace.org/
+      features/.
+
+[11] React, "React Documentation." [Online]. Available: https://react.dev/.
+
+[12] FastAPI, "FastAPI Documentation." [Online]. Available: https://fastapi.
+      tiangolo.com/.
+
+[13] PostgreSQL Global Development Group, "PostgreSQL Documentation." [Online].
+      Available: https://www.postgresql.org/docs/.
+
+[14] pgvector, "Open-Source Vector Similarity Search for Postgres." [Online]. Available:
+      https://github.com/pgvector/pgvector.
+
+[15] Docker, "Docker Documentation." [Online]. Available: https://docs.docker.
+      com/.
+

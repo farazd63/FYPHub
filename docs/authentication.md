@@ -113,3 +113,7 @@ The users table contained zero rows before and after the suite, confirming test 
 ## Remaining work
 
 Password reset/change workflows, email delivery, controlled staff creation, and role dashboards remain pending. The recovery screen honestly reports that no email delivery service is configured; it does not issue or expose reset tokens.
+
+## Password-entry UI convention
+
+Use the shared `PasswordField` for password-entry forms. Enable its advisory guidance for sign-in; account-creation fields use the same guidance, while confirmation fields show match/mismatch feedback without a strength meter. Guidance does not impose character-category requirements or alter authentication validation. Keep password values unchanged and do not log or persist them in browser storage.

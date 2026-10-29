@@ -307,7 +307,6 @@ main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) table the
   background: #f5f8fd;
   color: #526b93;
 }
-
 /* Approved Admin surface fallback: these selectors target the shared portal
    content directly so every Admin page keeps the same visual language even
    when the surrounding :has() scope is unavailable or reordered. */

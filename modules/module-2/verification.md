@@ -35,3 +35,7 @@ On 23 October 2026, `python -m unittest tests.test_student_matching tests.test_a
 ## User-performed visual check
 
 The user reports that the student-to-group discovery flow looked good in both desktop and mobile views. This is a user-performed visual check; browser details and viewport sizes were not supplied. The report does not establish live SMTP or AI operation, nor specify outcomes for every functional or negative-path check listed above.
+
+## Chatbot and email availability verification
+
+On 23 October 2026, the current backend configuration had no SMTP host or sender and no local AI URL or model. Direct calls with synthetic inputs to the chatbot generation, OTP email, and invitation email functions each returned HTTP 503 with an unavailable message. No live AI response or email delivery was attempted. `python -m unittest tests.test_group_ai tests.test_anonymous_verification tests.test_individual_verification tests.test_invitations` passed 25 tests. These mocked tests cover chatbot unavailable/timeout/error behavior without saved AI messages, OTP failure rollback, and invitation delivery failure represented as failed rather than sent; they do not establish live delivery or model operation. No secrets, OTPs, or real student data were recorded.

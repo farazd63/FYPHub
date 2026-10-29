@@ -235,7 +235,9 @@ class AuthSessionTests(unittest.TestCase):
         self.assertEqual(status, 200)
         admin_cookie = self.cookie_value(admin_headers)
         status, _, _ = request(
-            "PATCH", f"/api/v1/admin/users/{target_id}/status", {"is_active": False},
+            "PATCH",
+            f"/api/v1/admin/users/{target_id}/status",
+            {"is_active": False},
             headers={"Cookie": f"{SESSION_COOKIE_NAME}={admin_cookie}", "Origin": "http://localhost:5173"},
         )
         self.assertEqual(status, 200)
@@ -258,8 +260,11 @@ class AuthSessionTests(unittest.TestCase):
         status, headers, _ = request("OPTIONS", "/api/v1/auth/login", headers={"Origin": origin, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type"})
         self.assertEqual(status, 200)
         self.assertEqual(headers["access-control-allow-origin"], origin)
+        self.assertEqual(headers["access-control-allow-credentials"], "true")
         status, headers, _ = self.login(Origin=origin)
         self.assertEqual(status, 200)
+        self.assertEqual(headers["access-control-allow-origin"], origin)
+        self.assertEqual(headers["access-control-allow-credentials"], "true")
         self.assertNotIn("secure", headers["set-cookie"].lower())
         self.assertEqual(self.login(Origin="http://localhost:5174")[0], 403)
         student_guard = require_roles(UserRole.ADMIN)
