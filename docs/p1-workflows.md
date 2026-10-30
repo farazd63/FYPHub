@@ -1,5 +1,13 @@
 # P1 feature explanations, workflows, and demonstrations
 
+## Module 03 approved baseline extraction
+
+1. An ADMIN uploads exactly one supported SHORT or LONG PDF/DOCX through the Module 03 baseline modal. The original bytes remain immutable and the selected proposal type is never mixed with the other type.
+2. The deterministic parser reads PDF page geometry and multi-page text bounding boxes or DOCX section/style settings. Measured values are normalized to millimetres/points and are shown with page/section evidence where available.
+3. The extractor reports margins, page size, font family/size, line and paragraph spacing, heading order/hierarchy, expected sections, captions, citations, and explicit unknown/not-detected values. Missing structural fields lower confidence and produce a clear incomplete-template warning.
+4. Activation requires extracted rules. LOW confidence additionally requires explicit Admin confirmation of a partial baseline. All uploads, activations, metadata versions, rule versions, provenance, and duplicate checks are audited.
+5. Initial reference history is v1. Metadata changes create a new immutable metadata version; formatting changes create a new immutable Rules version. Unchanged values are rejected unless the Admin explicitly confirms the duplicate.
+
 ## Implemented M1-D.1 transaction pipeline
 
 ```mermaid
@@ -33,7 +41,7 @@ This companion explains the source-cited matrix in [p1-feature-tracker.md](p1-fe
 
 ### M1 - academic governance
 
-M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, internal evaluation-rubric drafts with immutable ordered criteria, non-operational deadline configuration, non-operational reminder/escalation rule configuration, and an ADMIN-only audit-history viewer are present. Template and rubric work remain Partial: neither provides an approved publication/activation lifecycle, and rubric drafts intentionally contain no academic scoring values. Workflow-policy drafts now record administrator-supplied state and transition labels; publication, execution, deadline enforcement, reminder delivery, and escalation execution remain absent.
+M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, internal Evaluation Criteria drafts with immutable ordered criteria, non-operational deadline configuration, non-operational reminder/escalation rule configuration, and an ADMIN-only audit-history viewer are present. Template and Evaluation Criteria work remain Partial: neither provides an approved publication/activation lifecycle, and criteria drafts intentionally contain no academic scoring values. Workflow-policy drafts now record administrator-supplied state and transition labels; publication, execution, deadline enforcement, reminder delivery, and escalation execution remain absent.
 
 ### Supervisor allocation
 
@@ -85,7 +93,7 @@ flowchart TD
     D -->|cycle and group maximum| F[Lock cycle then policy; validate positive limit]
     D -->|internal template references and rules| P[Implemented partial: immutable internal metadata/rule versions]
     D -->|supervisor capacity| R[Lock capacity writer, account and cycle; save positive unique policy plus audit]
-    D -->|internal rubric drafts| S[Lock allocator; save immutable version, ordered criteria, and audit]
+    D -->|internal Evaluation Criteria drafts| S[Lock allocator; save immutable version, ordered criteria, and audit]
     D -->|academic deadline configuration| T[Resolve timezone; save immutable version and audit]
     D -->|reminders and escalations| Q[Record non-operational rule version and audit]
     E --> G{last active ADMIN or shared-team guard fails?}
@@ -99,7 +107,7 @@ flowchart TD
     K --> L[Safe response and UI refresh]
 ```
 
-Actual implementation is in `backend/app/main.py`, backed by the account, academic, capacity, rubric-version, and audit models. Proposed-only destinations remain disabled in the Admin navigation.
+Actual implementation is in `backend/app/main.py`, backed by the account, academic, capacity, Evaluation Criteria-version, and audit models. Proposed-only destinations remain disabled in the Admin navigation.
 
 ## M1-I.1 read-only audit history
 
@@ -167,15 +175,15 @@ Use an isolated Admin/test context and administrator-supplied values; do not alt
 
 Reported automated coverage includes authorization, Origin rejection, unknown cycles, strict requests, naive timestamps, timezone conversion/mismatch/gap/overlap behavior, historical preservation, atomic audit rollback, and bounded concurrent allocation: 8 deadline tests and 63 full backend tests. Alembic current/head are `a2b3c4d5e6f7`; schema check, `pip check` passed; frontend lint/build were previously reported as passed. Screenshot evidence shows the server preview converting 20 October 2026, 17:00 Asia/Karachi to 12:00 UTC. Browser preview invalidation, save/version-history interactions, and responsive/mobile visual verification remain pending.
 
-## M1-F.1 internal evaluation-rubric draft pipeline
+## M1-F.1 internal Evaluation Criteria draft pipeline
 
 ```mermaid
 flowchart TD
-    A[ADMIN opens Evaluation Rubrics] --> B[Load draft list and complete version history]
+    A[ADMIN opens Evaluation Criteria] --> B[Load draft list and complete version history]
     B --> C[Enter name, optional description, and ordered criteria]
     C --> D[Validate Origin, strict structure, nonblank names, and unique orders]
     D -->|invalid| E[Return field-addressable error without writing]
-    D -->|valid| F[Acquire rubric writer lock]
+    D -->|valid| F[Acquire Evaluation Criteria writer lock]
     F --> G[Allocate next version number]
     G --> H[Insert complete immutable version and criteria]
     H --> I[Insert audit event in the same transaction]
@@ -184,16 +192,16 @@ flowchart TD
     K -. future M9 boundary .-> L[Panel evaluation references a policy-approved version]
 ```
 
-The current screen and API create internal **Draft** configurations only. They do not make a rubric approved, published, active, or available to evaluators. They contain no marks, weights, thresholds, evaluation stages, result formula, or score submission. Those values and lifecycle rules must come from authorized university policy rather than software defaults.
+The current screen and API create internal **Draft** configurations only. They do not make Evaluation Criteria approved, published, active, or available to evaluators. They contain no marks, weights, thresholds, evaluation stages, result formula, or score submission. Those values and lifecycle rules must come from authorized university policy rather than software defaults.
 
 ### M1-F.1 manual demonstration
 
 Use an isolated Admin/test environment; do not alter real academic records.
 
-1. Sign in with an active persisted `ADMIN` account and open **Evaluation Rubrics**.
+1. Sign in with an active persisted `ADMIN` account and open **Evaluation Criteria**.
 2. Confirm the empty or existing draft list loads and every configuration is labelled **Draft**.
-3. Enter a rubric name, optional description, and at least one criterion. Add, remove, and reorder rows; confirm entered row values move with their rows.
-4. Save the initial rubric once and confirm duplicate clicks are disabled while the request is pending.
+3. Enter an Evaluation Criteria name, optional description, and at least one criterion. Add, remove, and reorder rows; confirm entered row values move with their rows.
+4. Save the initial Evaluation Criteria once and confirm duplicate clicks are disabled while the request is pending.
 5. Open its history, change the complete draft, and create the next version.
 6. Confirm versions are numbered in order and the earlier version and its criterion order remain unchanged.
 7. Confirm validation remains attached to the relevant criterion after row movement and service failures show a safe error.
@@ -202,11 +210,11 @@ Automated checks cover authorization, foreign-Origin rejection, validation, orde
 
 ### Remaining M1-F scoring-policy decisions
 
-- Official rubric definitions and criterion wording.
+- Official Evaluation Criteria definitions and criterion wording.
 - Permitted marks or scoring scales, weights, total constraints, aggregation, precision, and thresholds.
 - Official evaluation-stage names and applicability.
 - Draft review, approval, publication, activation, retirement, correction, and version-selection authority.
-- Rules connecting a future panel evaluation to an immutable approved rubric version.
+- Rules connecting a future panel evaluation to an immutable approved Evaluation Criteria version.
 
 ## M1-E.1 supervisor capacity pipeline
 
@@ -340,7 +348,7 @@ This implements the M1 template/rules foundation without claiming M3 format chec
 ### Subsequent source-dependent decisions
 
 - Define semester/workflow states; review ownership is decided, while the early-routing initiator, correction/resubmission rules, final approval authority, and Coordinator department/cycle scope remain open.
-- Provide capacity, rubric/scoring, deadline, reminder, and escalation policies before their M1 checkpoints.
+- Provide capacity, Evaluation Criteria/scoring, deadline, reminder, and escalation policies before their M1 checkpoints.
 - Resolve shared-login attribution for M2 matching, invitations, requests, chat, and collaboration before building those flows.
 - Define M3 lifecycle, upload/storage, role visibility, AI model/grounding/disclosure, and human-review rules before implementation.
 
@@ -363,3 +371,15 @@ Development fixtures are opt-in and idempotent: `python scripts/seed_archived_pr
 ### Evaluator portal mapping
 
 The existing `PANEL_MEMBER` database role is presented to users as **Evaluator** and routes to `EvaluatorPortal`. There is no separate user-facing Panel Member portal. Evaluator assignment, proposal review, defense scheduling, scoring, feedback, and decision-history APIs are not currently available, so the portal shows safe unavailable states and makes no fabricated requests or results.
+
+### Coordinator/Admin monitoring and request conversations
+
+`/api/v1/supervisor-requests/coordinator/monitor` and `/api/v1/supervisor-requests/admin/monitor` are read-only monitoring surfaces. They support cycle, selected-supervisor, lifecycle-status, and UTC date-range filters and return proposal ownership, extracted fields, original-document references, submission notes, status history, capacity usage/limits, and existing authorized audit detail. Neither role can accept, reject, request changes, or silently alter Supervisor decisions.
+
+Request conversations remain scoped to the request. The owning Student/team and selected Supervisor may append messages; Coordinator and Admin may read within their monitoring policy but receive `403` when attempting to send; Panel/Evaluator and unrelated users remain denied. Messages are chronological, append-only, timestamped with sender identity, and written with their audit event transactionally.
+
+### Coordinator/Admin registry workflow
+
+Coordinator and Admin registry lists are separate role-protected reads under `/api/v1/fyp-registry/{coordinator,admin}`. Filters are applied to cycle, section metadata, supervisor, student activity, proposal status, assignment status, completion availability, dates, and normalized search text. Detail responses assemble only persisted request, team, document, extraction, conversation, status-history, audit, archive-match, and Module 03 values; when no progress model exists they display `Progress tracking is not configured yet.`
+
+Only Admin may update registry metadata (`department_section`, `project_scope`, `team_label`, and administrative notes). Each update requires a correction reason, locks the request, stores a before/after snapshot in `fyp_registry_metadata`, and writes its audit event in the same transaction. Proposal PDFs, extraction snapshots, decisions, credentials, and historical audit records are not editable. Official template ingestion is a reference-baseline workflow: missing proposal-only fields are informational and do not become student-proposal validation failures.

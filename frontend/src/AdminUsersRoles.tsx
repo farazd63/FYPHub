@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { PasswordField } from "./PasswordField";
 import { passwordPolicyError } from "./passwordPolicy";
+import { emailValidationMessage, normalizeEmail } from "./emailValidation";
 
 type Role = "STUDENT" | "SUPERVISOR" | "COORDINATOR" | "PANEL_MEMBER" | "ADMIN";
 type User = {
@@ -85,6 +86,11 @@ export function AdminUsersRoles({ api }: { api: string }) {
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
     if (busy) return;
+    const emailError = emailValidationMessage(form.email);
+    if (emailError) {
+      setFieldError(emailError);
+      return;
+    }
     const passwordError = passwordPolicyError(form.password);
     if (passwordError) {
       setFieldError(passwordError);
@@ -103,6 +109,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          email: normalizeEmail(form.email),
           registration_number: form.registration_number.trim() || null,
         }),
       });
@@ -369,11 +376,18 @@ export function AdminUsersRoles({ api }: { api: string }) {
                 required
                 className={input}
                 type="email"
+                aria-invalid={Boolean(emailValidationMessage(form.email))}
                 value={form.email}
-                onChange={(event) =>
-                  setForm({ ...form, email: event.target.value })
-                }
+                onChange={(event) => {
+                  setForm({ ...form, email: event.target.value });
+                  setFieldError("");
+                }}
               />
+              {emailValidationMessage(form.email) && (
+                <span className="text-sm font-normal text-[#a43a33]">
+                  {emailValidationMessage(form.email)}
+                </span>
+              )}
             </label>
             <PasswordField
               label="Password"
@@ -417,7 +431,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
               </p>
             )}
             <button
-              disabled={busy !== null}
+              disabled={busy !== null || Boolean(emailValidationMessage(form.email))}
               className="rounded-lg bg-[#176b66] px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:bg-[#125650] disabled:opacity-60"
             >
               {busy === "create" ? "Creating…" : "Create account"}

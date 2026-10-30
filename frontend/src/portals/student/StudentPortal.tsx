@@ -15,6 +15,7 @@ export const STUDENT_PHASES: readonly StudentPhase[] = [
   { id: "team", name: "Student Team & Collaboration Hub", route: "/student/team", status: "Partial", icon: icon("team") },
   { id: "proposal", name: "Proposal Compliance Check", route: "/student/proposals", status: "Partial", icon: icon("proposal") },
   { id: "supervisors", name: "Supervisor Selection & Proposal Requests", route: "/student/supervisors", status: "Partial", icon: icon("supervisor") },
+  { id: "progress", name: "Project Progress & Supervision Dashboard", route: "/student/progress", status: "Partial", icon: icon("progress") },
   { id: "search", name: "FYP Archive & Knowledge Search", route: "/student/search", status: "Implemented", icon: icon("knowledge") },
 ];
 function Brand() { return <div className="student-brand"><svg aria-hidden="true" viewBox="0 0 56 40" fill="none"><path d="m4 14 24-10 24 10-24 10L4 14Z" fill="currentColor"/><path d="M15 20v8c5 5 21 5 26 0v-8M49 16v11" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg><span>FYPHub</span></div>; }

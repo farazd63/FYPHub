@@ -33,6 +33,22 @@ The rollback-isolated authentication fixture now captures its user ID and regist
 
 ## Student registration
 
+### Reversible registration mode
+
+Registration eligibility is controlled by the backend-only `REGISTRATION_MODE` setting. The safe default is `restricted` (including when the value is missing or invalid): approved-roster validation remains active. For a temporary panel presentation only, set:
+
+```dotenv
+REGISTRATION_MODE=demo
+```
+
+Demo mode bypasses only the approved-roster check for valid student/team registration. Password, email, duplicate, active-cycle, group-size, ownership, authentication, audit, and authorization rules remain active. Restore the production restriction with:
+
+```dotenv
+REGISTRATION_MODE=restricted
+```
+
+Only authenticated administrators see the demo-mode warning; public users never receive configuration details. Each registration audit event records the effective mode.
+
 `POST /api/v1/auth/register` creates a student account only. Public registration cannot assign a role, set account activity, create staff accounts, or issue tokens.
 
 ### Request
@@ -110,6 +126,18 @@ Database integration tests were run against `fyphub_p1` with a dependency overri
 
 The users table contained zero rows before and after the suite, confirming test writes were rolled back. Python compilation and `pip check` also passed.
 
-## Remaining work
+## Forgot Password and Reset Password
 
-Password reset/change workflows, email delivery, controlled staff creation, and role dashboards remain pending. The recovery screen honestly reports that no email delivery service is configured; it does not issue or expose reset tokens.
+The public login screen keeps a **Forgot Password?** link. It accepts an email or registration identifier and always returns the same response:
+
+> If an account exists, a password reset link will be sent.
+
+In development or demo mode only, a syntactically valid email with no matching active account returns the safe local-development message `No account was found with this email address.` SMTP and production mode always retain the generic response above.
+
+`POST /api/v1/auth/forgot-password` creates a cryptographically random, 15-minute token for an active matching account. Only the SHA-256 token hash, expiry, single-use timestamp, creation time, and optional request IP are stored. Older unused tokens for that account are invalidated before the new token is saved. Unknown, malformed, and inactive-account lookups do not reveal whether an account exists.
+
+When SMTP is configured, the link is sent using `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, and `PASSWORD_RESET_BASE_URL`. In local development with `APP_ENV=development` and a loopback request, the raw link is available only through the explicit development endpoint `GET /api/v1/auth/dev/password-reset-link?identifier=...`; it is never returned by the forgot-password response or written to normal application logs. Production deployments must configure SMTP and must not use the development endpoint.
+
+The recovery page reads `GET /api/v1/auth/password-reset-status`, which exposes only whether development mode and SMTP delivery are active; it does not expose credentials, tokens, or account information. This lets local development show the loopback reset-link action while production can retain its safe SMTP configuration warning.
+
+The reset page is `/reset-password?token=<token>`. `POST /api/v1/auth/reset-password` verifies the token hash, expiry, and single-use state, applies the centralized password policy, updates only the password hash, marks the token used, records a safe audit event, and revokes every active session for the account in the same transaction. The user must sign in again after a successful reset. Role, registration number, profile data, cookie policy, CORS, and authorization behavior remain unchanged.

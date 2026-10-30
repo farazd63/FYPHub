@@ -11,3 +11,5 @@
 | Supervisor/coordinator access | Existing supervisor assignment authorization and coordinator role guard | Partial: cycle scope is not represented by existing coordinator records |
 | Panel access | Backend role guard denies Panel | Implemented |
 | Original document download | Stored as immutable content; a dedicated scoped download endpoint remains | Pending |
+| Reference-template missing proposal fields | Explicit `Not specified in reference template` values; no false required-field failure | Implemented |
+| Coordinator/Admin registry linkage | Authorized registry detail links persisted compliance metadata when available | Implemented; report availability remains data-dependent |
