@@ -88,7 +88,7 @@ const extractedRuleKeys = [
 ];
 
 export function AdminTemplateUploadModal({ api, onSaved }: { api: string; onSaved?: () => void }) {
-  const [open, setOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [type, setType] = useState("SHORT");
   const [file, setFile] = useState<File | null>(null);
   const [busyAction, setBusyAction] = useState<"upload" | "activate" | "metadata" | "rules" | null>(null);
@@ -111,6 +111,13 @@ export function AdminTemplateUploadModal({ api, onSaved }: { api: string; onSave
       // History is supplemental; ingestion and activation errors remain visible.
     }
   };
+
+  const openUploadModal = () => {
+    setIsUploadModalOpen(true);
+    setMessage("");
+    void refreshHistory();
+  };
+  const closeUploadModal = () => setIsUploadModalOpen(false);
 
   const upload = async () => {
     if (!file || busy) return;
@@ -183,15 +190,15 @@ export function AdminTemplateUploadModal({ api, onSaved }: { api: string; onSave
     finally { setBusyAction(null); }
   };
 
-  const dialog = open ? (
-    <div className="module03-dialog" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
-      <div className="module03-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="module03-template-upload-heading">
+  const dialog = isUploadModalOpen ? (
+    <div className="module03-dialog" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeUploadModal(); }}>
+      <div className="module03-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="module03-template-upload-heading" onMouseDown={(event) => event.stopPropagation()}>
         <div className="module03-dialog__head">
           <div>
             <p className="module03-dialog__eyebrow">Module 03 · Admin ingestion</p>
             <h2 id="module03-template-upload-heading">Upload proposal baseline</h2>
           </div>
-          <button type="button" className="module03-dialog__close" aria-label="Close" onClick={() => setOpen(false)}>×</button>
+          <button type="button" className="module03-dialog__close" aria-label="Close" onClick={closeUploadModal}>×</button>
         </div>
         <div className="module03-dialog__body">
           <p>Upload the approved SHORT or LONG DOCX/PDF. Rules are extracted from the document; no hardcoded template values are used.</p>
@@ -213,10 +220,10 @@ export function AdminTemplateUploadModal({ api, onSaved }: { api: string; onSave
           </>}
           {history.length > 0 && <section aria-labelledby="module03-template-history-heading"><h3 id="module03-template-history-heading" className="module03-section-title">Baseline history</h3><div className="module03-history-list">{history.map((item) => <article key={item.id} className="module03-history-card"><div><strong>{item.template_type} · v{item.version}</strong><span>{item.filename}</span></div><div className="module03-history-meta"><span>Activation: {item.activation_mode ?? "Not activated"}</span><span>Confidence: {item.confidence ?? "Unknown"}</span><span>Warnings: {item.extraction_warnings.length}</span><span>Missing fields: {item.missing_fields.length ? item.missing_fields.join(", ") : "None"}</span></div></article>)}</div></section>}
         </div>
-        <div className="module03-dialog__footer"><button type="button" className="module03-button" disabled={!file || busy} onClick={() => void upload()}>{busyAction === "upload" ? "Extracting..." : "Ingest and extract"}</button>{result && <><button type="button" className="module03-button secondary" disabled={busy} onClick={() => void createMetadataVersion()}>Create metadata version</button><button type="button" className="module03-button secondary" disabled={busy} onClick={() => void createRuleVersion()}>Create rules version</button></>}<button type="button" aria-label={incomplete ? "Confirm partial baseline activation" : "Activate baseline"} className={`module03-button module03-button--activate ${incomplete ? "module03-button--partial" : ""}`} disabled={!canActivate || busy || Boolean(result?.is_active)} onClick={() => void activate()}>{busyAction === "activate" ? "Activating..." : result?.is_active ? `Active ${result.activation_mode === "PARTIAL" ? "partial" : "complete"} baseline` : incomplete ? "Activate partial baseline" : "Activate baseline"}</button><button type="button" className="module03-button secondary" onClick={() => setOpen(false)}>Close</button></div>
+        <div className="module03-dialog__footer"><button type="button" className="module03-button" disabled={!file || busy} onClick={() => void upload()}>{busyAction === "upload" ? "Extracting..." : "Ingest and extract"}</button>{result && <><button type="button" className="module03-button secondary" disabled={busy} onClick={() => void createMetadataVersion()}>Create metadata version</button><button type="button" className="module03-button secondary" disabled={busy} onClick={() => void createRuleVersion()}>Create rules version</button></>}<button type="button" aria-label={incomplete ? "Confirm partial baseline activation" : "Activate baseline"} className={`module03-button module03-button--activate ${incomplete ? "module03-button--partial" : ""}`} disabled={!canActivate || busy || Boolean(result?.is_active)} onClick={() => void activate()}>{busyAction === "activate" ? "Activating..." : result?.is_active ? `Active ${result.activation_mode === "PARTIAL" ? "partial" : "complete"} baseline` : incomplete ? "Activate partial baseline" : "Activate baseline"}</button><button type="button" className="module03-button secondary" onClick={closeUploadModal}>Close</button></div>
       </div>
     </div>
   ) : null;
 
-  return <><button type="button" className="module03-button secondary" onClick={() => { setOpen(true); setMessage(""); void refreshHistory(); }}>{"Upload dynamic baseline"}</button>{dialog && createPortal(dialog, document.body)}</>;
+  return <><button type="button" className="module03-button secondary" onClick={openUploadModal}>Upload dynamic baseline</button>{isUploadModalOpen && createPortal(dialog, document.body)}</>;
 }

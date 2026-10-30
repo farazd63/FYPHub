@@ -30,6 +30,14 @@ class Settings:
     password_reset_base_url: str = "http://localhost:5173/reset-password"
     app_env: str = "production"
     registration_mode: str = "restricted"
+    AI_PROVIDER: str = ""
+    GROQ_API_KEY: str = ""
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    GROQ_PROPOSAL_MODEL: str = ""
+    GROQ_AGENT_MODEL: str = ""
+    AI_TIMEOUT_SECONDS: float = 8.0
+    AI_MAX_RETRIES: int = 1
+    AI_RATE_LIMIT_PER_MINUTE: int = 10
 
     @property
     def database_url(self) -> URL:
@@ -66,6 +74,14 @@ def get_settings() -> Settings:
         password_reset_base_url=os.getenv("PASSWORD_RESET_BASE_URL", "http://localhost:5173/reset-password").rstrip("/"),
         app_env=os.getenv("APP_ENV", "production").strip().lower(),
         registration_mode=os.getenv("REGISTRATION_MODE", "restricted"),
+        AI_PROVIDER=os.getenv("AI_PROVIDER", "").strip().lower(),
+        GROQ_API_KEY=os.getenv("GROQ_API_KEY", ""),
+        GROQ_BASE_URL=os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/"),
+        GROQ_PROPOSAL_MODEL=os.getenv("GROQ_PROPOSAL_MODEL", ""),
+        GROQ_AGENT_MODEL=os.getenv("GROQ_AGENT_MODEL", ""),
+        AI_TIMEOUT_SECONDS=float(os.getenv("AI_TIMEOUT_SECONDS", "8")),
+        AI_MAX_RETRIES=min(2, max(0, int(os.getenv("AI_MAX_RETRIES", "1")))),
+        AI_RATE_LIMIT_PER_MINUTE=max(1, int(os.getenv("AI_RATE_LIMIT_PER_MINUTE", "10"))),
     )
 
 

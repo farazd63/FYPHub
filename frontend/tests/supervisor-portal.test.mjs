@@ -15,7 +15,7 @@ const unavailable = read("portals/supervisor/SupervisorUnavailable.tsx");
 const requestView = read("portals/supervisor/modules/supervisor-requests/SupervisorRequestsPdf.tsx");
 const app = read("App.tsx");
 
-for (const label of ["Overview", "Supervisor Requests", "Assigned Students & Teams", "Proposal Review", "Supervisor Capacity", "Conversations", "Decision History"]) {
+for (const label of ["Overview", "Supervisor Requests", "Assigned Students & Teams", "Proposal Review", "Supervisor Capacity", "Conversations", "Decision History", "Agentic Supervision"]) {
   assert.match(sidebar, new RegExp(label.replace(/[&]/g, "\\&")), `${label} should be in supervisor navigation`);
 }
 assert.match(portal, /SupervisorSidebar/);

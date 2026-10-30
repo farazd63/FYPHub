@@ -1,5 +1,7 @@
 """Cycle-scoped supervisor selection and proposal-request workflow."""
 
+import asyncio
+import os
 from datetime import datetime
 from io import BytesIO
 from typing import Any
@@ -13,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from .auth import get_current_user, require_roles, utc_now, validate_mutating_origin
 from .database import get_db
-from .pdf_extraction import EXTRACTION_RUNTIME, PdfExtractionError, extract_one_page_pdf
+from .pdf_extraction import EXTRACTION_RUNTIME, PdfExtractionError, extract_proposal_document
 from .models import (
     AcademicCycle,
     SupervisorAssignment,
@@ -28,8 +30,11 @@ from .models import (
     User,
     UserRole,
 )
+from .modules.module_03_proposal.models import M03CheckRun
+from .ai_provider import ProposalProviderPayload, run_groq_json
 
 router = APIRouter(prefix="/api/v1/supervisor-requests")
+proposal_router = APIRouter(prefix="/api/v1/proposals")
 
 ACTIVE_REQUEST_STATUSES = (
     SupervisorRequestStatus.DRAFT.value,
@@ -69,6 +74,27 @@ def _normalize_submission_note(value: str | None) -> str | None:
 
 def failure(code: str, message: str, http_status: int = status.HTTP_409_CONFLICT) -> HTTPException:
     return HTTPException(status_code=http_status, detail={"code": code, "message": message})
+
+
+def _ai_fallback(row: SupervisorRequest, document: SupervisorRequestDocument) -> dict[str, object]:
+    fields = document.extracted_fields if isinstance(document.extracted_fields, dict) else {}
+    checks = {
+        "problem_statement": (row.problem_statement or fields.get("purpose"), "Add a clear problem statement with context, gap, and impact."),
+        "objectives": (row.objectives or fields.get("objectives"), "State specific, measurable objectives."),
+        "methodology": (row.methodology or fields.get("methodology"), "Describe the method, data, evaluation approach, and validation procedure."),
+        "scope": (row.scope, "Define what is in scope and what is explicitly excluded."),
+        "abstract_purpose": (fields.get("purpose"), "Clarify the proposal purpose and expected contribution."),
+        "expected_outcomes": (fields.get("expected_outcomes"), "Describe concrete expected outcomes and how they will be evaluated."),
+    }
+    findings = []
+    for section, (value, suggestion) in checks.items():
+        present = bool(value and (not isinstance(value, dict) or value.get("value")))
+        findings.append({"section": section, "status": "PASS" if present else "WARNING", "feedback": "Content was detected for this section." if present else "No sufficiently clear content was detected for this section.", "suggestion": "No correction suggested." if present else suggestion, "page": 1 if present else None, "evidence": str(value)[:500] if present else "No evidence was detected.", "confidence": 0.9 if present else 0.65, "source": "DETERMINISTIC"})
+    return {"status": "UNAVAILABLE", "message": "AI review unavailable; deterministic section checks are shown.", "provider": "none", "model": None, "findings": findings, "advisory": True}
+
+
+def _ai_out(run: M03CheckRun) -> dict[str, object]:
+    return {"review_id": run.id, "proposal_id": run.proposal_id, "status": run.status, "provider": run.runtime, "model": run.model, "started_at": run.started_at, "finished_at": run.finished_at, **(run.result if isinstance(run.result, dict) else {})}
 
 
 def _team_for_student(session: Session, actor: User) -> Team | None:
@@ -300,6 +326,11 @@ def _out(session: Session, row: SupervisorRequest, *, include_history: bool = Tr
         "requester_registration_number": requester.registration_number if requester else None,
         "team_id": team.id if team else None,
         "supervisor_id": row.supervisor_id,
+        "proposal_type": row.proposal_type,
+        "problem_statement": row.problem_statement,
+        "objectives": row.objectives,
+        "scope": row.scope,
+        "methodology": row.methodology,
         "supervisor_name": supervisor.full_name if supervisor else None,
         "title": row.title,
         "summary": row.summary,
@@ -332,6 +363,7 @@ def _load_for_view(session: Session, request_id: int) -> SupervisorRequest:
 
 
 @router.get("/cycles")
+@proposal_router.get("/cycles")
 def active_cycles(_: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
     cycles = session.scalars(
         select(AcademicCycle).where(AcademicCycle.registration_open.is_(True)).order_by(AcademicCycle.display_name, AcademicCycle.id)
@@ -340,6 +372,7 @@ def active_cycles(_: User = Depends(require_roles(UserRole.STUDENT)), session: S
 
 
 @router.get("/supervisors")
+@proposal_router.get("/supervisors")
 def eligible_supervisors(
     academic_cycle_id: int = Query(gt=0),
     _: User = Depends(require_roles(UserRole.STUDENT)),
@@ -375,6 +408,7 @@ def eligible_supervisors(
 
 
 @router.get("/mine")
+@proposal_router.get("/mine")
 def my_requests(actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
     team = _team_for_student(session, actor)
     statement = select(SupervisorRequest).where(SupervisorRequest.requester_user_id == actor.id)
@@ -385,10 +419,16 @@ def my_requests(actor: User = Depends(require_roles(UserRole.STUDENT)), session:
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
+@proposal_router.post("", status_code=status.HTTP_201_CREATED)
 async def create_request(
     request: Request,
     academic_cycle_id: int = Form(..., gt=0),
     supervisor_id: int = Form(..., gt=0),
+    proposal_type: str = Form("SHORT"),
+    problem_statement: str | None = Form(None, max_length=10000),
+    objectives: str | None = Form(None, max_length=10000),
+    scope: str | None = Form(None, max_length=10000),
+    methodology: str | None = Form(None, max_length=10000),
     submission_note: str | None = Form(default=None, max_length=4000),
     proposal_file: UploadFile = File(...),
     actor: User = Depends(require_roles(UserRole.STUDENT)),
@@ -397,7 +437,7 @@ async def create_request(
     validate_mutating_origin(request)
     try:
         data = await proposal_file.read(5 * 1024 * 1024 + 1)
-        extraction = extract_one_page_pdf(data, proposal_file.content_type, proposal_file.filename)
+        extraction = extract_proposal_document(data, proposal_file.content_type, proposal_file.filename)
         cycle = _cycle_for_request(session, academic_cycle_id, lock=True)
         team = _team_for_student(session, actor)
         if team is not None and team.academic_cycle_id != cycle.id:
@@ -414,11 +454,19 @@ async def create_request(
         )
         if duplicate is not None:
             raise failure("duplicate_active_request", "An active request already exists for this supervisor and cycle.")
+        proposal_type = proposal_type.strip().upper()
+        if proposal_type not in {"SHORT", "LONG"}:
+            raise failure("invalid_proposal_type", "Proposal type must be SHORT or LONG.", status.HTTP_422_UNPROCESSABLE_CONTENT)
         row = SupervisorRequest(
             academic_cycle_id=cycle.id,
             requester_user_id=actor.id,
             team_id=team.id if team else None,
             supervisor_id=supervisor.id,
+            proposal_type=proposal_type,
+            problem_statement=problem_statement.strip() if problem_statement else None,
+            objectives=objectives.strip() if objectives else None,
+            scope=scope.strip() if scope else None,
+            methodology=methodology.strip() if methodology else None,
             submission_note=_normalize_submission_note(submission_note),
             status=SupervisorRequestStatus.DRAFT.value,
             extraction_status=SupervisorRequestExtractionStatus.EXTRACTED.value,
@@ -466,11 +514,16 @@ async def create_request(
 
 
 @router.post("/draft/{request_id}/document")
+@proposal_router.post("/draft/{request_id}/document")
 async def update_draft_document(
     request_id: int,
     request: Request,
     revision: int = Form(..., gt=0),
     submission_note: str | None = Form(default=None, max_length=4000),
+    problem_statement: str | None = Form(None, max_length=10000),
+    objectives: str | None = Form(None, max_length=10000),
+    scope: str | None = Form(None, max_length=10000),
+    methodology: str | None = Form(None, max_length=10000),
     proposal_file: UploadFile = File(...),
     actor: User = Depends(require_roles(UserRole.STUDENT)),
     session: Session = Depends(get_db),
@@ -478,7 +531,7 @@ async def update_draft_document(
     validate_mutating_origin(request)
     try:
         data = await proposal_file.read(5 * 1024 * 1024 + 1)
-        extraction = extract_one_page_pdf(data, proposal_file.content_type, proposal_file.filename)
+        extraction = extract_proposal_document(data, proposal_file.content_type, proposal_file.filename)
         row = _owner_request(session, request_id, actor, lock=True)
         if row.status not in (SupervisorRequestStatus.DRAFT.value, SupervisorRequestStatus.CHANGES_REQUESTED.value):
             raise failure("request_not_editable", "Only draft or changes-requested requests can be edited.")
@@ -503,6 +556,10 @@ async def update_draft_document(
         session.flush()
         _apply_document_snapshot(row, document)
         row.submission_note = _normalize_submission_note(submission_note)
+        row.problem_statement = problem_statement.strip() if problem_statement is not None else row.problem_statement
+        row.objectives = objectives.strip() if objectives is not None else row.objectives
+        row.scope = scope.strip() if scope is not None else row.scope
+        row.methodology = methodology.strip() if methodology is not None else row.methodology
         row.revision += 1
         _audit_document(session, actor, row, "supervisor_request_document_uploaded", document)
         _audit_document(session, actor, row, "supervisor_request_extracted", document)
@@ -521,6 +578,7 @@ async def update_draft_document(
 
 
 @router.post("/{request_id}/confirm")
+@proposal_router.post("/{request_id}/confirm")
 def confirm_extraction(
     request_id: int,
     payload: RevisionAction,
@@ -558,6 +616,7 @@ def confirm_extraction(
 
 
 @router.post("/{request_id}/submit")
+@proposal_router.post("/{request_id}/submit")
 def submit_request(
     request_id: int,
     payload: RevisionAction,
@@ -622,6 +681,7 @@ def submit_request(
 
 
 @router.post("/{request_id}/withdraw")
+@proposal_router.post("/{request_id}/withdraw")
 def withdraw_request(
     request_id: int,
     payload: RevisionAction,
@@ -670,6 +730,7 @@ def supervisor_queue(
 
 
 @router.post("/{request_id}/decision")
+@proposal_router.post("/{request_id}/decision")
 def decide_request(
     request_id: int,
     payload: DecisionAction,
@@ -740,6 +801,7 @@ def decide_request(
 
 
 @router.get("/document/{request_id}")
+@proposal_router.get("/document/{request_id}")
 def proposal_document(
     request_id: int,
     actor: User = Depends(get_current_user),
@@ -789,6 +851,7 @@ def _monitor_statement(
 
 
 @router.get("/admin/monitor")
+@proposal_router.get("/admin/monitor")
 def admin_monitor(
     academic_cycle_id: int | None = Query(None, gt=0),
     supervisor_id: int | None = Query(None, gt=0),
@@ -803,6 +866,7 @@ def admin_monitor(
 
 
 @router.get("/coordinator/monitor")
+@proposal_router.get("/coordinator/monitor")
 def coordinator_monitor(
     academic_cycle_id: int | None = Query(None, gt=0),
     supervisor_id: int | None = Query(None, gt=0),
@@ -817,6 +881,7 @@ def coordinator_monitor(
 
 
 @router.get("/detail/{request_id}")
+@proposal_router.get("/{request_id}")
 def read_request(
     request_id: int,
     actor: User = Depends(get_current_user),
@@ -832,3 +897,53 @@ def read_request(
     if not allowed:
         raise failure("request_forbidden", "This supervisor request is not accessible.", status.HTTP_403_FORBIDDEN)
     return _out(session, row)
+
+
+@proposal_router.post("/{request_id}/ai-review")
+async def run_proposal_ai_review(
+    request_id: int,
+    actor: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    row = _load_for_view(session, request_id)
+    team = _team_for_student(session, actor) if actor.role == UserRole.STUDENT else None
+    allowed = actor.role in (UserRole.COORDINATOR, UserRole.ADMIN) or (actor.role == UserRole.SUPERVISOR and row.supervisor_id == actor.id) or (actor.role == UserRole.STUDENT and (row.requester_user_id == actor.id or (team is not None and row.team_id == team.id)))
+    if not allowed:
+        raise failure("proposal_forbidden", "This proposal is outside your authorized scope.", status.HTTP_403_FORBIDDEN)
+    document = session.get(SupervisorRequestDocument, row.document_id) if row.document_id else None
+    if document is None:
+        raise failure("document_not_found", "A proposal document is required before AI review.", status.HTTP_422_UNPROCESSABLE_CONTENT)
+    proposal_key = f"supervisor-request:{row.id}"
+    existing = session.scalar(select(M03CheckRun).where(M03CheckRun.proposal_id == proposal_key, M03CheckRun.check_name == "proposal_ai_review", M03CheckRun.status == "RUNNING"))
+    if existing is not None:
+        raise failure("review_in_progress", "An AI review is already running for this proposal.")
+    run = M03CheckRun(proposal_id=proposal_key, check_name="proposal_ai_review", status="RUNNING", runtime="groq", model=os.getenv("GROQ_PROPOSAL_MODEL") or None, result={"status": "RUNNING", "advisory": True})
+    session.add(run); session.commit(); session.refresh(run)
+    try:
+        provider = await run_groq_json("Proposal text:\n" + document.extracted_text[:12000], ProposalProviderPayload, model_kind="proposal", rate_key=f"proposal:{actor.id}")
+        if provider.get("status") in ("AVAILABLE", "COMPLETED"):
+            provider = {"status": "AVAILABLE", "runtime": provider.get("provider"), "model": provider.get("model"), "timestamp": provider.get("timestamp"), "suggestions": provider.get("payload", {}).get("suggestions", []), "confidence": provider.get("payload", {}).get("confidence", 0.5), "metadata": {key: provider.get(key) for key in ("request_id", "http_status", "latency_ms", "retry_count")}}
+        if provider.get("status") not in ("AVAILABLE", "COMPLETED"):
+            result = {**_ai_fallback(row, document), **{key: provider.get(key) for key in ("provider", "source", "fallback_reason", "error_type", "http_status", "request_id", "retry_count", "latency_ms", "model", "timestamp") if provider.get(key) is not None}}
+        else:
+            suggestions = provider.get("suggestions", [])
+            findings = [{"section": "overall_consistency", "status": "WARNING", "feedback": str(item), "suggestion": "Review this advisory finding against the source document.", "page": 1, "evidence": document.extracted_text[:500], "confidence": provider.get("confidence", 0.5), "source": "AI"} for item in suggestions]
+            result = {"status": "COMPLETED", "provider": provider.get("runtime", "ollama-local"), "model": provider.get("model"), "findings": findings, "advisory": True}
+        run.status = "COMPLETED"; run.runtime = str(result.get("provider", "deterministic")); run.model = result.get("model"); run.result = result
+    except Exception as error:
+        run.status = "FAILED"; run.result = {"status": "FAILED", "message": "AI review failed; deterministic checks remain available.", "error_type": type(error).__name__, "findings": [], "advisory": True}
+    run.finished_at = utc_now(); session.commit(); session.refresh(run)
+    return _ai_out(run)
+
+
+@proposal_router.get("/{request_id}/ai-review")
+def latest_proposal_ai_review(request_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    row = _load_for_view(session, request_id)
+    team = _team_for_student(session, actor) if actor.role == UserRole.STUDENT else None
+    allowed = actor.role in (UserRole.COORDINATOR, UserRole.ADMIN) or (actor.role == UserRole.SUPERVISOR and row.supervisor_id == actor.id) or (actor.role == UserRole.STUDENT and (row.requester_user_id == actor.id or (team is not None and row.team_id == team.id)))
+    if not allowed:
+        raise failure("proposal_forbidden", "This proposal is outside your authorized scope.", status.HTTP_403_FORBIDDEN)
+    run = session.scalar(select(M03CheckRun).where(M03CheckRun.proposal_id == f"supervisor-request:{row.id}", M03CheckRun.check_name == "proposal_ai_review").order_by(M03CheckRun.id.desc()))
+    if run is None:
+        raise failure("review_not_found", "No AI review has been run for this proposal.", status.HTTP_404_NOT_FOUND)
+    return _ai_out(run)

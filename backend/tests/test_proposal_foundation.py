@@ -38,7 +38,11 @@ class ProposalFoundationTests(unittest.TestCase):
             with self.subTest(payload=payload), self.assertRaises(IntegrityError), self.engine.begin() as connection:
                 connection.execute(ProposalVersion.__table__.insert(), payload)
 
-    def test_no_operational_proposal_routes(self):
+    def test_proposal_lifecycle_routes_are_exposed(self):
         from app.main import app
-        self.assertFalse(any(path.startswith("/api/v1/proposals") for path in app.openapi()["paths"]))
+        paths = app.openapi()["paths"]
+        self.assertIn("/api/v1/proposals", paths)
+        self.assertIn("/api/v1/proposals/{request_id}/submit", paths)
+        self.assertIn("/api/v1/proposals/{request_id}/decision", paths)
+        self.assertIn("/api/v1/proposals/coordinator/monitor", paths)
 

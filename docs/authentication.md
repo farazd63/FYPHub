@@ -128,7 +128,6 @@ The users table contained zero rows before and after the suite, confirming test 
 
 ## Forgot Password and Reset Password
 
-<<<<<<< HEAD
 The public login screen keeps a **Forgot Password?** link. It accepts an email or registration identifier and always returns the same response:
 
 > If an account exists, a password reset link will be sent.
@@ -142,10 +141,3 @@ When SMTP is configured, the link is sent using `SMTP_HOST`, `SMTP_PORT`, `SMTP_
 The recovery page reads `GET /api/v1/auth/password-reset-status`, which exposes only whether development mode and SMTP delivery are active; it does not expose credentials, tokens, or account information. This lets local development show the loopback reset-link action while production can retain its safe SMTP configuration warning.
 
 The reset page is `/reset-password?token=<token>`. `POST /api/v1/auth/reset-password` verifies the token hash, expiry, and single-use state, applies the centralized password policy, updates only the password hash, marks the token used, records a safe audit event, and revokes every active session for the account in the same transaction. The user must sign in again after a successful reset. Role, registration number, profile data, cookie policy, CORS, and authorization behavior remain unchanged.
-=======
-Password reset/change workflows, email delivery, controlled staff creation, and role dashboards remain pending. The recovery screen honestly reports that no email delivery service is configured; it does not issue or expose reset tokens.
-
-## Password-entry UI convention
-
-Use the shared `PasswordField` for password-entry forms. Enable its advisory guidance for sign-in; account-creation fields use the same guidance, while confirmation fields show match/mismatch feedback without a strength meter. Guidance does not impose character-category requirements or alter authentication validation. Keep password values unchanged and do not log or persist them in browser storage.
->>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12

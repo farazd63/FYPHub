@@ -1631,14 +1631,17 @@ app.include_router(join_requests_router)
 from .invitations import router as invitations_router
 app.include_router(invitations_router)
 
-from .supervisor_requests import router as supervisor_requests_router
+from .supervisor_requests import proposal_router, router as supervisor_requests_router
 app.include_router(supervisor_requests_router)
+app.include_router(proposal_router)
 
 from .proposal_reference import router as proposal_reference_router
 app.include_router(proposal_reference_router)
 
 from .supervisor_request_conversations import router as supervisor_request_conversations_router
 app.include_router(supervisor_request_conversations_router)
+from .agent_supervision import router as agent_supervision_router
+app.include_router(agent_supervision_router)
 
 from .archived_projects import router as archived_projects_router
 app.include_router(archived_projects_router)

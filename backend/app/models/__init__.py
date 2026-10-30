@@ -36,15 +36,12 @@ from .invitation import Invitation, InvitationAudit
 
 from .invitation import InvitationOutbox
 
-<<<<<<< HEAD
 from .supervisor_request import SupervisorRequest, SupervisorRequestDocument, SupervisorRequestExtractionStatus, SupervisorRequestStatus, SupervisorRequestStatusHistory, SupervisorRequestSubmissionNoteVersion
-=======
 from .proposal import Proposal, ProposalVersion
-from .supervisor_request import SupervisorRequest, SupervisorRequestDocument, SupervisorRequestExtractionStatus, SupervisorRequestStatus, SupervisorRequestStatusHistory
->>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
 from .proposal_reference import ProposalReference, ProposalReferenceDocument
 from .supervisor_request_conversation import SupervisorRequestMessage
 from .fyp_registry import FypRegistryMetadata
 from .archived_project import ArchivedProject, ArchivedProjectDocument, ArchivedProjectDocumentType
 from ..modules.module_03_proposal.models import M03CheckRun, M03ComplianceFinding, M03ComplianceReport, M03ExtractionStatus, M03ProposalDocument, M03ProposalType, M03ReferenceTemplate, M03ReportStatus, M03Severity, M03TemplateRule
 from .project_workflow import ProjectMilestone, ProjectTask, SupervisionMeeting, DefenseSchedule, DefensePanelMember, PanelEvaluation, PanelEvaluationScore
+from .agent_supervision import SupervisionAgentRun

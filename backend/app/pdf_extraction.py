@@ -1,10 +1,11 @@
-"""Deterministic, local extraction for one-page supervisor-request PDFs."""
+"""Deterministic, local extraction for one-page supervisor-request PDFs and DOCX files."""
 
 from __future__ import annotations
 
 import hashlib
 import io
 import re
+from docx import Document
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -20,6 +21,34 @@ class PdfExtractionError(ValueError):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+def extract_proposal_document(data: bytes, content_type: str | None, filename: str | None) -> ExtractionResult:
+    """Extract the shared proposal fields from a PDF or DOCX upload."""
+    suffix = (filename or "").casefold().rsplit(".", 1)[-1]
+    if suffix == "docx" or (content_type or "").casefold() == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        if len(data) > MAX_SUPERVISOR_REQUEST_PDF_BYTES:
+            raise PdfExtractionError("file_too_large", "The proposal document exceeds the configured 5 MiB limit.")
+        if not data.startswith(b"PK") or not (filename or "").casefold().endswith(".docx"):
+            raise PdfExtractionError("invalid_docx", "Upload a valid DOCX proposal file.")
+        try:
+            document = Document(io.BytesIO(data))
+            text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+        except (ValueError, OSError, ImportError) as error:
+            raise PdfExtractionError("invalid_docx", "The proposal DOCX could not be read safely.") from error
+        normalized = _normalize_text(text)
+        if len(normalized) < 20:
+            raise PdfExtractionError("unreadable_docx", "The DOCX proposal does not contain readable text.")
+        return ExtractionResult(
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            file_size=len(data),
+            sha256=hashlib.sha256(data).hexdigest(),
+            page_count=1,
+            extracted_text=normalized,
+            extracted_fields=_extract_fields(normalized),
+            extracted_at=datetime.now(timezone.utc),
+        )
+    return extract_one_page_pdf(data, content_type, filename)
 
 
 @dataclass(frozen=True)

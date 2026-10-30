@@ -1,8 +1,9 @@
 import type { StudentPhase } from "../StudentSidebar";
-import { ProposalComplianceView } from "../../../modules/module_03_proposal/ProposalComplianceView";
+import { ProposalLifecycleWorkspace } from "./ProposalLifecycleWorkspace";
 import { StudentProgressDashboard } from "./StudentProgressDashboard";
+import { AgentSupervisionPanel } from "./AgentSupervisionPanel";
 export function StudentPhasePlaceholder({ phase, api }: { phase: StudentPhase; api?: string }) {
-  if (phase.id === "proposal") return <ProposalComplianceView api={api ?? "http://localhost:8010"} />;
+  if (phase.id === "proposal") return <><ProposalLifecycleWorkspace api={api ?? "http://localhost:8010"} /><AgentSupervisionPanel api={api ?? "http://localhost:8010"} /></>;
   if (phase.id === "progress") return <StudentProgressDashboard api={api ?? "http://localhost:8010"} />;
   const partial = phase.status === "Partial";
   const statusClass = phase.status === "Implemented" ? "implemented" : partial ? "partial" : "future";
