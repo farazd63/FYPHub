@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from datetime import datetime, timezone
+import logging
 
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
@@ -12,11 +13,27 @@ from .config import settings
 from .models import AuthSession, User, UserRole
 from .security import hash_session_token
 
+logger = logging.getLogger(__name__)
+
 SESSION_COOKIE_NAME = "fyphub_session"
 # Deliberately fixed for this checkpoint; changing it is a reviewed configuration change.
 SESSION_LIFETIME_HOURS = settings.session_lifetime_hours
 ALLOWED_BROWSER_ORIGIN = "http://127.0.0.1:5174"
 ALLOWED_BROWSER_ORIGINS = (ALLOWED_BROWSER_ORIGIN, "http://localhost:5173")
+_TEMPORARY_DIAGNOSTIC_PATHS = {"/api/v1/auth/login", "/api/v1/auth/me", "/api/v1/admin/me"}
+
+
+def log_temporary_auth_diagnostic(request: Request, event: str, **metadata: object) -> None:
+    """TEMPORARY: emit safe metadata while diagnosing post-login access failures."""
+    if request.url.path not in _TEMPORARY_DIAGNOSTIC_PATHS:
+        return
+    safe_metadata = {
+        "path": request.url.path,
+        "origin": request.headers.get("origin"),
+        "host": request.headers.get("host"),
+        **metadata,
+    }
+    logger.warning("TEMP_AUTH_DIAGNOSTIC %s %s", event, safe_metadata)
 
 
 def utc_now() -> datetime:
@@ -31,6 +48,12 @@ def validate_mutating_origin(request: Request) -> None:
     """Allow same-origin/non-browser calls, but reject a supplied foreign browser Origin."""
     origin = request.headers.get("origin")
     if origin is not None and origin not in ALLOWED_BROWSER_ORIGINS:
+        log_temporary_auth_diagnostic(
+            request,
+            "origin_rejected",
+            response_status=status.HTTP_403_FORBIDDEN,
+            reason="Origin rejection",
+        )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Origin is not allowed.")
 
 
@@ -65,6 +88,14 @@ def get_current_user(request: Request, session: Session = Depends(get_db)) -> Us
     """Resolve an active user through a current, non-revoked hashed cookie session."""
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if not token:
+        log_temporary_auth_diagnostic(
+            request,
+            "session_rejected",
+            session_cookie_present=False,
+            session_lookup="not found",
+            response_status=status.HTTP_401_UNAUTHORIZED,
+            reason="missing cookie",
+        )
         raise authentication_error()
     now = utc_now()
     record = session.execute(
@@ -73,18 +104,79 @@ def get_current_user(request: Request, session: Session = Depends(get_db)) -> Us
         .where(AuthSession.token_hash == hash_session_token(token))
     ).one_or_none()
     if record is None:
+        log_temporary_auth_diagnostic(
+            request,
+            "session_rejected",
+            session_cookie_present=True,
+            session_lookup="not found",
+            response_status=status.HTTP_401_UNAUTHORIZED,
+            reason="invalid session",
+        )
         raise authentication_error()
     auth_session, user = record
-    if auth_session.revoked_at is not None or auth_session.expires_at <= now or not user.is_active:
+    common_metadata = {
+        "session_cookie_present": True,
+        "session_lookup": "found",
+        "user_id": user.id,
+        "user_active": user.is_active,
+        "persisted_role": user.role.value,
+    }
+    if auth_session.revoked_at is not None:
+        log_temporary_auth_diagnostic(
+            request,
+            "session_rejected",
+            **common_metadata,
+            response_status=status.HTTP_401_UNAUTHORIZED,
+            reason="invalid session",
+        )
         raise authentication_error()
+    if auth_session.expires_at <= now:
+        log_temporary_auth_diagnostic(
+            request,
+            "session_rejected",
+            **common_metadata,
+            response_status=status.HTTP_401_UNAUTHORIZED,
+            reason="expired session",
+        )
+        raise authentication_error()
+    if not user.is_active:
+        log_temporary_auth_diagnostic(
+            request,
+            "session_rejected",
+            **common_metadata,
+            response_status=status.HTTP_401_UNAUTHORIZED,
+            reason="inactive user",
+        )
+        raise authentication_error()
+    log_temporary_auth_diagnostic(request, "session_accepted", **common_metadata)
     return user
 
 
 def require_roles(*roles: UserRole) -> Callable[[User], User]:
     """Create a dependency that permits only the listed roles after authentication."""
-    def role_guard(current_user: User = Depends(get_current_user)) -> User:
+    def role_guard(current_user: User = Depends(get_current_user), request: Request = None) -> User:
         if current_user.role not in roles:
+            if request is not None:
+                log_temporary_auth_diagnostic(
+                    request,
+                    "role_rejected",
+                    user_id=current_user.id,
+                    user_active=current_user.is_active,
+                    persisted_role=current_user.role.value,
+                    role_comparison="mismatch",
+                    response_status=status.HTTP_403_FORBIDDEN,
+                    reason="role mismatch",
+                )
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions.")
+        if request is not None:
+            log_temporary_auth_diagnostic(
+                request,
+                "role_accepted",
+                user_id=current_user.id,
+                user_active=current_user.is_active,
+                persisted_role=current_user.role.value,
+                role_comparison="matched",
+            )
         return current_user
 
     return role_guard

@@ -117,5 +117,3 @@ main:has(.admin-sidebar) .admin-sidebar nav > span[aria-disabled="true"] .admin-
 .admin-sidebar nav > span[aria-disabled="true"] .admin-nav-icon { color: #91a6c8; background: #182f59; border-color: #385887; opacity: .85; }
 .admin-sidebar-toggle { background: #214b9b; border-color: #78a4ff; color: #fff; }
 .admin-sidebar-toggle:hover { background: #3567d6; }
-
-

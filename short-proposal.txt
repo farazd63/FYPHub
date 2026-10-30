@@ -1,0 +1,103 @@
+                    Final Year Project Short Proposal
+
+       FYPHub: An Agentic AI-Driven
+Platform for Intelligent Final Year Project
+
+                      Management
+
+                           Muhammad Maaz 23108179
+                              Zain Ali Kiani 23108197
+                              Danish Faraz 23108160
+
+                        Supervised by: Sir Hamza Imran
+
+              Department of Robotics & Artificial Intelligence
+              Faculty of Computing and Engineering Sciences
+
+                                SZABIST University
+                                Islamabad, Pakistan
+
+                                        Fall 2026
+Introduction
+
+    FYPHub is a web-based, AI-assisted platform designed to manage the complete univer-
+sity Final Year Project (FYP) lifecycle in one role-aware system. It connects team formation,
+proposal submission, university-format compliance, originality analysis, supervisor allocation,
+proposal review, coordinator routing, defense scheduling, panel evaluation, progress monitoring,
+final archiving, and institutional knowledge reuse. The platform combines deterministic aca-
+demic rules with Large Language Models (LLMs), semantic embeddings, Retrieval-Augmented
+Generation (RAG), GraphRAG, optimization, and risk intelligence while keeping final academic
+authority with authorized university personnel.
+
+Purpose
+
+    The purpose of FYPHub is to reduce fragmented and manual FYP processes, improve pro-
+posal quality, prevent unnecessary topic duplication, make supervisor allocation more transpar-
+ent, preserve review and evaluation history, and convert completed FYP records into reusable
+institutional knowledge. It also supports students who do not yet have a complete team through
+AI-based teammate matching and prevents duplicate membership in more than one active FYP
+group during the same cycle.
+
+Targeted Audience
+
+    FYPHub is intended for five major roles: Students, Supervisors, FYP Coordinators,
+Panel Members, and Administrators. Each role accesses the same shared modules through
+role-based permissions rather than having duplicate modules for the same functionality.
+
+Product Functions and Features
+
+    The system contains twelve integrated modules: Admin Dashboard & Academic Man-
+agement for users, roles, academic policies, templates, deadlines, rubrics, and audit history;
+Student Team & Collaboration Hub for group creation, duplicate-member prevention, AI
+teammate matching, join requests, seven collaboration channels, and a group chatbot; Stu-
+dent Proposal & AI Compliance Check for short/long proposal submission, versioning,
+university-format validation, structural checks, and academic consistency analysis; Proposal
+Similarity & Originality Check for semantic comparison with archived FYPs, duplication
+evidence, contribution boundaries, and extension gaps; Supervisor Selection & Alloca-
+tion for expertise matching, ranking, slot/capacity management, requests, and fair assignment;
+Supervisor Proposal Review & Revision for comments, editing suggestions, revision re-
+quests, two-way discussion, version comparison, and AI revision-compliance checking; Coor-
+dinator Proposal Control for hold, return, forward-to-panel decisions, delay detection, and
+version-aware academic history; Defense & Panel Scheduling for panel assignment, avail-
+ability, date/time/room scheduling, conflict detection, and rescheduling; Panel Evaluation
+& Feedback for rubric scoring, detailed comments, AI-generated viva questions, evaluator-
+disagreement detection, and feedback resolution; Project Progress & Supervision Dash-
+board for supervision meetings, AI action extraction, milestones, project-health classification,
+risk explanation, and recovery recommendations; Final FYP Archive & Handover for fi-
+nal reports, code/data metadata, implemented-scope analysis, limitations, future work, and
+continuation packages; and FYP Knowledge Search & Analytics for natural-language in-
+stitutional search, RAG/GraphRAG, multi-hop reasoning, evidence citations, and institutional
+FYP trends.
+
+Social and Industrial Impact
+
+    FYPHub strengthens institutional knowledge continuity by preserving the FYP journey
+from team formation to final handover. It can reduce repeated project ideas, improve proposal
+compliance and review transparency, support fair supervisor allocation, reduce scheduling con-
+flicts, surface project risks, and make previous FYP knowledge searchable for future batches.
+The project also demonstrates responsible use of AI, semantic search, optimization, analytics,
+and human-in-the-loop decision support in an academic management environment.
+                  Department of Robotics & Artificial Intelligence
+                  Faculty of Computing and Engineering Sciences
+                  SZABIST University
+                  Islamabad, Pakistan
+
+Final Year Project (BS Artificial Intelligence)
+                 Supervisor Consent Form
+
+I accept the supervision of the following students with details as follows
+
+Project Title:         FYPHub: An Agentic AI-Driven Platform for Intelligent
+                       Final Year Project Management
+Student#1 Name & Reg-  Muhammad Maaz 23108179
+istration Number
+Student#2 Name & Reg-  Zain Ali Kiani 23108197
+istration Number
+Student#3 Name & Reg-  Danish Faraz 23108160
+istration Number
+
+Supervised By: Sir Hamza Imran
+
+Signature:
+Date: 18-09-2026
+

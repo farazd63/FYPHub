@@ -1,0 +1,57 @@
+﻿/* Academic cycles screen only. */
+.academic-cycles__heading {
+  animation: academic-cycles-entrance 380ms ease-out backwards;
+}
+.academic-cycles__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 1rem;
+}
+.academic-cycles__card {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 5px 22px rgb(24 48 71 / 0.06);
+  animation: academic-cycles-entrance 420ms ease-out 70ms backwards;
+  transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+.academic-cycles__card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #4663ff, #83a8ff, #dce7ff);
+  background-size: 160% 100%;
+  animation: academic-cycles-accent 700ms ease-out both;
+}
+.academic-cycles__card:hover {
+  transform: translateY(-3px);
+  border-color: #aabaff;
+  box-shadow: 0 12px 28px rgb(70 99 255 / 0.14), 0 0 0 1px rgb(70 99 255 / 0.08);
+}
+.academic-cycles__status {
+  animation: academic-cycles-badge 360ms ease-out 140ms backwards;
+}
+@keyframes academic-cycles-entrance {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes academic-cycles-accent {
+  from { background-position: 100% 0; opacity: 0.5; }
+  to { background-position: 0 0; opacity: 1; }
+}
+@keyframes academic-cycles-badge {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .academic-cycles__heading,
+  .academic-cycles__card,
+  .academic-cycles__card::before,
+  .academic-cycles__status {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+  .academic-cycles__card:hover { transform: none !important; }
+}
+

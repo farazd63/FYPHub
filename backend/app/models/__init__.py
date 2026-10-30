@@ -36,7 +36,12 @@ from .invitation import Invitation, InvitationAudit
 
 from .invitation import InvitationOutbox
 
+<<<<<<< HEAD
 from .supervisor_request import SupervisorRequest, SupervisorRequestDocument, SupervisorRequestExtractionStatus, SupervisorRequestStatus, SupervisorRequestStatusHistory, SupervisorRequestSubmissionNoteVersion
+=======
+from .proposal import Proposal, ProposalVersion
+from .supervisor_request import SupervisorRequest, SupervisorRequestDocument, SupervisorRequestExtractionStatus, SupervisorRequestStatus, SupervisorRequestStatusHistory
+>>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
 from .proposal_reference import ProposalReference, ProposalReferenceDocument
 from .supervisor_request_conversation import SupervisorRequestMessage
 from .fyp_registry import FypRegistryMetadata

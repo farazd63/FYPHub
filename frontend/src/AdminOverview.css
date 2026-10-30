@@ -140,5 +140,3 @@ main:has(.admin-sidebar) .admin-enter:has(> .cycle-overview) { max-width: none; 
 .cycle-overview__hero::after { right: 12%; top: -180px; border-color: rgba(207, 222, 255, .25); background: radial-gradient(circle, rgba(151, 189, 255, .17), transparent 65%); box-shadow: 0 0 0 42px rgba(195, 200, 255, .055), 0 0 0 90px rgba(183, 198, 255, .035); }
 @keyframes cycle-overview-shape { from { transform: rotate(35deg) translateY(0); } to { transform: rotate(48deg) translateY(-12px); } }
 @media (prefers-reduced-motion: reduce) { .cycle-overview__hero::before { animation: none; } }
-
-

@@ -33,9 +33,11 @@ from .auth import (
     clear_session_cookie,
     get_current_user,
     require_roles,
+    session_cookie_secure,
     set_session_cookie,
     utc_now,
     validate_mutating_origin,
+    log_temporary_auth_diagnostic,
 )
 
 app = FastAPI(title="FYPHub API")
@@ -742,6 +744,12 @@ def login(
         or not user.is_active
         or (credentials.requested_role is not None and user.role != credentials.requested_role)
     ):
+        log_temporary_auth_diagnostic(
+            request,
+            "login_response",
+            response_status=status.HTTP_401_UNAUTHORIZED,
+            session_cookie_set=False,
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
 
     now = utc_now()
@@ -763,20 +771,50 @@ def login(
     )
     session.commit()
     set_session_cookie(request, response, raw_token)
+    log_temporary_auth_diagnostic(
+        request,
+        "login_response",
+        response_status=status.HTTP_200_OK,
+        session_cookie_set=True,
+        cookie_domain=None,
+        cookie_path="/",
+        cookie_secure=session_cookie_secure(request),
+        cookie_samesite="lax",
+        cookie_max_age=SESSION_LIFETIME_HOURS * 60 * 60,
+    )
     return user
 
 
 @app.get("/api/v1/auth/me", response_model=CurrentUserResponse)
-def current_user(current_user: User = Depends(get_current_user)) -> User:
+def current_user(request: Request, current_user: User = Depends(get_current_user)) -> User:
     """Return the authenticated active account's safe fields."""
+    log_temporary_auth_diagnostic(
+        request,
+        "auth_me_response",
+        user_id=current_user.id,
+        user_active=current_user.is_active,
+        persisted_role=current_user.role.value,
+        role_comparison="not applicable",
+        response_status=status.HTTP_200_OK,
+    )
     return current_user
 
 
 @app.get("/api/v1/admin/me", response_model=CurrentUserResponse)
 def admin_current_user(
+    request: Request,
     current_user: User = Depends(require_roles(UserRole.ADMIN)),
 ) -> User:
     """Return the current account only when its persisted role is ADMIN."""
+    log_temporary_auth_diagnostic(
+        request,
+        "admin_me_response",
+        user_id=current_user.id,
+        user_active=current_user.is_active,
+        persisted_role=current_user.role.value,
+        role_comparison="matched",
+        response_status=status.HTTP_200_OK,
+    )
     return current_user
 
 
