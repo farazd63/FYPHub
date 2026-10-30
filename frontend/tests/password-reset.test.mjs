@@ -1,0 +1,46 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const app = readFileSync(join(here, "../src/App.tsx"), "utf8");
+const passwordField = readFileSync(join(here, "../src/PasswordField.tsx"), "utf8");
+
+assert.match(app, /Forgot Password\?/);
+assert.match(app, /forgot-password/);
+assert.match(app, /reset-password/);
+assert.match(app, /Request reset link/);
+assert.match(app, /password-reset-status/);
+assert.match(app, /dev\/password-reset-link/);
+assert.match(app, /recoveryStatus\?\.development_mode && !recoveryStatus\.smtp_configured/);
+assert.match(app, /isLocalUi/);
+assert.match(app, /let status = recoveryStatus/);
+assert.match(app, /developmentLinkState === "loading"/);
+assert.match(app, /setDevelopmentLinkState\("missing"\)/);
+assert.match(app, /setDevelopmentLinkState\("error"\)/);
+assert.match(app, /developmentBody\.reset_link/);
+assert.match(app, /const normalizedIdentifier/);
+assert.match(app, /recoveryIdentifier\.trim\(\)\.toLowerCase\(\)/);
+assert.match(app, /setResetLink\(""\)/);
+assert.match(app, /setResetLinkError\(""\)/);
+assert.match(app, /Reset link is not available right now\. Please request again\./);
+const recoveryField = app.match(/label="Email or Registration ID"[\s\S]*?onChange=\{\(value\) => \{[\s\S]*?\}\n\s+\/>/)?.[0] ?? "";
+assert.match(recoveryField, /value=\{recoveryIdentifier\}/);
+assert.match(recoveryField, /setRecoveryIdentifier\(value\)/);
+assert.doesNotMatch(recoveryField, /trim\(\)|toLowerCase\(\)|onKeyDown/);
+assert.match(app, /setRecoveryIdentifier\(""\)/);
+assert.doesNotMatch(app, /No local development reset link is available/);
+assert.match(app, /Open reset link/);
+assert.match(app, /Password recovery email delivery is not configured for this project/);
+assert.match(app, /No account was found with this email address/);
+assert.match(app, /body\.detail\?\.message/);
+assert.match(app, /Back to Login/);
+assert.match(app, /type="submit"/);
+assert.match(app, /passwordPolicyError\(newPassword\)/);
+assert.match(app, /Passwords do not match/);
+assert.match(app, /new URLSearchParams\(window\.location\.search\)/);
+assert.match(passwordField, /Show.*Hide|Hide.*Show/);
+assert.doesNotMatch(app, /8011/);
+
+console.log("password-reset.test.mjs: all assertions passed");

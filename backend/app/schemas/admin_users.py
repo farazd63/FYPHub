@@ -5,6 +5,8 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
 
 from ..models import UserRole
+from ..security import validate_password
+from .email import normalize_email
 
 
 class AdminUserResponse(BaseModel):
@@ -35,6 +37,11 @@ class AdminUserCreate(BaseModel):
     role: UserRole
     registration_number: str | None = None
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalized_email(cls, value: object) -> object:
+        return normalize_email(value)
+
     @field_validator("full_name")
     @classmethod
     def valid_name(cls, value: str) -> str:
@@ -46,8 +53,10 @@ class AdminUserCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def valid_password(cls, value: str) -> str:
-        if not 8 <= len(value) <= 128:
-            raise ValueError("password must be between 8 and 128 characters.")
+        try:
+            validate_password(value)
+        except ValueError as error:
+            raise ValueError(str(error)) from error
         return value
 
     @field_validator("registration_number")

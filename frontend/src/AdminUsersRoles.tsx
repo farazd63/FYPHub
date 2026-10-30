@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { PasswordField } from "./PasswordField";
+import { passwordPolicyError } from "./passwordPolicy";
+import { emailValidationMessage, normalizeEmail } from "./emailValidation";
 
 type Role = "STUDENT" | "SUPERVISOR" | "COORDINATOR" | "PANEL_MEMBER" | "ADMIN";
 type User = {
@@ -22,7 +24,7 @@ const roleLabel: Record<Role, string> = {
   STUDENT: "Student",
   SUPERVISOR: "Supervisor",
   COORDINATOR: "Coordinator",
-  PANEL_MEMBER: "Panel Member",
+  PANEL_MEMBER: "Evaluator",
   ADMIN: "Administrator",
 };
 const input =
@@ -84,8 +86,14 @@ export function AdminUsersRoles({ api }: { api: string }) {
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
     if (busy) return;
-    if (form.password.length < 8 || form.password.length > 128) {
-      setFieldError(form.password.length < 8 ? "Use at least 8 characters." : "Password must be no more than 128 characters.");
+    const emailError = emailValidationMessage(form.email);
+    if (emailError) {
+      setFieldError(emailError);
+      return;
+    }
+    const passwordError = passwordPolicyError(form.password);
+    if (passwordError) {
+      setFieldError(passwordError);
       return;
     }
     if (form.role === "STUDENT" && !form.registration_number.trim()) {
@@ -101,6 +109,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          email: normalizeEmail(form.email),
           registration_number: form.registration_number.trim() || null,
         }),
       });
@@ -205,7 +214,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
             >
               <option value="">All roles</option>
               {roles.map((item) => (
-                <option key={item}>{item}</option>
+                <option key={item} value={item}>{roleLabel[item]}</option>
               ))}
             </select>
             <select
@@ -286,7 +295,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                       </td>
                       <td className="px-3 py-3">
                         <span className="inline-flex rounded-full bg-[#eef0ff] px-2 py-1 text-xs font-bold text-[#263fae]">
-                          {user.role}
+                          {roleLabel[user.role]}
                         </span>
                       </td>
                       <td className="px-3 py-3">
@@ -367,11 +376,18 @@ export function AdminUsersRoles({ api }: { api: string }) {
                 required
                 className={input}
                 type="email"
+                aria-invalid={Boolean(emailValidationMessage(form.email))}
                 value={form.email}
-                onChange={(event) =>
-                  setForm({ ...form, email: event.target.value })
-                }
+                onChange={(event) => {
+                  setForm({ ...form, email: event.target.value });
+                  setFieldError("");
+                }}
               />
+              {emailValidationMessage(form.email) && (
+                <span className="text-sm font-normal text-[#a43a33]">
+                  {emailValidationMessage(form.email)}
+                </span>
+              )}
             </label>
             <PasswordField
               label="Password"
@@ -415,7 +431,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
               </p>
             )}
             <button
-              disabled={busy !== null}
+              disabled={busy !== null || Boolean(emailValidationMessage(form.email))}
               className="rounded-lg bg-[#176b66] px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:bg-[#125650] disabled:opacity-60"
             >
               {busy === "create" ? "Creating…" : "Create account"}

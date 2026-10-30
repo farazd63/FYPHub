@@ -1,4 +1,4 @@
-"""Strict request and response schemas for draft evaluation rubrics."""
+"""Strict request and response schemas for draft Evaluation Criteria."""
 
 from datetime import datetime
 

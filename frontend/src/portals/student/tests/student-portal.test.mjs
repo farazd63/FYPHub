@@ -6,22 +6,15 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(here, "../StudentPortal.tsx"), "utf8");
 const sidebar = readFileSync(join(here, "../StudentSidebar.tsx"), "utf8");
-const placeholder = readFileSync(join(here, "../modules/StudentPhasePlaceholder.tsx"), "utf8");
 const app = readFileSync(join(here, "../../../App.tsx"), "utf8");
 const css = readFileSync(join(here, "../student.css"), "utf8");
+const visibility = readFileSync(join(here, "../student-visibility.css"), "utf8");
 
 const phases = [
   ["Student Team & Collaboration Hub", "Partial", "/student/team"],
-  ["Student Proposal & AI Compliance Check", "Coming in Module 3", "/student/proposals"],
-  ["Proposal Similarity & Originality Check", "Coming in Module 4", "/student/similarity"],
-  ["Supervisor Selection & Allocation", "Partial", "/student/supervisors"],
-  ["Supervisor Proposal Review & Revision", "Coming in Module 6", "/student/reviews"],
-  ["Coordinator Proposal Control", "Coming in Module 7", "/student/coordinator"],
-  ["Panel Scheduling & Defense", "Coming in Module 8", "/student/panel/schedule"],
-  ["Panel Evaluation & Feedback", "Coming in Module 9", "/student/panel/evaluation"],
-  ["Project Progress & Supervision Dashboard", "Coming in Module 10", "/student/progress"],
-  ["Final FYP Archive & Handover", "Coming in Module 11", "/student/archive"],
-  ["FYP Knowledge Search & Analytics", "Coming in Module 12", "/student/search"],
+  ["Proposal Compliance Check", "Partial", "/student/proposals"],
+  ["Supervisor Selection & Proposal Requests", "Partial", "/student/supervisors"],
+  ["FYP Archive & Knowledge Search", "Implemented", "/student/search"],
 ];
 
 for (const [name, status, route] of phases) {
@@ -38,7 +31,11 @@ assert.match(app, /if \(page === "admin-portal" && authUser\)/);
 assert.match(sidebar, /Collapse navigation/);
 assert.match(sidebar, /Expand navigation/);
 assert.match(sidebar, /aria-current/);
-assert.doesNotMatch(placeholder, /fetch\(|axios|XMLHttpRequest/);
+for (const pending of ["Panel Scheduling & Defense", "Panel Evaluation & Feedback", "Coordinator Proposal Control", "Project Progress & Supervision Dashboard", "Final FYP Archive & Handover", "Coming in Module"]) {
+  assert.doesNotMatch(source, new RegExp(pending.replace(/[&]/g, "\\&")), `${pending} must remain hidden`);
+}
+assert.doesNotMatch(source, /data-future-route/);
+assert.match(visibility, /semantic|LLM/i);
 assert.match(css, /#10244a/);
 assert.match(css, /#3567d6/);
 

@@ -2,9 +2,21 @@ import { GroupChannels } from "./GroupChannels";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AdminPortal } from "./AdminPortal";
 import { PasswordField } from "./PasswordField";
+<<<<<<< HEAD
+import { passwordPolicyError } from "./passwordPolicy";
+import {
+  emailValidationMessage,
+  normalizeEmail,
+} from "./emailValidation";
 import { StudentPortal } from "./portals/student/StudentPortal";
 import { SupervisorPortal } from "./portals/supervisor/SupervisorPortal";
 import { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";
+import { StudentEvaluatorPortal as EvaluatorPortal } from "./portals/student/modules/StudentEvaluatorPortal";
+=======
+import { StudentPortal } from "./portals/student/StudentPortal";
+import { SupervisorPortal } from "./portals/supervisor/SupervisorPortal";
+import { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";
+>>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
 import signInStudentsImage from "./assets/sign-in-students.webp";
 
 type Member = { id: string; name: string; registration: string; email: string };
@@ -33,11 +45,18 @@ type SafeUser = {
   role: string;
   is_active: boolean;
 };
+type PasswordResetDeliveryStatus = {
+  development_mode: boolean;
+  smtp_configured: boolean;
+};
+type DevelopmentResetLinkState = "idle" | "loading" | "ready" | "missing" | "error";
 type PublicPage = "in" | "up" | "recover";
 type StudentSignupMode = "single" | "group";
 type PublicRoute = { page: PublicPage; signupRole: LoginRole | null; step: 1 | 2 | 3; studentMode: StudentSignupMode | null };
 
 const STEPS = ["Account Details", "Login Details", "Team Members"];
+<<<<<<< HEAD
+=======
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordPolicyError = (value: string): string => {
   const missing = [
@@ -49,6 +68,7 @@ const passwordPolicyError = (value: string): string => {
   ].filter(Boolean);
   return missing.length ? `Password must include ${missing.join(", ")}.` : "";
 };
+>>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
 const API = (
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8010"
 ).replace(/\/$/, "");
@@ -75,6 +95,7 @@ const PRIMARY =
   "rounded-lg bg-[#4663FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#354FE0] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";
 const AUTH_PRIMARY =
   "rounded-xl bg-[#4663FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#354ee0] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";
+const DEVELOPMENT_UNKNOWN_ACCOUNT_MESSAGE = "No account was found with this email address.";
 
 const newMember = (): Member => ({
   id: crypto.randomUUID(),
@@ -361,6 +382,23 @@ export default function App() {
     newMember(),
   ]);
   const [signIn, setSignIn] = useState({ email: "", password: "" });
+  const [recoveryView, setRecoveryView] = useState<"forgot" | "reset">(
+    () => window.location.pathname === "/reset-password" ? "reset" : "forgot",
+  );
+  const [resetToken, setResetToken] = useState(
+    () => new URLSearchParams(window.location.search).get("token") ?? "",
+  );
+  const [recoveryIdentifier, setRecoveryIdentifier] = useState("");
+  const [recoverySubmitting, setRecoverySubmitting] = useState(false);
+  const [recoveryMessage, setRecoveryMessage] = useState("");
+  const [recoveryError, setRecoveryError] = useState("");
+  const [resetLink, setResetLink] = useState("");
+  const [developmentLinkState, setDevelopmentLinkState] = useState<DevelopmentResetLinkState>("idle");
+  const [resetLinkError, setResetLinkError] = useState("");
+  const [recoveryStatus, setRecoveryStatus] = useState<PasswordResetDeliveryStatus | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [resetSuccess, setResetSuccess] = useState(false);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [cyclesState, setCyclesState] = useState<"loading" | "ready" | "error">(
     "loading",
@@ -433,6 +471,7 @@ export default function App() {
     return () => controller.abort();
   }, [cycleId]);
   useEffect(() => {
+    if (window.location.pathname === "/reset-password") return;
     void (async () => {
       try {
         const response = await fetch(`${API}/api/v1/auth/me`, {
@@ -449,6 +488,43 @@ export default function App() {
       }
     })();
   }, []);
+<<<<<<< HEAD
+  useEffect(() => {
+    if (page !== "recover" || recoveryView !== "forgot") return;
+    let active = true;
+    void fetch(`${API}/api/v1/auth/password-reset-status`)
+      .then((response) => response.ok ? response.json() as Promise<PasswordResetDeliveryStatus> : null)
+      .then((status) => {
+        if (active && status) setRecoveryStatus(status);
+      })
+      .catch(() => {
+        if (active) setRecoveryStatus(null);
+      });
+    return () => { active = false; };
+  }, [page, recoveryView]);
+  useEffect(() => {
+    if (authUser?.role !== "ADMIN") return;
+    void (async () => {
+      try {
+        const response = await fetch(`${API}/api/v1/admin/me`, {
+          credentials: "include",
+        });
+        if (response.ok) setPage("admin-portal");
+        else {
+          setAuthUser(null);
+          setPage("in");
+          setAuthError(
+            "Administrator access is not available for this account.",
+          );
+        }
+      } catch {
+        setAuthError("Administrator access could not be verified.");
+      }
+    })();
+  }, [authUser]);
+
+=======
+>>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
   const selectedCycle = cycles.find((cycle) => String(cycle.id) === cycleId);
   const maximum = policy?.max_group_size;
   const teamSize = members.length + 1;
@@ -490,8 +566,8 @@ export default function App() {
       if (!registration(account.registration))
         next["account.registration"] =
           "Enter the creator's registration number.";
-      if (!EMAIL.test(email(account.email)))
-        next["account.email"] = "Enter a valid university email.";
+      const accountEmailError = emailValidationMessage(account.email);
+      if (accountEmailError) next["account.email"] = accountEmailError;
       if (!cycleId) next["account.cycle"] = "Choose an academic cycle.";
       else if (!selectedCycle?.registration_open)
         next["account.cycle"] = "Registration is closed for this cycle.";
@@ -503,8 +579,8 @@ export default function App() {
         next["account.cycle"] = "Group policy could not be loaded.";
     }
     if (target === 2 || target === 0) {
-      if (!EMAIL.test(email(login.email)))
-        next["login.email"] = "Enter a valid shared login email.";
+      const sharedEmailError = emailValidationMessage(login.email);
+      if (sharedEmailError) next["login.email"] = sharedEmailError;
       const groupPasswordError = passwordPolicyError(login.password);
       if (groupPasswordError) next["login.password"] = groupPasswordError;
       if (login.password !== login.confirm)
@@ -521,8 +597,8 @@ export default function App() {
         if (!member.name.trim()) next[`${prefix}.name`] = "Enter a full name.";
         if (!reg)
           next[`${prefix}.registration`] = "Enter a registration number.";
-        if (!EMAIL.test(address))
-          next[`${prefix}.email`] = "Enter a valid university email.";
+        const memberEmailError = emailValidationMessage(address);
+        if (memberEmailError) next[`${prefix}.email`] = memberEmailError;
         if (reg && registrations.has(reg)) {
           next[`${prefix}.registration`] =
             "Registration number is already used in this team.";
@@ -551,7 +627,8 @@ export default function App() {
     const next: FieldErrors = {};
     if (!single.name.trim()) next["single.name"] = "Enter your full name.";
     if (!registration(single.registration)) next["single.registration"] = "Enter your registration number.";
-    if (!EMAIL.test(email(single.email))) next["single.email"] = "Enter a valid university email.";
+    const singleEmailError = emailValidationMessage(single.email);
+    if (singleEmailError) next["single.email"] = singleEmailError;
     const singlePasswordError = passwordPolicyError(single.password);
     if (singlePasswordError) next["single.password"] = singlePasswordError;
     if (single.password !== single.confirm) next["single.confirm"] = "Passwords do not match.";
@@ -589,8 +666,17 @@ export default function App() {
   });
   useEffect(() => {
     const initial = readPublicRoute(window.history.state) ?? publicRoute("in");
-    if (!readPublicRoute(window.history.state)) window.history.replaceState({ fyphubNavigation: initial }, "", window.location.href);
-    publicNavigationRef.current(initial, "pop");
+    if (window.location.pathname === "/reset-password") {
+      queueMicrotask(() => {
+        setRecoveryView("reset");
+        setResetToken(new URLSearchParams(window.location.search).get("token") ?? "");
+        setPage("recover");
+      });
+      window.history.replaceState({ fyphubNavigation: publicRoute("recover") }, "", window.location.href);
+    } else {
+      if (!readPublicRoute(window.history.state)) window.history.replaceState({ fyphubNavigation: initial }, "", window.location.href);
+      publicNavigationRef.current(initial, "pop");
+    }
     const onPopState = (event: PopStateEvent) => {
       const destination = (event.state as { fyphubNavigation?: { page?: string } } | null)?.fyphubNavigation?.page;
       if (destination === "admin-portal" && authUserRef.current?.role === "ADMIN") {
@@ -675,14 +761,14 @@ export default function App() {
       creator: {
         full_name: account.name.trim(),
         registration_number: registration(account.registration),
-        university_email: email(account.email),
+        university_email: normalizeEmail(account.email),
       },
-      shared_login_email: email(login.email),
+      shared_login_email: normalizeEmail(login.email),
       password: login.password,
       members: members.map((member) => ({
         full_name: member.name.trim(),
         registration_number: registration(member.registration),
-        university_email: email(member.email),
+        university_email: normalizeEmail(member.email),
       })),
     };
     try {
@@ -728,7 +814,7 @@ export default function App() {
         body: JSON.stringify({
           full_name: single.name.trim(),
           registration_number: registration(single.registration),
-          email: email(single.email),
+          email: normalizeEmail(single.email),
           password: single.password,
         }),
       });
@@ -758,13 +844,20 @@ export default function App() {
       );
       return;
     }
+    if (identifier.includes("@")) {
+      const identifierError = emailValidationMessage(identifier);
+      if (identifierError) {
+        setAuthError(identifierError);
+        return;
+      }
+    }
     setAuthSubmitting(true);
     setAuthError("");
     const payload: Record<string, string> = {
       password: signIn.password,
       requested_role: loginRole,
     };
-    if (EMAIL.test(identifier)) payload.email = identifier;
+    if (identifier.includes("@")) payload.email = normalizeEmail(identifier);
     else payload.registration_number = identifier;
     try {
       const response = await fetch(`${API}/api/v1/auth/login`, {
@@ -794,6 +887,125 @@ export default function App() {
       );
     } finally {
       setAuthSubmitting(false);
+    }
+  }
+  function recoveryIdentifierError(value: string): string {
+    const identifier = value.trim();
+    if (!identifier) return "Enter your email or registration ID.";
+    return identifier.includes("@")
+      ? emailValidationMessage(identifier) ?? ""
+      : "";
+  }
+  async function requestPasswordReset() {
+    if (recoverySubmitting) return;
+    const identifierError = recoveryIdentifierError(recoveryIdentifier);
+    if (identifierError) {
+      setRecoveryError(identifierError);
+      setRecoveryMessage("");
+      return;
+    }
+    const normalizedIdentifier = recoveryIdentifier.trim().toLowerCase();
+    setRecoverySubmitting(true);
+    setRecoveryError("");
+    setRecoveryMessage("");
+    setResetLink("");
+    setDevelopmentLinkState("idle");
+    setResetLinkError("");
+    try {
+      const response = await fetch(`${API}/api/v1/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: normalizedIdentifier }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setRecoveryError(body.detail?.code === "account_not_found" ? DEVELOPMENT_UNKNOWN_ACCOUNT_MESSAGE : "Password reset could not be requested.");
+        return;
+      }
+      setRecoveryMessage(body.message ?? "If an account exists, a password reset link will be sent.");
+      const isLocalUi = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname === "::1";
+      let status = recoveryStatus;
+      if (!status) {
+        try {
+          const statusResponse = await fetch(`${API}/api/v1/auth/password-reset-status`);
+          if (statusResponse.ok) {
+            const statusBody = await statusResponse.json() as Partial<PasswordResetDeliveryStatus>;
+            if (typeof statusBody.development_mode === "boolean" && typeof statusBody.smtp_configured === "boolean") {
+              status = statusBody as PasswordResetDeliveryStatus;
+              setRecoveryStatus(status);
+            }
+          }
+        } catch {
+          status = null;
+        }
+      }
+      if (!isLocalUi) return;
+      if (!status) {
+        setDevelopmentLinkState("error");
+        setResetLinkError("Reset link is not available right now. Please request again.");
+        return;
+      }
+      if (!status.development_mode || status.smtp_configured) return;
+      setDevelopmentLinkState("loading");
+      try {
+        const developmentResponse = await fetch(`${API}/api/v1/auth/dev/password-reset-link?identifier=${encodeURIComponent(normalizedIdentifier)}`);
+        const developmentBody = await developmentResponse.json().catch(() => ({}));
+        if (developmentResponse.ok && typeof developmentBody.reset_link === "string" && developmentBody.reset_link.trim()) {
+          setResetLink(developmentBody.reset_link);
+          setDevelopmentLinkState("ready");
+        } else if (developmentResponse.status === 404) {
+          setDevelopmentLinkState("missing");
+          setResetLinkError("Reset link is not available right now. Please request again.");
+        } else {
+          setDevelopmentLinkState("error");
+          setResetLinkError("Reset link is not available right now. Please request again.");
+        }
+      } catch {
+        setDevelopmentLinkState("error");
+        setResetLinkError("Reset link is not available right now. Please request again.");
+      }
+    } catch {
+      setRecoveryError("The password reset service is unavailable. Please try again shortly.");
+    } finally {
+      setRecoverySubmitting(false);
+    }
+  }
+  async function submitPasswordReset() {
+    if (recoverySubmitting) return;
+    if (!resetToken) {
+      setRecoveryError("This password reset link is missing its token.");
+      return;
+    }
+    const passwordError = passwordPolicyError(newPassword);
+    if (passwordError) {
+      setRecoveryError(passwordError);
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setRecoveryError("Passwords do not match.");
+      return;
+    }
+    setRecoverySubmitting(true);
+    setRecoveryError("");
+    try {
+      const response = await fetch(`${API}/api/v1/auth/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: resetToken, password: newPassword }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setRecoveryError(typeof body.detail?.message === "string" ? body.detail.message : "This password reset link is invalid or has expired.");
+        return;
+      }
+      setResetSuccess(true);
+      setRecoveryMessage(body.message ?? "Password reset successful. Please log in again.");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } catch {
+      setRecoveryError("The password reset service is unavailable. Please try again shortly.");
+    } finally {
+      setRecoverySubmitting(false);
     }
   }
   async function signOut() {
@@ -941,31 +1153,51 @@ export default function App() {
     );
   if (page === "recover")
     return (
-      <AuthLayout>
-          <div>
-            <h1 className="text-2xl font-bold">Reset your password</h1>
-            <p className="mt-2 text-sm text-[#4f6470]">
-              Password recovery email delivery is not configured for this
-              project.
-            </p>
+      <AuthLayout compact>
+        {recoveryView === "forgot" ? (
+          <form onSubmit={(event) => { event.preventDefault(); void requestPasswordReset(); }} className="space-y-4">
+            <h1 className="text-[26px] font-bold sm:text-[28px]">Forgot Password?</h1>
+            <p className="text-sm text-[#4f6470]">Enter your email or registration ID and, if an account exists, we will send a reset link.</p>
+            {recoveryStatus?.development_mode && !recoveryStatus.smtp_configured && <p role="status" className="rounded-lg bg-[#eaf2ff] px-3 py-2 text-sm text-[#243746]">Development mode is active. After requesting a reset, you can open the local reset link here.</p>}
+            {recoveryStatus && !recoveryStatus.development_mode && !recoveryStatus.smtp_configured && <p role="alert" className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">Password recovery email delivery is not configured for this project.</p>}
             <Field
-              label="Registered email"
-              type="email"
-              value=""
-              onChange={() => undefined}
-              disabled
+              label="Email or Registration ID"
+              type={recoveryIdentifier.includes("@") ? "email" : "text"}
+              autoComplete="username"
+              value={recoveryIdentifier}
+              disabled={recoverySubmitting}
+              error={recoveryIdentifier ? recoveryIdentifierError(recoveryIdentifier) : undefined}
+              onChange={(value) => {
+                setRecoveryIdentifier(value);
+                setRecoveryError("");
+                setRecoveryMessage("");
+                setResetLink("");
+                setDevelopmentLinkState("idle");
+                setResetLinkError("");
+              }}
             />
-            <p className="mt-4 text-sm text-[#4f6470]">
-              Contact your FYP coordinator for account recovery.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigatePublic(publicRoute("in"))}
-              className="mt-6 text-sm font-semibold text-[#176B66] underline"
-            >
-              Back to Login
-            </button>
-          </div>
+            {recoveryError && <p role="alert" className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{recoveryError}</p>}
+            {recoveryMessage && <p role="status" className="rounded-lg bg-[#e4eee7] px-3 py-2 text-sm text-[#176B66]">{recoveryMessage}</p>}
+            {developmentLinkState === "loading" && <p role="status" className="rounded-lg bg-[#eaf2ff] px-3 py-2 text-sm text-[#243746]">Loading local development reset link...</p>}
+            {resetLinkError && developmentLinkState !== "ready" && <p role="alert" className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{resetLinkError}</p>}
+            {developmentLinkState === "ready" && resetLink && <div className="space-y-2 rounded-lg border border-[#b9ddcf] bg-[#f4fbf7] p-3" role="status"><p className="break-all text-sm text-[#243746]">Development reset link: {resetLink}</p><button type="button" onClick={() => window.location.assign(resetLink)} className={`${AUTH_PRIMARY} w-full`}>Open reset link</button></div>}
+            <button type="submit" disabled={recoverySubmitting || Boolean(recoveryIdentifierError(recoveryIdentifier))} className={`${AUTH_PRIMARY} min-h-[46px] w-full`}>{recoverySubmitting ? "Requesting..." : "Request reset link"}</button>
+            <button type="button" disabled={recoverySubmitting} onClick={() => { setRecoveryIdentifier(""); navigatePublic(publicRoute("in")); }} className="w-full text-sm font-semibold text-[#176B66] underline">Back to Login</button>
+          </form>
+        ) : (
+          <form onSubmit={(event) => { event.preventDefault(); void submitPasswordReset(); }} className="space-y-4">
+            <h1 className="text-[26px] font-bold sm:text-[28px]">Reset Password</h1>
+            {!resetToken && !resetSuccess && <p role="alert" className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">This password reset link is missing its token.</p>}
+            {!resetSuccess && resetToken && <>
+              <PasswordField label="New password" value={newPassword} guidance disabled={recoverySubmitting} error={recoveryError && !newPassword ? recoveryError : undefined} onChange={(value) => { setNewPassword(value); setRecoveryError(""); }} />
+              <PasswordField label="Confirm new password" value={confirmNewPassword} confirm disabled={recoverySubmitting} error={newPassword !== confirmNewPassword && confirmNewPassword ? "Passwords do not match." : undefined} onChange={(value) => { setConfirmNewPassword(value); setRecoveryError(""); }} />
+              {recoveryError && <p role="alert" className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{recoveryError}</p>}
+              <button type="submit" disabled={recoverySubmitting || Boolean(passwordPolicyError(newPassword)) || newPassword !== confirmNewPassword} className={`${AUTH_PRIMARY} min-h-[46px] w-full`}>{recoverySubmitting ? "Resetting..." : "Reset Password"}</button>
+            </>}
+            {resetSuccess && recoveryMessage && <p role="status" className="rounded-lg bg-[#e4eee7] px-3 py-2 text-sm text-[#176B66]">{recoveryMessage}</p>}
+            <button type="button" disabled={recoverySubmitting} onClick={() => { setRecoveryIdentifier(""); navigatePublic(publicRoute("in")); }} className="w-full text-sm font-semibold text-[#176B66] underline">Back to Login</button>
+          </form>
+        )}
       </AuthLayout>
     );
   if (page === "up" && studentMode === "single" && individualSuccess)
@@ -1050,13 +1282,13 @@ export default function App() {
           <div className="grid gap-4">
             <Field label="Full name" autoComplete="name" value={single.name} disabled={submitting} error={errors["single.name"]} onChange={(value) => updateSingle("name", value)} />
             <Field label="Registration number" value={single.registration} disabled={submitting} error={errors["single.registration"]} onChange={(value) => updateSingle("registration", value)} />
-            <Field label="University email" type="email" value={single.email} disabled={submitting} error={errors["single.email"]} onChange={(value) => updateSingle("email", value)} />
+            <Field label="University email" type="email" value={single.email} disabled={submitting} error={errors["single.email"] ?? (single.email ? emailValidationMessage(single.email) : undefined)} onChange={(value) => updateSingle("email", value)} />
             <PasswordField label="Password" value={single.password} disabled={submitting} error={errors["single.password"]} onChange={(value) => updateSingle("password", value)} />
             <PasswordField label="Confirm password" value={single.confirm} confirm disabled={submitting} error={errors["single.confirm"]} onChange={(value) => updateSingle("confirm", value)} />
           </div>
           {notice && <p role="alert" className="mt-4 rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{notice}</p>}
           <div className="mt-6 grid gap-3">
-            <button type="submit" disabled={submitting} className={`${AUTH_PRIMARY} min-h-[46px] w-full`}>{submitting ? "Creating account..." : "Create Account"}</button>
+            <button type="submit" disabled={submitting || Boolean(emailValidationMessage(single.email))} className={`${AUTH_PRIMARY} min-h-[46px] w-full`}>{submitting ? "Creating account..." : "Create Account"}</button>
             <button type="button" disabled={submitting} onClick={() => navigatePublic(publicRoute("up", "STUDENT", 1, null))} className="w-full text-sm font-semibold text-[#176B66] underline">Back to Student options</button>
           </div>
         </form>
@@ -1103,11 +1335,23 @@ export default function App() {
               disabled={authSubmitting}
               compact
             />
+<<<<<<< HEAD
+            <form
+              className="mt-4 space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void performLogin();
+              }}
+            >
+=======
             <form className="mt-4 space-y-3" onSubmit={performLogin}>
+>>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
               <Field
                 label="Email or Registration ID"
+                type={signIn.email.includes("@") ? "email" : "text"}
                 autoComplete="username"
                 value={signIn.email}
+                error={signIn.email.includes("@") ? emailValidationMessage(signIn.email) : undefined}
                 disabled={authSubmitting}
                 onChange={(value) => {
                   setSignIn((current) => ({ ...current, email: value }));
@@ -1128,7 +1372,7 @@ export default function App() {
               <div className="flex justify-end text-sm">
                 <button
                   type="button"
-                  onClick={() => navigatePublic(publicRoute("recover"))}
+                  onClick={() => { setRecoveryView("forgot"); setResetToken(""); setResetSuccess(false); setRecoveryIdentifier(""); setRecoveryMessage(""); setRecoveryError(""); setResetLink(""); setDevelopmentLinkState("idle"); setResetLinkError(""); navigatePublic(publicRoute("recover")); }}
                   className="font-semibold text-[#176B66] underline"
                 >
                   Forgot Password?
@@ -1144,7 +1388,17 @@ export default function App() {
               )}
               <button
                 type="submit"
+<<<<<<< HEAD
+                disabled={
+                  authSubmitting ||
+                  Boolean(
+                    signIn.email.includes("@") &&
+                      emailValidationMessage(signIn.email),
+                  )
+                }
+=======
                 disabled={authSubmitting}
+>>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
                 className={`${AUTH_PRIMARY} min-h-[46px] w-full`}
               >
                 {authSubmitting ? "Signing in..." : "Login"}

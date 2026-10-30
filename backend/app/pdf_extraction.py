@@ -33,13 +33,18 @@ class ExtractionResult:
     extracted_at: datetime
 
 
-_FIELD_PATTERNS: dict[str, tuple[str, ...]] = {
-    "title": (r"^proposal\s+title\s*[:\-]\s*(.+)$", r"^title\s*[:\-]\s*(.+)$"),
-    "topic": (r"^(?:topic|area|research\s+area)\s*[:\-]\s*(.+)$",),
-    "purpose": (r"^(?:problem\s+statement|problem|purpose|aim)\s*[:\-]\s*(.+)$",),
-    "objectives": (r"^(?:objectives?|goals?)\s*[:\-]\s*(.+)$",),
-    "methodology": (r"^(?:methodology|approach|methods?)\s*[:\-]\s*(.+)$",),
+_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
+    "title": ("proposal title", "project title", "title"),
+    "topic": ("research area", "topic", "area"),
+    "purpose": ("problem statement", "project purpose", "purpose", "problem", "aim"),
+    "objectives": ("project objectives", "objectives", "objective", "goals", "goal"),
+    "methodology": ("methodology and approach", "methodology", "method", "approach", "methods"),
+    "expected_outcomes": ("expected outcomes", "outcomes", "expected outcome", "outcome"),
 }
+_FIELD_HEADING = re.compile(
+    rf"^\s*(?P<label>{'|'.join(sorted((re.escape(alias) for aliases in _FIELD_ALIASES.values() for alias in aliases), key=len, reverse=True))})\s*(?:(?::|-)\s*(?P<value>.*))?$",
+    flags=re.IGNORECASE,
+)
 
 
 def _field(value: str | None, page: int = 1) -> dict[str, object]:
@@ -48,22 +53,48 @@ def _field(value: str | None, page: int = 1) -> dict[str, object]:
     return {"value": value, "display": value, "source_page": page, "source": f"page {page}"}
 
 
+def _normalize_text(text: str) -> str:
+    """Normalize pypdf output while retaining line boundaries used by section parsing."""
+    normalized_lines = []
+    for raw_line in text.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ").split("\n"):
+        line = re.sub(r"[ \t]+", " ", raw_line).strip()
+        if line:
+            line = re.sub(r"\s*:\s*", ": ", line, count=1)
+            normalized_lines.append(line)
+    return "\n".join(normalized_lines).strip()
+
+
+def _heading(line: str) -> tuple[str, str | None] | None:
+    match = _FIELD_HEADING.match(line)
+    if not match:
+        return None
+    label = re.sub(r"\s+", " ", match.group("label")).strip().casefold()
+    for name, aliases in _FIELD_ALIASES.items():
+        if label in aliases:
+            value = (match.group("value") or "").strip() or None
+            return name, value
+    return None
+
+
 def _extract_fields(text: str) -> dict[str, object]:
-    fields: dict[str, object] = {}
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    fields: dict[str, object] = {name: _field(None) for name in _FIELD_ALIASES}
+    lines = _normalize_text(text).splitlines()
+    sections: list[tuple[int, int, str, str | None]] = []
+    for index, line in enumerate(lines):
+        matched = _heading(line)
+        if matched:
+            sections.append((index, index, matched[0], matched[1]))
+
     matched_lines: set[int] = set()
-    for name, patterns in _FIELD_PATTERNS.items():
-        value: str | None = None
-        for index, line in enumerate(lines):
-            for pattern in patterns:
-                match = re.match(pattern, line, flags=re.IGNORECASE)
-                if match:
-                    value = match.group(1).strip()
-                    matched_lines.add(index)
-                    break
-            if value:
-                break
-        fields[name] = _field(value)
+    for position, (start, _, name, inline_value) in enumerate(sections):
+        end = sections[position + 1][0] if position + 1 < len(sections) else len(lines)
+        content_lines = [inline_value] if inline_value else []
+        content_lines.extend(lines[start + 1:end])
+        value = " ".join(line.strip() for line in content_lines if line and line.strip()).strip() or None
+        if value is not None:
+            current = fields[name]["value"]
+            fields[name] = _field(value if current is None else f"{current} {value}")
+        matched_lines.update(range(start, end))
 
     other = [
         {"value": line, "source_page": 1, "source": "page 1"}
@@ -73,7 +104,7 @@ def _extract_fields(text: str) -> dict[str, object]:
     fields["other_sections"] = other
     fields["required_fields"] = ["title", "purpose"]
     fields["missing_required_fields"] = [name for name in ("title", "purpose") if not fields[name]["value"]]
-    fields["warnings"] = [f"{name} was not detected in the PDF." for name in ("topic", "objectives", "methodology") if not fields[name]["value"]]
+    fields["warnings"] = [f"{name} was not detected in the PDF." for name in ("topic", "objectives", "methodology", "expected_outcomes") if not fields[name]["value"]]
     return fields
 
 
@@ -96,7 +127,7 @@ def extract_one_page_pdf(data: bytes, content_type: str | None, filename: str | 
         raise
     except (PdfReadError, ValueError, OSError) as error:
         raise PdfExtractionError("invalid_pdf", "The proposal PDF could not be read safely.") from error
-    normalized = "\n".join(line.strip() for line in text.splitlines() if line.strip()).strip()
+    normalized = _normalize_text(text)
     if len(normalized) < 20:
         raise PdfExtractionError("unreadable_pdf", "The one-page PDF does not contain readable text.")
     return ExtractionResult(

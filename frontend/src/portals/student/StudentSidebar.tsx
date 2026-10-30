@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type StudentPhase = { id: string; name: string; route: string; status: "Implemented" | "Partial" | `Coming in Module ${number}`; icon: ReactNode };
+export type StudentPhase = { id: string; name: string; route: string; status: "Implemented" | "Partial"; icon: ReactNode };
 type Props = { phases: readonly StudentPhase[]; activeId: string; collapsed: boolean; mobileOpen: boolean; onSelect: (phase: StudentPhase) => void; onOverview: () => void; onToggleCollapse: () => void; onCloseMobile: () => void };
 
 export function StudentSidebar({ phases, activeId, collapsed, mobileOpen, onSelect, onOverview, onToggleCollapse, onCloseMobile }: Props) {

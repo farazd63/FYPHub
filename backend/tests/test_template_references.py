@@ -29,11 +29,20 @@ class TemplateReferenceTests(unittest.TestCase):
   finally: s.close()
  def setUp(self):
   s=Session(bind=self.connection,expire_on_commit=False,join_transaction_mode="create_savepoint"); a=User(full_name="Template Admin",email=f"template-{uuid4().hex}@example.com",registration_number=None,password_hash="test",role=UserRole.ADMIN); n=User(full_name="Student",email=f"student-{uuid4().hex}@example.com",registration_number=f"T{uuid4().hex[:9]}",password_hash="test",role=UserRole.STUDENT); s.add_all([a,n]); s.flush(); self.admin_id=a.id; self.token=generate_session_token(); s.add(AuthSession(user_id=a.id,token_hash=hash_session_token(self.token),expires_at=utc_now().replace(year=utc_now().year+1))); self.student=generate_session_token(); s.add(AuthSession(user_id=n.id,token_hash=hash_session_token(self.student),expires_at=utc_now().replace(year=utc_now().year+1))); s.commit(); s.close()
+  self.created_reference_ids=[]
+ def tearDown(self):
+  if not self.created_reference_ids: return
+  s=Session(bind=self.connection,expire_on_commit=False,join_transaction_mode="create_savepoint")
+  for root_id in self.created_reference_ids:
+   s.execute(text("delete from academic_rule_versions where template_reference_version_id in (select id from template_reference_versions where template_reference_id=:id)"),{"id":root_id})
+   s.execute(text("delete from template_reference_versions where template_reference_id=:id"),{"id":root_id})
+   s.execute(text("delete from template_references where id=:id"),{"id":root_id})
+  s.commit(); s.close()
  def headers(self,token=None,origin=None):
   h={} if token is None else {"cookie":f"{SESSION_COOKIE_NAME}={token}"}
   if origin: h["origin"]=origin
   return h
- def payload(self): return {"template_type":"SHORT","title":"Reference","provenance":"OBSERVED_REFERENCE","source_note":"Filled example","rules":{"page_size":"A4"}}
+ def payload(self): return {"template_type":"LONG","title":f"Reference {uuid4().hex}","provenance":"OBSERVED_REFERENCE","source_note":"Filled example","rules":{"page_size":"A4"}}
  def baseline_reference(self):
   """Create a test-local lineage without creating an audit record."""
   s=Session(bind=self.connection,expire_on_commit=False,join_transaction_mode="create_savepoint")
@@ -51,7 +60,7 @@ class TemplateReferenceTests(unittest.TestCase):
   self.assertEqual(request("GET","/api/v1/admin/template-references")[0],401); self.assertEqual(request("GET","/api/v1/admin/template-references",headers=self.headers(self.student))[0],403)
   self.assertEqual(request("GET","/api/v1/admin/template-references/999999",headers=self.headers(self.token))[0],404)
   self.assertEqual(request("POST","/api/v1/admin/template-references",{**self.payload(),"rules":{"bad":1}},headers=self.headers(self.token))[0],422)
-  status,_,body=request("POST","/api/v1/admin/template-references",self.payload(),headers=self.headers(self.token)); self.assertEqual(status,201); root=body["reference_id"]; version=body["versions"][0]["template"]["id"]
+  status,_,body=request("POST","/api/v1/admin/template-references",self.payload(),headers=self.headers(self.token)); self.assertEqual(status,201); root=body["reference_id"]; self.created_reference_ids.append(root); version=body["versions"][0]["template"]["id"]
   self.assertEqual(request("POST",f"/api/v1/admin/template-references/{root}/versions",{"title":"Second","provenance":"OBSERVED_REFERENCE","source_note":"Later"},headers=self.headers(self.token))[0],201)
   self.assertEqual(request("POST",f"/api/v1/admin/template-reference-versions/{version}/rules",{"provenance":"OBSERVED_REFERENCE","rules":{}},headers=self.headers(self.token))[0],201)
   status,_,listed=request("GET","/api/v1/admin/template-references",headers=self.headers(self.token)); self.assertEqual(status,200); self.assertEqual([item["reference_id"] for item in listed if item["id"] in {version}], [root])

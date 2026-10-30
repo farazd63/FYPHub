@@ -64,6 +64,7 @@ class SupervisorRequest(Base):
     document_id: Mapped[int | None] = mapped_column(ForeignKey("supervisor_request_documents.id", ondelete="RESTRICT", use_alter=True), nullable=True)
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    submission_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     extraction_status: Mapped[str] = mapped_column(String(16), nullable=False, default=SupervisorRequestExtractionStatus.PENDING.value, server_default=SupervisorRequestExtractionStatus.PENDING.value)
     extraction_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     extraction_confirmed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
@@ -122,3 +123,22 @@ class SupervisorRequestStatusHistory(Base):
     to_status: Mapped[str] = mapped_column(String(32), nullable=False)
     comment: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class SupervisorRequestSubmissionNoteVersion(Base):
+    """Immutable snapshots of notes submitted with a supervisor request."""
+
+    __tablename__ = "supervisor_request_submission_note_versions"
+    __table_args__ = (
+        CheckConstraint("version > 0", name="ck_supervisor_request_note_version_positive"),
+        CheckConstraint("body = btrim(body) AND body <> ''", name="ck_supervisor_request_note_body_nonblank"),
+        Index("uq_supervisor_request_note_version", "request_id", "version", unique=True),
+        Index("ix_supervisor_request_note_request", "request_id", "submitted_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    request_id: Mapped[int] = mapped_column(ForeignKey("supervisor_requests.id", ondelete="RESTRICT"), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

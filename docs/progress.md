@@ -1,14 +1,29 @@
 ## Module 1 end-to-end audit (2026-10-27)
 
 - Reconciled the eight Module 1 requirements in Long Proposal section 9.3 (PDF pp. 9-10) against `docs/p1-feature-tracker.md`, `docs/p1-workflows.md`, the current Admin route, models, migrations, routes, and tests.
-- Confirmed the current implementation covers the defined Module 1 configuration behavior: ADMIN account/role controls, cycle and group policies, workflow-policy drafts, internal template/rule versioning, supervisor capacity and assignment enforcement, rubric drafts, deadline versions/previews, reminder-rule previews, roster eligibility, and append-only audit history.
-- Recorded the exact unresolved gaps instead of inventing behavior: official template files and approval/storage lifecycle; approved scoring/rubric values and authority; separate semester semantics; operational deadline activation/enforcement; reminder delivery, recipients, scheduling, retries, and escalation authority; and the shared-team deactivation lifecycle.
-- No Module 2 AI gap or Module 3 feature was changed.
-- Verification from this checkpoint: 164 backend tests passed with `unittest`; Alembic current/head are `b2c3d4e5f6a7`, `alembic check` reports no pending operations, and `pip check` passes. Frontend lint and production build pass; `git diff --check` passes. The frontend API remains `http://localhost:8010`, with no `8011` reference.
+- Confirmed the current implementation covers the defined Module 1 configuration behavior: ADMIN account/role controls, cycle and group policies, workflow-policy drafts, internal template/rule versioning, supervisor capacity and assignment enforcement, Evaluation Criteria drafts, deadline versions/previews, reminder-rule previews, roster eligibility, and append-only audit history.
+- Recorded the exact unresolved gaps instead of inventing behavior: official template files and approval/storage lifecycle; approved scoring/Evaluation Criteria values and authority; separate semester semantics; operational deadline activation/enforcement; reminder delivery, recipients, scheduling, retries, and escalation authority; and the shared-team deactivation lifecycle.
+- Module 03 dynamic proposal compliance foundations were added in the current working tree: m03-prefixed immutable template/proposal/report records, deterministic Tier 1/2 checks, optional local Ollama Tier 3 advisory handling, role-guarded routes, and portal integration. This remains an unstaged checkpoint.
+- Verification from this checkpoint: 228 backend tests passed with `unittest`; Alembic current/head are `ff5a6b7c8d9e`, `alembic check` reports no pending operations, and `pip check` passes. Frontend tests, lint, TypeScript, production build, and `git diff --check` pass. The frontend API remains `http://localhost:8010`.
 - Browser visual/interaction verification could not be run because no browser surface was available in the current environment. The Vite server remains running from the requested checkout at `http://localhost:5173`.
 
 # Project Progress
 
+<<<<<<< HEAD
+## Functional workflow checkpoint: progress, defense scheduling, and evaluation
+
+## Module 03 template baseline checkpoint (2026-10-29)
+
+- Reworked deterministic PDF/DOCX baseline extraction. PDF geometry now records A4/Letter/custom page size, page dimensions, median multi-page content-box margins in millimetres, dominant font family/size, line/paragraph spacing where measurable, heading order/hierarchy, captions, citations, and source page references. DOCX extraction reads section dimensions/margins and paragraph/style font, spacing, heading, caption, and citation properties.
+- Missing structural fields now produce explicit warnings and LOW/MEDIUM confidence; HIGH is reserved for a measurable, complete structure. Values remain document-derived and use `Observed reference property` provenance unless an Admin explicitly records a confirmed requirement.
+- Added immutable metadata and formatting-rule version lineage under migration `fg6b7c8d9e0f`, with duplicate-value prevention and separate SHORT/LONG template histories. Admin endpoints support metadata versions and rule versions without mutating prior records.
+- Admin Module 03 modal now has one internal scroll container, reachable footer actions, partial-baseline confirmation for LOW confidence, readable extraction labels, warning/status/provenance cards, and metadata/rule version actions.
+
+- Added migration `ff5a6b7c8d9e` with persisted project milestones, tasks, supervision meetings, defense schedules/panel assignments, panel evaluations, criterion scores, disagreement flags, and resolution state.
+- Added role-scoped API workflows under `/api/v1/project-progress`, `/api/v1/panel-schedules`, and `/api/v1/panel-evaluations`. Team ownership, active supervisor assignment, evaluator assignment, overlap/room/panel/conflict-of-interest checks, and audit events are enforced server-side.
+- Student Project Progress now creates milestones, tasks, and supervision records and reports `On Track`, `Attention Required`, or `Critical` from stored evidence. Coordinator scheduling now supports panel assignment and rescheduling. Evaluator scoring supports saved drafts, submitted feedback, disagreement detection, and coordinator resolution.
+- Focused workflow tests and the full backend suite pass. Semantic/LLM similarity ranking, automated task extraction, optimization recommendations, and predictive analytics remain outside the deterministic implementation and are reported as unavailable rather than fabricated.
+=======
 ## M2 temporary match chat
 
 - Added a separate retained team-attributed conversation for opted-in teams in the same cycle with at least one matching category. Either team can close it; opting out closes the conversation and revokes access. Closed-chat access remains revoked; a new conversation requires fresh consent from both teams and has a new ID.
@@ -18,6 +33,7 @@
 
 - Added eight editable team-level questions across the six proposal topics, explicit same-cycle opt-in and withdrawal, and explainable suggestions using equal category weighting and case-insensitive exact matching. Unanswered categories are excluded; the shared account does not attribute answers to individuals. Migration `b8c9d0e1f2a3` stores preferences.
 - Five focused tests and 107 full backend tests passed. Alembic current/head `b8c9d0e1f2a3`, schema check, pip check, frontend lint/build, and git diff check passed. Long-term retention, live local LLM explanations and browser/mobile verification remain pending. Existing pending channel/chatbot and password changes were preserved.
+>>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
 
 ## Supervisor-to-Team Allocation
 
@@ -71,10 +87,17 @@
 
 ## M1-F.1 Internal Evaluation Criteria Draft Configuration (2026-10-19)
 
+<<<<<<< HEAD
+- Added stable Evaluation Criteria identities with immutable numbered versions and ordered criterion snapshots under Alembic revision `f1a2b3c4d5e6`. Names are required and descriptions optional; no criteria-set or academic values are seeded.
+- Added ADMIN-only list, complete-history, initial-create, and subsequent-version APIs. Mutations enforce browser Origin checks, strict request structure, nonblank names, unique explicit criterion orders, serialized version allocation, and atomic audit persistence.
+- Enabled the existing **Evaluation Criteria** navigation destination and added a focused Draft-labelled Admin screen. It supports history, initial and subsequent versions, criterion add/remove/reorder controls, stable row values and validation mapping, loading/empty/error feedback, and duplicate-submit prevention.
+- Verified 5 focused Evaluation Criteria tests and the complete 55-test backend suite. Alembic current/head are `f1a2b3c4d5e6`, schema check is clean, `pip check` passes, and frontend lint/build pass. Browser interaction, responsive visual verification, and the manual demonstration remain pending.
+=======
 - Added stable evaluation criteria identities with immutable numbered versions and ordered criterion snapshots under Alembic revision `f1a2b3c4d5e6`. Names are required and descriptions optional; no evaluation criteria or academic values are seeded.
 - Added ADMIN-only list, complete-history, initial-create, and subsequent-version APIs. Mutations enforce browser Origin checks, strict request structure, nonblank names, unique explicit criterion orders, serialized version allocation, and atomic audit persistence.
 - Enabled the existing **Evaluation Criteria** navigation destination and added a focused Draft-labelled Admin screen. It supports history, initial and subsequent versions, criterion add/remove/reorder controls, stable row values and validation mapping, loading/empty/error feedback, and duplicate-submit prevention.
 - Verified 5 focused evaluation criteria tests and the complete 55-test backend suite. Alembic current/head are `f1a2b3c4d5e6`, schema check is clean, `pip check` passes, and frontend lint/build pass. Browser interaction, responsive visual verification, and the manual demonstration remain pending.
+>>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
 - This is an internal draft-configuration foundation only. Marks, weights, thresholds, evaluation stages, approval/publication/activation/retirement, and panel scoring remain unimplemented pending academic-policy decisions. M1 and P1 remain Partial.
 
 ## M1-E.1 Supervisor Capacity Management (verified evidence)
@@ -138,7 +161,7 @@ P1 Mid, Modules 1–3.
 
 ## Implementation status
 
-All module features are not yet implemented.
+Module 03 proposal compliance is partially implemented. Dynamic baseline ingestion, proposal parsing, deterministic checks, advisory Ollama integration, versioned reports, and role guards exist. Dedicated original-document download, malware scanning, coordinator cycle scoping, and final academic lifecycle decisions remain pending.
 
 ## Checkpoint 2A
 
@@ -334,3 +357,6 @@ Before the 6th; month and year are not yet confirmed.
 - This audit: frontend lint/build and four isolated proposal-foundation tests passed; `git diff --check` passed. No live SMTP, live AI, browser, migration operation, commit, or push was performed.
 - **SUPERVISOR-H:** completed the decision/reference/conversation follow-up under migration `e7f8a9b0c1d2`. The selected Supervisor decision path remains revision-checked and capacity-locked; proposal reference search now provides exact, advisory similar, and explicit no-close-match outcomes with separate authorized reference PDFs; request conversations are append-only, audited, and limited to the owning Student/team, selected Supervisor, Coordinator, and Admin. Added focused backend coverage for search, PDF authorization, conversation visibility, cross-student denial, and Panel denial. The opt-in fixture seed (`scripts/seed_proposal_references.py`) was not run. Browser verification remains pending because no browser surface is available.
 - **ARCHIVE checkpoint:** added the separate logical FYP archive and immutable document-version workflow under migrations `f9a0b1c2d3e4` and `fa0b1c2d3e4`. Admin archive management supports metadata edits, PDF-only uploads, version history, non-destructive activation, duplicate-title protection, hashes, and audit events. Student knowledge search/detail uses deterministic ranked results and secure read-only PDF links; Supervisor and Coordinator reads are authorized and Panel access is denied. Focused archive tests (2) and the full backend suite (182) pass; frontend lint/build and Alembic/pip/diff checks pass. The eight-project seed (`scripts/seed_archived_projects.py`) was not run. Browser verification and semantic/embedding ranking remain pending/unavailable.
+- **EVALUATOR portal checkpoint:** the existing `PANEL_MEMBER` role now routes to the user-facing `EvaluatorPortal`; the stored role value and backend compatibility remain unchanged. The Evaluator shell consolidates queue, proposal review, defense schedule, criteria, scoring/feedback, and decision-history entry points with honest unavailable states because no evaluator assignment/scoring APIs currently exist. No separate Panel portal is routed or displayed.
+- **COORDINATOR-ADMIN-MONITORING + CONVERSATION-POLISH:** Coordinator and Admin request monitors now support cycle/supervisor/status/date filtering, lifecycle summary cards, capacity warnings, extracted proposal detail, original PDF links, status history, submission notes, and authorized audit history. Monitoring is read-only. Student/team and selected-Supervisor conversations remain send-capable; Coordinator/Admin conversation views are read-only and backend-enforced. Focused monitoring/conversation tests pass; browser verification remains pending.
+- **FYP REGISTRY + TEMPLATE BASELINE:** Added the role-separated Coordinator **FYP Students & Projects** and Admin **FYP Registry & Project Monitoring** registry under migration `fd3e4f5a6b7c`. Lists and detail views expose only persisted, authorized student/team, proposal, assignment, history, conversation, audit, archive-match, and Module 03 data. Admin-only metadata corrections require a correction reason and are transactionally audited; supervisor/student registry reads remain assignment/ownership scoped. Official Module 03 template ingestion now treats the uploaded PDF/DOCX as a structural reference baseline and records missing proposal-only fields as `Not specified in reference template` instead of false failures. Focused registry/template tests and the full backend suite (217 tests) pass; frontend tests (28), lint, production build, Alembic, pip, and diff checks pass. Browser verification remains pending.

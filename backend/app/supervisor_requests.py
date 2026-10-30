@@ -23,6 +23,7 @@ from .models import (
     SupervisorRequestExtractionStatus,
     SupervisorRequestStatus,
     SupervisorRequestStatusHistory,
+    SupervisorRequestSubmissionNoteVersion,
     Team,
     User,
     UserRole,
@@ -59,6 +60,11 @@ class DecisionAction(RevisionAction):
             return None
         value = value.strip()
         return value or None
+
+
+def _normalize_submission_note(value: str | None) -> str | None:
+    normalized = value.strip() if value else ""
+    return normalized or None
 
 
 def failure(code: str, message: str, http_status: int = status.HTTP_409_CONFLICT) -> HTTPException:
@@ -131,8 +137,16 @@ def _owner_request(session: Session, request_id: int, actor: User, *, lock: bool
     row = session.execute(statement).scalar_one_or_none()
     if row is None:
         raise failure("request_not_found", "Supervisor request was not found.", status.HTTP_404_NOT_FOUND)
-    team = _team_for_student(session, actor)
-    if row.requester_user_id != actor.id and (team is None or row.team_id != team.id):
+    if row.requester_user_id == actor.id:
+        return row
+    team_owner = session.scalar(
+        select(Team.id).where(
+            Team.id == row.team_id,
+            Team.academic_cycle_id == row.academic_cycle_id,
+            Team.shared_user_id == actor.id,
+        )
+    ) if row.team_id is not None else None
+    if team_owner is None:
         raise failure("request_forbidden", "This supervisor request is not accessible.", status.HTTP_403_FORBIDDEN)
     return row
 
@@ -211,8 +225,15 @@ def _missing_required(document: SupervisorRequestDocument | None) -> list[str]:
     if document is None:
         return ["proposal document"]
     fields = document.extracted_fields or {}
-    missing = fields.get("missing_required_fields", [])
-    return [str(item) for item in missing] if isinstance(missing, list) else []
+    missing = [str(item) for item in fields.get("missing_required_fields", [])] if isinstance(fields.get("missing_required_fields", []), list) else []
+    for name in ("title", "purpose"):
+        value = fields.get(name)
+        extracted_value = value.get("value") if isinstance(value, dict) else None
+        if not isinstance(extracted_value, str) or not extracted_value.strip():
+            label = "proposal title" if name == "title" else "problem statement or purpose"
+            if label not in missing:
+                missing.append(label)
+    return missing
 
 
 def _apply_document_snapshot(row: SupervisorRequest, document: SupervisorRequestDocument) -> None:
@@ -228,6 +249,20 @@ def _apply_document_snapshot(row: SupervisorRequest, document: SupervisorRequest
 def _next_document_version(session: Session, request_id: int) -> int:
     current = session.scalar(select(func.max(SupervisorRequestDocument.version)).where(SupervisorRequestDocument.request_id == request_id))
     return int(current or 0) + 1
+
+
+def _next_note_version(session: Session, request_id: int) -> int:
+    current = session.scalar(select(func.max(SupervisorRequestSubmissionNoteVersion.version)).where(SupervisorRequestSubmissionNoteVersion.request_id == request_id))
+    return int(current or 0) + 1
+
+
+def _note_versions_out(session: Session, request_id: int) -> list[dict[str, Any]]:
+    rows = session.scalars(
+        select(SupervisorRequestSubmissionNoteVersion)
+        .where(SupervisorRequestSubmissionNoteVersion.request_id == request_id)
+        .order_by(SupervisorRequestSubmissionNoteVersion.version)
+    ).all()
+    return [{"id": row.id, "version": row.version, "body": row.body, "created_by_id": row.created_by_id, "submitted_at": row.submitted_at} for row in rows]
 
 
 def _audit_document(session: Session, actor: User, row: SupervisorRequest, action: str, document: SupervisorRequestDocument) -> None:
@@ -248,6 +283,14 @@ def _out(session: Session, row: SupervisorRequest, *, include_history: bool = Tr
     supervisor = session.get(User, row.supervisor_id)
     team = session.get(Team, row.team_id) if row.team_id is not None else None
     reviewer = session.get(User, row.reviewer_id) if row.reviewer_id is not None else None
+    capacity_used = _capacity_used(session, row.supervisor_id, row.academic_cycle_id, exclude_request_id=row.id if row.status == SupervisorRequestStatus.SUBMITTED.value else None)
+    capacity_policy = session.scalar(
+        select(SupervisorCapacityPolicy).where(
+            SupervisorCapacityPolicy.supervisor_id == row.supervisor_id,
+            SupervisorCapacityPolicy.academic_cycle_id == row.academic_cycle_id,
+        )
+    )
+    capacity_limit = capacity_policy.max_group_capacity if capacity_policy else None
     result: dict[str, Any] = {
         "id": row.id,
         "academic_cycle_id": row.academic_cycle_id,
@@ -260,6 +303,8 @@ def _out(session: Session, row: SupervisorRequest, *, include_history: bool = Tr
         "supervisor_name": supervisor.full_name if supervisor else None,
         "title": row.title,
         "summary": row.summary,
+        "submission_note": row.submission_note,
+        "submission_note_versions": _note_versions_out(session, row.id),
         "status": row.status,
         "revision": row.revision,
         "created_at": row.created_at,
@@ -267,7 +312,10 @@ def _out(session: Session, row: SupervisorRequest, *, include_history: bool = Tr
         "submitted_at": row.submitted_at,
         "reviewed_at": row.reviewed_at,
         "reviewer_name": reviewer.full_name if reviewer else None,
-        "capacity_used": _capacity_used(session, row.supervisor_id, row.academic_cycle_id, exclude_request_id=row.id if row.status == SupervisorRequestStatus.SUBMITTED.value else None),
+        "capacity_used": capacity_used,
+        "capacity_limit": capacity_limit,
+        "capacity_remaining": max(capacity_limit - capacity_used, 0) if capacity_limit is not None else None,
+        "capacity_warning": capacity_limit is not None and capacity_used >= capacity_limit,
         "extraction_status": row.extraction_status,
         "document": _document_out(session, row),
     }
@@ -341,6 +389,7 @@ async def create_request(
     request: Request,
     academic_cycle_id: int = Form(..., gt=0),
     supervisor_id: int = Form(..., gt=0),
+    submission_note: str | None = Form(default=None, max_length=4000),
     proposal_file: UploadFile = File(...),
     actor: User = Depends(require_roles(UserRole.STUDENT)),
     session: Session = Depends(get_db),
@@ -370,6 +419,7 @@ async def create_request(
             requester_user_id=actor.id,
             team_id=team.id if team else None,
             supervisor_id=supervisor.id,
+            submission_note=_normalize_submission_note(submission_note),
             status=SupervisorRequestStatus.DRAFT.value,
             extraction_status=SupervisorRequestExtractionStatus.EXTRACTED.value,
             revision=1,
@@ -420,6 +470,7 @@ async def update_draft_document(
     request_id: int,
     request: Request,
     revision: int = Form(..., gt=0),
+    submission_note: str | None = Form(default=None, max_length=4000),
     proposal_file: UploadFile = File(...),
     actor: User = Depends(require_roles(UserRole.STUDENT)),
     session: Session = Depends(get_db),
@@ -451,6 +502,7 @@ async def update_draft_document(
         session.add(document)
         session.flush()
         _apply_document_snapshot(row, document)
+        row.submission_note = _normalize_submission_note(submission_note)
         row.revision += 1
         _audit_document(session, actor, row, "supervisor_request_document_uploaded", document)
         _audit_document(session, actor, row, "supervisor_request_extracted", document)
@@ -537,6 +589,17 @@ def submit_request(
         if duplicate is not None:
             raise failure("duplicate_active_request", "An active request already exists for this supervisor and cycle.")
         previous = row.status
+        if row.submission_note:
+            note_version = _next_note_version(session, row.id)
+            session.add(
+                SupervisorRequestSubmissionNoteVersion(
+                    request_id=row.id,
+                    version=note_version,
+                    body=row.submission_note,
+                    created_by_id=actor.id,
+                )
+            )
+            _audit(session, actor, row, "supervisor_request_submission_note_submitted", note_version=note_version)
         row.status = SupervisorRequestStatus.SUBMITTED.value
         row.submitted_at = utc_now()
         row.reviewed_at = None
@@ -629,18 +692,31 @@ def decide_request(
             raise failure("comment_required", "A comment is required for this decision.", status.HTTP_422_UNPROCESSABLE_CONTENT)
         if payload.action == "accept":
             cycle = _cycle_for_request(session, row.academic_cycle_id, lock=True)
+            team = session.execute(
+                select(Team)
+                .where(Team.id == row.team_id, Team.academic_cycle_id == cycle.id)
+                .with_for_update()
+            ).scalar_one_or_none() if row.team_id is not None else None
+            if team is None or team.shared_user_id != row.requester_user_id:
+                raise failure("team_required", "A registered team is required before supervisor assignment.", status.HTTP_422_UNPROCESSABLE_CONTENT)
             supervisor, policy = _lock_capacity(session, row.supervisor_id, cycle.id)
             _ensure_capacity(session, supervisor.id, cycle.id, policy, exclude_request_id=row.id)
-            if row.team_id is not None:
-                team = session.execute(select(Team).where(Team.id == row.team_id).with_for_update()).scalar_one_or_none()
-                if team is None or team.academic_cycle_id != row.academic_cycle_id:
-                    raise failure("cycle_mismatch", "The request team does not belong to its selected cycle.")
-                if session.scalar(select(SupervisorAssignment.id).where(SupervisorAssignment.team_id == team.id, SupervisorAssignment.ended_at.is_(None))) is not None:
-                    raise failure("team_already_assigned", "This team already has an active supervisor assignment.")
-                assignment = SupervisorAssignment(team_id=team.id, academic_cycle_id=cycle.id, supervisor_id=actor.id, assigned_by_id=actor.id)
-                session.add(assignment)
-                session.flush()
-                row.assignment_id = assignment.id
+            if session.scalar(select(SupervisorAssignment.id).where(SupervisorAssignment.team_id == team.id, SupervisorAssignment.ended_at.is_(None))) is not None:
+                raise failure("team_already_assigned", "This team already has an active supervisor assignment.")
+            assignment = SupervisorAssignment(team_id=team.id, academic_cycle_id=cycle.id, supervisor_id=actor.id, assigned_by_id=actor.id)
+            session.add(assignment)
+            session.flush()
+            row.assignment_id = assignment.id
+            _audit(
+                session,
+                actor,
+                row,
+                "supervisor_assignment_created",
+                assignment_id=assignment.id,
+                team_id=team.id,
+                academic_cycle_id=cycle.id,
+                supervisor_id=actor.id,
+            )
         target = {"accept": SupervisorRequestStatus.ACCEPTED.value, "reject": SupervisorRequestStatus.REJECTED.value, "request_changes": SupervisorRequestStatus.CHANGES_REQUESTED.value}[payload.action]
         previous = row.status
         row.status = target
@@ -729,11 +805,14 @@ def admin_monitor(
 @router.get("/coordinator/monitor")
 def coordinator_monitor(
     academic_cycle_id: int | None = Query(None, gt=0),
+    supervisor_id: int | None = Query(None, gt=0),
     status_filter: str | None = Query(None, alias="status"),
+    from_date: datetime | None = Query(None),
+    to_date: datetime | None = Query(None),
     _: User = Depends(require_roles(UserRole.COORDINATOR)),
     session: Session = Depends(get_db),
 ):
-    rows = _monitor_statement(session, cycle_id=academic_cycle_id, supervisor_id=None, status_filter=status_filter, from_date=None, to_date=None)
+    rows = _monitor_statement(session, cycle_id=academic_cycle_id, supervisor_id=supervisor_id, status_filter=status_filter, from_date=from_date, to_date=to_date)
     return [_out(session, row) for row in rows]
 
 

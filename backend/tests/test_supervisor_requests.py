@@ -16,7 +16,7 @@ from pypdf import PdfWriter
 from app.auth import SESSION_COOKIE_NAME, utc_now
 from app.database import engine, get_db
 from app.main import app
-from app.models import AcademicCycle, AuthSession, SupervisorAssignment, SupervisorCapacityPolicy, SupervisorRequestDocument, Team, User, UserRole
+from app.models import AcademicCycle, AuthSession, SupervisorAssignment, SupervisorCapacityPolicy, SupervisorRequestDocument, SupervisorRequestSubmissionNoteVersion, Team, User, UserRole
 from app.security import generate_session_token, hash_session_token
 from tests.test_supervisor_capacity import request
 
@@ -67,7 +67,7 @@ class SupervisorRequestTests(unittest.TestCase):
         session.commit()
         session.close()
 
-    def call(self, method: str, path: str, payload=None, token: str | None = None):
+    def call(self, method: str, path: str, payload=None, token: str | None = None, origin: str | None = None):
         if "?" not in path:
             return request(method, path, payload, token=token)
         parsed = urlsplit(path)
@@ -84,6 +84,8 @@ class SupervisorRequestTests(unittest.TestCase):
             headers = [(b"content-type", b"application/json")]
             if token:
                 headers.append((b"cookie", f"{SESSION_COOKIE_NAME}={token}".encode()))
+            if origin:
+                headers.append((b"origin", origin.encode()))
             async def send(message):
                 messages.append(message)
             await app({"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": method, "scheme": "http", "path": parsed.path, "raw_path": parsed.path.encode(), "query_string": parsed.query.encode(), "headers": headers, "client": ("127.0.0.1", 0), "server": ("127.0.0.1", 80)}, receive, send)
@@ -94,9 +96,12 @@ class SupervisorRequestTests(unittest.TestCase):
         return start["status"], json.loads(body) if body else None
 
     @staticmethod
-    def proposal_pdf(title: str = "Campus Safety Study", *, missing_title: bool = False, pages: int = 1) -> bytes:
+    def proposal_pdf(title: str = "Campus Safety Study", *, missing_title: bool = False, missing_purpose: bool = False, pages: int = 1) -> bytes:
         page_text = [] if missing_title else ["Proposal Title: Campus Safety Study"]
-        page_text += ["Topic: Student safety", "Purpose: Improve campus safety for students.", "Objectives: Map risks and propose controls.", "Methodology: Interviews and observation."]
+        page_text += ["Topic: Student safety"]
+        if not missing_purpose:
+            page_text.append("Purpose: Improve campus safety for students.")
+        page_text += ["Objectives: Map risks and propose controls.", "Methodology: Interviews and observation."]
         objects = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>"]
         content = "BT /F1 11 Tf 72 700 Td " + " ".join(f"({line}) Tj 0 -20 Td" for line in page_text) + " ET"
         content_bytes = content.encode()
@@ -146,8 +151,11 @@ class SupervisorRequestTests(unittest.TestCase):
         response_body = b"".join(message.get("body", b"") for message in messages if message["type"] == "http.response.body")
         return start["status"], json.loads(response_body) if response_body else None
 
-    def create_draft(self, token: str, supervisor_id: int | None = None, cycle_id: int | None = None, data: bytes | None = None, filename: str = "proposal.pdf", content_type: str = "application/pdf"):
-        return self.multipart_call("POST", "/api/v1/supervisor-requests", {"academic_cycle_id": str(cycle_id or self.cycle.id), "supervisor_id": str(supervisor_id or self.supervisor.id)}, token, filename, data, content_type)
+    def create_draft(self, token: str, supervisor_id: int | None = None, cycle_id: int | None = None, data: bytes | None = None, filename: str = "proposal.pdf", content_type: str = "application/pdf", submission_note: str | None = None):
+        fields = {"academic_cycle_id": str(cycle_id or self.cycle.id), "supervisor_id": str(supervisor_id or self.supervisor.id)}
+        if submission_note is not None:
+            fields["submission_note"] = submission_note
+        return self.multipart_call("POST", "/api/v1/supervisor-requests", fields, token, filename, data, content_type)
 
     def confirm(self, draft: dict, token: str):
         return self.call("POST", f"/api/v1/supervisor-requests/{draft['id']}/confirm", {"revision": draft["revision"]}, token)
@@ -194,6 +202,123 @@ class SupervisorRequestTests(unittest.TestCase):
         status, body = self.call("POST", f"/api/v1/supervisor-requests/{draft['id']}/decision", {"action": "accept", "revision": submitted["revision"]}, self.tokens["supervisor"])
         self.assertEqual((status, body["status"]), (200, "ACCEPTED"))
         self.assertEqual(self.connection.execute(text("SELECT count(*) FROM supervisor_assignments WHERE team_id=:id AND ended_at IS NULL"), {"id": self.team.id}).scalar_one(), 1)
+        status, teams = self.call("GET", "/api/v1/group-channels/teams", token=self.tokens["supervisor"])
+        self.assertEqual((status, teams), (200, [{"id": self.team.id, "academic_cycle_id": self.cycle.id}]))
+        status, teams = self.call("GET", "/api/v1/group-channels/teams", token=self.tokens["other"])
+        self.assertEqual((status, teams), (200, []))
+
+    def test_accept_requires_registered_team_and_keeps_request_submitted(self):
+        _, draft = self.create_draft(self.tokens["student"])
+        _, submitted = self.submit(draft, self.tokens["student"])
+        status, body = self.call(
+            "POST",
+            f"/api/v1/supervisor-requests/{draft['id']}/decision",
+            {"action": "accept", "revision": submitted["revision"]},
+            self.tokens["supervisor"],
+        )
+        self.assertEqual(
+            (status, body["detail"]["code"], body["detail"]["message"]),
+            (422, "team_required", "A registered team is required before supervisor assignment."),
+        )
+        self.assertEqual(
+            self.connection.execute(text("SELECT status FROM supervisor_requests WHERE id=:id"), {"id": draft["id"]}).scalar_one(),
+            "SUBMITTED",
+        )
+        self.assertEqual(
+            self.connection.execute(text("SELECT count(*) FROM supervisor_assignments WHERE supervisor_id=:id AND ended_at IS NULL"), {"id": self.supervisor.id}).scalar_one(),
+            0,
+        )
+
+    def test_duplicate_assignment_is_rejected_without_accepting_request(self):
+        _, draft = self.create_draft(self.tokens["team"])
+        _, submitted = self.submit(draft, self.tokens["team"])
+        session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        session.add(SupervisorAssignment(team_id=self.team.id, academic_cycle_id=self.cycle.id, supervisor_id=self.supervisor.id, assigned_by_id=self.admin.id))
+        session.commit()
+        session.close()
+        status, body = self.call(
+            "POST",
+            f"/api/v1/supervisor-requests/{draft['id']}/decision",
+            {"action": "accept", "revision": submitted["revision"]},
+            self.tokens["supervisor"],
+        )
+        self.assertEqual((status, body["detail"]["code"]), (409, "team_already_assigned"))
+        self.assertEqual(
+            self.connection.execute(text("SELECT status FROM supervisor_requests WHERE id=:id"), {"id": draft["id"]}).scalar_one(),
+            "SUBMITTED",
+        )
+        self.assertEqual(
+            self.connection.execute(text("SELECT count(*) FROM supervisor_assignments WHERE team_id=:id AND ended_at IS NULL"), {"id": self.team.id}).scalar_one(),
+            1,
+        )
+
+    def test_accept_capacity_conflict_rolls_back_assignment_and_status(self):
+        session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        policy = session.query(SupervisorCapacityPolicy).filter_by(supervisor_id=self.supervisor.id, academic_cycle_id=self.cycle.id).one()
+        policy.max_group_capacity = 1
+        second_user = User(
+            full_name="Second Team Student",
+            email=f"second-team-{uuid4().hex[:10]}@example.com",
+            registration_number=f"SECOND{uuid4().hex[:8]}".upper(),
+            password_hash="test",
+            role=UserRole.STUDENT,
+        )
+        session.add(second_user)
+        session.flush()
+        second_team = Team(academic_cycle_id=self.cycle.id, shared_user_id=second_user.id)
+        second_token = generate_session_token()
+        session.add_all([
+            second_team,
+            AuthSession(user_id=second_user.id, token_hash=hash_session_token(second_token), expires_at=utc_now() + timedelta(hours=1)),
+        ])
+        session.commit()
+        session.close()
+        _, first_draft = self.create_draft(self.tokens["team"])
+        _, first_submitted = self.submit(first_draft, self.tokens["team"])
+        _, second_draft = self.create_draft(second_token)
+        _, second_submitted = self.submit(second_draft, second_token)
+        status, accepted = self.call(
+            "POST",
+            f"/api/v1/supervisor-requests/{first_draft['id']}/decision",
+            {"action": "accept", "revision": first_submitted["revision"]},
+            self.tokens["supervisor"],
+        )
+        self.assertEqual((status, accepted["status"]), (200, "ACCEPTED"))
+        status, body = self.call(
+            "POST",
+            f"/api/v1/supervisor-requests/{second_draft['id']}/decision",
+            {"action": "accept", "revision": second_submitted["revision"]},
+            self.tokens["supervisor"],
+        )
+        self.assertEqual((status, body["detail"]["code"]), (409, "capacity_full"))
+        self.assertEqual(
+            self.connection.execute(text("SELECT status FROM supervisor_requests WHERE id=:id"), {"id": second_draft["id"]}).scalar_one(),
+            "SUBMITTED",
+        )
+        self.assertEqual(
+            self.connection.execute(text("SELECT count(*) FROM supervisor_assignments WHERE supervisor_id=:id AND ended_at IS NULL"), {"id": self.supervisor.id}).scalar_one(),
+            1,
+        )
+
+    def test_accept_audit_failure_rolls_back_assignment_and_status(self):
+        _, draft = self.create_draft(self.tokens["team"])
+        _, submitted = self.submit(draft, self.tokens["team"])
+        with patch("app.main.add_admin_audit_event", side_effect=RuntimeError("audit failure")):
+            status, body = self.call(
+                "POST",
+                f"/api/v1/supervisor-requests/{draft['id']}/decision",
+                {"action": "accept", "revision": submitted["revision"]},
+                self.tokens["supervisor"],
+            )
+        self.assertEqual((status, body["detail"]["code"]), (500, "decision_save_failed"))
+        self.assertEqual(
+            self.connection.execute(text("SELECT status FROM supervisor_requests WHERE id=:id"), {"id": draft["id"]}).scalar_one(),
+            "SUBMITTED",
+        )
+        self.assertEqual(
+            self.connection.execute(text("SELECT count(*) FROM supervisor_assignments WHERE team_id=:id AND ended_at IS NULL"), {"id": self.team.id}).scalar_one(),
+            0,
+        )
 
     def test_reject_changes_resubmit_withdraw_and_history(self):
         _, draft = self.create_draft(self.tokens["student"])
@@ -223,6 +348,9 @@ class SupervisorRequestTests(unittest.TestCase):
         self.assertEqual((status, body["detail"]["code"]), (409, "supervisor_ineligible"))
         self.assertEqual(self.call("GET", "/api/v1/supervisor-requests/admin/monitor", token=self.tokens["admin"])[0], 200)
         self.assertEqual(self.call("GET", "/api/v1/supervisor-requests/coordinator/monitor", token=self.tokens["coordinator"])[0], 200)
+        filtered_status, filtered_rows = self.call("GET", f"/api/v1/supervisor-requests/coordinator/monitor?academic_cycle_id={self.cycle.id}&supervisor_id={self.supervisor.id}&status=ACCEPTED", token=self.tokens["coordinator"])
+        self.assertEqual(filtered_status, 200)
+        self.assertTrue(all(row["status"] == "ACCEPTED" for row in filtered_rows))
         self.assertEqual(self.call("GET", "/api/v1/supervisor-requests/admin/monitor", token=self.tokens["student"])[0], 403)
         session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint"); session.execute(text("UPDATE supervisor_capacity_policies SET max_group_capacity=3 WHERE supervisor_id=:id AND academic_cycle_id=:cycle"), {"id": self.supervisor.id, "cycle": self.cycle.id}); session.commit(); session.close()
         with patch("app.main.add_admin_audit_event", side_effect=RuntimeError("audit failure")):
@@ -250,12 +378,45 @@ class SupervisorRequestTests(unittest.TestCase):
         self.assertEqual(status, 201)
         self.assertEqual(draft["document"]["page_count"], 1)
         self.assertEqual(draft["document"]["extracted_fields"]["title"]["source_page"], 1)
-        status, confirmed = self.confirm(draft, self.tokens["student"])
+        status, confirmed = self.call("POST", f"/api/v1/supervisor-requests/{draft['id']}/confirm", {"revision": draft["revision"]}, self.tokens["student"], origin="http://localhost:5173")
         self.assertEqual((status, confirmed["extraction_status"]), (200, "CONFIRMED"))
         status, document = self.call("GET", f"/api/v1/supervisor-requests/document/{draft['id']}", token=self.tokens["student"])
         self.assertEqual(status, 200)
         status, _ = self.call("GET", f"/api/v1/supervisor-requests/document/{draft['id']}", token=self.tokens["other"])
         self.assertEqual(status, 403)
+
+    def test_owner_confirm_and_submit_only(self):
+        _, draft = self.create_draft(self.tokens["student"])
+        status, denied = self.confirm(draft, self.tokens["team"])
+        self.assertEqual((status, denied["detail"]["code"]), (403, "request_forbidden"))
+        status, confirmed = self.confirm(draft, self.tokens["student"])
+        self.assertEqual((status, confirmed["extraction_status"], confirmed["status"]), (200, "CONFIRMED", "DRAFT"))
+        status, submitted = self.call("POST", f"/api/v1/supervisor-requests/{draft['id']}/submit", {"revision": confirmed["revision"]}, self.tokens["student"])
+        self.assertEqual((status, submitted["status"]), (200, "SUBMITTED"))
+
+    def test_submit_requires_confirmation_and_current_revision(self):
+        _, draft = self.create_draft(self.tokens["student"])
+        status, body = self.call("POST", f"/api/v1/supervisor-requests/{draft['id']}/submit", {"revision": draft["revision"]}, self.tokens["student"])
+        self.assertEqual((status, body["detail"]["code"]), (422, "extraction_not_confirmed"))
+        status, confirmed = self.confirm(draft, self.tokens["student"])
+        self.assertEqual(status, 200)
+        status, body = self.call("POST", f"/api/v1/supervisor-requests/{draft['id']}/submit", {"revision": draft["revision"]}, self.tokens["student"])
+        self.assertEqual((status, body["detail"]["code"]), (409, "stale_request"))
+
+    def test_cross_team_owner_and_missing_required_fields_are_denied(self):
+        _, team_draft = self.create_draft(self.tokens["team"])
+        status, body = self.confirm(team_draft, self.tokens["student"])
+        self.assertEqual((status, body["detail"]["code"]), (403, "request_forbidden"))
+        _, missing_title = self.create_draft(self.tokens["student"], data=self.proposal_pdf(missing_title=True))
+        status, body = self.confirm(missing_title, self.tokens["student"])
+        self.assertEqual((status, body["detail"]["code"]), (422, "required_fields_missing"))
+        session = Session(bind=self.connection, join_transaction_mode="create_savepoint")
+        session.add(SupervisorCapacityPolicy(supervisor_id=self.other_supervisor.id, academic_cycle_id=self.cycle.id, max_group_capacity=2))
+        session.commit()
+        session.close()
+        _, missing_purpose = self.create_draft(self.tokens["student"], data=self.proposal_pdf(missing_purpose=True), supervisor_id=self.other_supervisor.id)
+        status, body = self.confirm(missing_purpose, self.tokens["student"])
+        self.assertEqual((status, body["detail"]["code"]), (422, "required_fields_missing"))
 
     def test_concurrent_submission_revision_safety(self):
         _, draft = self.create_draft(self.tokens["student"])
@@ -264,3 +425,69 @@ class SupervisorRequestTests(unittest.TestCase):
         self.assertEqual((first_status, first["status"]), (200, "SUBMITTED"))
         second_status, second = self.call("POST", f"/api/v1/supervisor-requests/{draft['id']}/submit", {"revision": confirmed["revision"]}, self.tokens["student"])
         self.assertEqual((second_status, second["detail"]["code"]), (409, "request_not_submittable"))
+
+    def test_submission_note_is_optional_visible_and_immutable_by_version(self):
+        status, draft = self.create_draft(self.tokens["student"], submission_note="Completed the baseline survey; please advise on the sampling plan.")
+        self.assertEqual((status, draft["submission_note"]), (201, "Completed the baseline survey; please advise on the sampling plan."))
+        _, submitted = self.submit(draft, self.tokens["student"])
+        self.assertEqual(submitted["submission_note_versions"][0]["body"], draft["submission_note"])
+        self.assertEqual(self.call("GET", "/api/v1/supervisor-requests/supervisor/queue", token=self.tokens["supervisor"])[1][0]["submission_note"], draft["submission_note"])
+        self.assertEqual(self.call("GET", "/api/v1/supervisor-requests/coordinator/monitor", token=self.tokens["coordinator"])[1][0]["submission_note"], draft["submission_note"])
+        self.assertEqual(self.call("GET", "/api/v1/supervisor-requests/admin/monitor", token=self.tokens["admin"])[1][0]["submission_note"], draft["submission_note"])
+        self.assertEqual(self.connection.execute(text("SELECT count(*) FROM supervisor_request_submission_note_versions WHERE request_id=:id"), {"id": draft["id"]}).scalar_one(), 1)
+        self.assertEqual(self.connection.execute(text("SELECT body FROM supervisor_request_submission_note_versions WHERE request_id=:id AND version=1"), {"id": draft["id"]}).scalar_one(), draft["submission_note"])
+
+    def test_fyp_registry_role_scopes_filters_and_supervisor_assignment(self):
+        _, draft = self.create_draft(self.tokens["team"])
+        _, submitted = self.submit(draft, self.tokens["team"])
+        status, accepted = self.call(
+            "POST",
+            f"/api/v1/supervisor-requests/{draft['id']}/decision",
+            {"action": "accept", "revision": submitted["revision"]},
+            self.tokens["supervisor"],
+        )
+        self.assertEqual((status, accepted["status"]), (200, "ACCEPTED"))
+        status, rows = self.call("GET", f"/api/v1/fyp-registry/coordinator?academic_cycle_id={self.cycle.id}&status=ACCEPTED&search=TEAM", token=self.tokens["coordinator"])
+        self.assertEqual(status, 200)
+        self.assertEqual([row["id"] for row in rows], [draft["id"]])
+        self.assertEqual(rows[0]["assignment_status"], "Assigned")
+        status, supervisor_rows = self.call("GET", "/api/v1/fyp-registry/supervisor", token=self.tokens["supervisor"])
+        self.assertEqual(status, 200)
+        self.assertEqual([row["id"] for row in supervisor_rows], [draft["id"]])
+        self.assertEqual(self.call("GET", "/api/v1/fyp-registry/supervisor", token=self.tokens["other"])[1], [])
+        self.assertEqual(self.call("GET", "/api/v1/fyp-registry/admin", token=self.tokens["student"])[0], 403)
+        session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        panel = User(full_name="Registry Panel", email=f"registry-panel-{uuid4().hex[:10]}@example.com", password_hash="test", role=UserRole.PANEL_MEMBER)
+        panel_token = generate_session_token()
+        session.add(panel)
+        session.flush()
+        session.add(AuthSession(user_id=panel.id, token_hash=hash_session_token(panel_token), expires_at=utc_now() + timedelta(hours=1)))
+        session.commit()
+        session.close()
+        self.assertEqual(self.call("GET", "/api/v1/fyp-registry/coordinator", token=panel_token)[0], 403)
+
+    def test_fyp_registry_detail_and_admin_metadata_are_audited_without_mutating_proposal(self):
+        _, draft = self.create_draft(self.tokens["student"])
+        status, detail = self.call("GET", f"/api/v1/fyp-registry/{draft['id']}/coordinator", token=self.tokens["coordinator"])
+        self.assertEqual((status, detail["proposal_title"]), (200, "Campus Safety Study"))
+        self.assertEqual(detail["remaining_gaps"], "Progress tracking is not configured yet.")
+        status, updated = self.call(
+            "PATCH",
+            f"/api/v1/fyp-registry/{draft['id']}/admin/metadata?audit=1",
+            {"department_section": "CS / A", "project_scope": "Campus safety", "team_label": "Pilot team", "administrative_notes": "Verified for registry.", "correction_reason": "Corrected section metadata."},
+            self.tokens["admin"],
+            origin="http://localhost:5173",
+        )
+        self.assertEqual((status, updated["department_section"], updated["proposal_title"]), (200, "CS / A", "Campus Safety Study"))
+        self.assertEqual(updated["administrative_notes"], "Verified for registry.")
+        self.assertTrue(any(item["action"] == "fyp_registry_metadata_updated" for item in updated["audit_history"]))
+        status, searched = self.call("GET", "/api/v1/fyp-registry/admin?search=Pilot%20team", token=self.tokens["admin"])
+        self.assertEqual((status, [item["id"] for item in searched]), (200, [draft["id"]]))
+        self.assertEqual(self.call("PATCH", f"/api/v1/fyp-registry/{draft['id']}/admin/metadata?audit=2", {"correction_reason": "Nope"}, self.tokens["coordinator"], origin="http://localhost:5173")[0], 403)
+
+    def test_fyp_registry_student_ownership_and_cross_scope_are_enforced(self):
+        _, own = self.create_draft(self.tokens["student"])
+        status, detail = self.call("GET", f"/api/v1/fyp-registry/{own['id']}/student", token=self.tokens["student"])
+        self.assertEqual((status, detail["requester_user_id"]), (200, self.student.id))
+        self.assertEqual(self.call("GET", f"/api/v1/fyp-registry/{own['id']}/student", token=self.tokens["team"])[0], 403)
+        self.assertEqual(self.call("GET", f"/api/v1/fyp-registry/{own['id']}/admin", token=self.tokens["supervisor"])[0], 403)

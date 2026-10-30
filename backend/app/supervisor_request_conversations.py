@@ -59,6 +59,8 @@ def conversation_history(request_id: int, actor: User = Depends(get_current_user
 def send_conversation_message(request_id: int, payload: RequestMessageWrite, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     validate_mutating_origin(request)
     try:
+        if actor.role not in (UserRole.STUDENT, UserRole.SUPERVISOR):
+            raise HTTPException(status_code=403, detail="This conversation is read-only for your role.")
         _request_for_actor(session, request_id, actor, lock=True)
         message = SupervisorRequestMessage(request_id=request_id, sender_id=actor.id, body=payload.body)
         session.add(message)

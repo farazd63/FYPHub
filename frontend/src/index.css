@@ -310,6 +310,17 @@ main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) table the
 /* Approved Admin surface fallback: these selectors target the shared portal
    content directly so every Admin page keeps the same visual language even
    when the surrounding :has() scope is unavailable or reordered. */
+.student-page-heading .student-overview__eyebrow,
+.module03-heading .student-overview__eyebrow,
+.admin-enter .student-overview__eyebrow { color: #315db4; }
+
+.student-page-heading [class*="status"],
+.module03-card [class*="status"] { opacity: 1; }
+.student-supervisor-option:disabled,
+.student-request-actions button:disabled,
+.student-request-list article > button:disabled,
+.module03-button:disabled { opacity: 1; color: #526b93; background: #e8edf5; border-color: #c7d5e8; }
+
 .admin-enter > section[aria-labelledby],
 .admin-enter > section:not([aria-labelledby]) { color: #183047; }
 .admin-enter > section[aria-labelledby] > div:first-child h1,
