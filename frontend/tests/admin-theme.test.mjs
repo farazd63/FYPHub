@@ -10,9 +10,13 @@ const shared = readFileSync(join(here, "../src/index.css"), "utf8");
 const app = readFileSync(join(here, "../src/App.tsx"), "utf8");
 
 assert.match(portal, /import ["].\/AdminSidebar\.css["];/);
-assert.match(portal, /className=\{\(menu\?/);
+assert.match(portal, /admin-nav-group-toggle/);
+assert.match(portal, /aria-expanded=\{Boolean\(expanded\[group\.id\]\)\}/);
+assert.match(portal, /Required Documents/);
+assert.match(portal, /\/admin\/document-requirements/);
+assert.doesNotMatch(portal, /aria-disabled="true"/);
 assert.match(portal, /admin-sidebar-toggle/);
-assert.match(portal, /admin-nav-icon/);
+assert.match(portal, /disabled=\{!allowed\}/);
 assert.match(app, /AdminPortal api=\{API\}/);
 assert.match(sidebar, /\.admin-sidebar\s*\{[\s\S]*background:\s*#10244a/);
 assert.match(sidebar, /\.admin-sidebar nav button\[aria-current="page"\]/);

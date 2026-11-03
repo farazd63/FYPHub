@@ -9,7 +9,7 @@ from .auth import get_current_user, require_roles, utc_now, validate_mutating_or
 from .database import get_db
 from .models import (AcademicCycle, ProjectMilestone, ProjectTask, SupervisorAssignment, SupervisorRequest,
                       SupervisorRequestMessage, SupervisorRequestStatus, SupervisionAgentRun, Team, TeamMember, User, UserRole)
-from .ai_provider import SupervisionPlanPayload, run_groq_json
+from .ai_provider import SupervisionPlanPayload, run_ai_json
 
 router = APIRouter(prefix="/api/v1/agent-supervision")
 WRITE = (UserRole.STUDENT, UserRole.SUPERVISOR, UserRole.COORDINATOR, UserRole.ADMIN)
@@ -48,8 +48,8 @@ def start_run(team_id: int, request: Request, actor: User = Depends(require_role
     assignment = session.scalar(select(SupervisorAssignment).where(SupervisorAssignment.team_id == team.id, SupervisorAssignment.ended_at.is_(None)))
     objectives = proposal.objectives or "Complete the approved project objectives"
     methodology = proposal.methodology or "Follow the approved methodology"
-    provider = asyncio.run(run_groq_json("Objectives:\n" + objectives + "\nMethodology:\n" + methodology, SupervisionPlanPayload, model_kind="agent", rate_key=f"agent:{actor.id}:{team.id}"))
-    if provider.get("status") == "AVAILABLE":
+    provider = asyncio.run(run_ai_json("Objectives:\n" + objectives + "\nMethodology:\n" + methodology, SupervisionPlanPayload, model_kind="agent", rate_key=f"agent:{actor.id}:{team.id}"))
+    if provider.get("status") in ("AVAILABLE", "COMPLETED"):
         plan = {"source": "AI", "confidence": provider["payload"]["confidence"], "milestones": provider["payload"]["milestones"], "metadata": {key: provider.get(key) for key in ("provider", "model", "timestamp", "request_id", "http_status", "latency_ms", "retry_count")}}
     else:
         plan = {"source": "DETERMINISTIC_FALLBACK", "confidence": 0.65, "fallback_reason": provider.get("fallback_reason"), "milestones": [{"title": "Plan and design", "description": objectives, "due_at": (utc_now() + timedelta(days=14)).isoformat(), "tasks": [{"title": "Define implementation tasks", "description": methodology, "due_at": (utc_now() + timedelta(days=7)).isoformat(), "dependencies": []}]}, {"title": "Implementation and validation", "description": "Implement and validate the approved objectives.", "due_at": (utc_now() + timedelta(days=42)).isoformat(), "tasks": [{"title": "Validate outcomes", "description": "Record evidence against the approved objectives.", "due_at": (utc_now() + timedelta(days=35)).isoformat(), "dependencies": ["Define implementation tasks"]}]},], "cycle_id": cycle.id if cycle else None, "supervisor_id": assignment.supervisor_id if assignment else None}

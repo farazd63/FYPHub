@@ -8,6 +8,7 @@ import {
   normalizeEmail,
 } from "./emailValidation";
 import { StudentPortal } from "./portals/student/StudentPortal";
+import { fullNameValidationMessage } from "./inputValidation";
 import { SupervisorPortal } from "./portals/supervisor/SupervisorPortal";
 import { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";
 import { StudentEvaluatorPortal as EvaluatorPortal } from "./portals/student/modules/StudentEvaluatorPortal";
@@ -49,9 +50,7 @@ type StudentSignupMode = "single" | "group";
 type PublicRoute = { page: PublicPage; signupRole: LoginRole | null; step: 1 | 2 | 3; studentMode: StudentSignupMode | null };
 
 const STEPS = ["Account Details", "Login Details", "Team Members"];
-const API = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8010"
-).replace(/\/$/, "");
+export const API = (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8010").replace(/\/$/, "");
 const INPUT =
   "w-full rounded-lg border border-[#DCE3ED] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#4663FF] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
 const PRIMARY =
@@ -59,6 +58,7 @@ const PRIMARY =
 const AUTH_PRIMARY =
   "rounded-xl bg-[#4663FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#354ee0] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";
 const DEVELOPMENT_UNKNOWN_ACCOUNT_MESSAGE = "No account was found with this email address.";
+const academicCycleError = (status: number) => ({ 401: "Your session has expired. Please sign in again.", 403: "You are not authorized to load academic cycles.", 404: "The academic-cycles endpoint was not found.", 500: "The backend could not load academic cycles." }[status] ?? "Academic cycles could not be loaded.");
 
 const newMember = (): Member => ({
   id: crypto.randomUUID(),
@@ -384,9 +384,10 @@ export default function App() {
     void (async () => {
       try {
         const response = await fetch(`${API}/api/v1/academic-cycles`, {
+          credentials: "include",
           signal: controller.signal,
         });
-        if (!response.ok) throw new Error();
+        if (!response.ok) throw new Error(academicCycleError(response.status));
         const data: Cycle[] = await response.json();
         if (!controller.signal.aborted) {
           setCycles(data);
@@ -415,13 +416,13 @@ export default function App() {
       try {
         const response = await fetch(
           `${API}/api/v1/academic-cycles/${cycleId}/group-policy`,
-          { signal: controller.signal },
+          { credentials: "include", signal: controller.signal },
         );
         if (response.status === 404) {
           if (!controller.signal.aborted) setPolicyState("unavailable");
           return;
         }
-        if (!response.ok) throw new Error();
+        if (!response.ok) throw new Error(academicCycleError(response.status));
         const data: Policy = await response.json();
         if (!controller.signal.aborted) {
           setPolicy(data);
@@ -519,8 +520,8 @@ export default function App() {
   function validate(target: number): FieldErrors {
     const next: FieldErrors = {};
     if (target === 1 || target === 0) {
-      if (!account.name.trim())
-        next["account.name"] = "Enter the creator's full name.";
+      const accountNameError = fullNameValidationMessage(account.name);
+      if (accountNameError) next["account.name"] = accountNameError;
       if (!registration(account.registration))
         next["account.registration"] =
           "Enter the creator's registration number.";
@@ -552,7 +553,8 @@ export default function App() {
           member.id === "creator" ? "account" : `member.${member.id}`;
         const reg = registration(member.registration);
         const address = email(member.email);
-        if (!member.name.trim()) next[`${prefix}.name`] = "Enter a full name.";
+        const memberNameError = fullNameValidationMessage(member.name);
+        if (memberNameError) next[`${prefix}.name`] = memberNameError;
         if (!reg)
           next[`${prefix}.registration`] = "Enter a registration number.";
         const memberEmailError = emailValidationMessage(address);
@@ -583,7 +585,8 @@ export default function App() {
   }
   function validateSingle(): FieldErrors {
     const next: FieldErrors = {};
-    if (!single.name.trim()) next["single.name"] = "Enter your full name.";
+    const singleNameError = fullNameValidationMessage(single.name);
+    if (singleNameError) next["single.name"] = singleNameError;
     if (!registration(single.registration)) next["single.registration"] = "Enter your registration number.";
     const singleEmailError = emailValidationMessage(single.email);
     if (singleEmailError) next["single.email"] = singleEmailError;
@@ -841,10 +844,23 @@ export default function App() {
         );
         return;
       }
-      const user = (await response.json()) as SafeUser;
-      setAuthUser(user);
+      await response.json();
+      const sessionResponse = await fetch(`${API}/api/v1/auth/me`, {
+        credentials: "include",
+      });
+      if (!sessionResponse.ok) {
+        setAuthUser(null);
+        setAuthError(
+          sessionResponse.status === 401
+            ? "Sign-in succeeded, but the browser session could not be confirmed. Please try again."
+            : "The authenticated session could not be confirmed.",
+        );
+        return;
+      }
+      const confirmedUser = (await sessionResponse.json()) as SafeUser;
+      setAuthUser(confirmedUser);
       setSignIn((current) => ({ ...current, password: "" }));
-      const destination = user.role === "ADMIN" ? "admin-portal" : "account";
+      const destination = confirmedUser.role === "ADMIN" ? "admin-portal" : "account";
       window.history.pushState({ fyphubNavigation: { page: destination } }, "", window.location.href);
       setPage(destination);
     } catch {
@@ -1002,7 +1018,7 @@ export default function App() {
       <CoordinatorPortal api={API} user={authUser} onLogout={() => void signOut()} />
     );
   if (page === "account" && authUser?.role === "PANEL_MEMBER")
-    return <EvaluatorPortal user={authUser} onLogout={() => void signOut()} />;
+    return <EvaluatorPortal api={API} user={authUser} onLogout={() => void signOut()} />;
   if (page === "account" && authUser)
     return (
       <main className="min-h-screen bg-[#F7F5EF] px-4 py-8 text-[#243746]">

@@ -1,20 +1,22 @@
 """Cycle-scoped supervisor selection and proposal-request workflow."""
 
 import asyncio
+import logging
 import os
 from datetime import datetime
 from io import BytesIO
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .auth import get_current_user, require_roles, utc_now, validate_mutating_origin
 from .database import get_db
+from .config import settings
 from .pdf_extraction import EXTRACTION_RUNTIME, PdfExtractionError, extract_proposal_document
 from .models import (
     AcademicCycle,
@@ -31,7 +33,9 @@ from .models import (
     UserRole,
 )
 from .modules.module_03_proposal.models import M03CheckRun
-from .ai_provider import ProposalProviderPayload, run_groq_json
+from .ai_provider import ProposalProviderPayload, run_ai_json
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/supervisor-requests")
 proposal_router = APIRouter(prefix="/api/v1/proposals")
@@ -67,6 +71,53 @@ class DecisionAction(RevisionAction):
         return value or None
 
 
+REVIEW_SECTIONS = ("problem_statement", "objectives", "scope", "methodology", "abstract_purpose", "expected_outcomes", "proposed_solution")
+
+
+class ProposalAIReviewFinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    page: int | None
+    source: Literal["AI", "DETERMINISTIC"]
+    status: Literal["PASS", "WARNING", "FAIL"]
+    section: str
+    evidence: str
+    feedback: str = Field(min_length=1)
+    confidence: float = Field(ge=0, le=1)
+    suggestion: str = Field(min_length=1)
+
+
+class ProposalAIReviewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    review_id: int
+    proposal_id: str
+    status: Literal["COMPLETED", "UNAVAILABLE"]
+    provider: str
+    model: str
+    source: Literal["AI", "DETERMINISTIC_FALLBACK"]
+    message: str
+    advisory: bool
+    findings: list[ProposalAIReviewFinding] = Field(min_length=7, max_length=7)
+    timestamp: datetime | None
+    error_type: str | None
+    latency_ms: float | None
+    request_id: str | None
+    retry_count: int | None
+    fallback_reason: str | None
+
+    @model_validator(mode="after")
+    def validate_contract(self):
+        if tuple(item.section for item in self.findings) != REVIEW_SECTIONS:
+            raise ValueError("proposal review findings must contain the canonical seven sections")
+        expected_source = "AI" if self.source == "AI" else "DETERMINISTIC"
+        if self.status == "COMPLETED" and self.source != "AI":
+            raise ValueError("completed reviews must use source AI")
+        if self.status == "UNAVAILABLE" and self.source != "DETERMINISTIC_FALLBACK":
+            raise ValueError("unavailable reviews must use deterministic fallback")
+        if any(item.source != expected_source for item in self.findings):
+            raise ValueError("finding source does not match review source")
+        return self
+
+
 def _normalize_submission_note(value: str | None) -> str | None:
     normalized = value.strip() if value else ""
     return normalized or None
@@ -76,25 +127,48 @@ def failure(code: str, message: str, http_status: int = status.HTTP_409_CONFLICT
     return HTTPException(status_code=http_status, detail={"code": code, "message": message})
 
 
-def _ai_fallback(row: SupervisorRequest, document: SupervisorRequestDocument) -> dict[str, object]:
-    fields = document.extracted_fields if isinstance(document.extracted_fields, dict) else {}
+def _ai_fallback(row: SupervisorRequest, document: SupervisorRequestDocument | None) -> dict[str, object]:
+    fields = document.extracted_fields if document is not None and isinstance(document.extracted_fields, dict) else {}
     checks = {
         "problem_statement": (row.problem_statement or fields.get("purpose"), "Add a clear problem statement with context, gap, and impact."),
         "objectives": (row.objectives or fields.get("objectives"), "State specific, measurable objectives."),
-        "methodology": (row.methodology or fields.get("methodology"), "Describe the method, data, evaluation approach, and validation procedure."),
         "scope": (row.scope, "Define what is in scope and what is explicitly excluded."),
+        "methodology": (row.methodology or fields.get("methodology"), "Describe the method, data, evaluation approach, and validation procedure."),
         "abstract_purpose": (fields.get("purpose"), "Clarify the proposal purpose and expected contribution."),
         "expected_outcomes": (fields.get("expected_outcomes"), "Describe concrete expected outcomes and how they will be evaluated."),
+        "proposed_solution": (fields.get("proposed_solution") or fields.get("solution"), "Explain the proposed system features and how they solve the stated problem."),
     }
     findings = []
     for section, (value, suggestion) in checks.items():
         present = bool(value and (not isinstance(value, dict) or value.get("value")))
         findings.append({"section": section, "status": "PASS" if present else "WARNING", "feedback": "Content was detected for this section." if present else "No sufficiently clear content was detected for this section.", "suggestion": "No correction suggested." if present else suggestion, "page": 1 if present else None, "evidence": str(value)[:500] if present else "No evidence was detected.", "confidence": 0.9 if present else 0.65, "source": "DETERMINISTIC"})
-    return {"status": "UNAVAILABLE", "message": "AI review unavailable; deterministic section checks are shown.", "provider": "none", "model": None, "findings": findings, "advisory": True}
+    return {"status": "UNAVAILABLE", "source": "DETERMINISTIC_FALLBACK", "message": "AI review unavailable; deterministic section checks are shown.", "provider": "ollama", "model": settings.ollama_proposal_model, "findings": findings, "advisory": True}
+
+
+def _review_prompt(row: SupervisorRequest, document: SupervisorRequestDocument | None) -> str:
+    fields = document.extracted_fields if document is not None and isinstance(document.extracted_fields, dict) else {}
+    values = {
+        "problem_statement": row.problem_statement or fields.get("problem_statement") or fields.get("problem"),
+        "objectives": row.objectives or fields.get("objectives"),
+        "scope": row.scope or fields.get("scope"),
+        "methodology": row.methodology or fields.get("methodology"),
+        "abstract_purpose": fields.get("abstract_purpose") or fields.get("purpose"),
+        "expected_outcomes": fields.get("expected_outcomes"),
+        "proposed_solution": fields.get("proposed_solution") or fields.get("solution"),
+    }
+    lines = ["Act as an academic proposal reviewer. Evaluate quality, relevance, completeness, and alignment; do not mark PASS merely because text exists. Use only supplied content, do not invent evidence, and provide concise actionable feedback. Required sections must be reviewed in exact order."]
+    for section, value in values.items():
+        if isinstance(value, dict): value = value.get("value")
+        lines.append(f"{section}: {str(value).strip()[:1800] if value and str(value).strip() else '[MISSING]'}")
+    return "\n".join(lines)
 
 
 def _ai_out(run: M03CheckRun) -> dict[str, object]:
-    return {"review_id": run.id, "proposal_id": run.proposal_id, "status": run.status, "provider": run.runtime, "model": run.model, "started_at": run.started_at, "finished_at": run.finished_at, **(run.result if isinstance(run.result, dict) else {})}
+    result = run.result if isinstance(run.result, dict) else {}
+    payload = {"review_id": run.id, "proposal_id": run.proposal_id, "status": result.get("status", run.status), "provider": result.get("provider", run.runtime), "model": result.get("model", run.model) or settings.ollama_proposal_model, "source": result.get("source"), "message": result.get("message", "AI review completed."), "advisory": bool(result.get("advisory", True)), "findings": result.get("findings", []), "timestamp": result.get("timestamp", run.finished_at or run.started_at), "error_type": result.get("error_type"), "latency_ms": result.get("latency_ms"), "request_id": result.get("request_id"), "retry_count": result.get("retry_count"), "fallback_reason": result.get("fallback_reason")}
+    response = ProposalAIReviewResponse.model_validate(payload).model_dump(mode="json")
+    logger.info("ai_review.response request_id=%s status=%s source=%s finding_count=%s fallback_reason=%s error_type=%s latency_ms=%s sections=%s", response.get("request_id"), response.get("status"), response.get("source"), len(response.get("findings", [])), response.get("fallback_reason"), response.get("error_type"), response.get("latency_ms"), [item.get("section") for item in response.get("findings", [])])
+    return response
 
 
 def _team_for_student(session: Session, actor: User) -> Team | None:
@@ -899,40 +973,55 @@ def read_request(
     return _out(session, row)
 
 
-@proposal_router.post("/{request_id}/ai-review")
+@proposal_router.post("/{request_id}/ai-review", response_model=ProposalAIReviewResponse, status_code=status.HTTP_200_OK)
 async def run_proposal_ai_review(
     request_id: int,
     actor: User = Depends(get_current_user),
     session: Session = Depends(get_db),
+    request: Request = None,
 ):
+    correlation_id = getattr(getattr(request, "state", None), "request_id", None) or "untracked"
+    logger.info("ai_review.start request_id=%s proposal_id=%s", correlation_id, request_id)
     row = _load_for_view(session, request_id)
+    logger.info("proposal.loaded request_id=%s proposal_id=%s", correlation_id, request_id)
     team = _team_for_student(session, actor) if actor.role == UserRole.STUDENT else None
     allowed = actor.role in (UserRole.COORDINATOR, UserRole.ADMIN) or (actor.role == UserRole.SUPERVISOR and row.supervisor_id == actor.id) or (actor.role == UserRole.STUDENT and (row.requester_user_id == actor.id or (team is not None and row.team_id == team.id)))
     if not allowed:
         raise failure("proposal_forbidden", "This proposal is outside your authorized scope.", status.HTTP_403_FORBIDDEN)
     document = session.get(SupervisorRequestDocument, row.document_id) if row.document_id else None
-    if document is None:
-        raise failure("document_not_found", "A proposal document is required before AI review.", status.HTTP_422_UNPROCESSABLE_CONTENT)
+    logger.info("document.loaded request_id=%s proposal_id=%s present=%s", correlation_id, request_id, document is not None)
     proposal_key = f"supervisor-request:{row.id}"
     existing = session.scalar(select(M03CheckRun).where(M03CheckRun.proposal_id == proposal_key, M03CheckRun.check_name == "proposal_ai_review", M03CheckRun.status == "RUNNING"))
     if existing is not None:
         raise failure("review_in_progress", "An AI review is already running for this proposal.")
-    run = M03CheckRun(proposal_id=proposal_key, check_name="proposal_ai_review", status="RUNNING", runtime="groq", model=os.getenv("GROQ_PROPOSAL_MODEL") or None, result={"status": "RUNNING", "advisory": True})
+    run = M03CheckRun(proposal_id=proposal_key, check_name="proposal_ai_review", status="RUNNING", runtime="ollama", model=settings.ollama_proposal_model, result={"status": "RUNNING", "advisory": True})
     session.add(run); session.commit(); session.refresh(run)
     try:
-        provider = await run_groq_json("Proposal text:\n" + document.extracted_text[:12000], ProposalProviderPayload, model_kind="proposal", rate_key=f"proposal:{actor.id}")
-        if provider.get("status") in ("AVAILABLE", "COMPLETED"):
-            provider = {"status": "AVAILABLE", "runtime": provider.get("provider"), "model": provider.get("model"), "timestamp": provider.get("timestamp"), "suggestions": provider.get("payload", {}).get("suggestions", []), "confidence": provider.get("payload", {}).get("confidence", 0.5), "metadata": {key: provider.get(key) for key in ("request_id", "http_status", "latency_ms", "retry_count")}}
-        if provider.get("status") not in ("AVAILABLE", "COMPLETED"):
-            result = {**_ai_fallback(row, document), **{key: provider.get(key) for key in ("provider", "source", "fallback_reason", "error_type", "http_status", "request_id", "retry_count", "latency_ms", "model", "timestamp") if provider.get(key) is not None}}
+        extracted_text = document.extracted_text.strip() if document is not None and document.extracted_text else ""
+        logger.info("extracted_content.ready request_id=%s proposal_id=%s present=%s length=%s", correlation_id, request_id, bool(extracted_text), len(extracted_text))
+        logger.info("deterministic_findings.ready request_id=%s proposal_id=%s", correlation_id, request_id)
+        if not extracted_text:
+            result = {**_ai_fallback(row, document), "fallback_reason": "missing_document" if document is None else "invalid_response", "error_type": "MissingDocument" if document is None else "EmptyExtractedText", "request_id": correlation_id}
         else:
-            suggestions = provider.get("suggestions", [])
-            findings = [{"section": "overall_consistency", "status": "WARNING", "feedback": str(item), "suggestion": "Review this advisory finding against the source document.", "page": 1, "evidence": document.extracted_text[:500], "confidence": provider.get("confidence", 0.5), "source": "AI"} for item in suggestions]
-            result = {"status": "COMPLETED", "provider": provider.get("runtime", "ollama-local"), "model": provider.get("model"), "findings": findings, "advisory": True}
+            logger.info("ollama.request.start request_id=%s proposal_id=%s", correlation_id, request_id)
+            provider = await run_ai_json(_review_prompt(row, document), ProposalProviderPayload, model_kind="proposal", rate_key=f"proposal:{actor.id}")
+            logger.info("ollama.response.received request_id=%s proposal_id=%s status=%s", correlation_id, request_id, provider.get("status"))
+            logger.info("schema.validation request_id=%s proposal_id=%s valid=%s", correlation_id, request_id, provider.get("source") == "AI")
+            if provider.get("status") in ("AVAILABLE", "COMPLETED"):
+                provider = {"status": "AVAILABLE", "runtime": provider.get("provider"), "model": provider.get("model"), "timestamp": provider.get("timestamp"), "findings": provider.get("payload", {}).get("findings", []), "metadata": {key: provider.get(key) for key in ("request_id", "http_status", "latency_ms", "retry_count")}}
+            if provider.get("status") not in ("AVAILABLE", "COMPLETED"):
+                logger.warning("ai_review.fallback request_id=%s model=%s fallback_reason=%s error_type=%s", provider.get("request_id", correlation_id), provider.get("model", settings.ollama_proposal_model), provider.get("fallback_reason", "provider_failure"), provider.get("error_type", "UnknownError"))
+                result = {**_ai_fallback(row, document), **{key: provider.get(key) for key in ("provider", "source", "fallback_reason", "error_type", "http_status", "request_id", "retry_count", "latency_ms", "model", "timestamp") if provider.get(key) is not None}}
+            else:
+                findings = provider.get("findings", [])
+                result = {"status": "COMPLETED", "source": "AI", "provider": provider.get("runtime", "ollama"), "model": provider.get("model"), "findings": findings, "advisory": True}
         run.status = "COMPLETED"; run.runtime = str(result.get("provider", "deterministic")); run.model = result.get("model"); run.result = result
     except Exception as error:
-        run.status = "FAILED"; run.result = {"status": "FAILED", "message": "AI review failed; deterministic checks remain available.", "error_type": type(error).__name__, "findings": [], "advisory": True}
+        logger.exception("ai_review.failure request_id=%s proposal_id=%s error_type=%s", correlation_id, request_id, type(error).__name__)
+        run.status = "COMPLETED"; run.runtime = "ollama"; run.model = settings.ollama_proposal_model
+        run.result = {**_ai_fallback(row, document), "fallback_reason": "provider_unavailable", "error_type": type(error).__name__, "request_id": correlation_id}
     run.finished_at = utc_now(); session.commit(); session.refresh(run)
+    logger.info("review.persisted request_id=%s proposal_id=%s status=%s", correlation_id, request_id, run.status)
     return _ai_out(run)
 
 

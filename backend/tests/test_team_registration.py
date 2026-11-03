@@ -254,12 +254,13 @@ class TeamRegistrationApiTests(unittest.TestCase):
         self.assertTrue(verify_password(password, password_hash))
 
     def test_cors_allows_only_the_configured_frontend_origin(self) -> None:
-        allowed_status, allowed_headers = cors_preflight("http://127.0.0.1:5174")
-        self.assertEqual(allowed_status, 200)
-        self.assertEqual(allowed_headers.get("access-control-allow-origin"), "http://127.0.0.1:5174")
-        self.assertEqual(allowed_headers.get("access-control-allow-credentials"), "true")
+        for origin in ("http://127.0.0.1:5173", "http://localhost:5173"):
+            allowed_status, allowed_headers = cors_preflight(origin)
+            self.assertEqual(allowed_status, 200)
+            self.assertEqual(allowed_headers.get("access-control-allow-origin"), origin)
+            self.assertEqual(allowed_headers.get("access-control-allow-credentials"), "true")
 
-        denied_status, denied_headers = cors_preflight("http://localhost:5174")
+        denied_status, denied_headers = cors_preflight("http://127.0.0.1:5174")
         self.assertEqual(denied_status, 400)
         self.assertNotIn("access-control-allow-origin", denied_headers)
 

@@ -8,9 +8,11 @@ from .password_reset_token import PasswordResetToken
 from .audit_event import AdminAuditEvent
 from .template_reference import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
 from .evaluation_rubric import EvaluationRubric, EvaluationRubricVersion, EvaluationRubricCriterion
+from .dashboard_requirement import DashboardRequirement
 from .academic_deadline import AcademicDeadline, AcademicDeadlineVersion
+from .document_requirement import DocumentUploadRequirement, DocumentSubmission, DocumentSubmissionVersion
 
-__all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "PasswordResetToken", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion", "AcademicDeadline", "AcademicDeadlineVersion"]
+__all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "PasswordResetToken", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion", "AcademicDeadline", "AcademicDeadlineVersion", "DashboardRequirement", "DocumentUploadRequirement", "DocumentSubmission", "DocumentSubmissionVersion"]
 
 from .reminder_rule import ReminderRule, ReminderRuleVersion
 

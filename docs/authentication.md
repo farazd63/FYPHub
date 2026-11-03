@@ -12,7 +12,7 @@ A successful login returns safe user fields (`id`, `full_name`, `email`, `regist
 
 Cookie settings are `HttpOnly`, `SameSite=Lax`, `Path=/`, and omit `Domain`. `Secure` is enabled except for HTTP requests to `127.0.0.1`, the explicit local-development exception. Browser session values are not used in local/session storage. Passwords, raw tokens, and cookie values are never logged.
 
-Credentialed CORS is limited exactly to `http://127.0.0.1:5174`; no wildcard is used. Login and logout reject a supplied `Origin` other than that exact origin. This is the CSRF boundary for state-changing cookie routes: same-site Lax cookies plus explicit Origin validation protect browser form/fetch requests; any future cross-origin deployment must replace both configured origin and its CSRF design together.
+Credentialed CORS allows exactly `http://localhost:5173` and `http://127.0.0.1:5173`; no wildcard is used. Login and logout reject a supplied `Origin` outside that pair. This is the CSRF boundary for state-changing cookie routes: same-site Lax cookies plus explicit Origin validation protect browser form/fetch requests; any future cross-origin deployment must replace both configured origins and its CSRF design together.
 
 ```mermaid
 flowchart LR

@@ -1,15 +1,21 @@
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
+import json
+import logging
+import time
+import uuid
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .database import engine, get_db
+from .config import settings
 from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
 from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, SupervisorCapacityPolicy, SupervisorAssignment, SupervisorRequest, SupervisorRequestStatus
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
@@ -18,6 +24,8 @@ from .models import AcademicDeadline, AcademicDeadlineVersion
 from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
 from .schemas.evaluation_rubrics import RubricDetailOut, RubricListOut, RubricVersionOut, RubricVersionWrite
 from .schemas.academic_deadlines import DeadlineCreate, DeadlineDetailOut, DeadlineListOut, DeadlinePreviewOut, DeadlinePreviewRequest, DeadlineVersionOut, DeadlineWrite
+from .dashboard_requirements import router as dashboard_requirements_router
+from .document_requirements import router as document_requirements_router, student_router as student_document_requirements_router
 from .schemas.academic import CycleCreate, CycleOut, CycleUpdate, PolicyOut, PolicyUpdate
 from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
 from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange
@@ -41,13 +49,48 @@ from .auth import (
 )
 
 app = FastAPI(title="FYPHub API")
+settings.document_storage_root.mkdir(parents=True, exist_ok=True)
+
+logger = logging.getLogger("fyphub.request")
+
+
+def _workflow_name(path: str) -> str:
+    if "/proposals" in path: return "proposal"
+    if "/agent-supervision" in path: return "supervision"
+    if "/auth/" in path: return "auth"
+    if "/academic-cycles" in path: return "academic_cycle"
+    return "api"
+
+
+class StructuredRequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        request.state.request_id = request_id
+        started = time.monotonic()
+        path = request.url.path
+        logger.info(json.dumps({"event": "request.start", "request_id": request_id, "method": request.method, "path": path, "workflow": _workflow_name(path), "stage": "request", "origin": request.headers.get("origin") if request.method == "OPTIONS" else None, "requested_method": request.headers.get("access-control-request-method") if request.method == "OPTIONS" else None}, separators=(",", ":")))
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            logger.exception(json.dumps({"event": "request.failure", "request_id": request_id, "method": request.method, "path": path, "workflow": _workflow_name(path), "status": 500, "duration_ms": round((time.monotonic() - started) * 1000, 2), "failure_stage": "unhandled_exception", "error_type": type(exc).__name__}, separators=(",", ":")))
+            raise
+        response.headers["X-Request-ID"] = request_id
+        status_code = response.status_code
+        level = logging.ERROR if status_code >= 500 else logging.WARNING if status_code >= 400 else logging.INFO
+        logger.log(level, json.dumps({"event": "request.complete", "request_id": request_id, "method": request.method, "path": path, "workflow": _workflow_name(path), "status": status_code, "duration_ms": round((time.monotonic() - started) * 1000, 2), "failure_stage": None if status_code < 400 else "response"}, separators=(",", ":")))
+        return response
+
+
+app.add_middleware(StructuredRequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(ALLOWED_BROWSER_ORIGINS),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "PUT"],
-    allow_headers=["Content-Type", "X-File-Name", "X-Preview-Token"],
+    allow_methods=["GET", "POST", "OPTIONS", "PATCH", "PUT"],
+    allow_headers=["Content-Type", "Accept", "Authorization", "X-File-Name", "X-Preview-Token"],
 )
+app.include_router(document_requirements_router)
+app.include_router(student_document_requirements_router)
 
 _DUMMY_PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=4$FkrCX/M1V29q1Jj4yMHSiw$rONBAdg5KlI9DhIbVoDaHB3lM5HJXojJYVeAaLlbGwI"
 
@@ -1652,4 +1695,5 @@ from .fyp_registry import router as fyp_registry_router
 app.include_router(fyp_registry_router)
 from .password_reset import router as password_reset_router
 app.include_router(password_reset_router)
+app.include_router(dashboard_requirements_router)
 app.include_router(project_workflow_router)

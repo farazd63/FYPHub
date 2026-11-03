@@ -325,9 +325,13 @@ No screenshots were captured in this checkpoint. Browser verification remains pe
 
 ### Module 03 proposal compliance checkpoint
 
-Module 03 now stores dynamic Admin baseline document versions and extracted rule sets in `m03_` tables. Student proposal uploads are immutable versioned PDF/DOCX records. Tier 1 formatting and Tier 2 structural checks are deterministic; optional Groq advisory calls use backend-only `AI_PROVIDER=groq`, `GROQ_API_KEY`, model, timeout, retry, and rate-limit settings. Responses are strict Pydantic-validated JSON; failures return `DETERMINISTIC_FALLBACK`. Reports are advisory only and never approve or reject a proposal. Student, assigned Supervisor, Coordinator, and Admin visibility is enforced server-side; Panel is denied by default.
+Module 03 now stores dynamic Admin baseline document versions and extracted rule sets in `m03_` tables. Student proposal uploads are immutable versioned PDF/DOCX records. Tier 1 formatting and Tier 2 structural checks are deterministic; the active local advisory provider is Ollama (`AI_PROVIDER=ollama`, `OLLAMA_URL=http://127.0.0.1:11434`, `llama3.1:8b`) using `POST /api/chat` with `stream=false`. Responses are strict Pydantic-validated JSON; failures return `DETERMINISTIC_FALLBACK`. Reports are advisory only and never approve or reject a proposal. Groq settings remain optional for rollback and proposal text is not sent to Groq while Ollama is active. Student, assigned Supervisor, Coordinator, and Admin visibility is enforced server-side; Panel is denied by default.
 
 Remaining M1-D decisions: official templates with versioned academic rules
+
+### Observability
+
+Backend responses carry an `X-Request-ID`; the centralized request middleware logs safe JSON start/completion records with method, sanitized path, workflow, status, duration, and failure stage. Authentication diagnostics include only cookie presence/name and session lookup success. Development frontend logs capture workflow, endpoint path, status, request ID, duration, and safe error category; verbose logs are disabled in production. Use the request ID shown in a frontend error or response header to correlate a browser failure with backend logs. Passwords, cookies, tokens, API keys, prompts, proposal text, and uploaded content are never logged.
 
 The implemented administrative reference foundation still requires:
 

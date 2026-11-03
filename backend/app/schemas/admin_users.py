@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
 
 from ..models import UserRole
-from ..security import validate_password
+from ..security import validate_full_name, validate_password
 from .email import normalize_email
 
 
@@ -45,10 +45,7 @@ class AdminUserCreate(BaseModel):
     @field_validator("full_name")
     @classmethod
     def valid_name(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized or len(normalized) > 255:
-            raise ValueError("full_name must be between 1 and 255 non-whitespace characters.")
-        return normalized
+        return validate_full_name(value)
 
     @field_validator("password")
     @classmethod

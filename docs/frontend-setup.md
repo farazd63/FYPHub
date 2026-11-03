@@ -17,9 +17,9 @@ The Create Team Account screen loads academic cycles and the selected cycle's gr
 
 It sends `POST /api/v1/team-registration` with the creator separate from additional member contact records. Confirm password remains client-side. Backend error field paths are mapped to the relevant step and stable member row; password values are never stored or logged. A successful HTTP `201` shows a confirmation and clears both password fields.
 
-The login screen uses `VITE_API_BASE_URL` and sends requests with browser cookie credentials. Run the API at the configured local origin (`http://127.0.0.1:8010`) and the Vite frontend at `http://127.0.0.1:5174`; the backend allows that exact credentialed origin. Login accepts a registered email or the creator registration number, not a team member contact email. Password recovery remains unavailable until an email delivery service is configured.
+The login screen uses `VITE_API_BASE_URL` and sends requests with browser cookie credentials. Run the API at the configured local origin (`http://127.0.0.1:8010`) and the Vite frontend at `http://localhost:5173` or `http://127.0.0.1:5173`; the backend allows those exact credentialed origins. Login accepts a registered email or the creator registration number, not a team member contact email. Password recovery remains unavailable until an email delivery service is configured.
 
-The backend permits only the exact local frontend origin `http://127.0.0.1:5174`, with no wildcard origin or credential support.
+The backend permits only the exact local frontend origins `http://localhost:5173` and `http://127.0.0.1:5173`, with no wildcard origin and with credential support enabled.
 
 ## Password-entry feedback
 
