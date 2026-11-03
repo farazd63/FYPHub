@@ -26,6 +26,7 @@ from .schemas.evaluation_rubrics import RubricDetailOut, RubricListOut, RubricVe
 from .schemas.academic_deadlines import DeadlineCreate, DeadlineDetailOut, DeadlineListOut, DeadlinePreviewOut, DeadlinePreviewRequest, DeadlineVersionOut, DeadlineWrite
 from .dashboard_requirements import router as dashboard_requirements_router
 from .document_requirements import router as document_requirements_router, student_router as student_document_requirements_router
+from .academic_cycle_overview import router as academic_cycle_overview_router
 from .schemas.academic import CycleCreate, CycleOut, CycleUpdate, PolicyOut, PolicyUpdate
 from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
 from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange
@@ -91,6 +92,7 @@ app.add_middleware(
 )
 app.include_router(document_requirements_router)
 app.include_router(student_document_requirements_router)
+app.include_router(academic_cycle_overview_router)
 
 _DUMMY_PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=4$FkrCX/M1V29q1Jj4yMHSiw$rONBAdg5KlI9DhIbVoDaHB3lM5HJXojJYVeAaLlbGwI"
 
