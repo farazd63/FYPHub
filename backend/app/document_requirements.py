@@ -6,12 +6,12 @@ from zipfile import BadZipFile, ZipFile
 from io import BytesIO
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from .auth import get_current_user, require_roles, validate_mutating_origin
 from .database import get_db
-from .models import AcademicCycle, DocumentUploadRequirement, DocumentSubmission, DocumentSubmissionVersion, TeamMember, User, UserRole
+from .models import AcademicCycle, DocumentUploadRequirement, DocumentSubmission, DocumentSubmissionVersion, Team, TeamMember, User, UserRole
 from .schemas.document_requirements import RequirementWrite, RequirementPatch, RequirementOut, SubmissionOut, VersionOut
 from .config import settings
 
@@ -26,8 +26,47 @@ def _audit(db, actor, action, target, values=None, affected=None):
     from .main import add_admin_audit_event
     add_admin_audit_event(db, actor_id=actor.id, affected_user_id=affected, target_type=target, target_id=getattr(target, "id", None) if not isinstance(target, int) else target, action=action, changed_values=values or {})
 
-def _visible(req, user):
-    return user.role in ADMIN or (user.role == UserRole.STUDENT and "STUDENT" in (req.visible_to_roles or []) and (req.assigned_user_id is None or req.assigned_user_id == user.id))
+def _student_cycle_ids(user, db):
+    """Resolve the student's current cycle without trusting a client-supplied cycle."""
+    team_cycle_ids = set(db.scalars(select(Team.academic_cycle_id).where(Team.shared_user_id == user.id)).all())
+    member_cycle_ids = set(db.scalars(select(TeamMember.academic_cycle_id).where(
+        TeamMember.is_active.is_(True),
+        or_(TeamMember.registration_number == user.registration_number, TeamMember.university_email == user.email),
+    )).all())
+    open_cycles = set(db.scalars(select(AcademicCycle.id).where(AcademicCycle.registration_open.is_(True))).all())
+    if open_cycles:
+        return team_cycle_ids | member_cycle_ids | open_cycles
+    cycle_ids = team_cycle_ids | member_cycle_ids
+    if cycle_ids:
+        return cycle_ids
+    latest = db.scalar(select(AcademicCycle.id).order_by(AcademicCycle.id.desc()))
+    return {latest} if latest is not None else set()
+
+
+def _student_team_ids(user, db):
+    team_ids = set(db.scalars(select(Team.id).where(Team.shared_user_id == user.id)).all())
+    team_ids.update(db.scalars(select(TeamMember.team_id).where(
+        TeamMember.is_active.is_(True),
+        or_(TeamMember.registration_number == user.registration_number, TeamMember.university_email == user.email),
+    )).all())
+    return team_ids
+
+
+def _current_active_cycle_id(db):
+    return db.scalar(select(AcademicCycle.id).where(AcademicCycle.registration_open.is_(True)).order_by(AcademicCycle.id).limit(1))
+
+
+def _visible(req, user, db=None):
+    if user.role in ADMIN:
+        return True
+    visible_roles = {str(role).upper() for role in (req.visible_to_roles or [])}
+    if user.role != UserRole.STUDENT or "STUDENT" not in visible_roles:
+        return False
+    if req.assigned_user_id is not None and req.assigned_user_id != user.id:
+        return False
+    if db is None or req.academic_cycle_id not in _student_cycle_ids(user, db):
+        return False
+    return req.assigned_group_id is None or req.assigned_group_id in _student_team_ids(user, db)
 
 def _out(req): return RequirementOut.model_validate(req)
 def _now(): return datetime.now(timezone.utc)
@@ -44,7 +83,7 @@ def create_requirement(payload: RequirementWrite, _: object = Depends(validate_m
         values = payload.model_dump(exclude={"due_date", "assigned_to", "academic_cycle_id", "due_at", "description", "module", "visible_to_roles", "allowed_file_types", "assigned_user_id", "assigned_group_id"})
         due = payload.due_date or payload.due_at
         if due is None: raise HTTPException(422, "Deadline is required.")
-        cycle_id = payload.academic_cycle_id or db.scalar(select(AcademicCycle.id).order_by(AcademicCycle.id.desc()))
+        cycle_id = payload.academic_cycle_id or _current_active_cycle_id(db)
         if cycle_id is None: raise HTTPException(422, "No academic cycle is available.")
         assignment = (payload.assigned_to or "ALL_STUDENTS").strip()
         assigned_user_id = None
@@ -66,12 +105,12 @@ def create_requirement(payload: RequirementWrite, _: object = Depends(validate_m
 @router.get("", response_model=list[RequirementOut])
 def list_requirements(actor: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.scalars(select(DocumentUploadRequirement).order_by(DocumentUploadRequirement.due_at)).all()
-    return [_out(r) for r in rows if _visible(r, actor)]
+    return [_out(r) for r in rows if _visible(r, actor, db)]
 
 @router.get("/{requirement_id}", response_model=RequirementOut)
 def get_requirement(requirement_id: int, actor: User = Depends(get_current_user), db: Session = Depends(get_db)):
     req = db.get(DocumentUploadRequirement, requirement_id)
-    if req is None or not _visible(req, actor):
+    if req is None or not _visible(req, actor, db):
         raise HTTPException(404, "Requirement not found.")
     return _out(req)
 
@@ -98,7 +137,7 @@ def archive(requirement_id: int, _: object = Depends(validate_mutating_origin), 
 def reopen(requirement_id: int, _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(*ADMIN)), db: Session = Depends(get_db)): return _state(requirement_id, "ACTIVE", actor, db, True)
 
 def _submission(req, actor, db):
-    if not _visible(req, actor): raise HTTPException(403, "You are not authorized for this requirement.")
+    if not _visible(req, actor, db): raise HTTPException(403, "You are not authorized for this requirement.")
     row = db.scalar(select(DocumentSubmission).where(DocumentSubmission.requirement_id == req.id, DocumentSubmission.student_id == actor.id))
     return row
 
@@ -131,13 +170,13 @@ def _submission_out(row, db):
 @router.get("/student", response_model=list[RequirementOut])
 @student_router.get("/api/v1/student/document-requirements", response_model=list[RequirementOut])
 def student_requirements(actor: User = Depends(require_roles(UserRole.STUDENT)), db: Session = Depends(get_db)):
-    return [_out(r) for r in db.scalars(select(DocumentUploadRequirement).where(DocumentUploadRequirement.status == "ACTIVE").order_by(DocumentUploadRequirement.due_at)).all() if _visible(r, actor)]
+    return [_out(r) for r in db.scalars(select(DocumentUploadRequirement).where(DocumentUploadRequirement.status == "ACTIVE").order_by(DocumentUploadRequirement.due_at)).all() if r.status == "ACTIVE" and _visible(r, actor, db)]
 
 @router.post("/{requirement_id}/upload", response_model=SubmissionOut)
 async def upload(requirement_id: int, file: UploadFile = File(...), _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(UserRole.STUDENT)), db: Session = Depends(get_db)):
     req = db.get(DocumentUploadRequirement, requirement_id)
     if not req or req.status != "ACTIVE": raise HTTPException(404, "Requirement is not available.")
-    if not _visible(req, actor): raise HTTPException(403, "You are not authorized for this requirement.")
+    if not _visible(req, actor, db): raise HTTPException(403, "You are not authorized for this requirement.")
     late = _now() > req.due_at
     if late and not req.late_upload_allowed: raise HTTPException(409, "The deadline has passed; late uploads are closed.")
     data = await file.read(); suffix = _validate(req, file, data)

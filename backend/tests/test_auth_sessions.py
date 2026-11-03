@@ -315,6 +315,27 @@ class AuthSessionTests(unittest.TestCase):
         fixture_user.role = UserRole.ADMIN
         self.assertIs(student_guard(fixture_user), fixture_user)
 
+    def test_admin_published_document_requirement_is_visible_to_student(self) -> None:
+        admin_password = "Document Visibility Admin Password!"
+        session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        admin = User(full_name="Document Visibility Admin", email=f"document-visibility-admin-{uuid4().hex}@example.com", registration_number=None, password_hash=hash_password(admin_password), role=UserRole.ADMIN)
+        session.add(admin); session.commit(); session.close()
+
+        login_status, admin_headers, _ = request("POST", "/api/v1/auth/login", {"email": admin.email, "password": admin_password, "requested_role": "ADMIN"}, headers={"Origin": "http://127.0.0.1:5173"})
+        self.assertEqual(login_status, 200)
+        admin_cookie = self.cookie_value(admin_headers)
+        create_status, _, requirement = request("POST", "/api/v1/document-requirements", {"title": "Published student requirement", "due_date": "2026-12-12T18:45:00+05:00", "allowed_file_types": ["PDF"]}, headers={"Cookie": f"{SESSION_COOKIE_NAME}={admin_cookie}", "Origin": "http://127.0.0.1:5173"})
+        self.assertEqual(create_status, 201)
+        self.assertEqual(requirement["status"], "DRAFT")
+
+        publish_status, _, _ = request("POST", f"/api/v1/document-requirements/{requirement['id']}/publish", headers={"Cookie": f"{SESSION_COOKIE_NAME}={admin_cookie}", "Origin": "http://127.0.0.1:5173"})
+        self.assertEqual(publish_status, 200)
+        student_status, student_headers, _ = self.login(Origin="http://127.0.0.1:5173")
+        self.assertEqual(student_status, 200)
+        list_status, _, rows = request("GET", "/api/v1/student/document-requirements", headers={"Cookie": f"{SESSION_COOKIE_NAME}={self.cookie_value(student_headers)}"})
+        self.assertEqual(list_status, 200)
+        self.assertIn(requirement["id"], {row["id"] for row in rows})
+
     def test_forgot_password_is_generic_and_stores_only_a_hash(self) -> None:
         sent: list[str] = []
         with patch("app.password_reset._smtp_configured", return_value=True), patch("app.password_reset._send_reset_email", side_effect=lambda _address, link: sent.append(link) or True):
