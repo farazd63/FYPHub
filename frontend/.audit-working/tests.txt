@@ -1,0 +1,923 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Proposal Compliance Check should render
+    at file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/src/portals/student/tests/student-portal.test.mjs:21:10
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'import { useEffect, useState, type ReactNode } from "react";\r\n' +
+    'import { StudentOverviewWithDocuments as StudentOverview } from "./StudentOverview";\r\n' +
+    'import { StudentSidebar, type StudentPhase } from "./StudentSidebar";\r\n' +
+    'import { StudentPhasePlaceholder } from "./modules/StudentPhasePlaceholder";\r\n' +
+    'import { StudentTeamPhase } from "./modules/StudentTeamPhase";\r\n' +
+    'import { StudentSupervisorSelection } from "./modules/supervisor-selection/StudentSupervisorSelection";\r\n' +
+    'import { KnowledgeSearch } from "./modules/knowledge-search/KnowledgeSearch";\r\n' +
+    'import "./student.css";\r\n' +
+    'import "./modules/archive-knowledge.css";\r\n' +
+    'import "./student-visibility.css";\r\n' +
+    '\r\n' +
+    'type StudentUser = { id: number; full_name: string; email: string; registration_number: string | null; role: string };\r\n' +
+    'const icon = (kind: "team" | "proposal" | "search" | "supervisor" | "review" | "route" | "panel" | "progress" | "archive" | "knowledge"): ReactNode => { const paths = { team: <><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M17 8a3 3 0 1 1 0 6m1 2a5 5 0 0 1 3 4"/></>, proposal: <><path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v5h5M9 13h6m-6 4h5"/></>, search: <><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></>, supervisor: <><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M17 14v6m-3-3h6"/></>, review: <><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 11l1.5 1.5L13 10m2 1h1m-7 5 1.5 1.5L13 15m2 1h1"/></>, route: <><path d="M5 5h14M5 12h10M5 19h6"/><circle cx="19" cy="12" r="2"/></>, panel: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-9 4v4m-2-2h4"/></>, progress: <><path d="M4 19V5m0 14h16"/><path d="m7 15 3-4 3 2 5-7"/></>, archive: <><path d="M4 7h16v13H4zM3 4h18v3H3zM9 11h6"/></>, knowledge: <><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5M8 11h6M11 8v6"/></> }; return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[kind]}</svg>; };\r\n' +
+    'export const STUDENT_PHASES: readonly StudentPhase[] = [\r\n' +
+    '  { id: "documents", name: "Required Documents & Uploads", route: "/student/documents", status: "Implemented", icon: icon("proposal") },\r\n' +
+    '  { id: "team", name: "Student Team & Collaboration Hub", route: "/student/team", status: "Partial", icon: icon("team") },\r\n' +
+    '  { id: "proposal", name: "Proposal Lifecycle & Review", route: "/student/proposals", status: "Partial", icon: icon("proposal") },\r\n' +
+    '  { id: "supervisors", name: "Supervisor Selection & Proposal Requests", route: "/student/supervisors", status: "Partial", icon: icon("supervisor") },\r\n' +
+    '  { id: "progress", name: "Project Progress & Supervision Dashboard", route: "/student/progress", status: "Partial", icon: icon("progress") },\r\n' +
+    '  { id: "search", name: "FYP Archive & Knowledge Search", route: "/student/search", status: "Implemented", icon: icon("knowledge") },\r\n' +
+    '];\r\n' +
+    'function Brand() { return <div className="student-brand"><svg aria-hidden="true" viewBox="0 0 56 40" fill="none"><path d="m4 14 24-10 24 10-24 10L4 14Z" fill="currentColor"/><path d="M15 20v8c5 5 21 5 26 0v-8M49 16v11" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg><span>FYPHub</span></div>; }\r\n' +
+    'export function StudentPortal({ api, user, onLogout }: { api: string; user: StudentUser; onLogout: () => void }) { const [activeId, setActiveId] = useState("overview"); const [collapsed, setCollapsed] = useState(false); const [mobileOpen, setMobileOpen] = useState(false); useEffect(() => { const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); }; window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, []); const phase = STUDENT_PHASES.find((item) => item.id === activeId); const initials = user.full_name.trim().split(/\\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "S"; const select = (item: StudentPhase) => setActiveId(item.id); return <main className="student-shell"><header className="student-header"><div className="student-header__left"><button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>☰</button><Brand/><span className="student-role">Student</span></div><div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name">{user.full_name}</span><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div></header><div className="student-body"><StudentSidebar phases={STUDENT_PHASES} activeId={activeId} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={select} onOverview={() => setActiveId("overview")} onToggleCollapse={() => setCollapsed((value) => !value)} onCloseMobile={() => setMobileOpen(false)} /><section className="student-content"><div className="student-content__inner">{activeId === "overview" ? <StudentOverview phases={STUDENT_PHASES} onSelect={select} /> : phase?.id === "team" ? <StudentTeamPhase api={api} /> : phase?.id === "supervisors" ? <StudentSupervisorSelection api={api} userId={user.id} /> : phase?.id === "search" || phase?.id === "archive" ? <KnowledgeSearch api={api} /> : phase ? <StudentPhasePlaceholder phase={phase} /> : null}</div></section></div></main>; }\r\n',
+  expected: /Proposal Compliance Check/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v24.20.0
+✖ src\portals\student\tests\student-portal.test.mjs (261.3344ms)
+✖ academic cycle dashboard is mounted in both authorized portal shells (8.3156ms)
+✔ academic cycle dashboard loads list and authorized detail data with the session (1.0583ms)
+✔ detail dashboard provides the required summary and data tabs (0.8543ms)
+✔ single and group account creation preserve real success and failure states (3.7653ms)
+✔ role-specific accounts are created through the Admin endpoint with fixed role values (0.9647ms)
+✔ account creation never renders a success login link before an OK response (0.8886ms)
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /admin-nav-group-toggle/. Input:
+
+'import { useEffect, useState } from "react";\r\n' +
+  'import { AdminWorkflowPolicies } from "./AdminWorkflowPolicies";\r\n' +
+  'import { AdminCycleManager } from "./AdminCycleManager";\r\n' +
+  'import { AdminOverview } from "./AdminOverview";\r\n' +
+  'import { AdminTemplateReferences } from "./AdminTemplateReferences";\r\n' +
+  'import { AdminUsersRoles } from "./AdminUsersRoles";\r\n' +
+  'import { AdminSupervisorCapacity } from "./AdminSupervisorCapacity";\r\n' +
+  'import { AdminEvaluationRubrics } from "./AdminEvaluationRubrics";\r\n' +
+  'import { AdminReminderRules } from "./AdminReminderRules";\r\n' +
+  'import { AdminAuditHistory } from "./AdminAuditHistory";\r\n' +
+  'import { AdminStudentRoster } from "./AdminStudentRoster";\r\n' +
+  'import { AdminDeadlines } from "./AdminDeadlines";\r\n' +
+  'import { AdminSupervisorRequests } from "./portals/admin/modules/supervisor-requests/AdminSupervisorRequests";\r\n' +
+  'import { ArchiveManagement } from "./portals/admin/modules/archive/ArchiveManagement";\r\n' +
+  'import { AdminTemplateUploadModal } from "./modules/module_03_proposal/components/AdminTemplateUploadModal";\r\n' +
+  'import { AdminFypRegistry } from "./portals/admin/modules/fyp-registry/AdminFypRegistry";\r\n' +
+  'import { AdminDocumentRequirementManagerClean as AdminDocumentRequirementManager } from "./AdminDocumentRequirementManagerClean";\r\n' +
+  'import { AdminSidebar } from "./portals/shared/AdminSidebar";\r\n' +
+  'import "./AdminSidebar.css";\r\n' +
+  'import "./modules/module_03_proposal/module03.css";\r\n' +
+  '\r\n' +
+  'type User={full_name:string;email:string;role:string};\r\n' +
+  'type Page="overview"|"users"|"cycles"|"templates"|"capacity"|"rubrics"|"deadlines"|"reminders"|"audit"|"eligibility"|"workflow"|"supervisorRequests"|"archive"|"module03"|"registry"|"documentRequirements";\r\n' +
+  'type NavItem={label:string;page:Page}; type NavGroup={id:string;label:string;items:NavItem[]};\r\n' +
+  'const groups:NavGroup[]=[\r\n' +
+  ' {id:"workspace",label:"Workspace",items:[{label:"Overview",page:"overview"},{label:"FYP Registry & Project Monitoring",page:"registry"},{label:"FYP Archive",page:"archive"}]},\r\n' +
+  ' {id:"people",label:"People & Access",items:[{label:"Users & Roles",page:"users"},{label:"Student Eligibility",page:"eligibility"},{label:"Supervisor Capacity",page:"capacity"},{label:"Supervisor Requests",page:"supervisorRequests"}]},\r\n' +
+  ' {id:"academic",label:"Academic Setup",items:[{label:"Academic Cycles & Policies",page:"cycles"},{label:"Workflow Policies",page:"workflow"},{label:"Proposal Templates",page:"templates"},{label:"Module 03 Compliance",page:"module03"}]},\r\n' +
+  ' {id:"requirements",label:"Requirements & Review",items:[{label:"Required Documents",page:"documentRequirements"},{label:"Evaluation Criteria",page:"rubrics"},{label:"Deadlines",page:"deadlines"},{label:"Reminders & Escalations",page:"reminders"}]},\r\n' +
+  ' {id:"governance",label:"Governance",items:[{label:"Audit History",page:"audit"}]},\r\n' +
+  '];\r\n' +
+  'const fromPath=():Page=>window.location.pathname==="/admin/document-requirements"?"documentRequirements":"overview";\r\n' +
+  'const pagePath=(page:Page)=>page==="documentRequirements"?"/admin/document-requirements":"/admin";\r\n' +
+  'const groupId=(page:Page)=>groups.find(g=>g.items.some(i=>i.page===page))?.id??"workspace";\r\n' +
+  '\r\n' +
+  'export function AdminPortal({api,user,onLogout}:{api:string;user:User;onLogout:()=>void}){\r\n' +
+  ' const [page,setPage]=useState<Page>(fromPath),[menu,setMenu]=useState(false),[collapsed,setCollapsed]=useState(false),[revision,setRevision]=useState(0),[demoWarning,setDemoWarning]=useState("");\r\n' +
+  ' const [expanded,setExpanded]=useState<Record<string,boolean>>(()=>Object.fromEntries(groups.map(g=>[g.id,g.id===groupId(fromPath())])));\r\n' +
+  ' const permitted=["ADMIN","COORDINATOR"].includes(user.role.trim().toUpperCase());\r\n' +
+  ' const initials=user.full_name.trim().split(/\\s+/).filter(Boolean).slice(0,2).map(p=>Array.from(p)[0]).join("").toUpperCase()||"A";\r\n' +
+  ' const changed=()=>setRevision(value=>value+1);\r\n' +
+  ' useEffect(()=>{let cancelled=false;void fetch(`${api}/api/v1/admin/registration-mode`,{credentials:"include"}).then(r=>r.ok?r.json() as Promise<{demo_warning?:string|null}>:null).then(body=>{if(!cancelled&&body?.demo_warning)setDemoWarning(body.demo_warning)}).catch(()=>undefined);return()=>{cancelled=true}},[api]);\r\n' +
+  ' useEffect(()=>{const pop=()=>{const next=fromPath();setPage(next);setExpanded(value=>({...value,[groupId(next)]:true}))};addEventListener("popstate",pop);return()=>removeEventListener("popstate",pop)},[]);\r\n' +
+  ' const navigate=(target:Page)=>{if(target==="documentRequirements"&&!permitted)return;const path=pagePath(target);if(window.location.pathname!==path)window.history.pushState({adminPage:target},"",path);setPage(target);setExpanded(value=>({...value,[groupId(target)]:true}));setMenu(false)};\r\n' +
+  ' const content=page==="documentRequirements"?<AdminDocumentRequirementManager api={api}/>:page==="workflow"?<AdminWorkflowPolicies api={api}/>:page==="users"?<AdminUsersRoles api={api}/>:page==="cycles"?<AdminCycleManager api={api} onChanged={changed}/>:page==="templates"?<AdminTemplateReferences api={api}/>:page==="module03"?<section className="module03-page"><div className="module03-heading"><p className="student-overview__eyebrow">Module 03 - Admin configuration</p><h1>Dynamic proposal compliance baselines</h1></div><div className="module03-card"><h2>Reference template ingestion</h2><AdminTemplateUploadModal api={api} onSaved={changed}/></div></section>:page==="capacity"?<AdminSupervisorCapacity api={api}/>:page==="supervisorRequests"?<AdminSupervisorRequests api={api}/>:page==="registry"?<AdminFypRegistry api={api}/>:page==="archive"?<ArchiveManagement api={api}/>:page==="rubrics"?<AdminEvaluationRubrics api={api}/>:page==="deadlines"?<AdminDeadlines api={api}/>:page==="reminders"?<AdminReminderRules api={api}/>:page==="audit"?<AdminAuditHistory api={api}/>:page==="eligibility"?<AdminStudentRoster api={api}/>:<AdminOverview key={revision} api={api}/>;\r\n' +
+  ' return <main className={`min-h-screen overflow-x-hidden bg-[#f7f5ef] text-[#243746] ${collapsed?"admin-sidebar-collapsed":""}`}><header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#dce4de] bg-white/95 px-4 sm:px-6"><div className="flex items-center gap-3"><button type="button" aria-label={menu?"Close navigation":"Open navigation"} aria-expanded={menu} onClick={()=>setMenu(!menu)} className="rounded-lg p-2 md:hidden">☰</button><strong>FYPHub</strong><span className="admin-role hidden sm:inline-flex">Administrator</span></div><div className="admin-account flex gap-3"><span className="admin-avatar">{initials}</span><span className="admin-account-name hidden text-sm font-semibold md:inline">{user.full_name}</span><button type="button" onClick={onLogout} className="admin-logout rounded-lg border px-3 py-1.5 text-sm font-semibold">Logout</button></div></header><div className="flex"><AdminSidebar groups={groups} active={page} collapsed={collapsed} mobileOpen={menu} permitted={permitted} expanded={expanded} onSelect={(target)=>navigate(target as Page)} onToggle={()=>setCollapsed(value=>!value)} onClose={()=>setMenu(false)} onToggleSection={(section)=>setExpanded(value=>({...value,[groups.find((group)=>group.label===section)?.id ?? section]: !value[groups.find((group)=>group.label===section)?.id ?? section]}))} /><section className="min-w-0 flex-1 p-6 sm:p-8"><div className="mx-auto max-w-5xl admin-enter">{demoWarning&&<p role="status">{demoWarning}</p>}{content}</div></section></div></main>;\r\n' +
+  '}\r\n'
+
+    at file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/admin-theme.test.mjs:13:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'import { useEffect, useState } from "react";\r\n' +
+    'import { AdminWorkflowPolicies } from "./AdminWorkflowPolicies";\r\n' +
+    'import { AdminCycleManager } from "./AdminCycleManager";\r\n' +
+    'import { AdminOverview } from "./AdminOverview";\r\n' +
+    'import { AdminTemplateReferences } from "./AdminTemplateReferences";\r\n' +
+    'import { AdminUsersRoles } from "./AdminUsersRoles";\r\n' +
+    'import { AdminSupervisorCapacity } from "./AdminSupervisorCapacity";\r\n' +
+    'import { AdminEvaluationRubrics } from "./AdminEvaluationRubrics";\r\n' +
+    'import { AdminReminderRules } from "./AdminReminderRules";\r\n' +
+    'import { AdminAuditHistory } from "./AdminAuditHistory";\r\n' +
+    'import { AdminStudentRoster } from "./AdminStudentRoster";\r\n' +
+    'import { AdminDeadlines } from "./AdminDeadlines";\r\n' +
+    'import { AdminSupervisorRequests } from "./portals/admin/modules/supervisor-requests/AdminSupervisorRequests";\r\n' +
+    'import { ArchiveManagement } from "./portals/admin/modules/archive/ArchiveManagement";\r\n' +
+    'import { AdminTemplateUploadModal } from "./modules/module_03_proposal/components/AdminTemplateUploadModal";\r\n' +
+    'import { AdminFypRegistry } from "./portals/admin/modules/fyp-registry/AdminFypRegistry";\r\n' +
+    'import { AdminDocumentRequirementManagerClean as AdminDocumentRequirementManager } from "./AdminDocumentRequirementManagerClean";\r\n' +
+    'import { AdminSidebar } from "./portals/shared/AdminSidebar";\r\n' +
+    'import "./AdminSidebar.css";\r\n' +
+    'import "./modules/module_03_proposal/module03.css";\r\n' +
+    '\r\n' +
+    'type User={full_name:string;email:string;role:string};\r\n' +
+    'type Page="overview"|"users"|"cycles"|"templates"|"capacity"|"rubrics"|"deadlines"|"reminders"|"audit"|"eligibility"|"workflow"|"supervisorRequests"|"archive"|"module03"|"registry"|"documentRequirements";\r\n' +
+    'type NavItem={label:string;page:Page}; type NavGroup={id:string;label:string;items:NavItem[]};\r\n' +
+    'const groups:NavGroup[]=[\r\n' +
+    ' {id:"workspace",label:"Workspace",items:[{label:"Overview",page:"overview"},{label:"FYP Registry & Project Monitoring",page:"registry"},{label:"FYP Archive",page:"archive"}]},\r\n' +
+    ' {id:"people",label:"People & Access",items:[{label:"Users & Roles",page:"users"},{label:"Student Eligibility",page:"eligibility"},{label:"Supervisor Capacity",page:"capacity"},{label:"Supervisor Requests",page:"supervisorRequests"}]},\r\n' +
+    ' {id:"academic",label:"Academic Setup",items:[{label:"Academic Cycles & Policies",page:"cycles"},{label:"Workflow Policies",page:"workflow"},{label:"Proposal Templates",page:"templates"},{label:"Module 03 Compliance",page:"module03"}]},\r\n' +
+    ' {id:"requirements",label:"Requirements & Review",items:[{label:"Required Documents",page:"documentRequirements"},{label:"Evaluation Criteria",page:"rubrics"},{label:"Deadlines",page:"deadlines"},{label:"Reminders & Escalations",page:"reminders"}]},\r\n' +
+    ' {id:"governance",label:"Governance",items:[{label:"Audit History",page:"audit"}]},\r\n' +
+    '];\r\n' +
+    'const fromPath=():Page=>window.location.pathname==="/admin/document-requirements"?"documentRequirements":"overview";\r\n' +
+    'const pagePath=(page:Page)=>page==="documentRequirements"?"/admin/document-requirements":"/admin";\r\n' +
+    'const groupId=(page:Page)=>groups.find(g=>g.items.some(i=>i.page===page))?.id??"workspace";\r\n' +
+    '\r\n' +
+    'export function AdminPortal({api,user,onLogout}:{api:string;user:User;onLogout:()=>void}){\r\n' +
+    ' const [page,setPage]=useState<Page>(fromPath),[menu,setMenu]=useState(false),[collapsed,setCollapsed]=useState(false),[revision,setRevision]=useState(0),[demoWarning,setDemoWarning]=useState("");\r\n' +
+    ' const [expanded,setExpanded]=useState<Record<string,boolean>>(()=>Object.fromEntries(groups.map(g=>[g.id,g.id===groupId(fromPath())])));\r\n' +
+    ' const permitted=["ADMIN","COORDINATOR"].includes(user.role.trim().toUpperCase());\r\n' +
+    ' const initials=user.full_name.trim().split(/\\s+/).filter(Boolean).slice(0,2).map(p=>Array.from(p)[0]).join("").toUpperCase()||"A";\r\n' +
+    ' const changed=()=>setRevision(value=>value+1);\r\n' +
+    ' useEffect(()=>{let cancelled=false;void fetch(`${api}/api/v1/admin/registration-mode`,{credentials:"include"}).then(r=>r.ok?r.json() as Promise<{demo_warning?:string|null}>:null).then(body=>{if(!cancelled&&body?.demo_warning)setDemoWarning(body.demo_warning)}).catch(()=>undefined);return()=>{cancelled=true}},[api]);\r\n' +
+    ' useEffect(()=>{const pop=()=>{const next=fromPath();setPage(next);setExpanded(value=>({...value,[groupId(next)]:true}))};addEventListener("popstate",pop);return()=>removeEventListener("popstate",pop)},[]);\r\n' +
+    ' const navigate=(target:Page)=>{if(target==="documentRequirements"&&!permitted)return;const path=pagePath(target);if(window.location.pathname!==path)window.history.pushState({adminPage:target},"",path);setPage(target);setExpanded(value=>({...value,[groupId(target)]:true}));setMenu(false)};\r\n' +
+    ' const content=page==="documentRequirements"?<AdminDocumentRequirementManager api={api}/>:page==="workflow"?<AdminWorkflowPolicies api={api}/>:page==="users"?<AdminUsersRoles api={api}/>:page==="cycles"?<AdminCycleManager api={api} onChanged={changed}/>:page==="templates"?<AdminTemplateReferences api={api}/>:page==="module03"?<section className="module03-page"><div className="module03-heading"><p className="student-overview__eyebrow">Module 03 - Admin configuration</p><h1>Dynamic proposal compliance baselines</h1></div><div className="module03-card"><h2>Reference template ingestion</h2><AdminTemplateUploadModal api={api} onSaved={changed}/></div></section>:page==="capacity"?<AdminSupervisorCapacity api={api}/>:page==="supervisorRequests"?<AdminSupervisorRequests api={api}/>:page==="registry"?<AdminFypRegistry api={api}/>:page==="archive"?<ArchiveManagement api={api}/>:page==="rubrics"?<AdminEvaluationRubrics api={api}/>:page==="deadlines"?<AdminDeadlines api={api}/>:page==="reminders"?<AdminReminderRules api={api}/>:page==="audit"?<AdminAuditHistory api={api}/>:page==="eligibility"?<AdminStudentRoster api={api}/>:<AdminOverview key={revision} api={api}/>;\r\n' +
+    ' return <main className={`min-h-screen overflow-x-hidden bg-[#f7f5ef] text-[#243746] ${collapsed?"admin-sidebar-collapsed":""}`}><header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#dce4de] bg-white/95 px-4 sm:px-6"><div className="flex items-center gap-3"><button type="button" aria-label={menu?"Close navigation":"Open navigation"} aria-expanded={menu} onClick={()=>setMenu(!menu)} className="rounded-lg p-2 md:hidden">☰</button><strong>FYPHub</strong><span className="admin-role hidden sm:inline-flex">Administrator</span></div><div className="admin-account flex gap-3"><span className="admin-avatar">{initials}</span><span className="admin-account-name hidden text-sm font-semibold md:inline">{user.full_name}</span><button type="button" onClick={onLogout} className="admin-logout rounded-lg border px-3 py-1.5 text-sm font-semibold">Logout</button></div></header><div className="flex"><AdminSidebar groups={groups} active={page} collapsed={collapsed} mobileOpen={menu} permitted={permitted} expanded={expanded} onSelect={(target)=>navigate(target as Page)} onToggle={()=>setCollapsed(value=>!value)} onClose={()=>setMenu(false)} onToggleSection={(section)=>setExpanded(value=>({...value,[groups.find((group)=>group.label===section)?.id ?? section]: !value[groups.find((group)=>group.label===section)?.id ?? section]}))} /><section className="min-w-0 flex-1 p-6 sm:p-8"><div className="mx-auto max-w-5xl admin-enter">{demoWarning&&<p role="status">{demoWarning}</p>}{content}</div></section></div></main>;\r\n' +
+    '}\r\n',
+  expected: /admin-nav-group-toggle/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v24.20.0
+✖ tests\admin-theme.test.mjs (249.684ms)
+archive-search.test.mjs: all assertions passed
+✔ tests\archive-search.test.mjs (257.2861ms)
+✔ login and session validation use the shared API and cookie credentials (5.8995ms)
+✔ frontend source does not contain a second local API origin (56.5412ms)
+✔ academic-cycle bootstrap uses the supported endpoint, response shape, and credentials (1.0158ms)
+✔ development observability captures safe request IDs and categories (1.4045ms)
+✔ coordinator and Admin monitoring expose scoped filters and status summaries (3.5641ms)
+✔ monitoring conversations are rendered read-only and no panel controls are added (3.2342ms)
+✔ monitoring sources contain no legacy API port or object rendering (1.3312ms)
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Assigned Students & Teams/. Input:
+
+'import { useEffect, useState } from "react";\r\n' +
+  'import { CoordinatorRequestsPdf } from "./modules/supervisor-requests/CoordinatorRequestsPdf";\r\n' +
+  'import { CoordinatorFypRegistry } from "./modules/fyp-registry/CoordinatorFypRegistry";\r\n' +
+  'import { CoordinatorSidebar } from "./CoordinatorSidebar";\r\n' +
+  'import "../student/student.css";\r\n' +
+  'import "../supervisor/modules/supervisor-requests/supervisor-requests.css";\r\n' +
+  'import "./modules/supervisor-requests/coordinator-requests.css";\r\n' +
+  '\r\n' +
+  'export function CoordinatorPortal({ api, user, onLogout }: { api: string; user: { full_name: string }; onLogout: () => void }) {\r\n' +
+  '  const [mobileOpen, setMobileOpen] = useState(false);\r\n' +
+  '  const [collapsed, setCollapsed] = useState(false);\r\n' +
+  '  const [page, setPage] = useState<"requests" | "registry" | "scheduling">("requests");\r\n' +
+  '  useEffect(() => { const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); }; window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, []);\r\n' +
+  '  const initials = user.full_name.trim().split(/\\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "C";\r\n' +
+  '  return <main className="student-shell"><header className="student-header"><div className="student-header__left"><button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>☰</button><div className="student-brand"><svg aria-hidden="true" viewBox="0 0 56 40" fill="none"><path d="m4 14 24-10 24 10-24 10L4 14Z" fill="currentColor"/><path d="M15 20v8c5 5 21 5 26 0v-8M49 16v11" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg><span>FYPHub</span></div><span className="student-role">Coordinator</span></div><div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name">{user.full_name}</span><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div></header><div className="student-body"><CoordinatorSidebar active={page} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={(value) => setPage(value as typeof page)} onToggle={() => setCollapsed((value) => !value)} onClose={() => setMobileOpen(false)} /><section className="student-content"><div className="student-content__inner">{page === "registry" ? <CoordinatorFypRegistry api={api} /> : <CoordinatorRequestsPdf api={api} />}</div></section></div></main>;\r\n' +
+  '}\r\n'
+
+    at file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/coordinator-workspace.test.mjs:8:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'import { useEffect, useState } from "react";\r\n' +
+    'import { CoordinatorRequestsPdf } from "./modules/supervisor-requests/CoordinatorRequestsPdf";\r\n' +
+    'import { CoordinatorFypRegistry } from "./modules/fyp-registry/CoordinatorFypRegistry";\r\n' +
+    'import { CoordinatorSidebar } from "./CoordinatorSidebar";\r\n' +
+    'import "../student/student.css";\r\n' +
+    'import "../supervisor/modules/supervisor-requests/supervisor-requests.css";\r\n' +
+    'import "./modules/supervisor-requests/coordinator-requests.css";\r\n' +
+    '\r\n' +
+    'export function CoordinatorPortal({ api, user, onLogout }: { api: string; user: { full_name: string }; onLogout: () => void }) {\r\n' +
+    '  const [mobileOpen, setMobileOpen] = useState(false);\r\n' +
+    '  const [collapsed, setCollapsed] = useState(false);\r\n' +
+    '  const [page, setPage] = useState<"requests" | "registry" | "scheduling">("requests");\r\n' +
+    '  useEffect(() => { const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); }; window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, []);\r\n' +
+    '  const initials = user.full_name.trim().split(/\\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "C";\r\n' +
+    '  return <main className="student-shell"><header className="student-header"><div className="student-header__left"><button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>☰</button><div className="student-brand"><svg aria-hidden="true" viewBox="0 0 56 40" fill="none"><path d="m4 14 24-10 24 10-24 10L4 14Z" fill="currentColor"/><path d="M15 20v8c5 5 21 5 26 0v-8M49 16v11" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg><span>FYPHub</span></div><span className="student-role">Coordinator</span></div><div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name">{user.full_name}</span><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div></header><div className="student-body"><CoordinatorSidebar active={page} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={(value) => setPage(value as typeof page)} onToggle={() => setCollapsed((value) => !value)} onClose={() => setMobileOpen(false)} /><section className="student-content"><div className="student-content__inner">{page === "registry" ? <CoordinatorFypRegistry api={api} /> : <CoordinatorRequestsPdf api={api} />}</div></section></div></main>;\r\n' +
+    '}\r\n',
+  expected: /Assigned Students & Teams/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v24.20.0
+✖ tests\coordinator-workspace.test.mjs (282.6359ms)
+dashboard-navigation.test.mjs: all assertions passed
+✖ all dashboard shells load the shared floating vertical navigation presentation (7.9696ms)
+✖ role navigation sources retain their existing route data (2.3191ms)
+✖ all dashboards load the shared reference-inspired theme after base styles (4.7975ms)
+✔ shared dashboard navigation keeps the rail, panel, active state, and mobile drawer contract (0.9785ms)
+✖ shared Soft SaaS design system is loaded after the base styles (5.915ms)
+✔ shared design system defines the floating-shell tokens and accessible surfaces (1.5991ms)
+✖ authentication uses the light centered card shell without the photo asset (9.5871ms)
+✔ tests\document-requirements.test.mjs (242.1332ms)
+✔ shared email validator covers the required address rules and messages (3.4917ms)
+✔ login validates email-shaped identifiers before sending and preserves registration IDs (0.9543ms)
+✔ student, group, and Admin account creation share the same validation (0.937ms)
+encoding.test.mjs: all assertions passed
+✔ tests\encoding.test.mjs (501.7627ms)
+evaluation-criteria-labels.test.mjs: all assertions passed
+✔ tests\evaluation-criteria-labels.test.mjs (326.1654ms)
+evaluation-marks.test.mjs: all assertions passed
+✔ evaluation workspace preserves the official category ownership and API contracts (8.4669ms)
+✖ all role portals mount the restored feature without changing unrelated role shells (4.0286ms)
+evaluator-portal.test.mjs: all assertions passed
+✔ tests\evaluator-portal.test.mjs (320.161ms)
+✔ Coordinator and Admin registry wrappers use the shared authorized page (3.0284ms)
+✔ registry detail safely formats nested values and keeps admin edits scoped (0.8472ms)
+✔ registry modal remains usable inside the viewport (7.1773ms)
+✔ registry sources contain no legacy API port or mojibake (4.6712ms)
+✔ only a matching category enables a chat (2.9757ms)
+✔ closed chats are labelled (0.6307ms)
+module03-proposal.test.mjs: all assertions passed
+✔ tests\module03-proposal.test.mjs (316.9442ms)
+module03-template-modal.test.mjs: all assertions passed
+✔ tests\module03-template-modal.test.mjs (274.9747ms)
+✔ clicking Upload dynamic baseline opens the Module 03 upload modal (3.5035ms)
+✔ close controls and dialog events cannot immediately dismiss an open modal (0.714ms)
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /student-sidebar__collapse/. Input:
+
+'import { RoleSidebar, SidebarIcon, type RoleSidebarItem } from "../shared/RoleSidebar";\n' +
+  '\n' +
+  'export const supervisorNav: readonly RoleSidebarItem[] = [\n' +
+  '  { id: "overview", label: "Overview", icon: <SidebarIcon name="overview" />, section: "Workspace" },\n' +
+  '  { id: "requests", label: "Supervisor Requests", icon: <SidebarIcon name="requests" />, section: "Requests & Review" },\n' +
+  '  { id: "review", label: "Proposal Review", icon: <SidebarIcon name="review" />, section: "Requests & Review" },\n' +
+  '  { id: "conversations", label: "Conversations", icon: <SidebarIcon name="messages" />, section: "Communication" },\n' +
+  '  { id: "history", label: "Decision History", icon: <SidebarIcon name="history" />, section: "Communication" },\n' +
+  '];\n' +
+  '\n' +
+  'export function SupervisorSidebar({ active, collapsed, mobileOpen, onSelect, onToggle, onClose }: { active: string; collapsed: boolean; mobileOpen: boolean; onSelect: (id: string) => void; onToggle: () => void; onClose: () => void }) {\n' +
+  '  return <RoleSidebar ariaLabel="Supervisor navigation" workspaceLabel="Supervisor workspace" items={supervisorNav} active={active} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={onSelect} onToggle={onToggle} onClose={onClose} />;\n' +
+  '}\n'
+
+    at file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/password-policy.test.mjs:37:10
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'import { RoleSidebar, SidebarIcon, type RoleSidebarItem } from "../shared/RoleSidebar";\n' +
+    '\n' +
+    'export const supervisorNav: readonly RoleSidebarItem[] = [\n' +
+    '  { id: "overview", label: "Overview", icon: <SidebarIcon name="overview" />, section: "Workspace" },\n' +
+    '  { id: "requests", label: "Supervisor Requests", icon: <SidebarIcon name="requests" />, section: "Requests & Review" },\n' +
+    '  { id: "review", label: "Proposal Review", icon: <SidebarIcon name="review" />, section: "Requests & Review" },\n' +
+    '  { id: "conversations", label: "Conversations", icon: <SidebarIcon name="messages" />, section: "Communication" },\n' +
+    '  { id: "history", label: "Decision History", icon: <SidebarIcon name="history" />, section: "Communication" },\n' +
+    '];\n' +
+    '\n' +
+    'export function SupervisorSidebar({ active, collapsed, mobileOpen, onSelect, onToggle, onClose }: { active: string; collapsed: boolean; mobileOpen: boolean; onSelect: (id: string) => void; onToggle: () => void; onClose: () => void }) {\n' +
+    '  return <RoleSidebar ariaLabel="Supervisor navigation" workspaceLabel="Supervisor workspace" items={supervisorNav} active={active} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={onSelect} onToggle={onToggle} onClose={onClose} />;\n' +
+    '}\n',
+  expected: /student-sidebar__collapse/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v24.20.0
+✖ tests\password-policy.test.mjs (257.2626ms)
+password-reset.test.mjs: all assertions passed
+✔ tests\password-reset.test.mjs (239.5491ms)
+portal-contrast.test.mjs: all assertions passed
+✔ tests\portal-contrast.test.mjs (230.9191ms)
+project-workflow.test.mjs: all assertions passed
+✔ tests\project-workflow.test.mjs (245.3056ms)
+✔ student proposal route renders the dedicated lifecycle workspace (2.9988ms)
+✔ proposal workspace supports PDF and DOCX lifecycle actions (0.751ms)
+✔ Run AI review posts through the authenticated API client without status gating (2.6343ms)
+✔ proposal workspace loads the local API and reports response status safely (0.6203ms)
+✔ demo registration status is fetched only by the authenticated admin shell (3.019ms)
+✔ registration form behavior remains unchanged and public pages do not fetch mode (16.1017ms)
+role-sidebar.test.mjs: all assertions passed
+✖ role sidebars use the shared soft navigation shell (5.8821ms)
+✖ existing role navigation IDs remain present (4.7787ms)
+✖ sidebar styling keeps mobile drawer and collapsed tooltip behavior (1.7901ms)
+student-entry-flow.test.mjs: all assertions passed
+✔ tests\student-entry-flow.test.mjs (205.6509ms)
+supervisor-portal.test.mjs: all assertions passed
+✔ tests\supervisor-portal.test.mjs (206.7539ms)
+supervisor-request-workflow.test.mjs: all assertions passed
+✔ tests\supervisor-request-workflow.test.mjs (177.4701ms)
+ℹ tests 59
+ℹ suites 0
+ℹ pass 45
+ℹ fail 14
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 878.3465
+
+✖ failing tests:
+
+test at src\portals\student\tests\student-portal.test.mjs:1:1
+✖ src\portals\student\tests\student-portal.test.mjs (261.3344ms)
+  'test failed'
+
+test at tests\academic-cycle-dashboard.test.mjs:10:1
+✖ academic cycle dashboard is mounted in both authorized portal shells (8.3156ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /AcademicCycleDashboard/. Input:
+  
+  'import { useEffect, useState } from "react";\r\n' +
+    'import { AdminWorkflowPolicies } from "./AdminWorkflowPolicies";\r\n' +
+    'import { AdminCycleManager } from "./AdminCycleManager";\r\n' +
+    'import { AdminOverview } from "./AdminOverview";\r\n' +
+    'import { AdminTemplateReferences } from "./AdminTemplateReferences";\r\n' +
+    'import { AdminUsersRoles } from "./AdminUsersRoles";\r\n' +
+    'import { AdminSupervisorCapacity } from "./AdminSupervisorCapacity";\r\n' +
+    'import { AdminEvaluationRubrics } from "./AdminEvaluationRubrics";\r\n' +
+    'import { AdminReminderRules } from "./AdminReminderRules";\r\n' +
+    'import { AdminAuditHistory } from "./AdminAuditHistory";\r\n' +
+    'import { AdminStudentRoster } from "./AdminStudentRoster";\r\n' +
+    'import { AdminDeadlines } from "./AdminDeadlines";\r\n' +
+    'import { AdminSupervisorRequests } from "./portals/admin/modules/supervisor-requests/AdminSupervisorRequests";\r\n' +
+    'import { ArchiveManagement } from "./portals/admin/modules/archive/ArchiveManagement";\r\n' +
+    'import { AdminTemplateUploadModal } from "./modules/module_03_proposal/components/AdminTemplateUploadModal";\r\n' +
+    'import { AdminFypRegistry } from "./portals/admin/modules/fyp-registry/AdminFypRegistry";\r\n' +
+    'import { AdminDocumentRequirementManagerClean as AdminDocumentRequirementManager } from "./AdminDocumentRequirementManagerClean";\r\n' +
+    'import { AdminSidebar } from "./portals/shared/AdminSidebar";\r\n' +
+    'import "./AdminSidebar.css";\r\n' +
+    'import "./modules/module_03_proposal/module03.css";\r\n' +
+    '\r\n' +
+    'type User={full_name:string;email:string;role:string};\r\n' +
+    'type Page="overview"|"users"|"cycles"|"templates"|"capacity"|"rubrics"|"deadlines"|"reminders"|"audit"|"eligibility"|"workflow"|"supervisorRequests"|"archive"|"module03"|"registry"|"documentRequirements";\r\n' +
+    'type NavItem={label:string;page:Page}; type NavGroup={id:string;label:string;items:NavItem[]};\r\n' +
+    'const groups:NavGroup[]=[\r\n' +
+    ' {id:"workspace",label:"Workspace",items:[{label:"Overview",page:"overview"},{label:"FYP Registry & Project Monitoring",page:"registry"},{label:"FYP Archive",page:"archive"}]},\r\n' +
+    ' {id:"people",label:"People & Access",items:[{label:"Users & Roles",page:"users"},{label:"Student Eligibility",page:"eligibility"},{label:"Supervisor Capacity",page:"capacity"},{label:"Supervisor Requests",page:"supervisorRequests"}]},\r\n' +
+    ' {id:"academic",label:"Academic Setup",items:[{label:"Academic Cycles & Policies",page:"cycles"},{label:"Workflow Policies",page:"workflow"},{label:"Proposal Templates",page:"templates"},{label:"Module 03 Compliance",page:"module03"}]},\r\n' +
+    ' {id:"requirements",label:"Requirements & Review",items:[{label:"Required Documents",page:"documentRequirements"},{label:"Evaluation Criteria",page:"rubrics"},{label:"Deadlines",page:"deadlines"},{label:"Reminders & Escalations",page:"reminders"}]},\r\n' +
+    ' {id:"governance",label:"Governance",items:[{label:"Audit History",page:"audit"}]},\r\n' +
+    '];\r\n' +
+    'const fromPath=():Page=>window.location.pathname==="/admin/document-requirements"?"documentRequirements":"overview";\r\n' +
+    'const pagePath=(page:Page)=>page==="documentRequirements"?"/admin/document-requirements":"/admin";\r\n' +
+    'const groupId=(page:Page)=>groups.find(g=>g.items.some(i=>i.page===page))?.id??"workspace";\r\n' +
+    '\r\n' +
+    'export function AdminPortal({api,user,onLogout}:{api:string;user:User;onLogout:()=>void}){\r\n' +
+    ' const [page,setPage]=useState<Page>(fromPath),[menu,setMenu]=useState(false),[collapsed,setCollapsed]=useState(false),[revision,setRevision]=useState(0),[demoWarning,setDemoWarning]=useState("");\r\n' +
+    ' const [expanded,setExpanded]=useState<Record<string,boolean>>(()=>Object.fromEntries(groups.map(g=>[g.id,g.id===groupId(fromPath())])));\r\n' +
+    ' const permitted=["ADMIN","COORDINATOR"].includes(user.role.trim().toUpperCase());\r\n' +
+    ' const initials=user.full_name.trim().split(/\\s+/).filter(Boolean).slice(0,2).map(p=>Array.from(p)[0]).join("").toUpperCase()||"A";\r\n' +
+    ' const changed=()=>setRevision(value=>value+1);\r\n' +
+    ' useEffect(()=>{let cancelled=false;void fetch(`${api}/api/v1/admin/registration-mode`,{credentials:"include"}).then(r=>r.ok?r.json() as Promise<{demo_warning?:string|null}>:null).then(body=>{if(!cancelled&&body?.demo_warning)setDemoWarning(body.demo_warning)}).catch(()=>undefined);return()=>{cancelled=true}},[api]);\r\n' +
+    ' useEffect(()=>{const pop=()=>{const next=fromPath();setPage(next);setExpanded(value=>({...value,[groupId(next)]:true}))};addEventListener("popstate",pop);return()=>removeEventListener("popstate",pop)},[]);\r\n' +
+    ' const navigate=(target:Page)=>{if(target==="documentRequirements"&&!permitted)return;const path=pagePath(target);if(window.location.pathname!==path)window.history.pushState({adminPage:target},"",path);setPage(target);setExpanded(value=>({...value,[groupId(target)]:true}));setMenu(false)};\r\n' +
+    ' const content=page==="documentRequirements"?<AdminDocumentRequirementManager api={api}/>:page==="workflow"?<AdminWorkflowPolicies api={api}/>:page==="users"?<AdminUsersRoles api={api}/>:page==="cycles"?<AdminCycleManager api={api} onChanged={changed}/>:page==="templates"?<AdminTemplateReferences api={api}/>:page==="module03"?<section className="module03-page"><div className="module03-heading"><p className="student-overview__eyebrow">Module 03 - Admin configuration</p><h1>Dynamic proposal compliance baselines</h1></div><div className="module03-card"><h2>Reference template ingestion</h2><AdminTemplateUploadModal api={api} onSaved={changed}/></div></section>:page==="capacity"?<AdminSupervisorCapacity api={api}/>:page==="supervisorRequests"?<AdminSupervisorRequests api={api}/>:page==="registry"?<AdminFypRegistry api={api}/>:page==="archive"?<ArchiveManagement api={api}/>:page==="rubrics"?<AdminEvaluationRubrics api={api}/>:page==="deadlines"?<AdminDeadlines api={api}/>:page==="reminders"?<AdminReminderRules api={api}/>:page==="audit"?<AdminAuditHistory api={api}/>:page==="eligibility"?<AdminStudentRoster api={api}/>:<AdminOverview key={revision} api={api}/>;\r\n' +
+    ' return <main className={`min-h-screen overflow-x-hidden bg-[#f7f5ef] text-[#243746] ${collapsed?"admin-sidebar-collapsed":""}`}><header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#dce4de] bg-white/95 px-4 sm:px-6"><div className="flex items-center gap-3"><button type="button" aria-label={menu?"Close navigation":"Open navigation"} aria-expanded={menu} onClick={()=>setMenu(!menu)} className="rounded-lg p-2 md:hidden">☰</button><strong>FYPHub</strong><span className="admin-role hidden sm:inline-flex">Administrator</span></div><div className="admin-account flex gap-3"><span className="admin-avatar">{initials}</span><span className="admin-account-name hidden text-sm font-semibold md:inline">{user.full_name}</span><button type="button" onClick={onLogout} className="admin-logout rounded-lg border px-3 py-1.5 text-sm font-semibold">Logout</button></div></header><div className="flex"><AdminSidebar groups={groups} active={page} collapsed={collapsed} mobileOpen={menu} permitted={permitted} expanded={expanded} onSelect={(target)=>navigate(target as Page)} onToggle={()=>setCollapsed(value=>!value)} onClose={()=>setMenu(false)} onToggleSection={(section)=>setExpanded(value=>({...value,[groups.find((group)=>group.label===section)?.id ?? section]: !value[groups.find((group)=>group.label===section)?.id ?? section]}))} /><section className="min-w-0 flex-1 p-6 sm:p-8"><div className="mx-auto max-w-5xl admin-enter">{demoWarning&&<p role="status">{demoWarning}</p>}{content}</div></section></div></main>;\r\n' +
+    '}\r\n'
+  
+      at TestContext.<anonymous> (file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/academic-cycle-dashboard.test.mjs:11:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import { useEffect, useState } from "react";\r\nimport { AdminWorkflowPolicies } from "./AdminWorkflowPolicies";\r\nimport { AdminCycleManager } from "./AdminCycleManager";\r\nimport { AdminOverview } from "./AdminOverview";\r\nimport { AdminTemplateReferences } from "./AdminTemplateReferences";\r\nimport { AdminUsersRoles } from "./AdminUsersRoles";\r\nimport { AdminSupervisorCapacity } from "./AdminSupervisorCapacity";\r\nimport { AdminEvaluationRubrics } from "./AdminEvaluationRubrics";\r\nimport { AdminReminderRules } from "./AdminReminderRules";\r\nimport { AdminAuditHistory } from "./AdminAuditHistory";\r\nimport { AdminStudentRoster } from "./AdminStudentRoster";\r\nimport { AdminDeadlines } from "./AdminDeadlines";\r\nimport { AdminSupervisorRequests } from "./portals/admin/modules/supervisor-requests/AdminSupervisorRequests";\r\nimport { ArchiveManagement } from "./portals/admin/modules/archive/ArchiveManagement";\r\nimport { AdminTemplateUploadModal } from "./modules/module_03_proposal/components/AdminTemplateUploadModal";\r\nimport { AdminFypRegistry } from "./portals/admin/modules/fyp-registry/AdminFypRegistry";\r\nimport { AdminDocumentRequirementManagerClean as AdminDocumentRequirementManager } from "./AdminDocumentRequirementManagerClean";\r\nimport { AdminSidebar } from "./portals/shared/AdminSidebar";\r\nimport "./AdminSidebar.css";\r\nimport "./modules/module_03_proposal/module03.css";\r\n\r\ntype User={full_name:string;email:string;role:string};\r\ntype Page="overview"|"users"|"cycles"|"templates"|"capacity"|"rubrics"|"deadlines"|"reminders"|"audit"|"eligibility"|"workflow"|"supervisorRequests"|"archive"|"module03"|"registry"|"documentRequirements";\r\ntype NavItem={label:string;page:Page}; type NavGroup={id:string;label:string;items:NavItem[]};\r\nconst groups:NavGroup[]=[\r\n {id:"workspace",label:"Workspace",items:[{label:"Overview",page:"overview"},{label:"FYP Registry & Project Monitoring",page:"registry"},{label:"FYP Archive",page:"archive"}]},\r\n {id:"people",label:"People & Access",items:[{label:"Users & Roles",page:"users"},{label:"Student Eligibility",page:"eligibility"},{label:"Supervisor Capacity",page:"capacity"},{label:"Supervisor Requests",page:"supervisorRequests"}]},\r\n {id:"academic",label:"Academic Setup",items:[{label:"Academic Cycles & Policies",page:"cycles"},{label:"Workflow Policies",page:"workflow"},{label:"Proposal Templates",page:"templates"},{label:"Module 03 Compliance",page:"module03"}]},\r\n {id:"requirements",label:"Requirements & Review",items:[{label:"Required Documents",page:"documentRequirements"},{label:"Evaluation Criteria",page:"rubrics"},{label:"Deadlines",page:"deadlines"},{label:"Reminders & Escalations",page:"reminders"}]},\r\n {id:"governance",label:"Governance",items:[{label:"Audit History",page:"audit"}]},\r\n];\r\nconst fromPath=():Page=>window.location.pathname==="/admin/document-requirements"?"documentRequirements":"overview";\r\nconst pagePath=(page:Page)=>page==="documentRequirements"?"/admin/document-requirements":"/admin";\r\nconst groupId=(page:Page)=>groups.find(g=>g.items.some(i=>i.page===page))?.id??"workspace";\r\n\r\nexport function AdminPortal({api,user,onLogout}:{api:string;user:User;onLogout:()=>void}){\r\n const [page,setPage]=useState<Page>(fromPath),[menu,setMenu]=useState(false),[collapsed,setCollapsed]=useState(false),[revision,setRevision]=useState(0),[demoWarning,setDemoWarning]=useState("");\r\n const [expanded,setExpanded]=useState<Record<string,boolean>>(()=>Object.fromEntries(groups.map(g=>[g.id,g.id===groupId(fromPath())])));\r\n const permitted=["ADMIN","COORDINATOR"].includes(user.role.trim().toUpperCase());\r\n const initials=user.full_name.trim().split(/\\s+/).filter(Boolean).slice(0,2).map(p=>Array.from(p)[0]).join("").toUpperCase()||"A";\r\n const changed=()=>setRevision(value=>value+1);\r\n useEffect(()=>{let cancelled=false;void fetch(`${api}/api/v1/admin/registration-mode`,{credentials:"include"}).then(r=>r.ok?r.json() as Promise<{demo_warning?:string|null}>:null).then(body=>{if(!cancelled&&body?.demo_warning)setDemoWarning(body.demo_warning)}).catch(()=>undefined);return()=>{cancelled=true}},[api]);\r\n useEffect(()=>{const pop=()=>{const next=fromPath();setPage(next);setExpanded(value=>({...value,[groupId(next)]:true}))};addEventListener("popstate",pop);return()=>removeEventListener("popstate",pop)},[]);\r\n const navigate=(target:Page)=>{if(target==="documentRequirements"&&!permitted)return;const path=pagePath(target);if(window.location.pathname!==path)window.history.pushState({adminPage:target},"",path);setPage(target);setExpanded(value=>({...value,[groupId(target)]:true}));setMenu(false)};\r\n const content=page==="documentRequirements"?<AdminDocumentRequirementManager api={api}/>:page==="workflow"?<AdminWorkflowPolicies api={api}/>:page==="users"?<AdminUsersRoles api={api}/>:page==="cycles"?<AdminCycleManager api={api} onChanged={changed}/>:page==="templates"?<AdminTemplateReferences api={api}/>:page==="module03"?<section className="module03-page"><div className="module03-heading"><p className="student-overview__eyebrow">Module 03 - Admin configuration</p><h1>Dynamic proposal compliance baselines</h1></div><div className="module03-card"><h2>Reference template ingestion</h2><AdminTemplateUploadModal api={api} onSaved={changed}/></div></section>:page==="capacity"?<AdminSupervisorCapacity api={api}/>:page==="supervisorRequests"?<AdminSupervisorRequests api={api}/>:page==="registry"?<AdminFypRegistry api={api}/>:page==="archive"?<ArchiveManagement api={api}/>:page==="rubrics"?<AdminEvaluationRubrics api={api}/>:page==="deadlines"?<AdminDeadlines api={api}/>:page==="reminders"?<AdminReminderRules api={api}/>:page==="audit"?<AdminAuditHistory api={api}/>:page==="eligibility"?<AdminStudentRoster api={api}/>:<AdminOverview key={revision} api={api}/>;\r\n return <main className={`min-h-screen overflow-x-hidden bg-[#f7f5ef] text-[#243746] ${collapsed?"admin-sidebar-collapsed":""}`}><header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#dce4de] bg-white/95 px-4 sm:px-6"><div className="flex items-center gap-3"><button type="button" aria-label={menu?"Close navigation":"Open navigation"} aria-expanded={menu} onClick={()=>setMenu(!menu)} className="rounded-lg p-2 md:hidden">☰</button><strong>FYPHub</strong><span className="admin-role hidden sm:inline-flex">Administrator</span></div><div className="admin-account flex gap-3"><span className="admin-avatar">{initials}</span><span className="admin-account-name hidden text-sm font-semibold md:inline">{user.full_name}</span><button type="button" onClick={onLogout} className="admin-logout rounded-lg border px-3 py-1.5 text-sm font-semibold">Logout</button></div></header><div className="flex"><AdminSidebar groups={groups} active={page} collapsed={collapsed} mobileOpen={menu} permitted={permitted} expanded={expanded} onSelect={(target)=>navigate(target as Page)} onToggle={()=>setCollapsed(value=>!value)} onClose={()=>setMenu(false)} onToggleSection={(section)=>setExpanded(value=>({...value,[groups.find((group)=>group.label===section)?.id ?? section]: !value[groups.find((group)=>group.label===section)?.id ?? section]}))} /><section className="min-w-0 flex-1 p-6 sm:p-8"><div className="mx-auto max-w-5xl admin-enter">{demoWarning&&<p role="status">{demoWarning}</p>}{content}</div></section></div></main>;\r\n}\r\n',
+    expected: /AcademicCycleDashboard/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests\admin-theme.test.mjs:1:1
+✖ tests\admin-theme.test.mjs (249.684ms)
+  'test failed'
+
+test at tests\coordinator-workspace.test.mjs:1:1
+✖ tests\coordinator-workspace.test.mjs (282.6359ms)
+  'test failed'
+
+test at tests\dashboard-navigation.test.mjs:18:1
+✖ all dashboard shells load the shared floating vertical navigation presentation (7.9696ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /dashboard-theme\.css/. Input:
+  
+  'import { StrictMode } from "react";\r\n' +
+    'import { createRoot } from "react-dom/client";\r\n' +
+    'import App from "./App";\r\n' +
+    'import "./index.css";\r\n' +
+    'createRoot(document.getElementById("root")!).render(<StrictMode><App /></StrictMode>);\r\n'
+  
+      at TestContext.<anonymous> (file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/dashboard-navigation.test.mjs:19:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import { StrictMode } from "react";\r\nimport { createRoot } from "react-dom/client";\r\nimport App from "./App";\r\nimport "./index.css";\r\ncreateRoot(document.getElementById("root")!).render(<StrictMode><App /></StrictMode>);\r\n',
+    expected: /dashboard-theme\.css/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests\dashboard-navigation.test.mjs:39:1
+✖ role navigation sources retain their existing route data (2.3191ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /\[\["overview"[^\]]*"O"/. Input:
+  
+  'import type { EvaluatorNavKey } from "./EvaluatorPortal";\r\n' +
+    '\r\n' +
+    'type Props = { active: EvaluatorNavKey; collapsed: boolean; mobileOpen: boolean; onSelect: (key: EvaluatorNavKey) => void; onToggle: () => void; onClose: () => void };\r\n' +
+    '\r\n' +
+    'const items: Array<[EvaluatorNavKey, string, string]> = [["overview", "Overview", "O"], ["queue", "Evaluation Queue", "Q"], ["proposal", "Proposal Review", "P"], ["schedule", "Defense Schedule", "D"], ["criteria", "Evaluation Criteria", "C"], ["scoring", "Scoring & Feedback", "S"], ["history", "Decision History", "H"]];\r\n' +
+    '\r\n' +
+    'export function EvaluatorSidebar({ active, collapsed, mobileOpen, onSelect, onToggle, onClose }: Props) {\r\n' +
+    '  return <><aside className={`student-sidebar evaluator-sidebar ${mobileOpen ? "student-sidebar--open" : ""} ${collapsed ? "student-sidebar--collapsed" : ""}`}><div className="student-sidebar__mobile-head"><span className="student-sidebar__section-label">Evaluator workspace</span><button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onClose}>×</button></div><button type="button" className="student-sidebar__collapse" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={onToggle}><span aria-hidden="true">{collapsed ? "+" : "-"}</span></button><nav className="student-sidebar__nav" aria-label="Evaluator navigation">{items.map(([key, label, icon]) => <button key={key} type="button" className="student-sidebar__item" aria-current={active === key ? "page" : undefined} title={collapsed ? label : undefined} onClick={() => { onSelect(key); onClose(); }}><span className="student-sidebar__icon" aria-hidden="true">{icon}</span><span className="student-sidebar__label">{label}</span></button>)}</nav></aside><button type="button" aria-label="Close navigation" className={`student-sidebar__overlay ${mobileOpen ? "student-sidebar__overlay--open" : ""}`} onClick={onClose} /></>;\r\n' +
+    '}\r\n'
+  
+      at TestContext.<anonymous> (file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/dashboard-navigation.test.mjs:44:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import type { EvaluatorNavKey } from "./EvaluatorPortal";\r\n\r\ntype Props = { active: EvaluatorNavKey; collapsed: boolean; mobileOpen: boolean; onSelect: (key: EvaluatorNavKey) => void; onToggle: () => void; onClose: () => void };\r\n\r\nconst items: Array<[EvaluatorNavKey, string, string]> = [["overview", "Overview", "O"], ["queue", "Evaluation Queue", "Q"], ["proposal", "Proposal Review", "P"], ["schedule", "Defense Schedule", "D"], ["criteria", "Evaluation Criteria", "C"], ["scoring", "Scoring & Feedback", "S"], ["history", "Decision History", "H"]];\r\n\r\nexport function EvaluatorSidebar({ active, collapsed, mobileOpen, onSelect, onToggle, onClose }: Props) {\r\n  return <><aside className={`student-sidebar evaluator-sidebar ${mobileOpen ? "student-sidebar--open" : ""} ${collapsed ? "student-sidebar--collapsed" : ""}`}><div className="student-sidebar__mobile-head"><span className="student-sidebar__section-label">Evaluator workspace</span><button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onClose}>×</button></div><button type="button" className="student-sidebar__collapse" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={onToggle}><span aria-hidden="true">{collapsed ? "+" : "-"}</span></button><nav className="student-sidebar__nav" aria-label="Evaluator navigation">{items.map(([key, label, icon]) => <button key={key} type="button" className="student-sidebar__item" aria-current={active === key ? "page" : undefined} title={collapsed ? label : undefined} onClick={() => { onSelect(key); onClose(); }}><span className="student-sidebar__icon" aria-hidden="true">{icon}</span><span className="student-sidebar__label">{label}</span></button>)}</nav></aside><button type="button" aria-label="Close navigation" className={`student-sidebar__overlay ${mobileOpen ? "student-sidebar__overlay--open" : ""}`} onClick={onClose} /></>;\r\n}\r\n',
+    expected: /\[\["overview"[^\]]*"O"/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at tests\dashboard-theme.test.mjs:10:1
+✖ all dashboards load the shared reference-inspired theme after base styles (4.7975ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /import "\.\/dashboard-theme\.css";/. Input:
+  
+  'import { StrictMode } from "react";\r\n' +
+    'import { createRoot } from "react-dom/client";\r\n' +
+    'import App from "./App";\r\n' +
+    'import "./index.css";\r\n' +
+    'createRoot(document.getElementById("root")!).render(<StrictMode><App /></StrictMode>);\r\n'
+  
+      at TestContext.<anonymous> (file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/dashboard-theme.test.mjs:11:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import { StrictMode } from "react";\r\nimport { createRoot } from "react-dom/client";\r\nimport App from "./App";\r\nimport "./index.css";\r\ncreateRoot(document.getElementById("root")!).render(<StrictMode><App /></StrictMode>);\r\n',
+    expected: /import "\.\/dashboard-theme\.css";/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests\design-system.test.mjs:7:1
+✖ shared Soft SaaS design system is loaded after the base styles (5.915ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /import "\.\/auth\.css";/. Input:
+  
+  'import { StrictMode } from "react";\r\n' +
+    'import { createRoot } from "react-dom/client";\r\n' +
+    'import App from "./App";\r\n' +
+    'import "./index.css";\r\n' +
+    'createRoot(document.getElementById("root")!).render(<StrictMode><App /></StrictMode>);\r\n'
+  
+      at TestContext.<anonymous> (file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/design-system.test.mjs:10:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import { StrictMode } from "react";\r\nimport { createRoot } from "react-dom/client";\r\nimport App from "./App";\r\nimport "./index.css";\r\ncreateRoot(document.getElementById("root")!).render(<StrictMode><App /></StrictMode>);\r\n',
+    expected: /import "\.\/auth\.css";/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests\design-system.test.mjs:24:1
+✖ authentication uses the light centered card shell without the photo asset (9.5871ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /className=\{`auth-saas/. Input:
+  
+  'import { GroupChannels } from "./GroupChannels";\r\n' +
+    'import { useEffect, useId, useRef, useState, type ReactNode } from "react";\r\n' +
+    'import { AdminPortal } from "./AdminPortal";\r\n' +
+    'import { PasswordField } from "./PasswordField";\r\n' +
+    'import { passwordPolicyError } from "./passwordPolicy";\r\n' +
+    'import {\r\n' +
+    '  emailValidationMessage,\r\n' +
+    '  normalizeEmail,\r\n' +
+    '} from "./emailValidation";\r\n' +
+    'import { StudentPortal } from "./portals/student/StudentPortal";\r\n' +
+    'import { fullNameValidationMessage } from "./inputValidation";\r\n' +
+    'import { SupervisorPortal } from "./portals/supervisor/SupervisorPortal";\r\n' +
+    'import { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";\r\n' +
+    'import { StudentEvaluatorPortal as EvaluatorPortal } from "./portals/student/modules/StudentEvaluatorPortal";\r\n' +
+    'import signInStudentsImage from "./assets/sign-in-students.webp";\r\n' +
+    '\r\n' +
+    'type Member = { id: string; name: string; registration: string; email: string };\r\n' +
+    'type Details = { name: string; registration: string; email: string };\r\n' +
+    'type Cycle = {\r\n' +
+    '  id: number;\r\n' +
+    '  code: string;\r\n' +
+    '  display_name: string;\r\n' +
+    '  registration_open: boolean;\r\n' +
+    '};\r\n' +
+    'type Policy = { max_group_size: number };\r\n' +
+    'type FieldErrors = Record<string, string>;\r\n' +
+    'type ApiDetail = {\r\n' +
+    '  code?: string;\r\n' +
+    '  message?: string;\r\n' +
+    '  field?: string;\r\n' +
+    '  fields?: { path: string }[];\r\n' +
+    '};\r\n' +
+    'type PublicRole = "STUDENT" | "SUPERVISOR" | "PANEL_MEMBER" | "COORDINATOR";\r\n' +
+    'type LoginRole = PublicRole | "ADMIN";\r\n' +
+    'type SafeUser = {\r\n' +
+    '  id: number;\r\n' +
+    '  full_name: string;\r\n' +
+    '  email: string;\r\n' +
+    '  registration_number: string | null;\r\n' +
+    '  role: string;\r\n' +
+    '  is_active: boolean;\r\n' +
+    '};\r\n' +
+    'type PasswordResetDeliveryStatus = {\r\n' +
+    '  development_mode: boolean;\r\n' +
+    '  smtp_configured: boolean;\r\n' +
+    '};\r\n' +
+    'type DevelopmentResetLinkState = "idle" | "loading" | "ready" | "missing" | "error";\r\n' +
+    'type PublicPage = "in" | "up" | "recover";\r\n' +
+    'type StudentSignupMode = "single" | "group";\r\n' +
+    'type PublicRoute = { page: PublicPage; signupRole: LoginRole | null; step: 1 | 2 | 3; studentMode: StudentSignupMode | null };\r\n' +
+    '\r\n' +
+    'const STEPS = ["Account Details", "Login Details", "Team Members"];\r\n' +
+    'export const API = (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8010").replace(/\\/$/, "");\r\n' +
+    'const INPUT =\r\n' +
+    '  "w-full rounded-lg border border-[#DCE3ED] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#4663FF] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";\r\n' +
+    'const PRIMARY =\r\n' +
+    '  "rounded-lg bg-[#4663FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#354FE0] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";\r\n' +
+    'const AUTH_PRIMARY =\r\n' +
+    '  "rounded-xl bg-[#4663FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#354ee0] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";\r\n' +
+    'const DEVELOPMENT_UNKNOWN_ACCOUNT_MESSAGE = "No account was found with this email address.";\r\n' +
+    'const academicCycleError = (status: number) => ({ 401: "Your session has expired. Please sign in again.", 403: "You are not authorized to load academic cycles.", 404: "The academic-cycles endpoint was not found.", 500: "The backend could not load academic cycles." }[status] ?? "Academic cycles could not be loaded.");\r\n' +
+    '\r\n' +
+    'const newMember = (): Member => ({\r\n' +
+    '  id: crypto.randomUUID(),\r\n' +
+    '  name: "",\r\n' +
+    '  registration: "",\r\n' +
+    '  email: "",\r\n' +
+    '});\r\n' +
+    'const registration = (value: string) => value.trim().toUpperCase();\r\n' +
+    'const email = (value: string) => value.trim().toLowerCase();\r\n' +
+    'const memberKey = (id: string, field: keyof Details) => `member.${id}.${field}`;\r\n' +
+    'const isLoginRole = (value: unknown): value is LoginRole => typeof value === "string" && ["STUDENT", "SUPERVISOR", "PANEL_MEMBER", "COORDINATOR", "ADMIN"].includes(value);\r\n' +
+    'const publicRoute = (page: PublicPage, signupRole: LoginRole | null = null, step: 1 | 2 | 3 = 1, studentMode: StudentSignupMode | null = null): PublicRoute => ({ page, signupRole: page === "up" ? signupRole : null, step: page === "up" && signupRole === "STUDENT" && studentMode === "group" ? step : 1, studentMode: page === "up" && signupRole === "STUDENT" ? studentMode : null });\r\n' +
+    'const readPublicRoute = (value: unknown): PublicRoute | null => {\r\n' +
+    '  const route = (value as { fyphubNavigation?: unknown } | null)?.fyphubNavigation as Partial<PublicRoute> | undefined;\r\n' +
+    '  if (!route || (route.page !== "in" && route.page !== "up" && route.page !== "recover") || (route.signupRole !== null && !isLoginRole(route.signupRole)) || (route.step !== 1 && route.step !== 2 && route.step !== 3) || (route.studentMode !== undefined && route.studentMode !== null && route.studentMode !== "single" && route.studentMode !== "group")) return null;\r\n' +
+    '  return publicRoute(route.page, route.signupRole, route.step, route.studentMode === "single" || route.studentMode === "group" ? route.studentMode : null);\r\n' +
+    '};\r\n' +
+    '\r\n' +
+    'function Logo({ compact = false, auth = false, authMobile = false }: { compact?: boolean; auth?: boolean; authMobile?: boolean }) {\r\n' +
+    '  const classes = compact\r\n' +
+    '    ? { wrapper: "flex items-center gap-2", icon: "h-9 w-10 text-[#176B66]", wordmark: "text-xl font-bold tracking-tight" }\r\n' +
+    '    : auth\r\n' +
+    '      ? { wrapper: "flex items-center gap-3.5 sm:gap-4", icon: "h-auto w-[72px] text-[#c8f3df] lg:w-[100px]", wordmark: "text-[46px] font-bold tracking-tight text-white lg:text-[62px]" }\r\n' +
+    '      : authMobile\r\n' +
+    '        ? { wrapper: "flex items-center gap-3.5 sm:gap-4", icon: "h-auto w-[56px] text-[#176B66] sm:w-[72px]", wordmark: "text-[34px] font-bold tracking-tight sm:text-[46px]" }\r\n' +
+    '        : { wrapper: "flex items-center gap-2.5", icon: "h-12 w-auto text-[#176B66]", wordmark: "text-[28px] font-bold tracking-tight sm:text-[32px]" };\r\n' +
+    '  return (\r\n' +
+    '    <div className={classes.wrapper}>\r\n' +
+    '      <svg\r\n' +
+    '        aria-hidden="true"\r\n' +
+    '        className={classes.icon}\r\n' +
+    '        viewBox="0 0 56 40"\r\n' +
+    '        fill="none"\r\n' +
+    '      >\r\n' +
+    '        <path d="m4 14 24-10 24 10-24 10L4 14Z" fill="currentColor" />\r\n' +
+    '        <path\r\n' +
+    '          d="M15 20v8c5 5 21 5 26 0v-8M49 16v11"\r\n' +
+    '          stroke="currentColor"\r\n' +
+    '          strokeWidth="3"\r\n' +
+    '          strokeLinecap="round"\r\n' +
+    '        />\r\n' +
+    '        <circle\r\n' +
+    '          cx="49"\r\n' +
+    '          cy="30"\r\n' +
+    '          r="3"\r\n' +
+    '          fill="#E4EEE7"\r\n' +
+    '          stroke="currentColor"\r\n' +
+    '          strokeWidth="2"\r\n' +
+    '        />\r\n' +
+    '      </svg>\r\n' +
+    '      <span className={classes.wordmark}>FYPHub</span>\r\n' +
+    '    </div>\r\n' +
+    '  );\r\n' +
+    '}\r\n' +
+    '\r\n' +
+    'const ROLES: { value: LoginRole; label: string }[] = [\r\n' +
+    '  { value: "STUDENT", label: "Student" },\r\n' +
+    '  { value: "SUPERVISOR", label: "Supervisor" },\r\n' +
+    '  { value: "PANEL_MEMBER", label: "Evaluator" },\r\n' +
+    '  { value: "COORDINATOR", label: "Coordinator" },\r\n' +
+    '  { value: "ADMIN", label: "Administrator" },\r\n' +
+    '];\r\n' +
+    '\r\n' +
+    'function RoleIcon({ role }: { role: LoginRole }) {\r\n' +
+    '  const paths =\r\n' +
+    '    role === "STUDENT"\r\n' +
+    '      ? ["M3 10 12 5l9 5-9 5-9-5Z", "M6 12v4c2 2 10 2 12 0v-4", "M21 10v5"]\r\n' +
+    '      : role === "SUPERVISOR"\r\n' +
+    '        ? [\r\n' +
+    '            "M8 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",\r\n' +
+    '            "M3 20c0-3 2-5 5-5s5 2 5 5",\r\n' +
+    '            "M14 6h7v13h-7zM16 10h3M16 13h3",\r\n' +
+    '          ]\r\n' +
+    '        : role === "COORDINATOR"\r\n' +
+    '          ? [\r\n' +
+    '              "M5 5h4v4H5zM15 5h4v4h-4zM10 16h4v4h-4z",\r\n' +
+    '              "M9 7h6M17 9v4l-5 3M7 9v4l5 3",\r\n' +
+    '            ]\r\n' +
+    '          : role === "PANEL_MEMBER"\r\n' +
+    '            ? ["M7 3h10v18H7zM10 3v3h4V3", "M10 12l2 2 4-4"]\r\n' +
+    '            : [\r\n' +
+    '                "M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6l7-3Z",\r\n' +
+    '                "M12 9v6m-3-3h6",\r\n' +
+    '                "M18 15l1 1m0-3-1 1",\r\n' +
+    '              ];\r\n' +
+    '  return (\r\n' +
+    '    <svg\r\n' +
+    '      aria-hidden="true"\r\n' +
+    '      viewBox="0 0 24 24"\r\n' +
+    '      fill="none"\r\n' +
+    '      className="h-5 w-5"\r\n' +
+    '      stroke="currentColor"\r\n' +
+    '      strokeWidth="1.8"\r\n' +
+    '      strokeLinecap="round"\r\n' +
+    '      strokeLinejoin="round"\r\n' +
+    '    >\r\n' +
+    '      {paths.map((d) => (\r\n' +
+    '        <path key={d} d={d} />\r\n' +
+    '      ))}\r\n' +
+    '    </svg>\r\n' +
+    '  );\r\n' +
+    '}\r\n' +
+    '\r\n' +
+    'function AuthPhotoBackground() {\r\n' +
+    '  return <div aria-hidden="true" className="auth-photo-background pointer-events-none absolute inset-0 overflow-hidden"><img src={signInStudentsImage} alt="" width="1200" height="800" className="h-full w-full object-cover object-[58%_center]" /><div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(10,40,55,.82),rgba(11,70,78,.6)_55%,rgba(10,35,50,.5))]" /></div>;\r\n' +
+    '}\r\n' +
+    '\r\n' +
+    'function AuthLayout({ children, actions, compact = false }: { children: ReactNode; actions?: ReactNode; compact?: boolean }) {\r\n' +
+    '  return <main className="relative min-h-screen overflow-x-hidden px-4 py-7 text-[#243746] sm:px-6 sm:py-10 lg:py-5"><AuthPhotoBackground /><div className="relative mx-auto grid max-w-[1280px] gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(460px,500px)] lg:items-center lg:gap-16"><section className="hidden max-w-lg self-center text-white lg:block"><Logo auth /><h1 className="mt-14 text-4xl font-bold leading-[1.15] tracking-tight">From Your First Idea to Your Final Defense.</h1><p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-white/90">Bring your team, proposals, feedback, and progress together in one FYP workspace.</p><p className="mt-6 text-[15px] font-medium tracking-wide text-[#b9ddcf]">Stay focused. Build together.</p></section><div className={`auth-card mx-auto w-full max-w-[500px] rounded-3xl p-5 ${compact ? "sm:p-6" : "sm:p-7"}`}><header className={`mb-6 flex gap-4 ${actions ? "flex-col items-start sm:flex-row sm:items-center sm:justify-between" : "items-center justify-between lg:hidden"}`}><div className="lg:hidden"><Logo authMobile /></div>{actions && <div className="sm:ml-auto">{actions}</div>}</header>{children}</div></div></main>;\r\n' +
+    '}\r\n' +
+    '\r\n' +
+    'function RoleCards({\r\n' +
+    '  value,\r\n' +
+    '  onChange,\r\n' +
+    '  disabled = false,\r\n' +
+    '  includeAdmin = false,\r\n' +
+    '  compact = false,\r\n' +
+    '}: {\r\n' +
+    '  value: LoginRole;\r\n' +
+    '  onChange: (role: LoginRole) => void;\r\n' +
+    '  disabled?: boolean;\r\n' +
+    '  includeAdmin?: boolean;\r\n' +
+    '  compact?: boolean;\r\n' +
+    '}) {\r\n' +
+    '  const roles = includeAdmin ? ROLES : ROLES;\r\n' +
+    '  return (\r\n' +
+    '    <div\r\n' +
+    '      className={`grid grid-cols-2 ${compact ? "gap-[10px]" : "gap-3"}`}\r\n' +
+    '      role="radiogroup"\r\n' +
+    '      aria-label="Account type"\r\n' +
+    '    >\r\n' +
+    '      {roles.map((role) => (\r\n' +
+    '        <button\r\n' +
+    '          key={role.value'... 66772 more characters
+  
+      at TestContext.<anonymous> (file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/design-system.test.mjs:26:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import { GroupChannels } from "./GroupChannels";\r\nimport { useEffect, useId, useRef, useState, type ReactNode } from "react";\r\nimport { AdminPortal } from "./AdminPortal";\r\nimport { PasswordField } from "./PasswordField";\r\nimport { passwordPolicyError } from "./passwordPolicy";\r\nimport {\r\n  emailValidationMessage,\r\n  normalizeEmail,\r\n} from "./emailValidation";\r\nimport { StudentPortal } from "./portals/student/StudentPortal";\r\nimport { fullNameValidationMessage } from "./inputValidation";\r\nimport { SupervisorPortal } from "./portals/supervisor/SupervisorPortal";\r\nimport { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";\r\nimport { StudentEvaluatorPortal as EvaluatorPortal } from "./portals/student/modules/StudentEvaluatorPortal";\r\nimport signInStudentsImage from "./assets/sign-in-students.webp";\r\n\r\ntype Member = { id: string; name: string; registration: string; email: string };\r\ntype Details = { name: string; registration: string; email: string };\r\ntype Cycle = {\r\n  id: number;\r\n  code: string;\r\n  display_name: string;\r\n  registration_open: boolean;\r\n};\r\ntype Policy = { max_group_size: number };\r\ntype FieldErrors = Record<string, string>;\r\ntype ApiDetail = {\r\n  code?: string;\r\n  message?: string;\r\n  field?: string;\r\n  fields?: { path: string }[];\r\n};\r\ntype PublicRole = "STUDENT" | "SUPERVISOR" | "PANEL_MEMBER" | "COORDINATOR";\r\ntype LoginRole = PublicRole | "ADMIN";\r\ntype SafeUser = {\r\n  id: number;\r\n  full_name: string;\r\n  email: string;\r\n  registration_number: string | null;\r\n  role: string;\r\n  is_active: boolean;\r\n};\r\ntype PasswordResetDeliveryStatus = {\r\n  development_mode: boolean;\r\n  smtp_configured: boolean;\r\n};\r\ntype DevelopmentResetLinkState = "idle" | "loading" | "ready" | "missing" | "error";\r\ntype PublicPage = "in" | "up" | "recover";\r\ntype StudentSignupMode = "single" | "group";\r\ntype PublicRoute = { page: PublicPage; signupRole: LoginRole | null; step: 1 | 2 | 3; studentMode: StudentSignupMode | null };\r\n\r\nconst STEPS = ["Account Details", "Login Details", "Team Members"];\r\nexport const API = (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8010").replace(/\\/$/, "");\r\nconst INPUT =\r\n  "w-full rounded-lg border border-[#DCE3ED] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#4663FF] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";\r\nconst PRIMARY =\r\n  "rounded-lg bg-[#4663FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#354FE0] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";\r\nconst AUTH_PRIMARY =\r\n  "rounded-xl bg-[#4663FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#354ee0] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";\r\nconst DEVELOPMENT_UNKNOWN_ACCOUNT_MESSAGE = "No account was found with this email address.";\r\nconst academicCycleError = (status: number) => ({ 401: "Your session has expired. Please sign in again.", 403: "You are not authorized to load academic cycles.", 404: "The academic-cycles endpoint was not found.", 500: "The backend could not load academic cycles." }[status] ?? "Academic cycles could not be loaded.");\r\n\r\nconst newMember = (): Member => ({\r\n  id: crypto.randomUUID(),\r\n  name: "",\r\n  registration: "",\r\n  email: "",\r\n});\r\nconst registration = (value: string) => value.trim().toUpperCase();\r\nconst email = (value: string) => value.trim().toLowerCase();\r\nconst memberKey = (id: string, field: keyof Details) => `member.${id}.${field}`;\r\nconst isLoginRole = (value: unknown): value is LoginRole => typeof value === "string" && ["STUDENT", "SUPERVISOR", "PANEL_MEMBER", "COORDINATOR", "ADMIN"].includes(value);\r\nconst publicRoute = (page: PublicPage, signupRole: LoginRole | null = null, step: 1 | 2 | 3 = 1, studentMode: StudentSignupMode | null = null): PublicRoute => ({ page, signupRole: page === "up" ? signupRole : null, step: page === "up" && signupRole === "STUDENT" && studentMode === "group" ? step : 1, studentMode: page === "up" && signupRole === "STUDENT" ? studentMode : null });\r\nconst readPublicRoute = (value: unknown): PublicRoute | null => {\r\n  const route = (value as { fyphubNavigation?: unknown } | null)?.fyphubNavigation as Partial<PublicRoute> | undefined;\r\n  if (!route || (route.page !== "in" && route.page !== "up" && route.page !== "recover") || (route.signupRole !== null && !isLoginRole(route.signupRole)) || (route.step !== 1 && route.step !== 2 && route.step !== 3) || (route.studentMode !== undefined && route.studentMode !== null && route.studentMode !== "single" && route.studentMode !== "group")) return null;\r\n  return publicRoute(route.page, route.signupRole, route.step, route.studentMode === "single" || route.studentMode === "group" ? route.studentMode : null);\r\n};\r\n\r\nfunction Logo({ compact = false, auth = false, authMobile = false }: { compact?: boolean; auth?: boolean; authMobile?: boolean }) {\r\n  const classes = compact\r\n    ? { wrapper: "flex items-center gap-2", icon: "h-9 w-10 text-[#176B66]", wordmark: "text-xl font-bold tracking-tight" }\r\n    : auth\r\n      ? { wrapper: "flex items-center gap-3.5 sm:gap-4", icon: "h-auto w-[72px] text-[#c8f3df] lg:w-[100px]", wordmark: "text-[46px] font-bold tracking-tight text-white lg:text-[62px]" }\r\n      : authMobile\r\n        ? { wrapper: "flex items-center gap-3.5 sm:gap-4", icon: "h-auto w-[56px] text-[#176B66] sm:w-[72px]", wordmark: "text-[34px] font-bold tracking-tight sm:text-[46px]" }\r\n        : { wrapper: "flex items-center gap-2.5", icon: "h-12 w-auto text-[#176B66]", wordmark: "text-[28px] font-bold tracking-tight sm:text-[32px]" };\r\n  return (\r\n    <div className={classes.wrapper}>\r\n      <svg\r\n        aria-hidden="true"\r\n        className={classes.icon}\r\n        viewBox="0 0 56 40"\r\n        fill="none"\r\n      >\r\n        <path d="m4 14 24-10 24 10-24 10L4 14Z" fill="currentColor" />\r\n        <path\r\n          d="M15 20v8c5 5 21 5 26 0v-8M49 16v11"\r\n          stroke="currentColor"\r\n          strokeWidth="3"\r\n          strokeLinecap="round"\r\n        />\r\n        <circle\r\n          cx="49"\r\n          cy="30"\r\n          r="3"\r\n          fill="#E4EEE7"\r\n          stroke="currentColor"\r\n          strokeWidth="2"\r\n        />\r\n      </svg>\r\n      <span className={classes.wordmark}>FYPHub</span>\r\n    </div>\r\n  );\r\n}\r\n\r\nconst ROLES: { value: LoginRole; label: string }[] = [\r\n  { value: "STUDENT", label: "Student" },\r\n  { value: "SUPERVISOR", label: "Supervisor" },\r\n  { value: "PANEL_MEMBER", label: "Evaluator" },\r\n  { value: "COORDINATOR", label: "Coordinator" },\r\n  { value: "ADMIN", label: "Administrator" },\r\n];\r\n\r\nfunction RoleIcon({ role }: { role: LoginRole }) {\r\n  const paths =\r\n    role === "STUDENT"\r\n      ? ["M3 10 12 5l9 5-9 5-9-5Z", "M6 12v4c2 2 10 2 12 0v-4", "M21 10v5"]\r\n      : role === "SUPERVISOR"\r\n        ? [\r\n            "M8 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",\r\n            "M3 20c0-3 2-5 5-5s5 2 5 5",\r\n            "M14 6h7v13h-7zM16 10h3M16 13h3",\r\n          ]\r\n        : role === "COORDINATOR"\r\n          ? [\r\n              "M5 5h4v4H5zM15 5h4v4h-4zM10 16h4v4h-4z",\r\n              "M9 7h6M17 9v4l-5 3M7 9v4l5 3",\r\n            ]\r\n          : role === "PANEL_MEMBER"\r\n            ? ["M7 3h10v18H7zM10 3v3h4V3", "M10 12l2 2 4-4"]\r\n            : [\r\n                "M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6l7-3Z",\r\n                "M12 9v6m-3-3h6",\r\n                "M18 15l1 1m0-3-1 1",\r\n              ];\r\n  return (\r\n    <svg\r\n      aria-hidden="true"\r\n      viewBox="0 0 24 24"\r\n      fill="none"\r\n      className="h-5 w-5"\r\n      stroke="currentColor"\r\n      strokeWidth="1.8"\r\n      strokeLinecap="round"\r\n      strokeLinejoin="round"\r\n    >\r\n      {paths.map((d) => (\r\n        <path key={d} d={d} />\r\n      ))}\r\n    </svg>\r\n  );\r\n}\r\n\r\nfunction AuthPhotoBackground() {\r\n  return <div aria-hidden="true" className="auth-photo-background pointer-events-none absolute inset-0 overflow-hidden"><img src={signInStudentsImage} alt="" width="1200" height="800" className="h-full w-full object-cover object-[58%_center]" /><div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(10,40,55,.82),rgba(11,70,78,.6)_55%,rgba(10,35,50,.5))]" /></div>;\r\n}\r\n\r\nfunction AuthLayout({ children, actions, compact = false }: { children: ReactNode; actions?: ReactNode; compact?: boolean }) {\r\n  return <main className="relative min-h-screen overflow-x-hidden px-4 py-7 text-[#243746] sm:px-6 sm:py-10 lg:py-5"><AuthPhotoBackground /><div className="relative mx-auto grid max-w-[1280px] gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(460px,500px)] lg:items-center lg:gap-16"><section className="hidden max-w-lg self-center text-white lg:block"><Logo auth /><h1 className="mt-14 text-4xl font-bold leading-[1.15] tracking-tight">From Your First Idea to Your Final Defense.</h1><p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-white/90">Bring your team, proposals, feedback, and progress together in one FYP workspace.</p><p className="mt-6 text-[15px] font-medium tracking-wide text-[#b9ddcf]">Stay focused. Build together.</p></section><div className={`auth-card mx-auto w-full max-w-[500px] rounded-3xl p-5 ${compact ? "sm:p-6" : "sm:p-7"}`}><header className={`mb-6 flex gap-4 ${actions ? "flex-col items-start sm:flex-row sm:items-center sm:justify-between" : "items-center justify-between lg:hidden"}`}><div className="lg:hidden"><Logo authMobile /></div>{actions && <div className="sm:ml-auto">{actions}</div>}</header>{children}</div></div></main>;\r\n}\r\n\r\nfunction RoleCards({\r\n  value,\r\n  onChange,\r\n  disabled = false,\r\n  includeAdmin = false,\r\n  compact = false,\r\n}: {\r\n  value: LoginRole;\r\n  onChange: (role: LoginRole) => void;\r\n  disabled?: boolean;\r\n  includeAdmin?: boolean;\r\n  compact?: boolean;\r\n}) {\r\n  const roles = includeAdmin ? ROLES : ROLES;\r\n  return (\r\n    <div\r\n      className={`grid grid-cols-2 ${compact ? "gap-[10px]" : "gap-3"}`}\r\n      role="radiogroup"\r\n      aria-label="Account type"\r\n    >\r\n      {roles.map((role) => (\r\n        <button\r\n          key={role.value'... 66772 more characters,
+    expected: /className=\{`auth-saas/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests\evaluation-marks.test.mjs:27:1
+✖ all role portals mount the restored feature without changing unrelated role shells (4.0286ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /My FYP Results/. Input:
+  
+  'import { useEffect, useState, type ReactNode } from "react";\r\n' +
+    'import { StudentOverviewWithDocuments as StudentOverview } from "./StudentOverview";\r\n' +
+    'import { StudentSidebar, type StudentPhase } from "./StudentSidebar";\r\n' +
+    'import { StudentPhasePlaceholder } from "./modules/StudentPhasePlaceholder";\r\n' +
+    'import { StudentTeamPhase } from "./modules/StudentTeamPhase";\r\n' +
+    'import { StudentSupervisorSelection } from "./modules/supervisor-selection/StudentSupervisorSelection";\r\n' +
+    'import { KnowledgeSearch } from "./modules/knowledge-search/KnowledgeSearch";\r\n' +
+    'import "./student.css";\r\n' +
+    'import "./modules/archive-knowledge.css";\r\n' +
+    'import "./student-visibility.css";\r\n' +
+    '\r\n' +
+    'type StudentUser = { id: number; full_name: string; email: string; registration_number: string | null; role: string };\r\n' +
+    'const icon = (kind: "team" | "proposal" | "search" | "supervisor" | "review" | "route" | "panel" | "progress" | "archive" | "knowledge"): ReactNode => { const paths = { team: <><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M17 8a3 3 0 1 1 0 6m1 2a5 5 0 0 1 3 4"/></>, proposal: <><path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v5h5M9 13h6m-6 4h5"/></>, search: <><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></>, supervisor: <><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M17 14v6m-3-3h6"/></>, review: <><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 11l1.5 1.5L13 10m2 1h1m-7 5 1.5 1.5L13 15m2 1h1"/></>, route: <><path d="M5 5h14M5 12h10M5 19h6"/><circle cx="19" cy="12" r="2"/></>, panel: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-9 4v4m-2-2h4"/></>, progress: <><path d="M4 19V5m0 14h16"/><path d="m7 15 3-4 3 2 5-7"/></>, archive: <><path d="M4 7h16v13H4zM3 4h18v3H3zM9 11h6"/></>, knowledge: <><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5M8 11h6M11 8v6"/></> }; return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[kind]}</svg>; };\r\n' +
+    'export const STUDENT_PHASES: readonly StudentPhase[] = [\r\n' +
+    '  { id: "documents", name: "Required Documents & Uploads", route: "/student/documents", status: "Implemented", icon: icon("proposal") },\r\n' +
+    '  { id: "team", name: "Student Team & Collaboration Hub", route: "/student/team", status: "Partial", icon: icon("team") },\r\n' +
+    '  { id: "proposal", name: "Proposal Lifecycle & Review", route: "/student/proposals", status: "Partial", icon: icon("proposal") },\r\n' +
+    '  { id: "supervisors", name: "Supervisor Selection & Proposal Requests", route: "/student/supervisors", status: "Partial", icon: icon("supervisor") },\r\n' +
+    '  { id: "progress", name: "Project Progress & Supervision Dashboard", route: "/student/progress", status: "Partial", icon: icon("progress") },\r\n' +
+    '  { id: "search", name: "FYP Archive & Knowledge Search", route: "/student/search", status: "Implemented", icon: icon("knowledge") },\r\n' +
+    '];\r\n' +
+    'function Brand() { return <div className="student-brand"><svg aria-hidden="true" viewBox="0 0 56 40" fill="none"><path d="m4 14 24-10 24 10-24 10L4 14Z" fill="currentColor"/><path d="M15 20v8c5 5 21 5 26 0v-8M49 16v11" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg><span>FYPHub</span></div>; }\r\n' +
+    'export function StudentPortal({ api, user, onLogout }: { api: string; user: StudentUser; onLogout: () => void }) { const [activeId, setActiveId] = useState("overview"); const [collapsed, setCollapsed] = useState(false); const [mobileOpen, setMobileOpen] = useState(false); useEffect(() => { const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); }; window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, []); const phase = STUDENT_PHASES.find((item) => item.id === activeId); const initials = user.full_name.trim().split(/\\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "S"; const select = (item: StudentPhase) => setActiveId(item.id); return <main className="student-shell"><header className="student-header"><div className="student-header__left"><button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>☰</button><Brand/><span className="student-role">Student</span></div><div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name">{user.full_name}</span><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div></header><div className="student-body"><StudentSidebar phases={STUDENT_PHASES} activeId={activeId} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={select} onOverview={() => setActiveId("overview")} onToggleCollapse={() => setCollapsed((value) => !value)} onCloseMobile={() => setMobileOpen(false)} /><section className="student-content"><div className="student-content__inner">{activeId === "overview" ? <StudentOverview phases={STUDENT_PHASES} onSelect={select} /> : phase?.id === "team" ? <StudentTeamPhase api={api} /> : phase?.id === "supervisors" ? <StudentSupervisorSelection api={api} userId={user.id} /> : phase?.id === "search" || phase?.id === "archive" ? <KnowledgeSearch api={api} /> : phase ? <StudentPhasePlaceholder phase={phase} /> : null}</div></section></div></main>; }\r\n'
+  
+      at TestContext.<anonymous> (file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/evaluation-marks.test.mjs:28:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import { useEffect, useState, type ReactNode } from "react";\r\nimport { StudentOverviewWithDocuments as StudentOverview } from "./StudentOverview";\r\nimport { StudentSidebar, type StudentPhase } from "./StudentSidebar";\r\nimport { StudentPhasePlaceholder } from "./modules/StudentPhasePlaceholder";\r\nimport { StudentTeamPhase } from "./modules/StudentTeamPhase";\r\nimport { StudentSupervisorSelection } from "./modules/supervisor-selection/StudentSupervisorSelection";\r\nimport { KnowledgeSearch } from "./modules/knowledge-search/KnowledgeSearch";\r\nimport "./student.css";\r\nimport "./modules/archive-knowledge.css";\r\nimport "./student-visibility.css";\r\n\r\ntype StudentUser = { id: number; full_name: string; email: string; registration_number: string | null; role: string };\r\nconst icon = (kind: "team" | "proposal" | "search" | "supervisor" | "review" | "route" | "panel" | "progress" | "archive" | "knowledge"): ReactNode => { const paths = { team: <><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M17 8a3 3 0 1 1 0 6m1 2a5 5 0 0 1 3 4"/></>, proposal: <><path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v5h5M9 13h6m-6 4h5"/></>, search: <><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></>, supervisor: <><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M17 14v6m-3-3h6"/></>, review: <><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 11l1.5 1.5L13 10m2 1h1m-7 5 1.5 1.5L13 15m2 1h1"/></>, route: <><path d="M5 5h14M5 12h10M5 19h6"/><circle cx="19" cy="12" r="2"/></>, panel: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-9 4v4m-2-2h4"/></>, progress: <><path d="M4 19V5m0 14h16"/><path d="m7 15 3-4 3 2 5-7"/></>, archive: <><path d="M4 7h16v13H4zM3 4h18v3H3zM9 11h6"/></>, knowledge: <><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5M8 11h6M11 8v6"/></> }; return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[kind]}</svg>; };\r\nexport const STUDENT_PHASES: readonly StudentPhase[] = [\r\n  { id: "documents", name: "Required Documents & Uploads", route: "/student/documents", status: "Implemented", icon: icon("proposal") },\r\n  { id: "team", name: "Student Team & Collaboration Hub", route: "/student/team", status: "Partial", icon: icon("team") },\r\n  { id: "proposal", name: "Proposal Lifecycle & Review", route: "/student/proposals", status: "Partial", icon: icon("proposal") },\r\n  { id: "supervisors", name: "Supervisor Selection & Proposal Requests", route: "/student/supervisors", status: "Partial", icon: icon("supervisor") },\r\n  { id: "progress", name: "Project Progress & Supervision Dashboard", route: "/student/progress", status: "Partial", icon: icon("progress") },\r\n  { id: "search", name: "FYP Archive & Knowledge Search", route: "/student/search", status: "Implemented", icon: icon("knowledge") },\r\n];\r\nfunction Brand() { return <div className="student-brand"><svg aria-hidden="true" viewBox="0 0 56 40" fill="none"><path d="m4 14 24-10 24 10-24 10L4 14Z" fill="currentColor"/><path d="M15 20v8c5 5 21 5 26 0v-8M49 16v11" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg><span>FYPHub</span></div>; }\r\nexport function StudentPortal({ api, user, onLogout }: { api: string; user: StudentUser; onLogout: () => void }) { const [activeId, setActiveId] = useState("overview"); const [collapsed, setCollapsed] = useState(false); const [mobileOpen, setMobileOpen] = useState(false); useEffect(() => { const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); }; window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, []); const phase = STUDENT_PHASES.find((item) => item.id === activeId); const initials = user.full_name.trim().split(/\\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "S"; const select = (item: StudentPhase) => setActiveId(item.id); return <main className="student-shell"><header className="student-header"><div className="student-header__left"><button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>☰</button><Brand/><span className="student-role">Student</span></div><div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name">{user.full_name}</span><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div></header><div className="student-body"><StudentSidebar phases={STUDENT_PHASES} activeId={activeId} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={select} onOverview={() => setActiveId("overview")} onToggleCollapse={() => setCollapsed((value) => !value)} onCloseMobile={() => setMobileOpen(false)} /><section className="student-content"><div className="student-content__inner">{activeId === "overview" ? <StudentOverview phases={STUDENT_PHASES} onSelect={select} /> : phase?.id === "team" ? <StudentTeamPhase api={api} /> : phase?.id === "supervisors" ? <StudentSupervisorSelection api={api} userId={user.id} /> : phase?.id === "search" || phase?.id === "archive" ? <KnowledgeSearch api={api} /> : phase ? <StudentPhasePlaceholder phase={phase} /> : null}</div></section></div></main>; }\r\n',
+    expected: /My FYP Results/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests\password-policy.test.mjs:1:1
+✖ tests\password-policy.test.mjs (257.2626ms)
+  'test failed'
+
+test at tests\role-sidebar.test.mjs:14:1
+✖ role sidebars use the shared soft navigation shell (5.8821ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /RoleSidebar/. Input:
+  
+  'import type { EvaluatorNavKey } from "./EvaluatorPortal";\r\n' +
+    '\r\n' +
+    'type Props = { active: EvaluatorNavKey; collapsed: boolean; mobileOpen: boolean; onSelect: (key: EvaluatorNavKey) => void; onToggle: () => void; onClose: () => void };\r\n' +
+    '\r\n' +
+    'const items: Array<[EvaluatorNavKey, string, string]> = [["overview", "Overview", "O"], ["queue", "Evaluation Queue", "Q"], ["proposal", "Proposal Review", "P"], ["schedule", "Defense Schedule", "D"], ["criteria", "Evaluation Criteria", "C"], ["scoring", "Scoring & Feedback", "S"], ["history", "Decision History", "H"]];\r\n' +
+    '\r\n' +
+    'export function EvaluatorSidebar({ active, collapsed, mobileOpen, onSelect, onToggle, onClose }: Props) {\r\n' +
+    '  return <><aside className={`student-sidebar evaluator-sidebar ${mobileOpen ? "student-sidebar--open" : ""} ${collapsed ? "student-sidebar--collapsed" : ""}`}><div className="student-sidebar__mobile-head"><span className="student-sidebar__section-label">Evaluator workspace</span><button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onClose}>×</button></div><button type="button" className="student-sidebar__collapse" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={onToggle}><span aria-hidden="true">{collapsed ? "+" : "-"}</span></button><nav className="student-sidebar__nav" aria-label="Evaluator navigation">{items.map(([key, label, icon]) => <button key={key} type="button" className="student-sidebar__item" aria-current={active === key ? "page" : undefined} title={collapsed ? label : undefined} onClick={() => { onSelect(key); onClose(); }}><span className="student-sidebar__icon" aria-hidden="true">{icon}</span><span className="student-sidebar__label">{label}</span></button>)}</nav></aside><button type="button" aria-label="Close navigation" className={`student-sidebar__overlay ${mobileOpen ? "student-sidebar__overlay--open" : ""}`} onClick={onClose} /></>;\r\n' +
+    '}\r\n'
+  
+      at TestContext.<anonymous> (file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/role-sidebar.test.mjs:16:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import type { EvaluatorNavKey } from "./EvaluatorPortal";\r\n\r\ntype Props = { active: EvaluatorNavKey; collapsed: boolean; mobileOpen: boolean; onSelect: (key: EvaluatorNavKey) => void; onToggle: () => void; onClose: () => void };\r\n\r\nconst items: Array<[EvaluatorNavKey, string, string]> = [["overview", "Overview", "O"], ["queue", "Evaluation Queue", "Q"], ["proposal", "Proposal Review", "P"], ["schedule", "Defense Schedule", "D"], ["criteria", "Evaluation Criteria", "C"], ["scoring", "Scoring & Feedback", "S"], ["history", "Decision History", "H"]];\r\n\r\nexport function EvaluatorSidebar({ active, collapsed, mobileOpen, onSelect, onToggle, onClose }: Props) {\r\n  return <><aside className={`student-sidebar evaluator-sidebar ${mobileOpen ? "student-sidebar--open" : ""} ${collapsed ? "student-sidebar--collapsed" : ""}`}><div className="student-sidebar__mobile-head"><span className="student-sidebar__section-label">Evaluator workspace</span><button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onClose}>×</button></div><button type="button" className="student-sidebar__collapse" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={onToggle}><span aria-hidden="true">{collapsed ? "+" : "-"}</span></button><nav className="student-sidebar__nav" aria-label="Evaluator navigation">{items.map(([key, label, icon]) => <button key={key} type="button" className="student-sidebar__item" aria-current={active === key ? "page" : undefined} title={collapsed ? label : undefined} onClick={() => { onSelect(key); onClose(); }}><span className="student-sidebar__icon" aria-hidden="true">{icon}</span><span className="student-sidebar__label">{label}</span></button>)}</nav></aside><button type="button" aria-label="Close navigation" className={`student-sidebar__overlay ${mobileOpen ? "student-sidebar__overlay--open" : ""}`} onClick={onClose} /></>;\r\n}\r\n',
+    expected: /RoleSidebar/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests\role-sidebar.test.mjs:29:1
+✖ existing role navigation IDs remain present (4.7787ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /id: "overview"/. Input:
+  
+  'import type { EvaluatorNavKey } from "./EvaluatorPortal";\r\n' +
+    '\r\n' +
+    'type Props = { active: EvaluatorNavKey; collapsed: boolean; mobileOpen: boolean; onSelect: (key: EvaluatorNavKey) => void; onToggle: () => void; onClose: () => void };\r\n' +
+    '\r\n' +
+    'const items: Array<[EvaluatorNavKey, string, string]> = [["overview", "Overview", "O"], ["queue", "Evaluation Queue", "Q"], ["proposal", "Proposal Review", "P"], ["schedule", "Defense Schedule", "D"], ["criteria", "Evaluation Criteria", "C"], ["scoring", "Scoring & Feedback", "S"], ["history", "Decision History", "H"]];\r\n' +
+    '\r\n' +
+    'export function EvaluatorSidebar({ active, collapsed, mobileOpen, onSelect, onToggle, onClose }: Props) {\r\n' +
+    '  return <><aside className={`student-sidebar evaluator-sidebar ${mobileOpen ? "student-sidebar--open" : ""} ${collapsed ? "student-sidebar--collapsed" : ""}`}><div className="student-sidebar__mobile-head"><span className="student-sidebar__section-label">Evaluator workspace</span><button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onClose}>×</button></div><button type="button" className="student-sidebar__collapse" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={onToggle}><span aria-hidden="true">{collapsed ? "+" : "-"}</span></button><nav className="student-sidebar__nav" aria-label="Evaluator navigation">{items.map(([key, label, icon]) => <button key={key} type="button" className="student-sidebar__item" aria-current={active === key ? "page" : undefined} title={collapsed ? label : undefined} onClick={() => { onSelect(key); onClose(); }}><span className="student-sidebar__icon" aria-hidden="true">{icon}</span><span className="student-sidebar__label">{label}</span></button>)}</nav></aside><button type="button" aria-label="Close navigation" className={`student-sidebar__overlay ${mobileOpen ? "student-sidebar__overlay--open" : ""}`} onClick={onClose} /></>;\r\n' +
+    '}\r\n'
+  
+      at TestContext.<anonymous> (file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/role-sidebar.test.mjs:32:76)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'import type { EvaluatorNavKey } from "./EvaluatorPortal";\r\n\r\ntype Props = { active: EvaluatorNavKey; collapsed: boolean; mobileOpen: boolean; onSelect: (key: EvaluatorNavKey) => void; onToggle: () => void; onClose: () => void };\r\n\r\nconst items: Array<[EvaluatorNavKey, string, string]> = [["overview", "Overview", "O"], ["queue", "Evaluation Queue", "Q"], ["proposal", "Proposal Review", "P"], ["schedule", "Defense Schedule", "D"], ["criteria", "Evaluation Criteria", "C"], ["scoring", "Scoring & Feedback", "S"], ["history", "Decision History", "H"]];\r\n\r\nexport function EvaluatorSidebar({ active, collapsed, mobileOpen, onSelect, onToggle, onClose }: Props) {\r\n  return <><aside className={`student-sidebar evaluator-sidebar ${mobileOpen ? "student-sidebar--open" : ""} ${collapsed ? "student-sidebar--collapsed" : ""}`}><div className="student-sidebar__mobile-head"><span className="student-sidebar__section-label">Evaluator workspace</span><button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onClose}>×</button></div><button type="button" className="student-sidebar__collapse" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={onToggle}><span aria-hidden="true">{collapsed ? "+" : "-"}</span></button><nav className="student-sidebar__nav" aria-label="Evaluator navigation">{items.map(([key, label, icon]) => <button key={key} type="button" className="student-sidebar__item" aria-current={active === key ? "page" : undefined} title={collapsed ? label : undefined} onClick={() => { onSelect(key); onClose(); }}><span className="student-sidebar__icon" aria-hidden="true">{icon}</span><span className="student-sidebar__label">{label}</span></button>)}</nav></aside><button type="button" aria-label="Close navigation" className={`student-sidebar__overlay ${mobileOpen ? "student-sidebar__overlay--open" : ""}`} onClick={onClose} /></>;\r\n}\r\n',
+    expected: /id: "overview"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests\role-sidebar.test.mjs:37:1
+✖ sidebar styling keeps mobile drawer and collapsed tooltip behavior (1.7901ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /@media \(max-width:767px\)/. Input:
+  
+  '.role-sidebar {\n' +
+    '  position: relative;\n' +
+    '  display: flex;\n' +
+    '  width: 236px;\n' +
+    '  height: calc(100vh - 104px);\n' +
+    '  min-height: 0;\n' +
+    '  flex: 0 0 236px;\n' +
+    '  flex-direction: column;\n' +
+    '  gap: 10px;\n' +
+    '  margin: 16px 0 16px 16px;\n' +
+    '  padding: 16px 12px;\n' +
+    '  overflow: hidden;\n' +
+    '  border: 1px solid #294777;\n' +
+    '  border-radius: 22px;\n' +
+    '  background: linear-gradient(165deg, #10244a 0%, #0d1f40 62%, #0b1934 100%);\n' +
+    '  box-shadow: 0 18px 40px rgba(9, 24, 52, .2), inset 0 1px rgba(255, 255, 255, .08);\n' +
+    '  transition: width .22s ease, flex-basis .22s ease, box-shadow .22s ease, transform .22s ease;\n' +
+    '}\n' +
+    '.role-sidebar:hover { box-shadow: 0 22px 46px rgba(9, 24, 52, .26), inset 0 1px rgba(255, 255, 255, .1); }\n' +
+    '.role-sidebar .student-sidebar__nav { display: grid; min-height: 0; flex: 1 1 auto; gap: 6px; padding: 44px 0 8px; overflow-x: hidden; overflow-y: auto; scrollbar-color: rgba(147, 184, 247, .48) transparent; scrollbar-width: thin; }\n' +
+    '.role-sidebar .student-sidebar__item { position: relative; display: flex; width: 100%; min-height: 42px; flex: 0 0 auto; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #dce8ff; font-size: 13px; font-weight: 650; line-height: 1.3; text-align: left; transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease; }\n' +
+    '.role-sidebar .student-sidebar__item:hover { border-color: rgba(133, 177, 251, .28); background: #203d73; color: #fff; transform: translateX(2px); }\n' +
+    '.role-sidebar .student-sidebar__item[aria-current="page"] { border-color: #78a4ff; background: #3567d6; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), 0 8px 18px rgba(22, 65, 153, .3); color: #fff; }\n' +
+    '.role-sidebar .student-sidebar__item[aria-current="page"]::before { position: absolute; top: 20%; bottom: 20%; left: 0; width: 4px; border-radius: 4px; background: #a9ccff; box-shadow: 0 0 10px #8bb7ff; content: ""; }\n' +
+    '.role-sidebar .student-sidebar__icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border: 1px solid #4f7fd5; border-radius: 9px; background: #1b3970; color: #dceaff; }\n' +
+    '.role-sidebar .student-sidebar__icon svg { width: 17px; height: 17px; }\n' +
+    '.role-sidebar .student-sidebar__label { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; white-space: normal; }\n' +
+    '.role-sidebar .student-sidebar__collapse { position: absolute; top: 12px; right: 12px; z-index: 2; display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid #78a4ff; border-radius: 9px; background: #214b9b; color: #fff; box-shadow: 0 8px 18px rgba(5, 20, 55, .24); }\n' +
+    '.role-sidebar .student-sidebar__collapse:hover { background: #3567d6; }\n' +
+    '.role-sidebar .role-sidebar__section { display: grid; gap: 5px; }\n' +
+    '.role-sidebar .role-sidebar__section-heading { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 8px; text-align: left; }\n' +
+    '.role-sidebar .role-sidebar__section-heading:hover { background: rgba(73, 119, 207, .2); }\n' +
+    '.role-sidebar .role-sidebar__section-title { margin: 8px 8px 2px; color: #aebfdd; font-size: 10px; font-weight: 800; letter-spacing: .13em; line-height: 1.3; text-transform: uppercase; }\n' +
+    '.role-sidebar .role-sidebar__section:first-child .role-sidebar__section-title { margin-top: 0; }\n' +
+    '.role-sidebar .role-sidebar__section-chevron { color: #aebfdd; font-size: 16px; line-height: 1; }\n' +
+    '.role-sidebar .student-sidebar__mobile-head { display: none; }\n' +
+    '.role-sidebar .student-sidebar__overlay { display: none; }\n' +
+    '.role-sidebar.student-sidebar--collapsed { width: 70px; flex-basis: 70px; padding-inline: 9px; }\n' +
+    '.role-sidebar.student-sidebar--collapsed .student-sidebar__label,\n' +
+    '.role-sidebar.student-sidebar--collapsed .role-sidebar__section-title,\n' +
+    '.role-sidebar.student-sidebar--collapsed .role-sidebar__section-heading { display: none; }\n' +
+    '.role-sidebar.student-sidebar--collapsed .student-sidebar__item { justify-content: center; padding-inline: 6px; }\n' +
+    '.role-sidebar.student-sidebar--collapsed .student-sidebar__collapse { right: 50%; transform: translateX(50%); }\n' +
+    '.role-sidebar button:focus-visible { outline: 3px solid rgba(133, 170, 255, .8); outline-offset: 2px; }\n' +
+    '\n' +
+    '@media (max-width: 1024px) and (min-width: 768px) {\n' +
+    '  .role-sidebar { width: 224px; flex-basis: 224px; }\n' +
+    '}\n' +
+    '@media (max-width: 767px) {\n' +
+    '  .role-sidebar { position: fixed; inset: 76px auto 14px 14px; z-index: 40; width: min(84vw, 304px); height: auto; max-height: calc(100vh - 90px); margin: 0; padding: 14px 12px; transform: translateX(-110%); border-radius: 20px; opacity: 0; pointer-events: none; box-shadow: 0 22px 46px rgba(9, 24, 52, .3); }\n' +
+    '  .role-sidebar.student-sidebar--open { transform: translateX(0); opacity: 1; pointer-events: auto; }\n' +
+    '  .role-sidebar .student-sidebar__mobile-head { display: flex; align-items: center; justify-content: flex-start; gap: 8px; padding: 4px 48px 12px 4px; border-bottom: 1px solid rgba(194, 215, 250, .2); }\n' +
+    '  .role-sidebar .student-sidebar__section-label { color: #aebfdd; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }\n' +
+    '  .role-sidebar .student-sidebar__close { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid #78a4ff; border-radius: 9px; background: #214b9b; color: #fff; font-size: 22px; line-height: 1; }\n' +
+    '  .role-sidebar .student-sidebar__collapse { display: grid; top: 12px; right: 12px; }\n' +
+    '  .role-sidebar .student-sidebar__nav { padding-top: 12px; overflow: visible; }\n' +
+    '  .role-sidebar .student-sidebar__overlay { position: fixed; inset: 64px 0 0; z-index: 35; display: block; border: 0; background: rgba(15, 31, 61, .28); opacity: 0; pointer-events: none; transition: opacity .18s ease; }\n' +
+    '  .role-sidebar .student-sidebar__overlay--open { opacity: 1; pointer-events: auto; }\n' +
+    '  .role-sidebar.student-sidebar--collapsed { width: min(84vw, 304px); }\n' +
+    '  .role-sidebar.student-sidebar--collapsed .student-sidebar__label,\n' +
+    '  .role-sidebar.student-sidebar--collapsed .role-sidebar__section-title,\n' +
+    '  .role-sidebar.student-sidebar--collapsed .role-sidebar__section-heading { display: inline; }\n' +
+    '  .role-sidebar.student-sidebar--collapsed .student-sidebar__item { justify-content: flex-start; }\n' +
+    '}\n' +
+    '@media (prefers-reduced-motion: reduce) { .role-sidebar, .role-sidebar * { transition-duration: .01ms !important; } }\n' +
+    '\n' +
+    "/* This scoped override wins over each portal's older .student-sidebar and\n" +
+    '   Admin utility rules without changing the StudentSidebar itself. */\n' +
+    'main .student-sidebar.role-sidebar { width: 236px !important; height: calc(100vh - 104px) !important; min-height: 0 !important; flex: 0 0 236px !important; margin: 16px 0 16px 16px !important; padding: 16px 12px !important; overflow: hidden !important; }\n' +
+    'main .student-sidebar.role-sidebar .student-sidebar__nav { gap: 6px !important; padding: 44px 0 8px !important; overflow-x: hidden !important; overflow-y: auto !important; }\n' +
+    'main .student-sidebar.role-sidebar.student-sidebar--collapsed { width: 70px !important; flex-basis: 70px !important; padding-inline: 9px !important; }\n' +
+    '@media (max-width: 767px) {\n' +
+    '  main .student-sidebar.role-sidebar { position: fixed !important; inset: 76px auto 14px 14px !important; width: min(84vw, 304px) !important; height: auto !important; max-height: calc(100vh - 90px) !important; margin: 0 !important; padding: 14px 12px !important; transform: translateX(-110%) !important; }\n' +
+    '  main .student-sidebar.role-sidebar.student-sidebar--open { transform: translateX(0) !important; }\n' +
+    '  main .student-sidebar.role-sidebar.student-sidebar--collapsed { width: min(84vw, 304px) !important; flex-basis: auto !important; }\n' +
+    '  main .student-sidebar.role-sidebar .student-sidebar__nav { padding-top: 12px !important; overflow: visible !important; }\n' +
+    '}\n'
+  
+      at TestContext.<anonymous> (file:///D:/FYP%20Project/FYPHub-P1-GitHub/frontend/tests/role-sidebar.test.mjs:39:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `.role-sidebar {\n  position: relative;\n  display: flex;\n  width: 236px;\n  height: calc(100vh - 104px);\n  min-height: 0;\n  flex: 0 0 236px;\n  flex-direction: column;\n  gap: 10px;\n  margin: 16px 0 16px 16px;\n  padding: 16px 12px;\n  overflow: hidden;\n  border: 1px solid #294777;\n  border-radius: 22px;\n  background: linear-gradient(165deg, #10244a 0%, #0d1f40 62%, #0b1934 100%);\n  box-shadow: 0 18px 40px rgba(9, 24, 52, .2), inset 0 1px rgba(255, 255, 255, .08);\n  transition: width .22s ease, flex-basis .22s ease, box-shadow .22s ease, transform .22s ease;\n}\n.role-sidebar:hover { box-shadow: 0 22px 46px rgba(9, 24, 52, .26), inset 0 1px rgba(255, 255, 255, .1); }\n.role-sidebar .student-sidebar__nav { display: grid; min-height: 0; flex: 1 1 auto; gap: 6px; padding: 44px 0 8px; overflow-x: hidden; overflow-y: auto; scrollbar-color: rgba(147, 184, 247, .48) transparent; scrollbar-width: thin; }\n.role-sidebar .student-sidebar__item { position: relative; display: flex; width: 100%; min-height: 42px; flex: 0 0 auto; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #dce8ff; font-size: 13px; font-weight: 650; line-height: 1.3; text-align: left; transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease; }\n.role-sidebar .student-sidebar__item:hover { border-color: rgba(133, 177, 251, .28); background: #203d73; color: #fff; transform: translateX(2px); }\n.role-sidebar .student-sidebar__item[aria-current="page"] { border-color: #78a4ff; background: #3567d6; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), 0 8px 18px rgba(22, 65, 153, .3); color: #fff; }\n.role-sidebar .student-sidebar__item[aria-current="page"]::before { position: absolute; top: 20%; bottom: 20%; left: 0; width: 4px; border-radius: 4px; background: #a9ccff; box-shadow: 0 0 10px #8bb7ff; content: ""; }\n.role-sidebar .student-sidebar__icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border: 1px solid #4f7fd5; border-radius: 9px; background: #1b3970; color: #dceaff; }\n.role-sidebar .student-sidebar__icon svg { width: 17px; height: 17px; }\n.role-sidebar .student-sidebar__label { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; white-space: normal; }\n.role-sidebar .student-sidebar__collapse { position: absolute; top: 12px; right: 12px; z-index: 2; display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid #78a4ff; border-radius: 9px; background: #214b9b; color: #fff; box-shadow: 0 8px 18px rgba(5, 20, 55, .24); }\n.role-sidebar .student-sidebar__collapse:hover { background: #3567d6; }\n.role-sidebar .role-sidebar__section { display: grid; gap: 5px; }\n.role-sidebar .role-sidebar__section-heading { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 8px; text-align: left; }\n.role-sidebar .role-sidebar__section-heading:hover { background: rgba(73, 119, 207, .2); }\n.role-sidebar .role-sidebar__section-title { margin: 8px 8px 2px; color: #aebfdd; font-size: 10px; font-weight: 800; letter-spacing: .13em; line-height: 1.3; text-transform: uppercase; }\n.role-sidebar .role-sidebar__section:first-child .role-sidebar__section-title { margin-top: 0; }\n.role-sidebar .role-sidebar__section-chevron { color: #aebfdd; font-size: 16px; line-height: 1; }\n.role-sidebar .student-sidebar__mobile-head { display: none; }\n.role-sidebar .student-sidebar__overlay { display: none; }\n.role-sidebar.student-sidebar--collapsed { width: 70px; flex-basis: 70px; padding-inline: 9px; }\n.role-sidebar.student-sidebar--collapsed .student-sidebar__label,\n.role-sidebar.student-sidebar--collapsed .role-sidebar__section-title,\n.role-sidebar.student-sidebar--collapsed .role-sidebar__section-heading { display: none; }\n.role-sidebar.student-sidebar--collapsed .student-sidebar__item { justify-content: center; padding-inline: 6px; }\n.role-sidebar.student-sidebar--collapsed .student-sidebar__collapse { right: 50%; transform: translateX(50%); }\n.role-sidebar button:focus-visible { outline: 3px solid rgba(133, 170, 255, .8); outline-offset: 2px; }\n\n@media (max-width: 1024px) and (min-width: 768px) {\n  .role-sidebar { width: 224px; flex-basis: 224px; }\n}\n@media (max-width: 767px) {\n  .role-sidebar { position: fixed; inset: 76px auto 14px 14px; z-index: 40; width: min(84vw, 304px); height: auto; max-height: calc(100vh - 90px); margin: 0; padding: 14px 12px; transform: translateX(-110%); border-radius: 20px; opacity: 0; pointer-events: none; box-shadow: 0 22px 46px rgba(9, 24, 52, .3); }\n  .role-sidebar.student-sidebar--open { transform: translateX(0); opacity: 1; pointer-events: auto; }\n  .role-sidebar .student-sidebar__mobile-head { display: flex; align-items: center; justify-content: flex-start; gap: 8px; padding: 4px 48px 12px 4px; border-bottom: 1px solid rgba(194, 215, 250, .2); }\n  .role-sidebar .student-sidebar__section-label { color: #aebfdd; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }\n  .role-sidebar .student-sidebar__close { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid #78a4ff; border-radius: 9px; background: #214b9b; color: #fff; font-size: 22px; line-height: 1; }\n  .role-sidebar .student-sidebar__collapse { display: grid; top: 12px; right: 12px; }\n  .role-sidebar .student-sidebar__nav { padding-top: 12px; overflow: visible; }\n  .role-sidebar .student-sidebar__overlay { position: fixed; inset: 64px 0 0; z-index: 35; display: block; border: 0; background: rgba(15, 31, 61, .28); opacity: 0; pointer-events: none; transition: opacity .18s ease; }\n  .role-sidebar .student-sidebar__overlay--open { opacity: 1; pointer-events: auto; }\n  .role-sidebar.student-sidebar--collapsed { width: min(84vw, 304px); }\n  .role-sidebar.student-sidebar--collapsed .student-sidebar__label,\n  .role-sidebar.student-sidebar--collapsed .role-sidebar__section-title,\n  .role-sidebar.student-sidebar--collapsed .role-sidebar__section-heading { display: inline; }\n  .role-sidebar.student-sidebar--collapsed .student-sidebar__item { justify-content: flex-start; }\n}\n@media (prefers-reduced-motion: reduce) { .role-sidebar, .role-sidebar * { transition-duration: .01ms !important; } }\n\n/* This scoped override wins over each portal's older .student-sidebar and\n   Admin utility rules without changing the StudentSidebar itself. */\nmain .student-sidebar.role-sidebar { width: 236px !important; height: calc(100vh - 104px) !important; min-height: 0 !important; flex: 0 0 236px !important; margin: 16px 0 16px 16px !important; padding: 16px 12px !important; overflow: hidden !important; }\nmain .student-sidebar.role-sidebar .student-sidebar__nav { gap: 6px !important; padding: 44px 0 8px !important; overflow-x: hidden !important; overflow-y: auto !important; }\nmain .student-sidebar.role-sidebar.student-sidebar--collapsed { width: 70px !important; flex-basis: 70px !important; padding-inline: 9px !important; }\n@media (max-width: 767px) {\n  main .student-sidebar.role-sidebar { position: fixed !important; inset: 76px auto 14px 14px !important; width: min(84vw, 304px) !important; height: auto !important; max-height: calc(100vh - 90px) !important; margin: 0 !important; padding: 14px 12px !important; transform: translateX(-110%) !important; }\n  main .student-sidebar.role-sidebar.student-sidebar--open { transform: translateX(0) !important; }\n  main .student-sidebar.role-sidebar.student-sidebar--collapsed { width: min(84vw, 304px) !important; flex-basis: auto !important; }\n  main .student-sidebar.role-sidebar .student-sidebar__nav { padding-top: 12px !important; overflow: visible !important; }\n}\n`,
+    expected: /@media \(max-width:767px\)/,
+    operator: 'match',
+    diff: 'simple'
+  }

@@ -1,0 +1,204 @@
+/* Dashboard presentation tokens. This file is deliberately page-focused;
+   navigation geometry lives in dashboard-nav.css and auth in auth.css. */
+:root {
+  --dash-canvas: #e9ebf0;
+  --dash-surface: #ffffff;
+  --dash-surface-soft: #f7f8fb;
+  --dash-ink: #15233a;
+  --dash-muted: #6f7b90;
+  --dash-line: #e2e6ee;
+  --dash-blue: #4654eb;
+  --dash-blue-dark: #3543d7;
+  --dash-navy: #111a2b;
+  --dash-navy-soft: #1b263b;
+  --dash-shadow: 0 18px 44px rgb(25 38 66 / 0.12);
+  --dash-radius: 18px;
+}
+
+body:has(.student-shell),
+body:has(.admin-sidebar) { background: var(--dash-canvas); }
+
+.student-shell,
+main:has(.admin-sidebar) {
+  min-height: 100dvh;
+  background: var(--dash-canvas);
+  color: var(--dash-ink);
+}
+
+.student-header,
+main:has(.admin-sidebar) > header {
+  height: 64px;
+  border-bottom: 1px solid var(--dash-line);
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 1px 0 rgb(27 40 65 / 0.08), 0 8px 24px rgb(25 38 66 / 0.05);
+  backdrop-filter: blur(14px);
+}
+
+.student-header__left,
+main:has(.admin-sidebar) > header > div:first-child { gap: 16px; }
+
+.admin-menu {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--dash-blue);
+}
+
+.admin-menu svg { width: 22px; height: 22px; }
+.admin-menu:hover { background: #eef2ff; }
+
+.student-brand,
+main:has(.admin-sidebar) .admin-brand {
+  color: var(--dash-ink);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.student-brand svg,
+main:has(.admin-sidebar) .admin-brand svg {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+}
+
+.student-role,
+main:has(.admin-sidebar) .admin-role {
+  border-color: #d9def0;
+  background: #f1f3ff;
+  color: #4350c9;
+  font-size: 11px;
+  line-height: 1.1;
+  padding: 4px 8px;
+}
+
+.student-avatar,
+main:has(.admin-sidebar) .admin-avatar {
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+  border: 2px solid #fff;
+  background: linear-gradient(135deg, #ffd7c5, #c2d7ff);
+  box-shadow: 0 3px 10px rgb(52 67 104 / 0.14);
+  color: #314269;
+}
+
+.student-logout,
+main:has(.admin-sidebar) .admin-logout {
+  border-color: var(--dash-line);
+  border-radius: 10px;
+  background: var(--dash-surface);
+  color: #53627b;
+}
+
+.student-logout:hover,
+main:has(.admin-sidebar) .admin-logout:hover {
+  border-color: #9fb0dd;
+  background: #f4f7ff;
+}
+
+.student-content,
+main:has(.admin-sidebar) > div > section {
+  padding: 28px clamp(18px, 3vw, 42px) 42px;
+}
+
+.student-content__inner,
+main:has(.admin-sidebar) .admin-enter {
+  width: 100%;
+  max-width: 1240px;
+  margin-inline: auto;
+}
+
+.academic-cycle-dashboard__heading,
+.academic-cycle-dashboard__detail-heading {
+  margin-bottom: 22px;
+}
+
+.academic-cycle-dashboard h1,
+main:has(.admin-sidebar) h1 {
+  color: var(--dash-ink);
+  letter-spacing: -0.035em;
+}
+
+/* The overview hero is intentionally dark; keep its copy readable even if a
+   utility or global heading rule is loaded after the page chunk. */
+main:has(.cycle-overview) .cycle-overview__hero h1 { color: #fff; }
+main:has(.cycle-overview) .cycle-overview__hero .cycle-overview__eyebrow { color: #dbe6ff; }
+main:has(.cycle-overview) .cycle-overview__hero .cycle-overview__subtitle { color: #eef3ff; }
+
+.academic-cycle-dashboard__heading p,
+main:has(.admin-sidebar) .admin-enter p { color: var(--dash-muted); }
+
+.academic-cycle-dashboard__card,
+.academic-cycle-dashboard__table-wrap,
+main:has(.admin-sidebar) .admin-enter .rounded-xl.border,
+main:has(.admin-sidebar) .admin-enter .rounded-2xl.border,
+main:has(.admin-sidebar) .admin-enter .rounded-3xl.border {
+  border-color: var(--dash-line);
+  border-radius: var(--dash-radius);
+  background: var(--dash-surface);
+  box-shadow: 0 8px 26px rgb(31 45 76 / 0.07);
+}
+
+.academic-cycle-dashboard__card { border-radius: 22px; }
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+select,
+textarea {
+  min-height: 42px;
+  border: 1px solid #d8deea;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--dash-ink);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--dash-blue);
+  box-shadow: 0 0 0 3px rgb(70 84 235 / 0.14);
+  outline: 0;
+}
+
+table {
+  width: 100%;
+  border: 1px solid var(--dash-line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 26px rgb(31 45 76 / 0.06);
+}
+
+thead th {
+  background: #f7f8fb;
+  color: #5d6b83;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+button[type="submit"],
+button[class*="bg-[#4663ff]"],
+button[class*="bg-[#176b66]"],
+button[class*="bg-[#176B66]"] {
+  border-radius: 10px;
+  background: var(--dash-blue);
+  box-shadow: 0 7px 16px rgb(70 84 235 / 0.18);
+}
+
+button[type="submit"]:hover:not(:disabled),
+button[class*="bg-[#4663ff]"]:hover:not(:disabled),
+button[class*="bg-[#176b66]"]:hover:not(:disabled),
+button[class*="bg-[#176B66]"]:hover:not(:disabled) { background: var(--dash-blue-dark); }
+
+@media (max-width: 767px) {
+  .student-content,
+  main:has(.admin-sidebar) > div > section { padding: 20px 14px 30px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .student-shell .student-sidebar__item,
+  main:has(.admin-sidebar) .admin-sidebar nav button { transition: none; }
+}

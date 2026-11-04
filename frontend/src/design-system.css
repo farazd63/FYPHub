@@ -1,0 +1,170 @@
+/* Shared presentation tokens. Components keep their existing routes,
+   handlers, permissions and status semantics. */
+:root {
+  --app-primary: #4169e1;
+  --app-primary-hover: #3157c8;
+  --app-action: #4169e1;
+  --app-action-hover: #3157c8;
+  --app-action-soft: #eef1ff;
+  --app-action-ink: #315db4;
+  --app-success: #2f9b72;
+  --app-warning: #c8892f;
+  --app-danger: #c45555;
+  --app-page: #f4f7fb;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f7f9fd;
+  --app-border: #dbe4f0;
+  --app-border-strong: #c8d5e7;
+  --app-text: #182b49;
+  --app-muted: #667892;
+  --app-shadow-sm: 0 6px 18px rgb(25 53 102 / 0.06);
+  --app-shadow-md: 0 16px 40px rgb(25 53 102 / 0.09);
+  --app-radius: 14px;
+}
+
+body {
+  background: var(--app-page);
+  color: var(--app-text);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgb(65 105 225 / 0.28);
+  outline-offset: 2px;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+select,
+textarea {
+  border-color: var(--app-border-strong);
+  border-radius: 11px;
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--app-primary);
+  box-shadow: 0 0 0 3px rgb(65 105 225 / 0.13);
+  outline: 0;
+}
+
+textarea {
+  min-height: 92px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+button:disabled { cursor: not-allowed; }
+
+/* Existing cards and table wrappers share a quiet surface hierarchy. */
+.student-request-card,
+.student-phase-card,
+.student-placeholder,
+.student-overview-card,
+.cycle-overview__card,
+.academic-cycles__card,
+.academic-cycle-dashboard__card,
+.admin-card,
+.admin-panel,
+.admin-table-card {
+  border-color: var(--app-border);
+  border-radius: var(--app-radius);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-sm);
+}
+
+table {
+  border-color: var(--app-border);
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+thead th {
+  background: var(--app-surface-muted);
+  color: #385170;
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+tbody tr { border-color: var(--app-border); }
+tbody tr:hover { background: #f8faff; }
+[role="alert"],
+[role="status"] { border-radius: 11px; }
+
+/* Legacy primary utility colors are normalized only on actionable buttons.
+   Status text and badges retain their own semantic colors. */
+button[type="submit"],
+button[class*="bg-[#4663ff]"],
+button[class*="bg-[#4663FF]"],
+button[class*="bg-[#3567d6]"],
+button[class*="bg-[#176b66]"],
+button[class*="bg-[#176B66]"] {
+  border-radius: 11px;
+  font-weight: 700;
+}
+
+button[class*="bg-[#4663ff]"]:not(:disabled),
+button[class*="bg-[#4663FF]"]:not(:disabled),
+button[class*="bg-[#3567d6]"]:not(:disabled),
+button[class*="bg-[#176b66]"]:not(:disabled),
+button[class*="bg-[#176B66]"]:not(:disabled) { background-color: var(--app-action); }
+
+button[class*="hover:bg-[#354FE0]"]:hover:not(:disabled),
+button[class*="hover:bg-[#354ee0]"]:hover:not(:disabled),
+button[class*="hover:bg-[#354fe0]"]:hover:not(:disabled),
+button[class*="hover:bg-[#125650]"]:hover:not(:disabled) { background-color: var(--app-action-hover); }
+
+button[type="submit"]:hover:not(:disabled),
+button[class*="bg-[#4663ff]"]:hover:not(:disabled),
+button[class*="bg-[#4663FF]"]:hover:not(:disabled),
+button[class*="bg-[#3567d6]"]:hover:not(:disabled),
+button[class*="bg-[#176b66]"]:hover:not(:disabled),
+button[class*="bg-[#176B66]"]:hover:not(:disabled) { transform: translateY(-1px); }
+
+.auth-photo-background { display: none !important; }
+
+.auth-saas .auth-card {
+  border: 1px solid var(--app-border);
+  border-radius: 18px;
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-md);
+  backdrop-filter: none;
+}
+
+@media (max-width: 767px) {
+  .student-request-layout,
+  .student-overview-grid,
+  .academic-cycle-dashboard__grid { grid-template-columns: minmax(0, 1fr); }
+
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
