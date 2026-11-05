@@ -12,7 +12,8 @@ from .anonymous_verification import COOKIE, get_context
 from .auth import get_current_user, utc_now, validate_mutating_origin
 from .database import get_db
 from .individual_verification import eligible, guard, send_email, settings, unavailable
-from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, AnonymousIdentityProof, AnonymousVerificationChallenge, IdentityChallenge, IdentityProof, Invitation, InvitationAudit, InvitationOutbox, Team, TeamMember, User
+from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, AnonymousIdentityProof, AnonymousVerificationChallenge, IdentityChallenge, IdentityProof, Invitation, InvitationAudit, InvitationOutbox, Module2Notification, Team, TeamMember, User
+from .team_lifecycle import refresh_team_status
 from .security import generate_session_token, hash_password, hash_session_token, verify_password
 
 router = APIRouter(prefix='/api/v1/invitations')
@@ -138,7 +139,7 @@ def send(data: CreatorSend,request:Request,actor:User=Depends(get_current_user),
         if member or count>=policy.max_group_size or pending: raise HTTPException(400,'Invitation could not be sent.')
         consumed=session.execute(update(IdentityProof).where(IdentityProof.token_hash==hash_session_token(data.proof),IdentityProof.student_id==person.id,IdentityProof.cycle_id==cycle.id,IdentityProof.actor_id==actor.id,IdentityProof.purpose=='invitation',IdentityProof.action=='send_invitation',IdentityProof.target_team_id==team.id,IdentityProof.target_student_id==recipient.id,IdentityProof.expires_at>utc_now(),IdentityProof.consumed_at.is_(None)).values(consumed_at=utc_now()).returning(IdentityProof.id)).scalar_one_or_none()
         if consumed is None: raise HTTPException(400,'Invitation could not be sent.')
-        row=Invitation(team_id=team.id,cycle_id=cycle.id,student_id=recipient.id,status='pending');session.add(row);session.flush()
+        row=Invitation(team_id=team.id,cycle_id=cycle.id,student_id=recipient.id,status='pending',expires_at=utc_now()+timedelta(days=7));session.add(row);session.flush()
         session.add(InvitationAudit(invitation_id=row.id,actor_student_id=person.id,action='queued'))
         session.add(InvitationOutbox(invitation_id=row.id,status='queued'));session.commit()
         invitation_id=row.id
@@ -202,7 +203,14 @@ def decide(data:InviteeDecision,request:Request,session:Session=Depends(get_db))
         consumed=session.execute(update(AnonymousIdentityProof).where(AnonymousIdentityProof.token_hash==hash_session_token(data.proof),AnonymousIdentityProof.context_id==context.id,AnonymousIdentityProof.student_id==person.id,AnonymousIdentityProof.cycle_id==cycle.id,AnonymousIdentityProof.purpose=='invitation',AnonymousIdentityProof.action==data.action,AnonymousIdentityProof.target_team_id==team.id,AnonymousIdentityProof.target_invitation_id==row.id,AnonymousIdentityProof.expires_at>now,AnonymousIdentityProof.consumed_at.is_(None)).values(consumed_at=now).returning(AnonymousIdentityProof.id)).scalar_one_or_none()
         if consumed is None: raise HTTPException(400,'Invitation could not be decided.')
         row.status='accepted' if data.action=='accept_invitation' else 'rejected'
-        if row.status=='accepted': session.add(TeamMember(team_id=team.id,academic_cycle_id=cycle.id,full_name=person.name.strip(),registration_number=person.registration_number.strip().upper(),university_email=person.university_email.strip().lower(),is_creator=False,is_active=True))
+        if row.status=='accepted':
+            session.add(TeamMember(team_id=team.id,academic_cycle_id=cycle.id,student_id=person.id,full_name=person.name.strip(),registration_number=person.registration_number.strip().upper(),university_email=person.university_email.strip().lower(),is_creator=False,is_active=True))
+            session.flush()
+            session.execute(update(Invitation).where(Invitation.student_id == person.id, Invitation.cycle_id == cycle.id, Invitation.status == 'pending', Invitation.id != row.id).values(status='cancelled'))
+            from .models import JoinRequest
+            session.execute(update(JoinRequest).where(JoinRequest.student_id == person.id, JoinRequest.cycle_id == cycle.id, JoinRequest.status == 'pending').values(status='cancelled'))
+            refresh_team_status(session, team)
+            session.add(Module2Notification(recipient_user_id=team.shared_user_id, kind='invitation_decided', payload={'team_id': team.id, 'invitation_id': row.id, 'status': row.status}))
         session.add(InvitationAudit(invitation_id=row.id,actor_student_id=person.id,action=row.status));session.commit();return {'id':row.id,'status':row.status}
     except HTTPException: session.rollback();raise
     except Exception: session.rollback();raise HTTPException(500,'Invitation could not be decided.') from None
@@ -211,5 +219,6 @@ def decide(data:InviteeDecision,request:Request,session:Session=Depends(get_db))
 def list_invitations(team_id:int,actor:User=Depends(get_current_user),session:Session=Depends(get_db)):
     team=session.scalar(select(Team).where(Team.id==team_id,Team.shared_user_id==actor.id))
     if not team: raise HTTPException(403,'Team access is required.')
+    session.execute(update(Invitation).where(Invitation.team_id == team.id, Invitation.status == 'pending', Invitation.expires_at.is_not(None), Invitation.expires_at <= utc_now()).values(status='expired'))
     rows=session.execute(select(Invitation,ApprovedStudent,InvitationOutbox).join(ApprovedStudent,ApprovedStudent.id==Invitation.student_id).outerjoin(InvitationOutbox,InvitationOutbox.invitation_id==Invitation.id).where(Invitation.team_id==team.id).order_by(Invitation.id.desc()).limit(100)).all()
     return [{'id':row.id,'status':row.status,'delivery':outbox.status if outbox else 'unknown','student_name':person.name,'registration_number':person.registration_number} for row,person,outbox in rows]

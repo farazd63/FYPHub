@@ -1,6 +1,7 @@
 from enum import Enum
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+import re
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .auth import get_current_user, validate_mutating_origin
@@ -19,6 +20,9 @@ class Channel(str, Enum):
 class MessageWrite(BaseModel):
     model_config = ConfigDict(extra="forbid")
     body: str = Field(min_length=1, max_length=4000, strict=True)
+    thread_root_id: int | None = Field(default=None, gt=0)
+    attachment_name: str | None = Field(default=None, max_length=255)
+    attachment_url: str | None = Field(default=None, max_length=500)
     @field_validator("body")
     @classmethod
     def nonblank(cls, value):
@@ -27,6 +31,8 @@ class MessageWrite(BaseModel):
 
 def permission(session, actor, team_id, channel, write=False):
     team = session.get(Team, team_id)
+    if team and actor.role in (UserRole.ADMIN, UserRole.COORDINATOR):
+        return actor.role.value
     if team and actor.role == UserRole.STUDENT and team.shared_user_id == actor.id:
         return "TEAM"
     if team and actor.role == UserRole.SUPERVISOR and channel != Channel.general and not (write and channel == Channel.announcements_deadlines):
@@ -35,7 +41,7 @@ def permission(session, actor, team_id, channel, write=False):
     raise HTTPException(status_code=403, detail="Channel access is not permitted.")
 
 def output(message):
-    return {"id": message.id, "author_kind": message.author_kind, "author_id": message.author_id, "body": message.body, "created_at": message.created_at}
+    return {"id": message.id, "author_kind": message.author_kind, "author_id": message.author_id, "body": message.body, "thread_root_id": message.thread_root_id, "mentions": message.mentions or [], "attachment_name": message.attachment_name, "attachment_url": message.attachment_url, "created_at": message.created_at}
 @router.get("/teams")
 def teams(actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     if actor.role == UserRole.STUDENT:
@@ -56,7 +62,12 @@ def send(team_id: int, channel: Channel, payload: MessageWrite, request: Request
     validate_mutating_origin(request)
     try:
         kind = permission(session, actor, team_id, channel, write=True)
-        message = GroupMessage(team_id=team_id, channel=channel.value, author_id=actor.id, author_kind=kind, body=payload.body)
+        if payload.thread_root_id is not None:
+            root = session.scalar(select(GroupMessage.id).where(GroupMessage.id == payload.thread_root_id, GroupMessage.team_id == team_id, GroupMessage.channel == channel.value))
+            if root is None:
+                raise HTTPException(400, "The thread does not belong to this channel.")
+        mentions = sorted(set(re.findall(r"@([A-Za-z0-9_.-]{2,80})", payload.body)))
+        message = GroupMessage(team_id=team_id, channel=channel.value, author_id=actor.id, author_kind=kind, body=payload.body, thread_root_id=payload.thread_root_id, mentions=mentions, attachment_name=payload.attachment_name, attachment_url=payload.attachment_url)
         session.add(message); session.flush(); session.commit(); session.refresh(message)
         return output(message)
     except HTTPException:

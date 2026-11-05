@@ -48,4 +48,5 @@ from .supervisor_request_conversation import SupervisorRequestMessage
 from .fyp_registry import FypRegistryMetadata
 from .archived_project import ArchivedProject, ArchivedProjectDocument, ArchivedProjectDocumentType
 from .project_workflow import ProjectMilestone, ProjectTask, SupervisionMeeting, DefenseSchedule, DefensePanelMember, PanelEvaluation, PanelEvaluationScore
+from .module2_collaboration import Module2Notification, Module2ChannelRead, Module2MatchReport, Module2ChatbotSession
 from .agent_supervision import SupervisionAgentRun

@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from ..database import Base
 
@@ -20,10 +20,16 @@ class AcademicCycle(Base):
 
 class AcademicGroupPolicy(Base):
     __tablename__="academic_group_policies"
-    __table_args__=(CheckConstraint("max_group_size > 0",name="ck_academic_group_policies_max_group_size_positive"),)
+    __table_args__=(
+        CheckConstraint("max_group_size > 0",name="ck_academic_group_policies_max_group_size_positive"),
+        CheckConstraint("min_group_size > 0 AND min_group_size <= max_group_size",name="ck_academic_group_policies_min_group_size_valid"),
+    )
     id:Mapped[int]=mapped_column(primary_key=True)
     academic_cycle_id:Mapped[int]=mapped_column(ForeignKey("academic_cycles.id",ondelete="CASCADE"),nullable=False,unique=True)
     max_group_size:Mapped[int]=mapped_column(Integer,nullable=False)
+    min_group_size:Mapped[int]=mapped_column(Integer,nullable=False,default=1,server_default="1")
+    formation_deadline:Mapped[datetime | None]=mapped_column(DateTime(timezone=True),nullable=True)
+    matching_weights:Mapped[dict]=mapped_column(JSON,nullable=False,default=dict,server_default="{}")
     created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False,server_default=func.now())
     updated_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False,server_default=func.now(),onupdate=func.now())
     academic_cycle:Mapped[AcademicCycle]=relationship(back_populates="group_policy")

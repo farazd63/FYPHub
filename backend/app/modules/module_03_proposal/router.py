@@ -19,10 +19,11 @@ from sqlalchemy.orm import Session
 from ...auth import get_current_user, require_roles, utc_now, validate_mutating_origin
 from ...config import settings
 from ...database import get_db
-from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, SupervisorAssignment, TeamMember, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
+from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, SupervisorAssignment, Team, TeamMember, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
 from ...pdf_extraction import PdfExtractionError, extract_proposal_document
 from .compliance_engine import build_compliance_report
 from .template_extractor import extract_template_rules
+from ...team_lifecycle import lock_team
 
 router = APIRouter(prefix="/api/v1/proposal-compliance", tags=["module-3-proposal-compliance"])
 REVIEW_ROLES = (UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR, UserRole.PANEL_MEMBER)
@@ -257,7 +258,8 @@ async def submit_proposal(
     if action not in {"draft", "submit"}:
         raise _error("invalid_submission_action", "Action must be draft or submit.", 422)
     is_draft = action == "draft"
-    row = ProposalComplianceSubmission(proposal_key=key, owner_user_id=actor.id, proposal_type=proposal_type, title=title.strip(), version=version_number, status="DRAFT" if is_draft else ("RESUBMITTED" if previous else "SUBMITTED"), processing_status="PENDING" if is_draft else "COMPLETED", filename=proposal_file.filename or "proposal", content_type=extracted.content_type, file_size=extracted.file_size, sha256=extracted.sha256, page_count=extracted.page_count, storage_key=str(path.relative_to(settings.document_storage_root)), extracted_text=extracted.extracted_text, extracted_fields=fields, template_reference_version_id=template_version.id)
+    team = session.scalar(select(Team).where(Team.shared_user_id == actor.id, Team.status != "dissolved").order_by(Team.id).limit(1))
+    row = ProposalComplianceSubmission(proposal_key=key, owner_user_id=actor.id, team_id=team.id if team else None, proposal_type=proposal_type, title=title.strip(), version=version_number, status="DRAFT" if is_draft else ("RESUBMITTED" if previous else "SUBMITTED"), processing_status="PENDING" if is_draft else "COMPLETED", filename=proposal_file.filename or "proposal", content_type=extracted.content_type, file_size=extracted.file_size, sha256=extracted.sha256, page_count=extracted.page_count, storage_key=str(path.relative_to(settings.document_storage_root)), extracted_text=extracted.extracted_text, extracted_fields=fields, template_reference_version_id=template_version.id)
     session.add(row)
     session.flush()
     if is_draft:
@@ -267,6 +269,9 @@ async def submit_proposal(
     report = build_compliance_report(submission=row, rules=rules, previous_versions=history)
     session.add(ProposalComplianceReport(submission_id=row.id, status=report["reportSummary"]["status"], score=report["reportSummary"]["score"], total_checks=report["finalResults"]["totalChecks"], report=report))
     session.commit()
+    if team is not None and not is_draft:
+        lock_team(session, team.id, "proposal_submitted")
+        session.commit()
     return {"submission": _submission_out(session, row), "report": report}
 
 
@@ -352,6 +357,25 @@ def get_original(submission_id: int, actor: User = Depends(get_current_user), se
     return FileResponse(path, media_type=row.content_type, filename=row.filename)
 
 
+@router.get("/reports/{submission_id}/annotated")
+def get_annotated_document(submission_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    """Return a safe annotated copy; the student's original file is never modified."""
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or not _can_view(session, actor, row):
+        raise _error("document_not_found", "The annotated proposal was not found.", 404)
+    saved = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
+    if saved is None:
+        raise _error("report_pending", "The compliance report is not available yet.", 409)
+    path = settings.document_storage_root / row.storage_key
+    if not path.is_file():
+        raise _error("document_missing", "The original proposal file is no longer available.", 404)
+    try:
+        data = _render_annotated_document(path.read_bytes(), row.content_type, row.filename, saved.report)
+    except PdfExtractionError as error:
+        raise _error(error.code, error.message, 422) from error
+    return Response(content=data, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="annotated-{_safe_filename(row.filename.rsplit(".", 1)[0])}.pdf"'})
+
+
 @router.get("/reports/{submission_id}/pdf")
 def download_report_pdf(submission_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     row = session.get(ProposalComplianceSubmission, submission_id)
@@ -379,3 +403,54 @@ def _render_pdf(report: dict[str, Any]) -> bytes:
         story.extend([Paragraph(f"{violation.get('id')} · {violation.get('severity')} · {violation.get('title')}", styles["Heading3"]), Paragraph(f"Location: {violation.get('location', 'Document')} · Requirement: {violation.get('requirement')} · Detected: {violation.get('detected')}", styles["BodyText"]), Paragraph(str(violation.get("evidence", "")), styles["BodyText"]), Spacer(1, 6)])
     document.build(story)
     return stream.getvalue()
+
+
+def _render_annotated_document(data: bytes, content_type: str, filename: str, report: dict[str, Any]) -> bytes:
+    """Annotate each affected page with red issue callouts and append full evidence."""
+    from io import BytesIO
+    try:
+        import fitz
+    except ImportError as error:
+        raise PdfExtractionError("pdf_annotation_unavailable", "PDF annotation is unavailable on this server.") from error
+    if not filename.casefold().endswith(".pdf") or not content_type.casefold().endswith("pdf"):
+        raise PdfExtractionError("pdf_annotation_unavailable", "Annotated preview is currently available for PDF proposals only.")
+    try:
+        document = fitz.open(stream=data, filetype="pdf")
+    except Exception as error:
+        raise PdfExtractionError("invalid_pdf", "The proposal PDF could not be opened for annotation.") from error
+    violations = report.get("violations", [])
+    by_page: dict[int, list[dict[str, Any]]] = {}
+    for violation in violations:
+        page_number = violation.get("pageNumber") or (violation.get("location", {}).get("page") if isinstance(violation.get("location"), dict) else None) or 1
+        by_page.setdefault(max(1, int(page_number)), []).append(violation)
+    for page_number, page_violations in by_page.items():
+        if page_number > document.page_count:
+            continue
+        page = document[page_number - 1]
+        for index, violation in enumerate(page_violations[:6]):
+            top = 24 + index * 43
+            rect = fitz.Rect(24, top, page.rect.width - 24, top + 35)
+            page.draw_rect(rect, color=(0.88, 0.08, 0.14), fill=(1, 0.93, 0.94), width=1.6, overlay=True)
+            label = f"{violation.get('id', 'Issue')} | {violation.get('title', 'Compliance issue')} | Expected: {display_value(violation.get('requirement'))} | Detected: {display_value(violation.get('detected'))}"
+            page.insert_textbox(rect + (5, 4, -5, -4), label[:300], fontsize=8, color=(0.55, 0.05, 0.08), overlay=True)
+    appendix = document.new_page()
+    appendix.insert_text((36, 45), "FYPHub - Annotated Compliance Findings", fontsize=16, color=(0.1, 0.18, 0.3))
+    y = 75
+    for violation in violations:
+        text = f"{violation.get('id', 'Issue')} | {violation.get('severity', 'Review')} | {violation.get('title', 'Compliance issue')}\nLocation: {violation.get('location', 'Document')}\nExpected: {display_value(violation.get('requirement'))}\nDetected: {display_value(violation.get('detected'))}\nEvidence: {violation.get('evidence', '')}"
+        box = fitz.Rect(36, y, appendix.rect.width - 36, y + 70)
+        appendix.draw_rect(box, color=(0.88, 0.08, 0.14), fill=(1, 0.95, 0.95), width=1.2, overlay=True)
+        appendix.insert_textbox(box + (8, 7, -8, -7), text[:700], fontsize=8, color=(0.18, 0.2, 0.25), overlay=True)
+        y += 82
+        if y > appendix.rect.height - 90:
+            appendix = document.new_page(); y = 45
+    output = BytesIO()
+    document.save(output, garbage=4, deflate=True)
+    document.close()
+    return output.getvalue()
+
+
+def display_value(value: Any) -> str:
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value)
+    return "Not available" if value is None or value == "" else str(value)

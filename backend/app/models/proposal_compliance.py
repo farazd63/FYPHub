@@ -22,6 +22,7 @@ class ProposalComplianceSubmission(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     proposal_key: Mapped[str] = mapped_column(String(64), nullable=False)
     owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    team_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id", ondelete="RESTRICT"), nullable=True)
     proposal_type: Mapped[str] = mapped_column(String(5), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")

@@ -744,13 +744,15 @@ def set_group_policy(cycle_id: int, payload: PolicyUpdate, request: Request, act
     validate_mutating_origin(request)
     cycle, policy = locked_cycle_and_policy(session, cycle_id)
     largest = largest_active_team_size(session, cycle.id)
+    if payload.min_group_size > payload.max_group_size:
+        raise cycle_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid_group_size_range", "Minimum group size cannot exceed maximum group size.")
     if payload.max_group_size < largest:
         raise cycle_error(status.HTTP_409_CONFLICT, "existing_team_exceeds_limit", "Existing active team membership exceeds that maximum.")
     created = policy is None
     if policy is None:
-        policy = AcademicGroupPolicy(academic_cycle_id=cycle.id, max_group_size=payload.max_group_size); session.add(policy); session.flush()
+        policy = AcademicGroupPolicy(academic_cycle_id=cycle.id, max_group_size=payload.max_group_size, min_group_size=payload.min_group_size, formation_deadline=payload.formation_deadline, matching_weights=payload.matching_weights); session.add(policy); session.flush()
     else:
-        previous = policy.max_group_size; policy.max_group_size = payload.max_group_size
+        previous = policy.max_group_size; policy.max_group_size = payload.max_group_size; policy.min_group_size = payload.min_group_size; policy.formation_deadline = payload.formation_deadline; policy.matching_weights = payload.matching_weights
     add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_GROUP_POLICY", target_id=policy.id, action="group_policy_created" if created else "group_policy_updated", changed_values={"academic_cycle_id": cycle.id, "max_group_size": payload.max_group_size, "previous_max_group_size": None if created else previous})
     session.commit(); session.refresh(policy)
     return policy
@@ -1502,6 +1504,9 @@ def register_team(
             for index, member in enumerate(all_members)
         ]
         session.add_all(created_members)
+        session.flush()
+        from .team_lifecycle import refresh_team_status
+        refresh_team_status(session, team)
         if request is not None:
             add_admin_audit_event(
                 session,
@@ -1676,6 +1681,8 @@ app.include_router(supervisor_assignments_router)
 
 from .group_channels import router as group_channels_router
 app.include_router(group_channels_router)
+from .module2_collaboration import router as module2_collaboration_router
+app.include_router(module2_collaboration_router)
 
 from .group_ai import router as group_ai_router
 app.include_router(group_ai_router)

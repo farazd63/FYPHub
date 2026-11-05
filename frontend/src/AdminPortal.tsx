@@ -23,7 +23,7 @@ const groups:NavGroup[]=[
  {id:"workspace",label:"Workspace",items:[{label:"Overview",page:"overview"},{label:"FYP Registry & Project Monitoring",page:"registry"},{label:"FYP Archive",page:"archive"}]},
  {id:"people",label:"People & Access",items:[{label:"Users & Roles",page:"users"},{label:"Student Eligibility",page:"eligibility"},{label:"Supervisor Capacity",page:"capacity"},{label:"Supervisor Requests",page:"supervisorRequests"}]},
  {id:"academic",label:"Academic Setup",items:[{label:"Academic Cycles & Policies",page:"cycles"},{label:"Workflow Policies",page:"workflow"},{label:"Proposal Templates",page:"templates"}]},
- {id:"requirements",label:"Requirements & Review",items:[{label:"Required Documents",page:"documentRequirements"},{label:"Evaluation Criteria",page:"rubrics"},{label:"Deadlines",page:"deadlines"},{label:"Reminders & Escalations",page:"reminders"}]},
+ {id:"requirements",label:"Requirements & Review",items:[{label:"Required Documents",page:"documentRequirements"},{label:"Evaluation Criteria",page:"rubrics"}]},
  {id:"governance",label:"Governance",items:[{label:"Audit History",page:"audit"}]},
 ];
 const fromPath=():Page=>window.location.pathname==="/admin/document-requirements"?"documentRequirements":window.location.pathname==="/admin/templates"?"templates":"overview";

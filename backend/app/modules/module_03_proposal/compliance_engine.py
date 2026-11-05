@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from difflib import SequenceMatcher
+import re
 from typing import Any
 
 
@@ -68,24 +69,28 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
         expected = rules.get(key)
         detected = actual.get(key)
         status, evidence = _status(expected, detected)
-        item = {"id": f"{category.lower().replace(' ', '-')}-{key}", "name": label, "category": category, "status": status, "expected": expected, "actual": detected, "difference": (round(abs(float(expected) - float(detected)), 2) if isinstance(expected, (int, float)) and isinstance(detected, (int, float)) else None), "location": {"scope": "document", "page": 1}, "evidence": evidence or ""}
+        item = {"id": f"{category.lower().replace(' ', '-')}-{key}", "name": label, "category": category, "status": status, "expected": expected, "actual": detected, "difference": (round(abs(float(expected) - float(detected)), 2) if isinstance(expected, (int, float)) and isinstance(detected, (int, float)) else None), "location": {"scope": "document", "page": 1, "document_level": True}, "evidence": evidence or ""}
         checks.append(item)
         category_items.setdefault(category, []).append(item)
         if status == "FAIL":
             violations.append(_violation(item, len(violations) + 1, category))
 
-    actual_sections = [str(item.get("name", "")) for item in actual.get("detected_headings", []) if item.get("name")]
+    actual_heading_rows = [item for item in actual.get("detected_headings", []) if item.get("name")]
+    actual_sections = [str(item.get("name", "")) for item in actual_heading_rows]
     expected_sections = [str(item) for item in rules.get("required_sections", []) if str(item).strip()]
     section_results: list[dict[str, Any]] = []
     missing_sections: list[dict[str, str]] = []
     for index, expected in enumerate(expected_sections):
         match = _similar_section(expected, actual_sections)
         presence = "PASS" if match else "FAIL"
-        order = "PASS" if match and index < len(actual_sections) and _text(actual_sections[index]).casefold() == _text(match).casefold() else "PARTIAL" if match else "FAIL"
-        section_results.append({"name": expected, "check1": _pill(presence), "check2": _pill(order), "detected": match, "expected_order": index + 1, "detected_order": (actual_sections.index(match) + 1 if match in actual_sections else None)})
+        order = "PASS" if match and index < len(actual_sections) and _text(actual_sections[index]).casefold() == _text(match).casefold() else "PARTIAL" if match else "REVIEW"
+        matched_row = next((row for row in actual_heading_rows if str(row.get("name", "")) == match), None)
+        detected_order = actual_sections.index(match) + 1 if match in actual_sections else None
+        section_number = _section_number(match or expected, index + 1)
+        section_results.append({"name": expected, "check1": _pill(presence), "check2": _pill(order), "detected": match, "expected_order": index + 1, "detected_order": detected_order, "page": matched_row.get("page") if matched_row else None, "sectionNumber": section_number})
         if not match:
             missing_sections.append({"issue": "Missing Section", "details": expected})
-            item = {"id": f"structure-{index + 1}", "name": f"Missing section: {expected}", "category": "Document Structure", "status": "FAIL", "expected": expected, "actual": None, "difference": None, "location": {"scope": "document", "page": None}, "evidence": "The required section was not detected in the uploaded proposal."}
+            item = {"id": f"structure-{index + 1}", "name": f"Missing section: {expected}", "category": "Document Structure", "status": "FAIL", "expected": expected, "actual": None, "difference": None, "location": {"scope": "document", "page": None, "section_number": _section_number(expected, index + 1), "section_name": expected}, "evidence": "The required section was not detected in the uploaded proposal."}
             checks.append(item)
             category_items.setdefault("Document Structure", []).append(item)
             violations.append(_violation(item, len(violations) + 1, "Document Structure"))
@@ -93,12 +98,12 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
         ordered = [item for item in actual_sections if item in expected_sections]
         if ordered != [item for item in expected_sections if item in actual_sections]:
             missing_sections.append({"issue": "Incorrect Sequence", "details": "Detected sections are not in the active template order."})
-            item = {"id": "sequence-order", "name": "Section Sequence", "category": "Section Sequence", "status": "FAIL", "expected": expected_sections, "actual": actual_sections, "difference": None, "location": {"scope": "document", "page": None}, "evidence": "The detected section order differs from the active university template."}
+            item = {"id": "sequence-order", "name": "Section Sequence", "category": "Section Sequence", "status": "FAIL", "expected": expected_sections, "actual": actual_sections, "difference": None, "location": {"scope": "document", "page": actual_heading_rows[0].get("page") if actual_heading_rows else None, "section_number": "order", "section_name": "Required section sequence"}, "evidence": "The detected section order differs from the active university template."}
             checks.append(item)
             category_items.setdefault("Section Sequence", []).append(item)
             violations.append(_violation(item, len(violations) + 1, "Section Sequence"))
         else:
-            item = {"id": "sequence-order", "name": "Section Sequence", "category": "Section Sequence", "status": "PASS", "expected": expected_sections, "actual": actual_sections, "difference": None, "location": {"scope": "document", "page": None}, "evidence": "The detected sections follow the active template order."}
+            item = {"id": "sequence-order", "name": "Section Sequence", "category": "Section Sequence", "status": "PASS", "expected": expected_sections, "actual": actual_sections, "difference": None, "location": {"scope": "document", "page": actual_heading_rows[0].get("page") if actual_heading_rows else None, "section_number": "order", "section_name": "Required section sequence"}, "evidence": "The detected sections follow the active template order."}
             checks.append(item)
             category_items.setdefault("Section Sequence", []).append(item)
 
@@ -138,6 +143,19 @@ def _category_detail(items: list[dict[str, Any]]) -> str:
 
 def _violation(item: dict[str, Any], number: int, category: str) -> dict[str, Any]:
     severity = "Major" if category in {"Page Layout", "Document Structure", "Section Sequence"} else "Minor"
-    page = item.get("location", {}).get("page")
-    location = "Document" if page is None else f"Page {page}"
+    location_data = item.get("location", {})
+    page = location_data.get("page")
+    section_number = location_data.get("section_number")
+    section_name = location_data.get("section_name")
+    if section_number:
+        location = f"Page {page} · Section {section_number} · {section_name or item['name']}" if page else f"Page not detected · Section {section_number} · {section_name or item['name']}"
+    elif location_data.get("document_level"):
+        location = f"Page {page} · Document-level formatting"
+    else:
+        location = "Document"
     return {"id": f"V-{number:03d}", "severity": severity, "title": item["name"], "status": "Non-Compliant", "location": location, "requirement": item.get("expected"), "detected": item.get("actual"), "difference": item.get("difference"), "evidence": item.get("evidence", ""), "affectedArea": location, "pageNumber": page}
+
+
+def _section_number(name: str, fallback: int) -> str:
+    match = re.match(r"^\s*(?:chapter\s+)?(\d+(?:\.\d+)*)", _text(name), re.IGNORECASE)
+    return match.group(1) if match else str(fallback)
