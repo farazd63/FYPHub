@@ -7,7 +7,7 @@ function iconFor(page: string) {
   if (page === "overview") return <SidebarIcon name="overview" />;
   if (page === "users" || page === "eligibility" || page === "registry") return <SidebarIcon name="people" />;
   if (page === "cycles" || page === "schedule") return <SidebarIcon name="schedule" />;
-  if (page === "templates" || page === "module03" || page === "documentRequirements") return <SidebarIcon name="documents" />;
+  if (page === "templates" || page === "documentRequirements") return <SidebarIcon name="documents" />;
   if (page === "capacity") return <SidebarIcon name="capacity" />;
   if (page === "supervisorRequests") return <SidebarIcon name="requests" />;
   if (page === "workflow" || page === "rubrics" || page === "deadlines" || page === "reminders") return <SidebarIcon name="criteria" />;
