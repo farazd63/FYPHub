@@ -3,20 +3,12 @@
 - Reconciled the eight Module 1 requirements in Long Proposal section 9.3 (PDF pp. 9-10) against `docs/p1-feature-tracker.md`, `docs/p1-workflows.md`, the current Admin route, models, migrations, routes, and tests.
 - Confirmed the current implementation covers the defined Module 1 configuration behavior: ADMIN account/role controls, cycle and group policies, workflow-policy drafts, internal template/rule versioning, supervisor capacity and assignment enforcement, Evaluation Criteria drafts, deadline versions/previews, reminder-rule previews, roster eligibility, and append-only audit history.
 - Recorded the exact unresolved gaps instead of inventing behavior: official template files and approval/storage lifecycle; approved scoring/Evaluation Criteria values and authority; separate semester semantics; operational deadline activation/enforcement; reminder delivery, recipients, scheduling, retries, and escalation authority; and the shared-team deactivation lifecycle.
-- Module 03 dynamic proposal compliance foundations were added in the current working tree: m03-prefixed immutable template/proposal/report records, deterministic Tier 1/2 checks, optional local Ollama Tier 3 advisory handling, role-guarded routes, and portal integration. This remains an unstaged checkpoint.
 - Verification from this checkpoint: 228 backend tests passed with `unittest`; Alembic current/head are `ff5a6b7c8d9e`, `alembic check` reports no pending operations, and `pip check` passes. Frontend tests, lint, TypeScript, production build, and `git diff --check` pass. The frontend API remains `http://localhost:8010`.
 - Browser visual/interaction verification could not be run because no browser surface was available in the current environment. The Vite server remains running from the requested checkout at `http://localhost:5173`.
 
 # Project Progress
 
 ## Functional workflow checkpoint: progress, defense scheduling, and evaluation
-
-## Module 03 template baseline checkpoint (2026-10-29)
-
-- Reworked deterministic PDF/DOCX baseline extraction. PDF geometry now records A4/Letter/custom page size, page dimensions, median multi-page content-box margins in millimetres, dominant font family/size, line/paragraph spacing where measurable, heading order/hierarchy, captions, citations, and source page references. DOCX extraction reads section dimensions/margins and paragraph/style font, spacing, heading, caption, and citation properties.
-- Missing structural fields now produce explicit warnings and LOW/MEDIUM confidence; HIGH is reserved for a measurable, complete structure. Values remain document-derived and use `Observed reference property` provenance unless an Admin explicitly records a confirmed requirement.
-- Added immutable metadata and formatting-rule version lineage under migration `fg6b7c8d9e0f`, with duplicate-value prevention and separate SHORT/LONG template histories. Admin endpoints support metadata versions and rule versions without mutating prior records.
-- Admin Module 03 modal now has one internal scroll container, reachable footer actions, partial-baseline confirmation for LOW confidence, readable extraction labels, warning/status/provenance cards, and metadata/rule version actions.
 
 - Added migration `ff5a6b7c8d9e` with persisted project milestones, tasks, supervision meetings, defense schedules/panel assignments, panel evaluations, criterion scores, disagreement flags, and resolution state.
 - Added role-scoped API workflows under `/api/v1/project-progress`, `/api/v1/panel-schedules`, and `/api/v1/panel-evaluations`. Team ownership, active supervisor assignment, evaluator assignment, overlap/room/panel/conflict-of-interest checks, and audit events are enforced server-side.
@@ -33,7 +25,7 @@
 
 - Added ADMIN-only configuration drafts with administrator-entered state and transition labels, strict same-version reference validation, stable identities and complete numbered history. Versions and audit events commit atomically; concurrent writers serialize on the policy row. No transition execution or default academic workflow is provided.
 - Added the Workflow Policies Admin screen. Four focused tests and the full 94-test backend suite passed. Alembic current/head `e5f6a7b8c9d0`, schema check and pip check passed. Frontend lint/build and git diff check passed. Browser/mobile verification remains pending; M1 and P1 remain Partial.
-- Publication, operational routing and workflow execution require future work. The existing Supervisor, Panel and Coordinator boundaries remain decisions for the future M3 workflow; early-routing initiator, resubmissions, final approval and Coordinator scope remain unresolved.
+- Publication, operational routing and workflow execution require future work. The existing Supervisor, Panel and Coordinator boundaries remain decisions for later workflow checkpoints; early-routing initiator, resubmissions, final approval and Coordinator scope remain unresolved.
 
 ## M1-J.2 New Team Registration Eligibility
 
@@ -103,8 +95,7 @@
 
 ## M1-D.2 Admin UI (2026-10-15)
 
-- `AdminTemplateReferences.tsx` enables the Proposal Templates destination for ADMIN users. It creates initial references, displays typed supported rule controls, and—after a newly created reference is selected—creates metadata/rule versions and refreshes its returned history. Blank values remain unset and read views show “Not configured”.
-- Browser verification remains pending. The list API now returns the stable parent `reference_id` for every metadata-version item, so complete server history can be opened after reload as well as immediately after creation. M1-D remains Partial because publication, storage/download, activation/retirement, and M3 compliance are not implemented.
+- Browser verification remains pending. The list API now returns the stable parent `reference_id` for every metadata-version item, so complete server history can be opened after reload as well as immediately after creation. M1-D remains Partial because publication, storage/download, and activation/retirement are not implemented.
 
 ## M1-D.1 verification (2026-10-15)
 
@@ -114,8 +105,8 @@
 ## Checkpoint finalization (2026-10-16)
 
 - The full backend suite passed 46/46 against `fyphub_p1`; Alembic current and heads are `d5e6f7a8b9c0`, `alembic check` reports no pending operations, and `pip check` passes.
-- Frontend lint and production build passed through the installed Node npm executable. Browser interaction and visual verification remain pending; M1-D and P1 remain Partial. No template publication, upload/download, activation/retirement, or M3 compliance checking is implemented.
-- The complete backend suite passed: 46 tests. Compilation, Alembic current/heads/check, `pip check`, and `git diff --check` also passed. UI, publication, storage/download, activation/retirement, and M3 compliance remain pending.
+- Frontend lint and production build passed through the installed Node npm executable. Browser interaction and visual verification remain pending; M1-D and P1 remain Partial. No template publication, upload/download, or activation/retirement is implemented.
+- The complete backend suite passed: 46 tests. Compilation, Alembic current/heads/check, `pip check`, and `git diff --check` also passed. UI, publication, storage/download, and activation/retirement remain pending.
 
 ## Verified setup
 
@@ -136,13 +127,11 @@ P1 Mid, Modules 1–3.
 ## Proposal-source reconciliation
 
 - The original `long proposal.pdf` (17 PDF pages) and `short proposal.pdf` (3 PDF pages) were read from `D:\FYP Project` on 2026-10-15.
-- The authoritative P1 Mid scope is M1 Admin Dashboard & Academic Management, M2 Student Team & Collaboration Hub, and M3 Student Proposal & AI Compliance Check (long proposal section 9.3, pp9-10; section 10, p14).
-- `docs/p1-feature-tracker.md` records every individual M1-M3 proposal feature with source page, implementation/test evidence, gaps, and decisions. `docs/p1-workflows.md` supplies report-ready explanations, actual-versus-proposed workflows, demonstrations, and M1-D blockers.
+- The current documented P1 scope is M1 Admin Dashboard & Academic Management and M2 Student Team & Collaboration Hub.
+- `docs/p1-feature-tracker.md` records the active M1-M2 feature evidence, gaps, and decisions. `docs/p1-workflows.md` supplies report-ready explanations, actual-versus-proposed workflows, demonstrations, and M1-D blockers.
 - M1 and P1 remain incomplete. No screenshots or browser-verification claims were added.
 
 ## Implementation status
-
-Module 03 proposal compliance is partially implemented. Dynamic baseline ingestion, proposal parsing, deterministic checks, advisory Ollama integration, versioned reports, and role guards exist. Dedicated original-document download, malware scanning, coordinator cycle scoping, and final academic lifecycle decisions remain pending.
 
 ## Checkpoint 2A
 
@@ -331,4 +320,9 @@ Before the 6th; month and year are not yet confirmed.
 - **ARCHIVE checkpoint:** added the separate logical FYP archive and immutable document-version workflow under migrations `f9a0b1c2d3e4` and `fa0b1c2d3e4`. Admin archive management supports metadata edits, PDF-only uploads, version history, non-destructive activation, duplicate-title protection, hashes, and audit events. Student knowledge search/detail uses deterministic ranked results and secure read-only PDF links; Supervisor and Coordinator reads are authorized and Panel access is denied. Focused archive tests (2) and the full backend suite (182) pass; frontend lint/build and Alembic/pip/diff checks pass. The eight-project seed (`scripts/seed_archived_projects.py`) was not run. Browser verification and semantic/embedding ranking remain pending/unavailable.
 - **EVALUATOR portal checkpoint:** the existing `PANEL_MEMBER` role now routes to the user-facing `EvaluatorPortal`; the stored role value and backend compatibility remain unchanged. The Evaluator shell consolidates queue, proposal review, defense schedule, criteria, scoring/feedback, and decision-history entry points with honest unavailable states because no evaluator assignment/scoring APIs currently exist. No separate Panel portal is routed or displayed.
 - **COORDINATOR-ADMIN-MONITORING + CONVERSATION-POLISH:** Coordinator and Admin request monitors now support cycle/supervisor/status/date filtering, lifecycle summary cards, capacity warnings, extracted proposal detail, original PDF links, status history, submission notes, and authorized audit history. Monitoring is read-only. Student/team and selected-Supervisor conversations remain send-capable; Coordinator/Admin conversation views are read-only and backend-enforced. Focused monitoring/conversation tests pass; browser verification remains pending.
-- **FYP REGISTRY + TEMPLATE BASELINE:** Added the role-separated Coordinator **FYP Students & Projects** and Admin **FYP Registry & Project Monitoring** registry under migration `fd3e4f5a6b7c`. Lists and detail views expose only persisted, authorized student/team, proposal, assignment, history, conversation, audit, archive-match, and Module 03 data. Admin-only metadata corrections require a correction reason and are transactionally audited; supervisor/student registry reads remain assignment/ownership scoped. Official Module 03 template ingestion now treats the uploaded PDF/DOCX as a structural reference baseline and records missing proposal-only fields as `Not specified in reference template` instead of false failures. Focused registry/template tests and the full backend suite (217 tests) pass; frontend tests (28), lint, production build, Alembic, pip, and diff checks pass. Browser verification remains pending.
+- **FYP REGISTRY:** Added the role-separated Coordinator **FYP Students & Projects** and Admin **FYP Registry & Project Monitoring** registry under migration `fd3e4f5a6b7c`. Lists and detail views expose only persisted, authorized student/team, proposal, assignment, history, conversation, audit, and archive-match data. Admin-only metadata corrections require a correction reason and are transactionally audited; supervisor/student registry reads remain assignment/ownership scoped. Browser verification remains pending.
+## Modules 1-3 technical completion checkpoint (2026-11-05)
+
+- Module 1: mounted the role-based evaluation router, restored evaluation model metadata for Alembic, added idempotent repair migrations for rubric/panel evaluation tables and identity columns, and aligned project-health severity thresholds with the persisted workflow contract.
+- Module 2: fixed the configured Ollama model lookup in Group AI, added advisory AI team ranking with deterministic compatibility fallback, and kept the existing role/cycle/opt-in protections intact.
+- Verification: focused Module 1/2/3 backend tests pass; `python -m compileall -q app alembic` passes; `python -m alembic check` reports no new operations; frontend production build and lint pass. Full-suite/live browser, SMTP, and Ollama checks remain environment-dependent and are not represented as complete without those services.

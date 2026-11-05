@@ -20,8 +20,9 @@ class Settings:
     postgres_password: str
     session_lifetime_hours: int = 8
     ollama_url: str = "http://127.0.0.1:11434"
-    ollama_proposal_model: str = "llama3.1:8b"
-    ollama_agent_model: str = "llama3.1:8b"
+    ollama_proposal_model: str = "llama3.2:3b"
+    ollama_agent_model: str = "llama3.2:3b"
+    ollama_fallback_model: str = "llama3.1:8b"
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_username: str = ""
@@ -66,8 +67,9 @@ def get_settings() -> Settings:
         postgres_user=os.getenv("POSTGRES_USER", "fyphub_p1_user"),
         postgres_password=password,
         ollama_url=os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/"),
-        ollama_proposal_model=os.getenv("OLLAMA_PROPOSAL_MODEL", "llama3.1:8b"),
-        ollama_agent_model=os.getenv("OLLAMA_AGENT_MODEL", "llama3.1:8b"),
+        ollama_proposal_model=os.getenv("OLLAMA_PROPOSAL_MODEL", "llama3.2:3b"),
+        ollama_agent_model=os.getenv("OLLAMA_AGENT_MODEL", "llama3.2:3b"),
+        ollama_fallback_model=os.getenv("OLLAMA_FALLBACK_MODEL", "llama3.1:8b"),
         smtp_host=os.getenv("SMTP_HOST", ""),
         smtp_port=int(os.getenv("SMTP_PORT", "587")),
         smtp_username=os.getenv("SMTP_USERNAME", ""),

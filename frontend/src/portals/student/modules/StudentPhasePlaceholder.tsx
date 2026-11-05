@@ -1,12 +1,9 @@
 import type { StudentPhase } from "../StudentSidebar";
-import { ProposalLifecycleWorkspace } from "./ProposalLifecycleWorkspace";
 import { StudentProgressDashboard } from "./StudentProgressDashboard";
-import { AgentSupervisionPanel } from "./AgentSupervisionPanel";
 import { API } from "../../../App";
 import { StudentRequiredDocumentsComplete } from "./StudentRequiredDocumentsComplete";
 export function StudentPhasePlaceholder({ phase, api }: { phase: StudentPhase; api?: string }) {
   const resolvedApi = api ?? API;
-  if (phase.id === "proposal") return <><ProposalLifecycleWorkspace api={resolvedApi} /><AgentSupervisionPanel api={resolvedApi} /></>;
   if (phase.id === "progress") return <StudentProgressDashboard api={resolvedApi} />;
   if (phase.id === "documents") return <StudentRequiredDocumentsComplete api={resolvedApi} />;
   const partial = phase.status === "Partial";

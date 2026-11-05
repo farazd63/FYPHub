@@ -43,7 +43,7 @@ class SupervisionPlanPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
     confidence: float = Field(ge=0, le=1); milestones: list[PlanMilestone]
 def provider_config() -> dict[str, Any]:
-    return {"provider": settings.AI_PROVIDER, "key": settings.GROQ_API_KEY, "base_url": settings.GROQ_BASE_URL, "ollama_url": settings.ollama_url, "proposal_model": settings.ollama_proposal_model if settings.AI_PROVIDER == "ollama" else settings.GROQ_PROPOSAL_MODEL, "agent_model": settings.ollama_agent_model if settings.AI_PROVIDER == "ollama" else settings.GROQ_AGENT_MODEL, "timeout": max(1.0, settings.AI_TIMEOUT_SECONDS), "retries": settings.AI_MAX_RETRIES, "rate_limit": settings.AI_RATE_LIMIT_PER_MINUTE}
+    return {"provider": settings.AI_PROVIDER, "key": settings.GROQ_API_KEY, "base_url": settings.GROQ_BASE_URL, "ollama_url": settings.ollama_url, "proposal_model": settings.ollama_proposal_model if settings.AI_PROVIDER == "ollama" else settings.GROQ_PROPOSAL_MODEL, "agent_model": settings.ollama_agent_model if settings.AI_PROVIDER == "ollama" else settings.GROQ_AGENT_MODEL, "fallback_model": settings.ollama_fallback_model, "timeout": max(1.0, settings.AI_TIMEOUT_SECONDS), "retries": settings.AI_MAX_RETRIES, "rate_limit": settings.AI_RATE_LIMIT_PER_MINUTE}
 
 def validate_provider_configuration(cfg: dict[str, Any] | None = None) -> tuple[bool, str | None]:
     cfg = cfg or provider_config()
@@ -61,8 +61,12 @@ def _allowed(key: str, limit: int) -> bool:
     now=time.monotonic(); values=[x for x in _BUCKETS.get(key, []) if now-x<60]
     if len(values)>=limit: _BUCKETS[key]=values; return False
     values.append(now); _BUCKETS[key]=values; return True
-async def run_ai_json(prompt: str, schema: type[T], *, model_kind: str, rate_key: str) -> dict[str, Any]:
+async def _run_ai_json_once(prompt: str, schema: type[T], *, model_kind: str, rate_key: str, model_override: str | None = None) -> dict[str, Any]:
     cfg=provider_config(); provider=cfg["provider"]; started=datetime.now(timezone.utc); request_id=str(uuid.uuid4()); model=cfg["proposal_model"] if model_kind=="proposal" else cfg["agent_model"]; base={"provider":provider,"model":model or None,"timestamp":started.isoformat(),"request_id":request_id,"retry_count":0,"latency_ms":0}
+    if model_override:
+        model = model_override
+        base["model"] = model
+        cfg = {**cfg, "proposal_model": model if model_kind == "proposal" else cfg["proposal_model"], "agent_model": model if model_kind != "proposal" else cfg["agent_model"]}
     valid, config_error = validate_provider_configuration(cfg)
     if not valid:
         logger.error("ai_configuration_invalid provider=%s model=%s error_type=ConfigurationError reason=%s", cfg["provider"] or "missing", model or "missing", config_error)
@@ -81,7 +85,7 @@ async def run_ai_json(prompt: str, schema: type[T], *, model_kind: str, rate_key
                 reason = {401: "invalid_api_key", 403: "forbidden", 404: "invalid_model", 429: "rate_limited"}[response.status_code]
                 if attempt == cfg["retries"]:
                     result = {**base,"status":"UNAVAILABLE","source":"DETERMINISTIC_FALLBACK","fallback_reason":reason,"error_type":"HTTPStatusError","http_status":response.status_code,"latency_ms":round((time.monotonic()-started_request)*1000,2),"retry_count":attempt}
-                    logger.warning("groq_failure provider=%s model=%s http_status=%s request_id=%s retry_count=%s latency_ms=%s error_type=%s", "groq", model, response.status_code, request_id, attempt, result["latency_ms"], result["error_type"])
+                    logger.warning("ai_provider_failure provider=%s model=%s http_status=%s request_id=%s retry_count=%s latency_ms=%s error_type=%s", provider, model, response.status_code, request_id, attempt, result["latency_ms"], result["error_type"])
                     return result
                 continue
             response.raise_for_status(); raw=response.json(); content=raw["message"]["content"] if provider == "ollama" else raw["choices"][0]["message"]["content"]
@@ -107,11 +111,19 @@ async def run_ai_json(prompt: str, schema: type[T], *, model_kind: str, rate_key
         except (httpx.HTTPError,KeyError) as exc:
             if attempt==cfg["retries"]:
                 reason = "timeout" if isinstance(exc,httpx.TimeoutException) else "invalid_response" if isinstance(exc,(KeyError,TypeError,ValueError,ValidationError,json.JSONDecodeError)) else "provider_unavailable"
-                result={**base,"status":"UNAVAILABLE","source":"DETERMINISTIC_FALLBACK","fallback_reason":reason,"error_type":type(exc).__name__,"failure_stage":"request" if isinstance(exc, httpx.HTTPError) else "response_validation","retry_count":attempt,"latency_ms":round((time.monotonic()-started_request)*1000,2)}; logger.warning("groq_failure provider=groq model=%s http_status=%s request_id=%s retry_count=%s latency_ms=%s error_type=%s", model, result.get("http_status"), request_id, attempt, result.get("latency_ms"), result["error_type"]); return result
+                result={**base,"status":"UNAVAILABLE","source":"DETERMINISTIC_FALLBACK","fallback_reason":reason,"error_type":type(exc).__name__,"failure_stage":"request" if isinstance(exc, httpx.HTTPError) else "response_validation","retry_count":attempt,"latency_ms":round((time.monotonic()-started_request)*1000,2)}; logger.warning("ai_provider_failure provider=%s model=%s http_status=%s request_id=%s retry_count=%s latency_ms=%s error_type=%s", provider, model, result.get("http_status"), request_id, attempt, result.get("latency_ms"), result["error_type"]); return result
             await asyncio.sleep(0)
         except (TypeError,ValueError,ValidationError,json.JSONDecodeError) as exc:
             logger.warning("ai_response_invalid request_id=%s model=%s response_length=%s validation_error_type=%s", request_id, model, len(content) if isinstance(locals().get("content"), str) else 0, type(exc).__name__)
             return {**base,"status":"UNAVAILABLE","source":"DETERMINISTIC_FALLBACK","fallback_reason":"invalid_response","error_type":type(exc).__name__,"failure_stage":"response_validation","retry_count":attempt,"latency_ms":round((time.monotonic()-started_request)*1000,2)}
+
+async def run_ai_json(prompt: str, schema: type[T], *, model_kind: str, rate_key: str) -> dict[str, Any]:
+    result = await _run_ai_json_once(prompt, schema, model_kind=model_kind, rate_key=rate_key)
+    cfg = provider_config()
+    if result.get("status") == "UNAVAILABLE" and result.get("provider") == "ollama" and cfg.get("fallback_model") and cfg.get("fallback_model") != result.get("model"):
+        return await _run_ai_json_once(prompt, schema, model_kind=model_kind, rate_key=rate_key, model_override=cfg["fallback_model"])
+    return result
+
 
 async def run_groq_json(prompt: str, schema: type[T], *, model_kind: str, rate_key: str) -> dict[str, Any]:
     return await run_ai_json(prompt, schema, model_kind=model_kind, rate_key=rate_key)

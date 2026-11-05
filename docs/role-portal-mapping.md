@@ -20,6 +20,4 @@ The application keeps the existing database and authentication role value `PANEL
 | `STUDENT` | Registry API only | Own request/team records only, including shared-team ownership. |
 | `PANEL_MEMBER` | None | Registry endpoints are role-protected and Panel/Evaluator access is denied. |
 
-The Module 03 Admin template upload is a reference-baseline workflow. It extracts observable structure and records missing proposal-only fields as `Not specified in reference template`; student proposal extraction remains independently validated.
-
 The Evaluator portal deliberately shows safe unavailable states until evaluator assignment, proposal review, defense scheduling, scoring, feedback, and decision-history endpoints exist. It does not fabricate records or call unrelated APIs. There is no separate user-facing Panel Member portal or label.

@@ -19,7 +19,12 @@ SESSION_COOKIE_NAME = "fyphub_session"
 # Deliberately fixed for this checkpoint; changing it is a reviewed configuration change.
 SESSION_LIFETIME_HOURS = settings.session_lifetime_hours
 ALLOWED_BROWSER_ORIGIN = "http://127.0.0.1:5173"
-ALLOWED_BROWSER_ORIGINS = (ALLOWED_BROWSER_ORIGIN, "http://localhost:5173")
+# Explicit local Vite origins. Credentials remain restricted; no wildcard is
+# permitted because the application uses cookie-backed sessions.
+ALLOWED_BROWSER_ORIGINS = (
+    ALLOWED_BROWSER_ORIGIN,
+    "http://localhost:5173",
+)
 _TEMPORARY_DIAGNOSTIC_PATHS = {"/api/v1/auth/login", "/api/v1/auth/me", "/api/v1/admin/me"}
 
 

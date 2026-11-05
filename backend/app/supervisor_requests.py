@@ -32,7 +32,7 @@ from .models import (
     User,
     UserRole,
 )
-from .modules.module_03_proposal.models import M03CheckRun
+from .models.proposal_ai_review import ProposalAIReviewRun
 from .ai_provider import ProposalProviderPayload, run_ai_json
 
 logger = logging.getLogger(__name__)
@@ -123,6 +123,18 @@ def _normalize_submission_note(value: str | None) -> str | None:
     return normalized or None
 
 
+def _reject_text_for_supervisor_selection(request: Request, filename: str | None, content_type: str | None = None) -> None:
+    """Keep the legacy supervisor-selection upload contract PDF/DOCX-only.
+
+    The supervisor selection workflow intentionally remains a one-page
+    proposal-document workflow with its existing PDF/DOCX contract.
+    """
+    is_text_filename = (filename or "").casefold().endswith((".txt", ".text", ".md"))
+    is_text_content = (content_type or "").casefold() in {"text/plain", "text/markdown"}
+    if request.url.path.startswith("/api/v1/supervisor-requests") and (is_text_filename or is_text_content):
+        raise PdfExtractionError("invalid_pdf", "Supervisor selection accepts PDF or DOCX documents only.")
+
+
 def failure(code: str, message: str, http_status: int = status.HTTP_409_CONFLICT) -> HTTPException:
     return HTTPException(status_code=http_status, detail={"code": code, "message": message})
 
@@ -142,7 +154,7 @@ def _ai_fallback(row: SupervisorRequest, document: SupervisorRequestDocument | N
     for section, (value, suggestion) in checks.items():
         present = bool(value and (not isinstance(value, dict) or value.get("value")))
         findings.append({"section": section, "status": "PASS" if present else "WARNING", "feedback": "Content was detected for this section." if present else "No sufficiently clear content was detected for this section.", "suggestion": "No correction suggested." if present else suggestion, "page": 1 if present else None, "evidence": str(value)[:500] if present else "No evidence was detected.", "confidence": 0.9 if present else 0.65, "source": "DETERMINISTIC"})
-    return {"status": "UNAVAILABLE", "source": "DETERMINISTIC_FALLBACK", "message": "AI review unavailable; deterministic section checks are shown.", "provider": "ollama", "model": settings.ollama_proposal_model, "findings": findings, "advisory": True}
+    return {"status": "UNAVAILABLE", "source": "DETERMINISTIC_FALLBACK", "message": "AI review unavailable; deterministic section checks are shown.", "provider": "ollama", "model": settings.ollama_fallback_model, "findings": findings, "advisory": True}
 
 
 def _review_prompt(row: SupervisorRequest, document: SupervisorRequestDocument | None) -> str:
@@ -163,7 +175,7 @@ def _review_prompt(row: SupervisorRequest, document: SupervisorRequestDocument |
     return "\n".join(lines)
 
 
-def _ai_out(run: M03CheckRun) -> dict[str, object]:
+def _ai_out(run: ProposalAIReviewRun) -> dict[str, object]:
     result = run.result if isinstance(run.result, dict) else {}
     payload = {"review_id": run.id, "proposal_id": run.proposal_id, "status": result.get("status", run.status), "provider": result.get("provider", run.runtime), "model": result.get("model", run.model) or settings.ollama_proposal_model, "source": result.get("source"), "message": result.get("message", "AI review completed."), "advisory": bool(result.get("advisory", True)), "findings": result.get("findings", []), "timestamp": result.get("timestamp", run.finished_at or run.started_at), "error_type": result.get("error_type"), "latency_ms": result.get("latency_ms"), "request_id": result.get("request_id"), "retry_count": result.get("retry_count"), "fallback_reason": result.get("fallback_reason")}
     response = ProposalAIReviewResponse.model_validate(payload).model_dump(mode="json")
@@ -511,6 +523,7 @@ async def create_request(
     validate_mutating_origin(request)
     try:
         data = await proposal_file.read(5 * 1024 * 1024 + 1)
+        _reject_text_for_supervisor_selection(request, proposal_file.filename, proposal_file.content_type)
         extraction = extract_proposal_document(data, proposal_file.content_type, proposal_file.filename)
         cycle = _cycle_for_request(session, academic_cycle_id, lock=True)
         team = _team_for_student(session, actor)
@@ -605,6 +618,7 @@ async def update_draft_document(
     validate_mutating_origin(request)
     try:
         data = await proposal_file.read(5 * 1024 * 1024 + 1)
+        _reject_text_for_supervisor_selection(request, proposal_file.filename, proposal_file.content_type)
         extraction = extract_proposal_document(data, proposal_file.content_type, proposal_file.filename)
         row = _owner_request(session, request_id, actor, lock=True)
         if row.status not in (SupervisorRequestStatus.DRAFT.value, SupervisorRequestStatus.CHANGES_REQUESTED.value):
@@ -894,7 +908,8 @@ def proposal_document(
     if document is None:
         raise failure("document_not_found", "The proposal document was not found.", status.HTTP_404_NOT_FOUND)
     filename = document.filename.replace('"', "'").replace("\r", "").replace("\n", "")
-    return StreamingResponse(BytesIO(document.content), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{filename}"'})
+    media_type = document.content_type or "application/octet-stream"
+    return StreamingResponse(BytesIO(document.content), media_type=media_type, headers={"Content-Disposition": f'inline; filename="{filename}"'})
 
 
 def _monitor_statement(
@@ -991,10 +1006,10 @@ async def run_proposal_ai_review(
     document = session.get(SupervisorRequestDocument, row.document_id) if row.document_id else None
     logger.info("document.loaded request_id=%s proposal_id=%s present=%s", correlation_id, request_id, document is not None)
     proposal_key = f"supervisor-request:{row.id}"
-    existing = session.scalar(select(M03CheckRun).where(M03CheckRun.proposal_id == proposal_key, M03CheckRun.check_name == "proposal_ai_review", M03CheckRun.status == "RUNNING"))
+    existing = session.scalar(select(ProposalAIReviewRun).where(ProposalAIReviewRun.proposal_id == proposal_key, ProposalAIReviewRun.status == "RUNNING"))
     if existing is not None:
         raise failure("review_in_progress", "An AI review is already running for this proposal.")
-    run = M03CheckRun(proposal_id=proposal_key, check_name="proposal_ai_review", status="RUNNING", runtime="ollama", model=settings.ollama_proposal_model, result={"status": "RUNNING", "advisory": True})
+    run = ProposalAIReviewRun(proposal_id=proposal_key, status="RUNNING", runtime="ollama", model=settings.ollama_proposal_model, result={"status": "RUNNING", "advisory": True})
     session.add(run); session.commit(); session.refresh(run)
     try:
         extracted_text = document.extracted_text.strip() if document is not None and document.extracted_text else ""
@@ -1032,7 +1047,7 @@ def latest_proposal_ai_review(request_id: int, actor: User = Depends(get_current
     allowed = actor.role in (UserRole.COORDINATOR, UserRole.ADMIN) or (actor.role == UserRole.SUPERVISOR and row.supervisor_id == actor.id) or (actor.role == UserRole.STUDENT and (row.requester_user_id == actor.id or (team is not None and row.team_id == team.id)))
     if not allowed:
         raise failure("proposal_forbidden", "This proposal is outside your authorized scope.", status.HTTP_403_FORBIDDEN)
-    run = session.scalar(select(M03CheckRun).where(M03CheckRun.proposal_id == f"supervisor-request:{row.id}", M03CheckRun.check_name == "proposal_ai_review").order_by(M03CheckRun.id.desc()))
+    run = session.scalar(select(ProposalAIReviewRun).where(ProposalAIReviewRun.proposal_id == f"supervisor-request:{row.id}").order_by(ProposalAIReviewRun.id.desc()))
     if run is None:
         raise failure("review_not_found", "No AI review has been run for this proposal.", status.HTTP_404_NOT_FOUND)
     return _ai_out(run)

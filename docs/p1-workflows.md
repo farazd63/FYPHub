@@ -1,13 +1,5 @@
 # P1 feature explanations, workflows, and demonstrations
 
-## Module 03 approved baseline extraction
-
-1. An ADMIN uploads exactly one supported SHORT or LONG PDF/DOCX through the Module 03 baseline modal. The original bytes remain immutable and the selected proposal type is never mixed with the other type.
-2. The deterministic parser reads PDF page geometry and multi-page text bounding boxes or DOCX section/style settings. Measured values are normalized to millimetres/points and are shown with page/section evidence where available.
-3. The extractor reports margins, page size, font family/size, line and paragraph spacing, heading order/hierarchy, expected sections, captions, citations, and explicit unknown/not-detected values. Missing structural fields lower confidence and produce a clear incomplete-template warning.
-4. Activation requires extracted rules. LOW confidence additionally requires explicit Admin confirmation of a partial baseline. All uploads, activations, metadata versions, rule versions, provenance, and duplicate checks are audited.
-5. Initial reference history is v1. Metadata changes create a new immutable metadata version; formatting changes create a new immutable Rules version. Unchanged values are rejected unless the Admin explicitly confirms the duplicate.
-
 ## Implemented M1-D.1 transaction pipeline
 
 ```mermaid
@@ -323,10 +315,6 @@ No screenshots were captured in this checkpoint. Browser verification remains pe
 
 ## Prioritized remaining checkpoints and blockers
 
-### Module 03 proposal compliance checkpoint
-
-Module 03 now stores dynamic Admin baseline document versions and extracted rule sets in `m03_` tables. Student proposal uploads are immutable versioned PDF/DOCX records. Tier 1 formatting and Tier 2 structural checks are deterministic; the active local advisory provider is Ollama (`AI_PROVIDER=ollama`, `OLLAMA_URL=http://127.0.0.1:11434`, `llama3.1:8b`) using `POST /api/chat` with `stream=false`. Responses are strict Pydantic-validated JSON; failures return `DETERMINISTIC_FALLBACK`. Reports are advisory only and never approve or reject a proposal. Groq settings remain optional for rollback and proposal text is not sent to Groq while Ollama is active. Student, assigned Supervisor, Coordinator, and Admin visibility is enforced server-side; Panel is denied by default.
-
 Remaining M1-D decisions: official templates with versioned academic rules
 
 ### Observability
@@ -337,7 +325,7 @@ The implemented administrative reference foundation still requires:
 
 - official blank short- and long-proposal files and an approval authority;
 - publication/storage/download and activation/retirement policy and operations;
-- approved machine-readable normative rules that can later drive M3, but no proposal upload or AI checker yet;
+- approved machine-readable normative rules for future academic workflows;
 - browser verification of the existing ADMIN screen.
 
 This implements the M1 template/rules foundation without claiming M3 format checking.
@@ -354,7 +342,6 @@ This implements the M1 template/rules foundation without claiming M3 format chec
 - Define semester/workflow states; review ownership is decided, while the early-routing initiator, correction/resubmission rules, final approval authority, and Coordinator department/cycle scope remain open.
 - Provide capacity, Evaluation Criteria/scoring, deadline, reminder, and escalation policies before their M1 checkpoints.
 - Resolve shared-login attribution for M2 matching, invitations, requests, chat, and collaboration before building those flows.
-- Define M3 lifecycle, upload/storage, role visibility, AI model/grounding/disclosure, and human-review rules before implementation.
 
 ### SUPERVISOR-H: decision follow-up, reference search, and authorized conversation
 
@@ -384,6 +371,6 @@ Request conversations remain scoped to the request. The owning Student/team and 
 
 ### Coordinator/Admin registry workflow
 
-Coordinator and Admin registry lists are separate role-protected reads under `/api/v1/fyp-registry/{coordinator,admin}`. Filters are applied to cycle, section metadata, supervisor, student activity, proposal status, assignment status, completion availability, dates, and normalized search text. Detail responses assemble only persisted request, team, document, extraction, conversation, status-history, audit, archive-match, and Module 03 values; when no progress model exists they display `Progress tracking is not configured yet.`
+Coordinator and Admin registry lists are separate role-protected reads under `/api/v1/fyp-registry/{coordinator,admin}`. Filters are applied to cycle, section metadata, supervisor, student activity, proposal status, assignment status, completion availability, dates, and normalized search text. Detail responses assemble only persisted request, team, document, extraction, conversation, status-history, audit, and archive-match values; when no progress model exists they display `Progress tracking is not configured yet.`
 
 Only Admin may update registry metadata (`department_section`, `project_scope`, `team_label`, and administrative notes). Each update requires a correction reason, locks the request, stores a before/after snapshot in `fyp_registry_metadata`, and writes its audit event in the same transaction. Proposal PDFs, extraction snapshots, decisions, credentials, and historical audit records are not editable. Official template ingestion is a reference-baseline workflow: missing proposal-only fields are informational and do not become student-proposal validation failures.

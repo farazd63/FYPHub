@@ -1,4 +1,6 @@
 """Opt-in, same-cycle matching of shared-team preferences."""
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from sqlalchemy import delete, or_, select, update as sql_update
@@ -10,6 +12,7 @@ from .anonymous_verification import MatchingIdentityInput, get_context
 from .individual_verification import eligible
 from .security import hash_session_token
 from .team_compatibility import aggregate_compatibility
+from .ai_provider import run_ai_json
 
 router = APIRouter(prefix="/api/v1/team-matching")
 GROUPS = {"skills": ("skills", "skills_wanted"), "domain": ("domain", "domain_interest"), "availability": ("availability",), "work_style": ("work_style",), "preferred_role": ("preferred_role",), "commitment": ("commitment",)}
@@ -27,6 +30,18 @@ class PreferenceWrite(BaseModel):
     model_config = ConfigDict(extra="forbid")
     opted_in: StrictBool
     answers: Preferences
+
+
+class AITeamSuggestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    team_id: int = Field(gt=0)
+    confidence: float = Field(ge=0, le=1)
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class AITeamSuggestionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suggestions: list[AITeamSuggestion]
 
 def owned(session, actor):
     if actor.role != UserRole.STUDENT: raise HTTPException(403, "Team access is required.")
@@ -74,6 +89,67 @@ def suggestions(actor: User = Depends(get_current_user), session: Session = Depe
         result = aggregate_compatibility(assessments(profile.answers, preferences.answers))
         if result["answered"]: output.append({"team_id": candidate.id, **result})
     return sorted(output, key=lambda item: (-item["fraction"], item["team_id"]))
+
+
+@router.get("/ai-suggestions")
+async def ai_suggestions(actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    """Return advisory Llama/Groq-ranked suggestions without replacing rules.
+
+    Deterministic category matching remains the source of truth. The model may
+    only rank already eligible, opted-in same-cycle teams and provide a short
+    explanation. If the configured AI provider is unavailable, the same
+    deterministic matches are returned with an explicit fallback source.
+    """
+    team = owned(session, actor)
+    profile = session.get(TeamPreference, team.id)
+    if not profile or not profile.opted_in:
+        return {"source": "DETERMINISTIC", "model": None, "suggestions": []}
+    candidates = session.execute(
+        select(Team, TeamPreference)
+        .join(TeamPreference, TeamPreference.team_id == Team.id)
+        .where(
+            Team.academic_cycle_id == team.academic_cycle_id,
+            Team.id != team.id,
+            TeamPreference.opted_in.is_(True),
+        )
+    ).all()
+    deterministic: dict[int, dict[str, object]] = {}
+    candidate_payload = []
+    for candidate, preferences in candidates:
+        result = aggregate_compatibility(assessments(profile.answers, preferences.answers))
+        if not result["answered"]:
+            continue
+        deterministic[candidate.id] = {"team_id": candidate.id, **result}
+        candidate_payload.append({"team_id": candidate.id, "answers": preferences.answers, "deterministic": result})
+    if not candidate_payload:
+        return {"source": "DETERMINISTIC", "model": None, "suggestions": []}
+    prompt = (
+        "Rank these already eligible, opted-in same-cycle team matches for an advisory UI. "
+        "Do not invent team IDs, do not exclude a team solely for a different answer, and return only JSON.\n"
+        f"My preferences: {json.dumps(profile.answers, sort_keys=True)}\n"
+        f"Candidates: {json.dumps(candidate_payload, sort_keys=True)}"
+    )
+    result = await run_ai_json(prompt, AITeamSuggestionResponse, model_kind="agent", rate_key=f"team-matching:{actor.id}")
+    if result.get("status") != "COMPLETED":
+        fallback = [
+            {**item, "confidence": float(item["fraction"]), "reason": "Deterministic category comparison; AI ranking is unavailable."}
+            for item in sorted(deterministic.values(), key=lambda item: (-float(item["fraction"]), int(item["team_id"])))
+        ]
+        return {"source": "DETERMINISTIC_FALLBACK", "model": result.get("model"), "suggestions": fallback}
+    parsed = result.get("payload", {}).get("suggestions", [])
+    suggestions_out = []
+    for item in parsed:
+        if not isinstance(item, dict) or int(item.get("team_id", 0)) not in deterministic:
+            continue
+        team_id = int(item["team_id"])
+        suggestions_out.append({**deterministic[team_id], "confidence": item.get("confidence", deterministic[team_id]["fraction"]), "reason": item.get("reason", "AI-ranked from the eligible preference comparison.")})
+    if not suggestions_out:
+        suggestions_out = [
+            {**item, "confidence": float(item["fraction"]), "reason": "Deterministic category comparison; the AI response did not return an eligible ranking."}
+            for item in sorted(deterministic.values(), key=lambda item: (-float(item["fraction"]), int(item["team_id"])))
+        ]
+        return {"source": "DETERMINISTIC_FALLBACK", "model": result.get("model"), "suggestions": suggestions_out}
+    return {"source": "AI", "model": result.get("model"), "suggestions": suggestions_out}
 
 
 class StudentDiscovery(MatchingIdentityInput):

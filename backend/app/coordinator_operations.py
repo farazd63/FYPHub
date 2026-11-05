@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from .auth import require_roles
 from .database import get_db
-from .models import AcademicCycle, AdminAuditEvent, EvaluationRubric, EvaluationRubricVersion, M03ReferenceTemplate, SupervisorCapacityPolicy, TemplateReference, TemplateReferenceVersion, User, UserRole, WorkflowPolicy, WorkflowPolicyVersion
+from .models import AcademicCycle, AdminAuditEvent, EvaluationRubric, EvaluationRubricVersion, SupervisorCapacityPolicy, TemplateReference, TemplateReferenceVersion, User, UserRole, WorkflowPolicy, WorkflowPolicyVersion
 
 router = APIRouter(prefix="/api/v1/coordinator", tags=["coordinator-operations"])
 COORDINATOR_ROLES = (UserRole.ADMIN, UserRole.COORDINATOR)
@@ -52,15 +52,14 @@ def workflow_policies(_: User = Depends(require_roles(*COORDINATOR_ROLES)), sess
 
 @router.get("/proposal-templates")
 def proposal_templates(_: User = Depends(require_roles(*COORDINATOR_ROLES)), session: Session = Depends(get_db)):
-    latest = select(TemplateReferenceVersion.template_reference_id, func.max(TemplateReferenceVersion.version_number).label("version")).group_by(TemplateReferenceVersion.template_reference_id).subquery()
-    rows = session.execute(select(TemplateReferenceVersion, TemplateReference).join(latest, (latest.c.template_reference_id == TemplateReferenceVersion.template_reference_id) & (latest.c.version == TemplateReferenceVersion.version_number)).join(TemplateReference, TemplateReference.id == TemplateReferenceVersion.template_reference_id).order_by(TemplateReference.id)).all()
-    return [{"id": reference.id, "template_type": str(reference.template_type), "title": version.title, "version": version.version_number, "provenance": version.provenance} for version, reference in rows]
-
-
-@router.get("/module03-compliance")
-def module03_compliance(_: User = Depends(require_roles(*COORDINATOR_ROLES)), session: Session = Depends(get_db)):
-    rows = session.scalars(select(M03ReferenceTemplate).where(M03ReferenceTemplate.is_active.is_(True)).order_by(M03ReferenceTemplate.template_type, M03ReferenceTemplate.version.desc())).all()
-    return [{"id": row.id, "template_type": row.template_type, "filename": row.filename, "version": row.version, "extraction_status": row.extraction_status, "activation_mode": row.activation_mode} for row in rows]
+    active = select(TemplateReferenceVersion.template_reference_id, TemplateReferenceVersion.id.label("version_id")).where(TemplateReferenceVersion.is_active.is_(True)).subquery()
+    rows = session.execute(
+        select(TemplateReferenceVersion, TemplateReference)
+        .join(active, active.c.version_id == TemplateReferenceVersion.id)
+        .join(TemplateReference, TemplateReference.id == TemplateReferenceVersion.template_reference_id)
+        .order_by(TemplateReference.id)
+    ).all()
+    return [{"id": reference.id, "template_type": str(reference.template_type), "title": version.title, "version": version.version_number, "provenance": version.provenance, "is_active": version.is_active, "activated_at": version.activated_at} for version, reference in rows]
 
 
 @router.get("/evaluation-criteria")

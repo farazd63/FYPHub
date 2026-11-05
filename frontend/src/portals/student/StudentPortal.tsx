@@ -5,7 +5,7 @@ import { StudentPhasePlaceholder } from "./modules/StudentPhasePlaceholder";
 import { StudentTeamPhase } from "./modules/StudentTeamPhase";
 import { StudentSupervisorSelection } from "./modules/supervisor-selection/StudentSupervisorSelection";
 import { KnowledgeSearch } from "./modules/knowledge-search/KnowledgeSearch";
-import { ProposalWorkspace } from "../../modules/module-3/ProposalWorkspace";
+import { ProposalComplianceWorkspace } from "../../modules/module-3/ProposalComplianceWorkspace";
 import "./student.css";
 import "./student-admin-theme.css";
 import "./modules/archive-knowledge.css";
@@ -32,7 +32,7 @@ const icon = (kind: "team" | "proposal" | "search" | "supervisor" | "review" | "
 
 export const STUDENT_PHASES: readonly StudentPhase[] = [
   { id: "documents", name: "Required Documents & Uploads", route: "/student/documents", status: "Implemented", icon: icon("proposal") },
-  { id: "proposal", name: "Proposal Submission & Review", route: "/student/proposal", status: "Implemented", icon: icon("proposal") },
+  { id: "proposal", name: "Proposal Compliance Check", route: "/student/proposal", status: "Implemented", icon: icon("compliance") },
   { id: "team", name: "Student Team & Collaboration Hub", route: "/student/team", status: "Partial", icon: icon("team") },
   { id: "supervisors", name: "Supervisor Selection & Proposal Requests", route: "/student/supervisors", status: "Partial", icon: icon("supervisor") },
   { id: "progress", name: "Project Progress & Supervision Dashboard", route: "/student/progress", status: "Partial", icon: icon("progress") },
@@ -57,10 +57,10 @@ export function StudentPortal({ api, user, onLogout }: { api: string; user: Stud
   const select = (item: StudentPhase) => setActiveId(item.id);
   const content = activeId === "overview"
     ? <StudentOverview phases={STUDENT_PHASES} onSelect={select} />
-      : phase?.id === "proposal"
-        ? <ProposalWorkspace api={api} />
       : phase?.id === "team"
       ? <StudentTeamPhase api={api} />
+      : phase?.id === "proposal"
+        ? <ProposalComplianceWorkspace api={api} />
       : phase?.id === "supervisors"
         ? <StudentSupervisorSelection api={api} userId={user.id} />
         : phase?.id === "search" || phase?.id === "archive"

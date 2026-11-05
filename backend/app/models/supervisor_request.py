@@ -87,7 +87,7 @@ class SupervisorRequestDocument(Base):
     __table_args__ = (
         CheckConstraint("version > 0", name="ck_supervisor_request_documents_version_positive"),
         CheckConstraint("file_size > 0", name="ck_supervisor_request_documents_file_size_positive"),
-        CheckConstraint("page_count = 1", name="ck_supervisor_request_documents_one_page"),
+        CheckConstraint("page_count > 0", name="ck_supervisor_request_documents_page_count_positive"),
         CheckConstraint("extraction_status IN ('PENDING','EXTRACTED','FAILED','CONFIRMED')", name="ck_supervisor_request_documents_extraction_status"),
         Index("uq_supervisor_request_document_version", "request_id", "version", unique=True),
     )

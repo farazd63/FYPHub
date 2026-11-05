@@ -1,7 +1,7 @@
 # Remaining Long Proposal requirements
 
 - **Verified membership and leader/member rules:** initial registration validates roster eligibility but does not establish each initial member's individual consent. The proposal does not define the remaining membership or leader lifecycle rules; obtain those decisions before implementing them.
-- **AI teammate compatibility matching:** eight team-level fields and deterministic team comparisons exist, but the proposal calls for AI-assisted teammate discovery. Agentic AI is explicitly deferred; the AI approach and its dependencies need a future user decision. Do not treat deterministic suggestions as completion.
+- **AI teammate compatibility matching:** deterministic compatibility remains the source of truth and the new `/api/v1/team-matching/ai-suggestions` endpoint adds advisory AI ranking with an explicit deterministic fallback. Live Ollama availability still needs environment verification.
 - **Group AI chatbot:** local integration and mocked tests exist; a configured runtime and model are needed to verify live operation.
 
 Verification still needed: functional browser checks beyond the user-reported student discovery visual check, and actual SMTP delivery for roster OTP and invitations. These are verification gaps, not additional proposal features. SMTP server acceptance does not prove final delivery.

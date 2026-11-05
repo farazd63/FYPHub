@@ -11,7 +11,6 @@ def test_coordinator_read_only_routes_are_registered():
         "/api/v1/coordinator/audit-history",
         "/api/v1/coordinator/workflow-policies",
         "/api/v1/coordinator/proposal-templates",
-        "/api/v1/coordinator/module03-compliance",
         "/api/v1/coordinator/evaluation-criteria",
     }
 

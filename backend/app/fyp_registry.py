@@ -90,7 +90,6 @@ class RegistryDetail(RegistryRow):
     submitted_reviewed_dates: dict[str, datetime | None]
     audit_history: list[dict[str, Any]]
     related_archived_reference_matches: list[dict[str, Any]]
-    module03_compliance_report: dict[str, Any] | None
     administrative_notes: str | None
     correction_reason: str | None
 
@@ -208,7 +207,6 @@ def _detail(session: Session, row: SupervisorRequest) -> dict[str, Any]:
         "submitted_reviewed_dates": _decision_dates(history, row),
         "audit_history": _audit(session, row.id),
         "related_archived_reference_matches": archived,
-        "module03_compliance_report": None,
         "administrative_notes": _metadata(session, row.id).administrative_notes if _metadata(session, row.id) else None,
         "correction_reason": _metadata(session, row.id).correction_reason if _metadata(session, row.id) else None,
     })

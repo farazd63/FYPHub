@@ -1,1 +1,1 @@
-"""Module 03 dynamic proposal compliance engine."""
+"""Module 3: student proposal and university-template compliance."""

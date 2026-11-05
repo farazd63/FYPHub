@@ -36,7 +36,6 @@ SAFE_KEYS = {
     "group_policy_updated": {"academic_cycle_id", "max_group_size", "previous_max_group_size"},
     "supervisor_capacity_created": {"academic_cycle_id", "max_group_capacity"},
     "supervisor_capacity_updated": {"before", "after"},
-    "template_reference_version_created": {"template_type", "version", "provenance"},
     "academic_rule_version_created": {"version", "provenance"},
     "evaluation_rubric_version_created": {"version", "name", "criteria"},
     "academic_deadline_version_created": {"academic_cycle_id", "version", "name", "due_at_utc", "time_zone", "utc_offset", "operational"},
@@ -47,11 +46,6 @@ SAFE_KEYS = {
     "archived_project_activated": {"is_active"},
     "archived_project_deactivated": {"is_active"},
     "archived_project_document_uploaded": {"document_type", "version", "file_hash"},
-    "module03_template_uploaded": {"template_type", "version", "sha256"},
-    "module03_template_activated": {"template_type", "version", "is_active"},
-    "module03_template_deactivated": {"template_type", "version", "is_active"},
-    "module03_proposal_uploaded": {"proposal_type", "version", "sha256"},
-    "module03_compliance_report_generated": {"proposal_id", "report_version", "status"},
     "fyp_registry_metadata_updated": {"before", "after"},
 }
 NESTED_KEYS = {"academic_cycle_updated": {"code", "display_name", "registration_open"}, "supervisor_capacity_updated": {"academic_cycle_id", "supervisor_id", "max_group_capacity"}, "archived_project_updated": {"title", "abstract_summary", "keywords", "academic_year", "department_program", "project_scope", "completion_stage", "implemented_scope", "remaining_gaps", "future_work", "supervisor_display_reference", "source_label", "source_metadata"}, "archived_project_metadata_rolled_back": {"title", "abstract_summary", "keywords", "academic_year", "department_program", "project_scope", "completion_stage", "implemented_scope", "remaining_gaps", "future_work", "supervisor_display_reference", "source_label", "source_metadata"}, "fyp_registry_metadata_updated": {"department_section", "project_scope", "team_label", "administrative_notes", "correction_reason"}}

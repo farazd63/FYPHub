@@ -1091,7 +1091,6 @@ export default function App() {
                 "Overview",
                 "Users & Roles",
                 "Academic Cycles & Policies",
-                "Proposal Templates",
                 "Supervisor Capacity",
                 "Evaluation Criteria",
                 "Deadlines",

@@ -28,7 +28,10 @@ def unavailable():
 
 def generate(question):
     url = settings.ollama_url.strip().rstrip("/")
-    model = settings.ollama_model.strip()
+    # Group collaboration uses the configured agent model. The old
+    # ``ollama_model`` attribute no longer exists on Settings and caused every
+    # live chatbot request to fail before reaching Ollama.
+    model = str(getattr(settings, "ollama_agent_model", getattr(settings, "ollama_model", ""))).strip()
     try:
         parts = urlsplit(url)
         if not model or parts.scheme != "http" or parts.hostname not in ("127.0.0.1", "localhost", "::1") or parts.username or parts.password or parts.query or parts.fragment:

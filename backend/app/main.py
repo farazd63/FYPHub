@@ -19,9 +19,9 @@ from .config import settings
 from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
 from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, SupervisorCapacityPolicy, SupervisorAssignment, SupervisorRequest, SupervisorRequestStatus
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
+from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
 from .models import EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion
 from .models import AcademicDeadline, AcademicDeadlineVersion
-from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
 from .schemas.evaluation_rubrics import RubricDetailOut, RubricListOut, RubricVersionOut, RubricVersionWrite
 from .schemas.academic_deadlines import DeadlineCreate, DeadlineDetailOut, DeadlineListOut, DeadlinePreviewOut, DeadlinePreviewRequest, DeadlineVersionOut, DeadlineWrite
 from .dashboard_requirements import router as dashboard_requirements_router
@@ -36,6 +36,8 @@ from .schemas.team_registration import TeamMemberInput, TeamRegistrationRequest,
 from .security import generate_session_token, hash_password, hash_session_token, validate_password, verify_password
 from .registration_policy import DEMO_MODE_WARNING, RegistrationMode, registration_mode, roster_validation_required
 from .project_workflow import router as project_workflow_router
+from .evaluations import router as evaluations_router
+from .modules.module_03_proposal.router import router as proposal_compliance_router
 from .auth import (
     ALLOWED_BROWSER_ORIGINS,
     SESSION_COOKIE_NAME,
@@ -95,6 +97,7 @@ app.include_router(document_requirements_router)
 app.include_router(student_document_requirements_router)
 app.include_router(coordinator_operations_router)
 app.include_router(academic_cycle_overview_router)
+app.include_router(proposal_compliance_router)
 
 _DUMMY_PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=4$FkrCX/M1V29q1Jj4yMHSiw$rONBAdg5KlI9DhIbVoDaHB3lM5HJXojJYVeAaLlbGwI"
 
@@ -482,9 +485,26 @@ def template_reference_detail(
 def create_template_reference(payload:TemplateCreate,request:Request,actor:User=Depends(require_roles(UserRole.ADMIN)),session:Session=Depends(get_db)):
  validate_mutating_origin(request)
  try:
-  session.execute(text("SELECT pg_advisory_xact_lock(98137242)")); root=TemplateReference(template_type=payload.template_type); session.add(root); session.flush(); ref=TemplateReferenceVersion(template_reference_id=root.id,version_number=1,title=payload.title.strip(),provenance=payload.provenance,source_note=payload.source_note.strip(),created_by_id=actor.id); session.add(ref); session.flush(); rule=AcademicRuleVersion(template_reference_version_id=ref.id,version_number=1,provenance=payload.provenance,rules=payload.rules.model_dump(exclude_none=True),created_by_id=actor.id); session.add(rule); add_admin_audit_event(session,actor_id=actor.id,affected_user_id=None,target_type="TEMPLATE_REFERENCE",target_id=ref.id,action="template_reference_version_created",changed_values={"template_type":payload.template_type.value,"version":1,"provenance":payload.provenance}); session.commit(); session.refresh(ref); session.refresh(rule); return {"reference_id":root.id,"template_type":root.template_type,"versions":[{"template":ref,"rules":[rule]}]}
+  session.execute(text("SELECT pg_advisory_xact_lock(98137242)"))
+  root = session.scalar(select(TemplateReference).where(TemplateReference.template_type == payload.template_type))
+  if root is None:
+   root = TemplateReference(template_type=payload.template_type)
+   session.add(root)
+   session.flush()
+  number = (session.execute(select(func.max(TemplateReferenceVersion.version_number)).where(TemplateReferenceVersion.template_reference_id == root.id)).scalar_one() or 0) + 1
+  ref = TemplateReferenceVersion(template_reference_id=root.id, version_number=number, title=payload.title.strip(), provenance=payload.provenance, source_note=payload.source_note.strip(), created_by_id=actor.id)
+  session.add(ref)
+  session.flush()
+  rule = AcademicRuleVersion(template_reference_version_id=ref.id, version_number=1, provenance=payload.provenance, rules=payload.rules.model_dump(exclude_none=True), created_by_id=actor.id)
+  session.add(rule)
+  add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="TEMPLATE_REFERENCE", target_id=ref.id, action="template_reference_version_created", changed_values={"template_type": payload.template_type.value, "version": number, "provenance": payload.provenance})
+  session.commit()
+  session.refresh(ref)
+  session.refresh(rule)
+  return {"reference_id": root.id, "template_type": root.template_type, "versions": [{"template": ref, "rules": [rule]}]}
  except Exception as error:
-  session.rollback(); raise HTTPException(status_code=500,detail="Template reference could not be saved.") from error
+  session.rollback()
+  raise HTTPException(status_code=500, detail="Template reference could not be saved.") from error
 @app.post("/api/v1/admin/template-references/{reference_id}/versions",status_code=201,response_model=TemplateOut)
 def create_template_version(reference_id:int,payload:TemplateVersionCreate,request:Request,actor:User=Depends(require_roles(UserRole.ADMIN)),session:Session=Depends(get_db)):
  validate_mutating_origin(request); root=session.get(TemplateReference,reference_id)
@@ -1693,11 +1713,10 @@ app.include_router(agent_supervision_router)
 from .archived_projects import router as archived_projects_router
 app.include_router(archived_projects_router)
 
-from .modules.module_03_proposal.router import router as module03_router
-app.include_router(module03_router)
 from .fyp_registry import router as fyp_registry_router
 app.include_router(fyp_registry_router)
 from .password_reset import router as password_reset_router
 app.include_router(password_reset_router)
 app.include_router(dashboard_requirements_router)
 app.include_router(project_workflow_router)
+app.include_router(evaluations_router)
