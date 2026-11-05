@@ -7,6 +7,7 @@ import { StudentSupervisorSelection } from "./modules/supervisor-selection/Stude
 import { KnowledgeSearch } from "./modules/knowledge-search/KnowledgeSearch";
 import { ProposalWorkspace } from "../../modules/module-3/ProposalWorkspace";
 import "./student.css";
+import "./student-admin-theme.css";
 import "./modules/archive-knowledge.css";
 import "./student-visibility.css";
 

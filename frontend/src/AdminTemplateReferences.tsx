@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminTemplateUpload } from "./modules/module-3/AdminTemplateUpload";
-import { ProposalComplianceReport } from "./modules/module-3/ProposalComplianceReport";
 
 type Provenance = "OBSERVED_REFERENCE" | "CONFIRMED_REQUIREMENT";
 type Rules = { page_size?: string; font_family?: string; font_size_pt?: number; margin_mm?: number; line_spacing?: number; heading_style?: string; required_sections?: string[] };
@@ -24,5 +23,5 @@ function AdminTemplateReferenceManager({api}:{api:string}){
 }
 
 export function AdminTemplateReferences({api}:{api:string}){
- return <><AdminTemplateUpload api={api}/><AdminTemplateReferenceManager api={api}/><section className="mt-8 border-t border-[#dce4de] pt-8" aria-labelledby="admin-compliance-heading"><div className="mb-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#315db4]">Module 3 · Proposal review</p><h2 id="admin-compliance-heading" className="mt-1 text-2xl font-bold text-[#243746]">Compliance reports</h2><p className="mt-1 text-sm text-[#60716b]">Open, re-run, and download reports for uploaded student proposals from the same Proposal Templates workspace.</p></div><ProposalComplianceReport api={api} reviewerMode embedded /></section></>;
+ return <><AdminTemplateUpload api={api}/><AdminTemplateReferenceManager api={api}/></>;
 }
