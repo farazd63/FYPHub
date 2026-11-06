@@ -31,7 +31,7 @@ class GroupChannelTests(unittest.TestCase):
         allowed=['proposal','research','supervisor_discussion','tasks_progress','files_resources']
         for channel in ['general',*allowed,'announcements_deadlines']:
             with self.subTest(channel=channel):
-                self.assertEqual(self.call('POST',channel,self.student_token,{'body':'team message'})[0],201)
+                self.assertEqual(self.call('POST',channel,self.student_token,{'body':'team message'})[0],403 if channel=='announcements_deadlines' else 201)
                 self.assertEqual(self.call('GET',channel,self.student_token)[0],200)
                 self.assertEqual(self.call('GET',channel,self.other_token)[0],403)
                 self.assertEqual(self.call('GET',channel,self.supervisor_token)[0],403 if channel=='general' else 200)
