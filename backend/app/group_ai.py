@@ -44,30 +44,36 @@ def unavailable():
 
 def generate(question, context=None):
     url = settings.ollama_url.strip().rstrip("/")
-    # Group collaboration uses the configured agent model. The old
-    # ``ollama_model`` attribute no longer exists on Settings and caused every
-    # live chatbot request to fail before reaching Ollama.
-    model = str(getattr(settings, "ollama_agent_model", getattr(settings, "ollama_model", ""))).strip()
-    try:
-        parts = urlsplit(url)
-        if not model or parts.scheme != "http" or parts.hostname not in ("127.0.0.1", "localhost", "::1") or parts.username or parts.password or parts.query or parts.fragment:
-            raise unavailable()
-        system = "You are an advisory group assistant. Your output is AI-generated advice, not an academic decision."
-        if context:
-            system += " You are strictly scoped to this group context and must not reveal other group data:\n" + json.dumps(context, sort_keys=True)
-        payload = json.dumps({"model": model, "stream": False, "messages": [{"role": "system", "content": system}, {"role": "user", "content": question}]}).encode("utf-8")
-        request = UrlRequest(url + "/api/chat", data=payload, headers={"Content-Type": "application/json"}, method="POST")
-        with build_opener(NoRedirect()).open(request, timeout=30) as response:
-            raw = response.read(65537)
-        if len(raw) > 65536: raise ValueError("response too large")
-        data = json.loads(raw)
-        content = data["message"]["content"]
-        if not isinstance(content, str) or not content.strip() or len(content) > 16000: raise ValueError("invalid response")
-        return content
-    except HTTPException:
-        raise
-    except (ValueError, KeyError, TypeError, UnicodeError, URLError, HTTPError, TimeoutError, OSError):
+    primary = str(getattr(settings, "ollama_agent_model", getattr(settings, "ollama_model", ""))).strip()
+    fallback = str(getattr(settings, "ollama_fallback_model", "")).strip()
+    models = [model for index, model in enumerate((primary, fallback)) if model and model not in (primary, fallback)[:index]]
+    parts = urlsplit(url)
+    if not models or parts.scheme != "http" or parts.hostname not in ("127.0.0.1", "localhost", "::1") or parts.username or parts.password or parts.query or parts.fragment:
+        raise unavailable()
+    system = "You are an advisory group assistant. Your output is AI-generated advice, not an academic decision."
+    if context:
+        system += " You are strictly scoped to this group context and must not reveal other group data:\n" + json.dumps(context, sort_keys=True)
+    last_error: Exception | None = None
+    for model in models:
+        try:
+            payload = json.dumps({"model": model, "stream": False, "messages": [{"role": "system", "content": system}, {"role": "user", "content": question}]}).encode("utf-8")
+            request = UrlRequest(url + "/api/chat", data=payload, headers={"Content-Type": "application/json"}, method="POST")
+            with build_opener(NoRedirect()).open(request, timeout=30) as response:
+                raw = response.read(65537)
+            if len(raw) > 65536:
+                raise ValueError("response too large")
+            data = json.loads(raw)
+            content = data["message"]["content"]
+            if not isinstance(content, str) or not content.strip() or len(content) > 16000:
+                raise ValueError("invalid response")
+            return content
+        except HTTPException:
+            raise
+        except (ValueError, KeyError, TypeError, UnicodeError, URLError, HTTPError, TimeoutError, OSError) as error:
+            last_error = error
+    if last_error is not None:
         raise unavailable() from None
+    raise unavailable()
 
 @router.get("/{team_id}")
 def history(team_id: int, before_id: int | None = Query(None, gt=0), actor: User = Depends(get_current_user), session: Session = Depends(get_db)):

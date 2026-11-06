@@ -67,6 +67,14 @@ def _allowed_upload(filename: str | None, content_type: str | None) -> bool:
     return suffix in {"pdf", "docx", "txt"} or (content_type or "").lower() in {"application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
 
 
+def _allowed_template_upload(filename: str | None, content_type: str | None) -> bool:
+    suffix = (filename or "").lower().rsplit(".", 1)[-1]
+    return suffix in {"pdf", "docx"} or (content_type or "").lower() in {
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+
+
 def _detected_headings(text: str) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     page = 1
@@ -132,7 +140,7 @@ async def upload_template(
     validate_mutating_origin(request)
     if template_type not in {"SHORT", "LONG"}:
         raise _error("invalid_template_type", "Template type must be SHORT or LONG.", 422)
-    if not _allowed_upload(template_file.filename, template_file.content_type):
+    if not _allowed_template_upload(template_file.filename, template_file.content_type):
         raise _error("unsupported_template", "Only PDF and DOCX templates are supported.", 422)
     data = await template_file.read()
     if not data or len(data) > MAX_UPLOAD_BYTES:
@@ -179,6 +187,21 @@ def activate_template(version_id: int, request: Request, actor: User = Depends(r
     version.is_active = True
     version.activated_at = utc_now()
     version.activated_by_id = actor.id
+    session.commit()
+    session.refresh(version)
+    return _template_out(session, version)
+
+
+@router.post("/templates/{version_id}/deactivate")
+def deactivate_template(version_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
+    """Stop using a baseline without deleting its immutable version history."""
+    validate_mutating_origin(request)
+    version = session.get(TemplateReferenceVersion, version_id)
+    if version is None:
+        raise _error("template_not_found", "Template version was not found.", 404)
+    version.is_active = False
+    version.activated_at = None
+    version.activated_by_id = None
     session.commit()
     session.refresh(version)
     return _template_out(session, version)

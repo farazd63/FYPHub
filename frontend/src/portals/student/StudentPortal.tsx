@@ -33,7 +33,7 @@ const icon = (kind: "team" | "proposal" | "search" | "supervisor" | "review" | "
 export const STUDENT_PHASES: readonly StudentPhase[] = [
   { id: "documents", name: "Required Documents & Uploads", route: "/student/documents", status: "Implemented", icon: icon("proposal") },
   { id: "proposal", name: "Proposal Compliance Check", route: "/student/proposal", status: "Implemented", icon: icon("compliance") },
-  { id: "team", name: "Student Team & Collaboration Hub", route: "/student/team", status: "Partial", icon: icon("team") },
+  { id: "team", name: "Student Team & Collaboration Hub", route: "/student/team", status: "Implemented", icon: icon("team") },
   { id: "supervisors", name: "Supervisor Selection & Proposal Requests", route: "/student/supervisors", status: "Partial", icon: icon("supervisor") },
   { id: "progress", name: "Project Progress & Supervision Dashboard", route: "/student/progress", status: "Partial", icon: icon("progress") },
   { id: "search", name: "FYP Archive & Knowledge Search", route: "/student/search", status: "Implemented", icon: icon("knowledge") },
