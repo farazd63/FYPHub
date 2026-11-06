@@ -81,7 +81,7 @@ export function AdminProposalTemplates({ api }: { api: string }) {
   };
 
   return <section className="module3-admin-page" aria-labelledby="module3-templates-heading">
-    <div className="module3-page-heading"><p className="module3-eyebrow">Proposal Template</p><h1 id="module3-templates-heading">Proposal Templates</h1><p>Upload the approved SHORT or LONG template. Rules are extracted from the file and remain versioned for historical reports.</p></div>
+    <div className="module3-page-heading"><h1 id="module3-templates-heading">Proposal Templates</h1><p>Upload the approved SHORT or LONG template. Rules are extracted from the file and remain versioned for historical reports.</p></div>
     {message && <p className="module3-alert module3-alert--success" role="status">{message}</p>}
     {error && <p className="module3-alert module3-alert--error" role="alert">{error}</p>}
     <div className="module3-admin-grid">
