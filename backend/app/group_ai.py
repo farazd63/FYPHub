@@ -48,7 +48,13 @@ def generate(question, context=None):
     fallback = str(getattr(settings, "ollama_fallback_model", "")).strip()
     models = [model for index, model in enumerate((primary, fallback)) if model and model not in (primary, fallback)[:index]]
     parts = urlsplit(url)
-    if not models or parts.scheme != "http" or parts.hostname not in ("127.0.0.1", "localhost", "::1") or parts.username or parts.password or parts.query or parts.fragment:
+    allowed_hosts = getattr(
+        settings,
+        "ollama_allowed_hosts",
+        ("127.0.0.1", "localhost", "::1"),
+    )
+    hostname = (parts.hostname or "").lower()
+    if not models or parts.scheme != "http" or hostname not in allowed_hosts or parts.username or parts.password or parts.query or parts.fragment:
         raise unavailable()
     system = "You are an advisory group assistant. Your output is AI-generated advice, not an academic decision."
     if context:

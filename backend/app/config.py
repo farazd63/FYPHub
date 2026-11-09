@@ -23,6 +23,7 @@ class Settings:
     ollama_proposal_model: str = "llama3.2:3b"
     ollama_agent_model: str = "llama3.2:3b"
     ollama_fallback_model: str = "llama3.1:8b"
+    ollama_allowed_hosts: tuple[str, ...] = ("127.0.0.1", "localhost", "::1", "ollama", "host.docker.internal")
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_username: str = ""
@@ -70,6 +71,14 @@ def get_settings() -> Settings:
         ollama_proposal_model=os.getenv("OLLAMA_PROPOSAL_MODEL", "llama3.2:3b"),
         ollama_agent_model=os.getenv("OLLAMA_AGENT_MODEL", "llama3.2:3b"),
         ollama_fallback_model=os.getenv("OLLAMA_FALLBACK_MODEL", "llama3.1:8b"),
+        ollama_allowed_hosts=tuple(
+            host.strip().lower()
+            for host in os.getenv(
+                "OLLAMA_ALLOWED_HOSTS",
+                "127.0.0.1,localhost,::1,ollama,host.docker.internal",
+            ).split(",")
+            if host.strip()
+        ),
         smtp_host=os.getenv("SMTP_HOST", ""),
         smtp_port=int(os.getenv("SMTP_PORT", "587")),
         smtp_username=os.getenv("SMTP_USERNAME", ""),
