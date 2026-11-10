@@ -19,8 +19,11 @@ class Settings:
     postgres_user: str
     postgres_password: str
     session_lifetime_hours: int = 8
-    ollama_url: str = ""
-    ollama_model: str = ""
+    ollama_url: str = "http://127.0.0.1:11434"
+    ollama_proposal_model: str = "llama3.2:3b"
+    ollama_agent_model: str = "llama3.2:3b"
+    ollama_fallback_model: str = "llama3.1:8b"
+    ollama_allowed_hosts: tuple[str, ...] = ("127.0.0.1", "localhost", "::1", "ollama", "host.docker.internal")
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_username: str = ""
@@ -30,6 +33,15 @@ class Settings:
     password_reset_base_url: str = "http://localhost:5173/reset-password"
     app_env: str = "production"
     registration_mode: str = "restricted"
+    AI_PROVIDER: str = ""
+    GROQ_API_KEY: str = ""
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    GROQ_PROPOSAL_MODEL: str = ""
+    GROQ_AGENT_MODEL: str = ""
+    AI_TIMEOUT_SECONDS: float = 120.0
+    AI_MAX_RETRIES: int = 1
+    AI_RATE_LIMIT_PER_MINUTE: int = 10
+    document_storage_root: Path = Path("backend/storage/document-requirements")
 
     @property
     def database_url(self) -> URL:
@@ -55,8 +67,18 @@ def get_settings() -> Settings:
         postgres_database=os.getenv("POSTGRES_DB", "fyphub_p1"),
         postgres_user=os.getenv("POSTGRES_USER", "fyphub_p1_user"),
         postgres_password=password,
-        ollama_url=os.getenv("OLLAMA_URL", ""),
-        ollama_model=os.getenv("OLLAMA_MODEL", ""),
+        ollama_url=os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/"),
+        ollama_proposal_model=os.getenv("OLLAMA_PROPOSAL_MODEL", "llama3.2:3b"),
+        ollama_agent_model=os.getenv("OLLAMA_AGENT_MODEL", "llama3.2:3b"),
+        ollama_fallback_model=os.getenv("OLLAMA_FALLBACK_MODEL", "llama3.1:8b"),
+        ollama_allowed_hosts=tuple(
+            host.strip().lower()
+            for host in os.getenv(
+                "OLLAMA_ALLOWED_HOSTS",
+                "127.0.0.1,localhost,::1,ollama,host.docker.internal",
+            ).split(",")
+            if host.strip()
+        ),
         smtp_host=os.getenv("SMTP_HOST", ""),
         smtp_port=int(os.getenv("SMTP_PORT", "587")),
         smtp_username=os.getenv("SMTP_USERNAME", ""),
@@ -66,6 +88,15 @@ def get_settings() -> Settings:
         password_reset_base_url=os.getenv("PASSWORD_RESET_BASE_URL", "http://localhost:5173/reset-password").rstrip("/"),
         app_env=os.getenv("APP_ENV", "production").strip().lower(),
         registration_mode=os.getenv("REGISTRATION_MODE", "restricted"),
+        AI_PROVIDER=os.getenv("AI_PROVIDER", "").strip().lower(),
+        GROQ_API_KEY=os.getenv("GROQ_API_KEY", ""),
+        GROQ_BASE_URL=os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/"),
+        GROQ_PROPOSAL_MODEL=os.getenv("GROQ_PROPOSAL_MODEL", ""),
+        GROQ_AGENT_MODEL=os.getenv("GROQ_AGENT_MODEL", ""),
+        AI_TIMEOUT_SECONDS=float(os.getenv("AI_TIMEOUT_SECONDS", "120")),
+        AI_MAX_RETRIES=min(2, max(0, int(os.getenv("AI_MAX_RETRIES", "1")))),
+        AI_RATE_LIMIT_PER_MINUTE=max(1, int(os.getenv("AI_RATE_LIMIT_PER_MINUTE", "10"))),
+        document_storage_root=Path(os.getenv("DOCUMENT_STORAGE_ROOT", str(Path(__file__).resolve().parents[1] / "storage" / "document-requirements"))).resolve(),
     )
 
 

@@ -1,13 +1,5 @@
 # P1 feature explanations, workflows, and demonstrations
 
-## Module 03 approved baseline extraction
-
-1. An ADMIN uploads exactly one supported SHORT or LONG PDF/DOCX through the Module 03 baseline modal. The original bytes remain immutable and the selected proposal type is never mixed with the other type.
-2. The deterministic parser reads PDF page geometry and multi-page text bounding boxes or DOCX section/style settings. Measured values are normalized to millimetres/points and are shown with page/section evidence where available.
-3. The extractor reports margins, page size, font family/size, line and paragraph spacing, heading order/hierarchy, expected sections, captions, citations, and explicit unknown/not-detected values. Missing structural fields lower confidence and produce a clear incomplete-template warning.
-4. Activation requires extracted rules. LOW confidence additionally requires explicit Admin confirmation of a partial baseline. All uploads, activations, metadata versions, rule versions, provenance, and duplicate checks are audited.
-5. Initial reference history is v1. Metadata changes create a new immutable metadata version; formatting changes create a new immutable Rules version. Unchanged values are rejected unless the Admin explicitly confirms the duplicate.
-
 ## Implemented M1-D.1 transaction pipeline
 
 ```mermaid
@@ -41,11 +33,7 @@ This companion explains the source-cited matrix in [p1-feature-tracker.md](p1-fe
 
 ### M1 - academic governance
 
-<<<<<<< HEAD
 M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, internal Evaluation Criteria drafts with immutable ordered criteria, non-operational deadline configuration, non-operational reminder/escalation rule configuration, and an ADMIN-only audit-history viewer are present. Template and Evaluation Criteria work remain Partial: neither provides an approved publication/activation lifecycle, and criteria drafts intentionally contain no academic scoring values. Workflow-policy drafts now record administrator-supplied state and transition labels; publication, execution, deadline enforcement, reminder delivery, and escalation execution remain absent.
-=======
-M1 is the controlled configuration layer. Administrators should maintain people and roles, academic cycles and group limits, official proposal templates and versioned rules, supervisor capacity, panel scoring configuration, deadlines, reminder/escalation rules, and an audit trail. Today user/role management, limited cycle/group-size configuration, supervisor-capacity configuration, append-only audit writing, internal template-reference metadata with immutable academic-rule versions, internal evaluation criteria drafts with immutable ordered criteria, non-operational deadline configuration, non-operational reminder/escalation rule configuration, and an ADMIN-only audit-history viewer are present. Template and evaluation criteria work remain Partial: neither provides an approved publication/activation lifecycle, and evaluation criteria drafts intentionally contain no academic scoring values. Workflow-policy drafts now record administrator-supplied state and transition labels; publication, execution, deadline enforcement, reminder delivery, and escalation execution remain absent.
->>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
 
 ### Supervisor allocation
 
@@ -77,11 +65,11 @@ Drafts are configuration only and do not execute transitions or create review au
 
 ### M2 - team formation and collaboration
 
-M2 should let students form one legitimate team per cycle, discover compatible teammates through a defined 8-10-question profile, make and answer joining/invitation requests, use temporary match chat, then collaborate in seven named channels with a group chatbot. Current work is narrower: one shared team account can be registered with a creator and contact-member records, subject to cycle opening, maximum group size, and duplicate registration/contact restrictions. Seven retained group text channels and a shared-team advisory AI chatbot are available; invitations remain unimplemented; temporary team match chat is available.
+M2 should let students form one legitimate team per cycle, discover compatible teammates through a defined 8-10-question profile, make and answer joining/invitation requests, use temporary match chat, then collaborate in seven named channels with a group chatbot. Current work is narrower: one shared team account can be registered with a creator and contact-member records, subject to cycle opening, maximum group size, and duplicate registration/contact restrictions. It is not a discovery, invitation, chat, channel, or chatbot system.
 
 ### M3 - official proposal and readiness record
 
-M3 should hold one official short/long proposal record, uploads and versions, state transitions for draft/submission/resubmission, and readiness analysis. The report must check the university's actual format and structure and assist with consistency analysis; authorized staff view the same analysis according to permission. A non-operational proposal and version schema foundation exists; no operational M3 proposal workflow exists. Submitted project proposals are requirements evidence, not official blank university templates or numeric formatting rules.
+M3 should hold one official short/long proposal record, uploads and versions, state transitions for draft/submission/resubmission, and readiness analysis. The report must check the university's actual format and structure and assist with consistency analysis; authorized staff view the same analysis according to permission. No M3 implementation exists. Submitted project proposals are requirements evidence, not official blank university templates or numeric formatting rules.
 
 ## Actual and proposed pipelines
 
@@ -97,11 +85,7 @@ flowchart TD
     D -->|cycle and group maximum| F[Lock cycle then policy; validate positive limit]
     D -->|internal template references and rules| P[Implemented partial: immutable internal metadata/rule versions]
     D -->|supervisor capacity| R[Lock capacity writer, account and cycle; save positive unique policy plus audit]
-<<<<<<< HEAD
     D -->|internal Evaluation Criteria drafts| S[Lock allocator; save immutable version, ordered criteria, and audit]
-=======
-    D -->|internal evaluation criteria drafts| S[Lock allocator; save immutable version, ordered criteria, and audit]
->>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
     D -->|academic deadline configuration| T[Resolve timezone; save immutable version and audit]
     D -->|reminders and escalations| Q[Record non-operational rule version and audit]
     E --> G{last active ADMIN or shared-team guard fails?}
@@ -115,11 +99,7 @@ flowchart TD
     K --> L[Safe response and UI refresh]
 ```
 
-<<<<<<< HEAD
 Actual implementation is in `backend/app/main.py`, backed by the account, academic, capacity, Evaluation Criteria-version, and audit models. Proposed-only destinations remain disabled in the Admin navigation.
-=======
-Actual implementation is in `backend/app/main.py`, backed by the account, academic, capacity, evaluation criteria version, and audit models. Proposed-only destinations remain disabled in the Admin navigation.
->>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
 
 ## M1-I.1 read-only audit history
 
@@ -187,11 +167,7 @@ Use an isolated Admin/test context and administrator-supplied values; do not alt
 
 Reported automated coverage includes authorization, Origin rejection, unknown cycles, strict requests, naive timestamps, timezone conversion/mismatch/gap/overlap behavior, historical preservation, atomic audit rollback, and bounded concurrent allocation: 8 deadline tests and 63 full backend tests. Alembic current/head are `a2b3c4d5e6f7`; schema check, `pip check` passed; frontend lint/build were previously reported as passed. Screenshot evidence shows the server preview converting 20 October 2026, 17:00 Asia/Karachi to 12:00 UTC. Browser preview invalidation, save/version-history interactions, and responsive/mobile visual verification remain pending.
 
-<<<<<<< HEAD
 ## M1-F.1 internal Evaluation Criteria draft pipeline
-=======
-## M1-F.1 internal evaluation criteria draft pipeline
->>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
 
 ```mermaid
 flowchart TD
@@ -199,11 +175,7 @@ flowchart TD
     B --> C[Enter name, optional description, and ordered criteria]
     C --> D[Validate Origin, strict structure, nonblank names, and unique orders]
     D -->|invalid| E[Return field-addressable error without writing]
-<<<<<<< HEAD
     D -->|valid| F[Acquire Evaluation Criteria writer lock]
-=======
-    D -->|valid| F[Acquire evaluation criteria writer lock]
->>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
     F --> G[Allocate next version number]
     G --> H[Insert complete immutable version and criteria]
     H --> I[Insert audit event in the same transaction]
@@ -212,11 +184,7 @@ flowchart TD
     K -. future M9 boundary .-> L[Panel evaluation references a policy-approved version]
 ```
 
-<<<<<<< HEAD
 The current screen and API create internal **Draft** configurations only. They do not make Evaluation Criteria approved, published, active, or available to evaluators. They contain no marks, weights, thresholds, evaluation stages, result formula, or score submission. Those values and lifecycle rules must come from authorized university policy rather than software defaults.
-=======
-The current screen and API create internal **Draft** configurations only. They do not make evaluation criteria approved, published, active, or available to evaluators. They contain no marks, weights, thresholds, evaluation stages, result formula, or score submission. Those values and lifecycle rules must come from authorized university policy rather than software defaults.
->>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
 
 ### M1-F.1 manual demonstration
 
@@ -224,13 +192,8 @@ Use an isolated Admin/test environment; do not alter real academic records.
 
 1. Sign in with an active persisted `ADMIN` account and open **Evaluation Criteria**.
 2. Confirm the empty or existing draft list loads and every configuration is labelled **Draft**.
-<<<<<<< HEAD
 3. Enter an Evaluation Criteria name, optional description, and at least one criterion. Add, remove, and reorder rows; confirm entered row values move with their rows.
 4. Save the initial Evaluation Criteria once and confirm duplicate clicks are disabled while the request is pending.
-=======
-3. Enter an evaluation criteria name, optional description, and at least one criterion. Add, remove, and reorder rows; confirm entered row values move with their rows.
-4. Save the initial criteria draft once and confirm duplicate clicks are disabled while the request is pending.
->>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
 5. Open its history, change the complete draft, and create the next version.
 6. Confirm versions are numbered in order and the earlier version and its criterion order remain unchanged.
 7. Confirm validation remains attached to the relevant criterion after row movement and service failures show a safe error.
@@ -239,19 +202,11 @@ Automated checks cover authorization, foreign-Origin rejection, validation, orde
 
 ### Remaining M1-F scoring-policy decisions
 
-<<<<<<< HEAD
 - Official Evaluation Criteria definitions and criterion wording.
 - Permitted marks or scoring scales, weights, total constraints, aggregation, precision, and thresholds.
 - Official evaluation-stage names and applicability.
 - Draft review, approval, publication, activation, retirement, correction, and version-selection authority.
 - Rules connecting a future panel evaluation to an immutable approved Evaluation Criteria version.
-=======
-- Official evaluation criteria definitions and criterion wording.
-- Permitted marks or scoring scales, weights, total constraints, aggregation, precision, and thresholds.
-- Official evaluation-stage names and applicability.
-- Draft review, approval, publication, activation, retirement, correction, and version-selection authority.
-- Rules connecting a future panel evaluation to an immutable approved evaluation criteria version.
->>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
 
 ## M1-E.1 supervisor capacity pipeline
 
@@ -271,18 +226,6 @@ flowchart TD
 
 This is configuration, not allocation enforcement. A policy is retained and labelled historical if its supervisor later becomes inactive, but new or edited policies require an active account whose persisted role is `SUPERVISOR`. Verified evidence covers backend tests, migration/schema checks, frontend lint/build, successful policy creation, and edit-form population with separate supervisor name/email fields. Update-save, post-save refresh persistence, and mobile browser verification are pending. ADMIN-only supervisor-to-team assignment now enforces these limits using actual active assignments and displays assigned, remaining and full status. Assignment history is retained. Coordinator permissions and department/cycle scope remain undecided; matching and allocation workflows beyond manual ADMIN assignment remain future work. Browser and mobile checks for allocation remain pending.
 
-### M2 teammate matching
-
-Shared-team accounts can edit eight optional questions across skills, domain, availability, work style, preferred role and commitment, and explicitly opt in or withdraw. Suggestions include only other opted-in teams in the same cycle. Each comparable category has equal weight; categories without a corresponding answer from both teams are excluded. Answers are compared exactly after trimming and case folding. Skills and domain have two questions each: all mutually answered questions in a category must match for that category to match. Suggestions show matching and differing categories, with ties ordered by team ID; they are not academic rankings or individual performance records. Withdrawal stops discovery and retains editable answers. No automatic expiry is defined. LLM explanations remain pending; browser/mobile verification remains pending.
-
-### M2 temporary match chat
-
-Two opted-in teams in the same academic cycle may open a separate match chat when at least one category matches. Either team can close it; opting out closes it and revokes access. Messages identify the shared team account and are retained. Closed-chat access remains revoked for both teams even after re-opting in; retained messages are not returned through the chat API. Each team must separately consent before a new conversation is created with a new ID. Opting out invalidates pending fresh consents. Time-based expiry and moderation are undecided. Browser and mobile checks remain pending.
-
-### M2 group AI chatbot
-
-The shared team account can ask an advisory group chatbot; questions and AI-generated responses are retained as team history. The service sends only the current question to the configured local Ollama runtime, without retrieving channel messages or other teams' data. Set `OLLAMA_URL` to a loopback HTTP endpoint and `OLLAMA_MODEL` to an existing local model; neither is configured by default. Missing configuration, unavailable models, runtime errors and timeouts return an unavailable state without a generated response. No model is downloaded. AI advice is not an academic decision; live runtime and browser/mobile verification are pending.
-
 ### M2 pipeline
 
 ```mermaid
@@ -296,15 +239,12 @@ flowchart TD
     E -- yes --> F[Create one STUDENT shared-login User]
     F --> G[Create Team, creator record, and contact-member records]
     G --> H[Commit atomically and return safe response]
-    H --> M[Optional team preference questions and opt-in]
-    M --> N[Explainable team compatibility suggestions]
-    N --> O[Temporary match chat for opted-in same-cycle teams]
-    N -. future .-> P[Proposed: request and invitation]
-    A --> Q[Shared-team advisory group AI chatbot]
-    A --> R[Seven retained group text channels]
+    M[Proposed: profile questions] --> N[Proposed: AI matching]
+    N --> O[Proposed: request/invitation, accept/reject and temporary chat]
+    O --> Q[Proposed: seven channels and group AI chatbot]
 ```
 
-Team preference matching is implemented; join requests and invitations remain proposed. Group-channel messages identify the shared team account, not an individual member. The current assigned Supervisor may read and post in Proposal, Research, Supervisor Discussion, Tasks & Progress and Files & Resources, may only read Announcements & Deadlines, and cannot access General. Access ends with the assignment; a newly assigned Supervisor sees existing permitted channel history. Messages are retained without automatic expiry or hard deletion. Browser and mobile checks remain pending.
+The lower proposed branch is not connected to the current shared-account flow. Its design must decide how requests, invitations, chat authorship, and acceptance work without silently changing the approved shared-login model.
 
 ### Approved roster import and registration eligibility
 
@@ -375,17 +315,17 @@ No screenshots were captured in this checkpoint. Browser verification remains pe
 
 ## Prioritized remaining checkpoints and blockers
 
-### Module 03 proposal compliance checkpoint
-
-Module 03 now stores dynamic Admin baseline document versions and extracted rule sets in `m03_` tables. Student proposal uploads are immutable versioned PDF/DOCX records. Tier 1 formatting and Tier 2 structural checks are deterministic; Tier 3 is an optional local Ollama advisory request using `OLLAMA_BASE_URL` and structured JSON mode. A missing or malformed local runtime returns `UNAVAILABLE` without fabricating findings. Reports are advisory only and never approve or reject a proposal. Student, assigned Supervisor, Coordinator, and Admin visibility is enforced server-side; Panel is denied by default.
-
 Remaining M1-D decisions: official templates with versioned academic rules
+
+### Observability
+
+Backend responses carry an `X-Request-ID`; the centralized request middleware logs safe JSON start/completion records with method, sanitized path, workflow, status, duration, and failure stage. Authentication diagnostics include only cookie presence/name and session lookup success. Development frontend logs capture workflow, endpoint path, status, request ID, duration, and safe error category; verbose logs are disabled in production. Use the request ID shown in a frontend error or response header to correlate a browser failure with backend logs. Passwords, cookies, tokens, API keys, prompts, proposal text, and uploaded content are never logged.
 
 The implemented administrative reference foundation still requires:
 
 - official blank short- and long-proposal files and an approval authority;
 - publication/storage/download and activation/retirement policy and operations;
-- approved machine-readable normative rules that can later drive M3, but no proposal upload or AI checker yet;
+- approved machine-readable normative rules for future academic workflows;
 - browser verification of the existing ADMIN screen.
 
 This implements the M1 template/rules foundation without claiming M3 format checking.
@@ -400,14 +340,8 @@ This implements the M1 template/rules foundation without claiming M3 format chec
 ### Subsequent source-dependent decisions
 
 - Define semester/workflow states; review ownership is decided, while the early-routing initiator, correction/resubmission rules, final approval authority, and Coordinator department/cycle scope remain open.
-<<<<<<< HEAD
 - Provide capacity, Evaluation Criteria/scoring, deadline, reminder, and escalation policies before their M1 checkpoints.
 - Resolve shared-login attribution for M2 matching, invitations, requests, chat, and collaboration before building those flows.
-=======
-- Provide capacity, evaluation criteria/scoring, deadline, reminder, and escalation policies before their M1 checkpoints.
-- Resolve individual attribution for M2 matching, invitations, requests and temporary chat; group-channel team posts use the shared account.
->>>>>>> c3b9ee80fadf2c13df694c08620da65daf55cb12
-- Define M3 lifecycle, upload/storage, role visibility, AI model/grounding/disclosure, and human-review rules before implementation.
 
 ### SUPERVISOR-H: decision follow-up, reference search, and authorized conversation
 
@@ -437,6 +371,6 @@ Request conversations remain scoped to the request. The owning Student/team and 
 
 ### Coordinator/Admin registry workflow
 
-Coordinator and Admin registry lists are separate role-protected reads under `/api/v1/fyp-registry/{coordinator,admin}`. Filters are applied to cycle, section metadata, supervisor, student activity, proposal status, assignment status, completion availability, dates, and normalized search text. Detail responses assemble only persisted request, team, document, extraction, conversation, status-history, audit, archive-match, and Module 03 values; when no progress model exists they display `Progress tracking is not configured yet.`
+Coordinator and Admin registry lists are separate role-protected reads under `/api/v1/fyp-registry/{coordinator,admin}`. Filters are applied to cycle, section metadata, supervisor, student activity, proposal status, assignment status, completion availability, dates, and normalized search text. Detail responses assemble only persisted request, team, document, extraction, conversation, status-history, audit, and archive-match values; when no progress model exists they display `Progress tracking is not configured yet.`
 
 Only Admin may update registry metadata (`department_section`, `project_scope`, `team_label`, and administrative notes). Each update requires a correction reason, locks the request, stores a before/after snapshot in `fyp_registry_metadata`, and writes its audit event in the same transaction. Proposal PDFs, extraction snapshots, decisions, credentials, and historical audit records are not editable. Official template ingestion is a reference-baseline workflow: missing proposal-only fields are informational and do not become student-proposal validation failures.

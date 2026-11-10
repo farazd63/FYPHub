@@ -1,9 +1,28 @@
 import type { EvaluatorNavKey } from "./EvaluatorPortal";
+import { RoleSidebar, SidebarIcon, type RoleSidebarItem } from "../shared/RoleSidebar";
 
 type Props = { active: EvaluatorNavKey; collapsed: boolean; mobileOpen: boolean; onSelect: (key: EvaluatorNavKey) => void; onToggle: () => void; onClose: () => void };
 
-const items: Array<[EvaluatorNavKey, string, string]> = [["overview", "Overview", "O"], ["queue", "Evaluation Queue", "Q"], ["proposal", "Proposal Review", "P"], ["schedule", "Defense Schedule", "D"], ["criteria", "Evaluation Criteria", "C"], ["scoring", "Scoring & Feedback", "S"], ["history", "Decision History", "H"]];
+const items: readonly RoleSidebarItem[] = [
+  { id: "overview", label: "Overview", icon: <SidebarIcon name="overview" />, section: "Workspace" },
+  { id: "queue", label: "Evaluation Queue", icon: <SidebarIcon name="queue" />, section: "Evaluation" },
+  { id: "proposal", label: "Proposal Review", icon: <SidebarIcon name="review" />, section: "Evaluation" },
+  { id: "criteria", label: "Evaluation Criteria", icon: <SidebarIcon name="criteria" />, section: "Evaluation" },
+  { id: "scoring", label: "Scoring & Feedback", icon: <SidebarIcon name="review" />, section: "Evaluation" },
+  { id: "schedule", label: "Defense Schedule", icon: <SidebarIcon name="schedule" />, section: "Schedule & History" },
+  { id: "history", label: "Decision History", icon: <SidebarIcon name="history" />, section: "Schedule & History" },
+];
 
 export function EvaluatorSidebar({ active, collapsed, mobileOpen, onSelect, onToggle, onClose }: Props) {
-  return <><aside className={`student-sidebar evaluator-sidebar ${mobileOpen ? "student-sidebar--open" : ""} ${collapsed ? "student-sidebar--collapsed" : ""}`}><div className="student-sidebar__mobile-head"><span className="student-sidebar__section-label">Evaluator workspace</span><button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onClose}>×</button></div><button type="button" className="student-sidebar__collapse" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={onToggle}><span aria-hidden="true">{collapsed ? "+" : "-"}</span></button><nav className="student-sidebar__nav" aria-label="Evaluator navigation">{items.map(([key, label, icon]) => <button key={key} type="button" className="student-sidebar__item" aria-current={active === key ? "page" : undefined} title={collapsed ? label : undefined} onClick={() => { onSelect(key); onClose(); }}><span className="student-sidebar__icon" aria-hidden="true">{icon}</span><span className="student-sidebar__label">{label}</span></button>)}</nav></aside><button type="button" aria-label="Close navigation" className={`student-sidebar__overlay ${mobileOpen ? "student-sidebar__overlay--open" : ""}`} onClick={onClose} /></>;
+  return <RoleSidebar
+    ariaLabel="Evaluator navigation"
+    workspaceLabel="Evaluator workspace"
+    items={items}
+    active={active}
+    collapsed={collapsed}
+    mobileOpen={mobileOpen}
+    onSelect={(key) => onSelect(key as EvaluatorNavKey)}
+    onToggle={onToggle}
+    onClose={onClose}
+  />;
 }

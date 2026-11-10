@@ -1,38 +1,26 @@
-type NavItem = { id: string; label: string; icon: string };
+import { RoleSidebar, SidebarIcon, type RoleSidebarItem } from "../shared/RoleSidebar";
 
-export const supervisorNav: NavItem[] = [
-  { id: "overview", label: "Overview", icon: "⌂" },
-  { id: "requests", label: "Supervisor Requests", icon: "▣" },
-  { id: "assigned", label: "Assigned Students & Teams", icon: "◎" },
-  { id: "review", label: "Proposal Review", icon: "✓" },
-  { id: "capacity", label: "Supervisor Capacity", icon: "▥" },
-  { id: "conversations", label: "Conversations", icon: "☷" },
-  { id: "history", label: "Decision History", icon: "◷" },
+export const supervisorNav: readonly RoleSidebarItem[] = [
+  { id: "overview", label: "Overview", icon: <SidebarIcon name="overview" />, section: "Workspace" },
+  { id: "requests", label: "Supervisor Requests", icon: <SidebarIcon name="requests" />, section: "Requests & Review" },
+  { id: "review", label: "Proposal Review", icon: <SidebarIcon name="review" />, section: "Requests & Review" },
+  { id: "assigned", label: "Assigned Students & Teams", icon: <SidebarIcon name="people" />, section: "Supervision" },
+  { id: "capacity", label: "Supervisor Capacity", icon: <SidebarIcon name="capacity" />, section: "Supervision" },
+  { id: "agent-supervision", label: "Agentic Supervision", icon: <SidebarIcon name="agent" />, section: "Supervision" },
+  { id: "conversations", label: "Conversations", icon: <SidebarIcon name="messages" />, section: "History & Communication" },
+  { id: "history", label: "Decision History", icon: <SidebarIcon name="history" />, section: "History & Communication" },
 ];
 
-export function SupervisorSidebar({
-  active,
-  collapsed,
-  mobileOpen,
-  onSelect,
-  onToggle,
-  onClose,
-}: {
-  active: string;
-  collapsed: boolean;
-  mobileOpen: boolean;
-  onSelect: (id: string) => void;
-  onToggle: () => void;
-  onClose: () => void;
-}) {
-  return <>
-    <aside className={`student-sidebar ${mobileOpen ? "student-sidebar--open" : ""} ${collapsed ? "student-sidebar--collapsed" : ""}`}>
-      <div className="student-sidebar__mobile-head"><span className="student-sidebar__section-label">Supervisor workspace</span><button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onClose}>×</button></div>
-      <button type="button" className="student-sidebar__collapse" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={onToggle}><span aria-hidden="true">{collapsed ? "›" : "‹"}</span></button>
-      <nav className="student-sidebar__nav" aria-label="Supervisor navigation">
-        {supervisorNav.map((item) => <button type="button" key={item.id} aria-current={active === item.id ? "page" : undefined} className={`student-sidebar__item ${active === item.id ? "student-sidebar__item--active" : ""}`} onClick={() => { onSelect(item.id); onClose(); }}><span className="student-sidebar__icon" aria-hidden="true">{item.icon}</span><span className="student-sidebar__label">{item.label}</span></button>)}
-      </nav>
-    </aside>
-    <button type="button" aria-label="Close navigation" className={`student-sidebar__overlay ${mobileOpen ? "student-sidebar__overlay--open" : ""}`} onClick={onClose} />
-  </>;
+export function SupervisorSidebar({ active, collapsed, mobileOpen, onSelect, onToggle, onClose }: { active: string; collapsed: boolean; mobileOpen: boolean; onSelect: (id: string) => void; onToggle: () => void; onClose: () => void }) {
+  return <RoleSidebar
+    ariaLabel="Supervisor navigation"
+    workspaceLabel="Supervisor workspace"
+    items={supervisorNav}
+    active={active}
+    collapsed={collapsed}
+    mobileOpen={mobileOpen}
+    onSelect={onSelect}
+    onToggle={onToggle}
+    onClose={onClose}
+  />;
 }

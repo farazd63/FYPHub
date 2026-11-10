@@ -10,7 +10,8 @@ from .anonymous_verification import COOKIE, TargetedIdentityInput, consume_anony
 from .auth import get_current_user, utc_now, validate_mutating_origin
 from .database import get_db
 from .individual_verification import IdentityInput, eligible, guard, send_email, settings, unavailable
-from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, IdentityChallenge, IdentityProof, JoinRequest, JoinRequestAudit, Team, TeamMember, User
+from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, IdentityChallenge, IdentityProof, JoinRequest, JoinRequestAudit, Module2Notification, Team, TeamMember, User
+from .team_lifecycle import refresh_team_status
 from .security import generate_session_token, hash_password, hash_session_token, verify_password
 
 router = APIRouter(prefix='/api/v1/join-requests')
@@ -35,7 +36,7 @@ def submit(data: Submission, request: Request, session: Session = Depends(get_db
             raise HTTPException(400, 'Join request could not be submitted.')
         if not consume_anonymous_proof(session, data.proof, request.cookies.get(COOKIE, ''), student_id=student.id, cycle_id=cycle.id, purpose='join_request', action='submit_join_request', target_team_id=team.id):
             raise HTTPException(400, 'Join request could not be submitted.')
-        row = JoinRequest(team_id=team.id, cycle_id=cycle.id, student_id=student.id)
+        row = JoinRequest(team_id=team.id, cycle_id=cycle.id, student_id=student.id, expires_at=utc_now() + timedelta(days=7))
         session.add(row); session.flush()
         session.add(JoinRequestAudit(request_id=row.id, actor_student_id=student.id, action='submitted'))
         session.commit()
@@ -134,7 +135,13 @@ def decide(request_id: int, data: DecisionProof, request: Request, actor: User =
         if consumed is None: raise HTTPException(400, 'Join request could not be decided.')
         row.status = 'accepted' if data.action == 'accept_join_request' else 'rejected'
         if row.status == 'accepted':
-            session.add(TeamMember(team_id=team.id, academic_cycle_id=data.cycle_id, full_name=student.name.strip(), registration_number=student.registration_number.strip().upper(), university_email=student.university_email.strip().lower(), is_creator=False, is_active=True))
+            session.add(TeamMember(team_id=team.id, academic_cycle_id=data.cycle_id, student_id=student.id, full_name=student.name.strip(), registration_number=student.registration_number.strip().upper(), university_email=student.university_email.strip().lower(), is_creator=False, is_active=True))
+            session.flush()
+            session.execute(update(JoinRequest).where(JoinRequest.student_id == student.id, JoinRequest.cycle_id == data.cycle_id, JoinRequest.status == 'pending', JoinRequest.id != row.id).values(status='cancelled'))
+            from .models import Invitation
+            session.execute(update(Invitation).where(Invitation.student_id == student.id, Invitation.cycle_id == data.cycle_id, Invitation.status == 'pending').values(status='cancelled'))
+            refresh_team_status(session, team)
+            session.add(Module2Notification(recipient_user_id=team.shared_user_id, kind='join_request_decided', payload={'team_id': team.id, 'request_id': row.id, 'status': row.status}))
         session.add(JoinRequestAudit(request_id=row.id, actor_student_id=person.id, action=row.status))
         session.commit(); return {'id': row.id, 'status': row.status}
     except HTTPException:
@@ -147,5 +154,6 @@ def list_requests(team_id: int, actor: User = Depends(get_current_user), session
     team = session.scalar(select(Team).where(Team.id == team_id, Team.shared_user_id == actor.id))
     if not team:
         raise HTTPException(403, 'Team access is required.')
+    session.execute(update(JoinRequest).where(JoinRequest.team_id == team.id, JoinRequest.status == 'pending', JoinRequest.expires_at.is_not(None), JoinRequest.expires_at <= utc_now()).values(status='expired'))
     rows = session.execute(select(JoinRequest, ApprovedStudent).join(ApprovedStudent, ApprovedStudent.id == JoinRequest.student_id).where(JoinRequest.team_id == team.id, JoinRequest.cycle_id == team.academic_cycle_id).order_by(JoinRequest.id.desc()).limit(100)).all()
     return [{'id': row.id, 'status': row.status, 'student_name': student.name, 'registration_number': student.registration_number} for row, student in rows]

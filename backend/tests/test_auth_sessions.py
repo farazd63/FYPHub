@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.auth import SESSION_COOKIE_NAME, get_current_user, require_roles, utc_now
 from app.database import engine, get_db
 from app.main import app
-from app.models import AuthSession, PasswordResetToken, User, UserRole
+from app.models import AuthSession, DocumentUploadRequirement, PasswordResetToken, User, UserRole
 from app.password_reset import PASSWORD_RESET_DEVELOPMENT_UNKNOWN_MESSAGE, PASSWORD_RESET_GENERIC_MESSAGE
 from app.security import generate_session_token, hash_password, hash_session_token
 
@@ -108,7 +108,7 @@ class AuthSessionTests(unittest.TestCase):
         return headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
 
     def test_login_safe_cookie_and_me(self) -> None:
-        status, headers, body = self.login(Origin="http://127.0.0.1:5174")
+        status, headers, body = self.login(Origin="http://127.0.0.1:5173")
         self.assertEqual(status, 200)
         self.assertEqual(body["email"], self.email)
         self.assertNotIn("password", body)
@@ -118,6 +118,15 @@ class AuthSessionTests(unittest.TestCase):
         self.assertIn("samesite=lax", cookie)
         self.assertIn("path=/", cookie)
         self.assertNotIn("domain=", cookie)
+        self.assertNotIn("secure", cookie)
+
+    def test_login_session_is_usable_by_proposal_endpoints(self) -> None:
+        status, headers, _ = self.login()
+        self.assertEqual(status, 200)
+        cookie = {"Cookie": f"{SESSION_COOKIE_NAME}={self.cookie_value(headers)}"}
+        self.assertEqual(request("GET", "/api/v1/auth/me", headers=cookie)[0], 200)
+        self.assertEqual(request("GET", "/api/v1/proposals/cycles", headers=cookie)[0], 200)
+        self.assertEqual(request("GET", "/api/v1/proposals/mine", headers=cookie)[0], 200)
         self.assertNotIn("secure", cookie)  # explicit 127.0.0.1 HTTP development exception
         secure_status, secure_headers, _ = request("POST", "/api/v1/auth/login", {"email": self.email, "password": "Correct Password!"}, scheme="https")
         self.assertEqual(secure_status, 200)
@@ -205,7 +214,7 @@ class AuthSessionTests(unittest.TestCase):
         second = self.cookie_value(second_headers)
         self.assertNotEqual(first, second)
         self.assertEqual(request("GET", "/api/v1/auth/me", headers={"Cookie": f"{SESSION_COOKIE_NAME}={first}"})[0], 401)
-        headers = {"Cookie": f"{SESSION_COOKIE_NAME}={second}", "Origin": "http://127.0.0.1:5174"}
+        headers = {"Cookie": f"{SESSION_COOKIE_NAME}={second}", "Origin": "http://127.0.0.1:5173"}
         logout_status, logout_headers, logout_body = request("POST", "/api/v1/auth/logout", headers=headers)
         self.assertEqual(logout_status, 204)
         self.assertIsNone(logout_body)
@@ -270,10 +279,23 @@ class AuthSessionTests(unittest.TestCase):
     def test_origin_cors_and_role_helpers(self) -> None:
         self.assertEqual(self.login(Origin="https://evil.example")[0], 403)
         self.assertEqual(request("POST", "/api/v1/auth/logout", headers={"Origin": "https://evil.example"})[0], 403)
-        status, headers, _ = request("OPTIONS", "/api/v1/auth/login", headers={"Origin": "http://127.0.0.1:5174", "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type"})
+        status, headers, _ = request("OPTIONS", "/api/v1/auth/login", headers={"Origin": "http://127.0.0.1:5173", "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type"})
         self.assertEqual(status, 200)
-        self.assertEqual(headers["access-control-allow-origin"], "http://127.0.0.1:5174")
+        self.assertEqual(headers["access-control-allow-origin"], "http://127.0.0.1:5173")
         self.assertEqual(headers["access-control-allow-credentials"], "true")
+
+    def test_authenticated_admin_can_create_document_requirement(self) -> None:
+        admin = User(full_name="Document Admin", email=f"document-admin-{uuid4().hex}@example.com", registration_number=None, password_hash=hash_password("Document Admin Password!"), role=UserRole.ADMIN)
+        session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        session.add(admin); session.commit(); session.close()
+        login_status, login_headers, _ = request("POST", "/api/v1/auth/login", {"email": admin.email, "password": "Document Admin Password!", "requested_role": "ADMIN"}, headers={"Origin": "http://127.0.0.1:5173"})
+        self.assertEqual(login_status, 200)
+        status, _, body = request("POST", "/api/v1/document-requirements", {"title": "Test document", "due_date": "2026-11-12T18:45:00+05:00", "allowed_file_types": ["PDF"]}, headers={"Cookie": f"{SESSION_COOKIE_NAME}={self.cookie_value(login_headers)}", "Origin": "http://127.0.0.1:5173"})
+        self.assertEqual(status, 201)
+        self.assertEqual(body["title"], "Test document")
+        self.assertEqual(body["allowed_file_types"], ["pdf"])
+        persisted = self.connection.execute(text("SELECT count(*) FROM document_upload_requirements WHERE id=:id"), {"id": body["id"]}).scalar_one()
+        self.assertEqual(persisted, 1)
         origin = "http://localhost:5173"
         status, headers, _ = request("OPTIONS", "/api/v1/auth/login", headers={"Origin": origin, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type"})
         self.assertEqual(status, 200)
@@ -292,6 +314,27 @@ class AuthSessionTests(unittest.TestCase):
         self.assertEqual(denied.exception.status_code, 403)
         fixture_user.role = UserRole.ADMIN
         self.assertIs(student_guard(fixture_user), fixture_user)
+
+    def test_admin_published_document_requirement_is_visible_to_student(self) -> None:
+        admin_password = "Document Visibility Admin Password!"
+        session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        admin = User(full_name="Document Visibility Admin", email=f"document-visibility-admin-{uuid4().hex}@example.com", registration_number=None, password_hash=hash_password(admin_password), role=UserRole.ADMIN)
+        session.add(admin); session.commit(); session.close()
+
+        login_status, admin_headers, _ = request("POST", "/api/v1/auth/login", {"email": admin.email, "password": admin_password, "requested_role": "ADMIN"}, headers={"Origin": "http://127.0.0.1:5173"})
+        self.assertEqual(login_status, 200)
+        admin_cookie = self.cookie_value(admin_headers)
+        create_status, _, requirement = request("POST", "/api/v1/document-requirements", {"title": "Published student requirement", "due_date": "2026-12-12T18:45:00+05:00", "allowed_file_types": ["PDF"]}, headers={"Cookie": f"{SESSION_COOKIE_NAME}={admin_cookie}", "Origin": "http://127.0.0.1:5173"})
+        self.assertEqual(create_status, 201)
+        self.assertEqual(requirement["status"], "DRAFT")
+
+        publish_status, _, _ = request("POST", f"/api/v1/document-requirements/{requirement['id']}/publish", headers={"Cookie": f"{SESSION_COOKIE_NAME}={admin_cookie}", "Origin": "http://127.0.0.1:5173"})
+        self.assertEqual(publish_status, 200)
+        student_status, student_headers, _ = self.login(Origin="http://127.0.0.1:5173")
+        self.assertEqual(student_status, 200)
+        list_status, _, rows = request("GET", "/api/v1/student/document-requirements", headers={"Cookie": f"{SESSION_COOKIE_NAME}={self.cookie_value(student_headers)}"})
+        self.assertEqual(list_status, 200)
+        self.assertIn(requirement["id"], {row["id"] for row in rows})
 
     def test_forgot_password_is_generic_and_stores_only_a_hash(self) -> None:
         sent: list[str] = []

@@ -1,6 +1,9 @@
+import io
 import unittest
 
-from app.pdf_extraction import _extract_fields, _normalize_text
+from docx import Document
+
+from app.pdf_extraction import PdfExtractionError, _extract_fields, _normalize_text, extract_proposal_document
 
 
 class PdfExtractionFieldTests(unittest.TestCase):
@@ -41,6 +44,27 @@ class PdfExtractionFieldTests(unittest.TestCase):
 
     def test_normalization_preserves_sections_and_colon_spacing(self):
         self.assertEqual(_normalize_text(" Title\r\n :  Value \r\n\r\nPurpose\t:Thing "), "Title\n: Value\nPurpose: Thing")
+
+    def test_docx_upload_extracts_fields_with_immutable_file_metadata(self):
+        document = Document()
+        document.add_paragraph("Title: DOCX Proposal")
+        document.add_paragraph("Purpose: Improve campus safety.")
+        payload = io.BytesIO()
+        document.save(payload)
+        result = extract_proposal_document(
+            payload.getvalue(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "proposal.docx",
+        )
+        self.assertEqual(result.content_type, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        self.assertEqual(result.extracted_fields["title"]["value"], "DOCX Proposal")
+        self.assertEqual(result.extracted_fields["purpose"]["value"], "Improve campus safety.")
+        self.assertEqual(len(result.sha256), 64)
+
+    def test_unsupported_upload_is_rejected(self):
+        with self.assertRaises(PdfExtractionError) as error:
+            extract_proposal_document(b"plain text", "text/plain", "proposal.txt")
+        self.assertEqual(error.exception.code, "invalid_pdf")
 
 
 if __name__ == "__main__":

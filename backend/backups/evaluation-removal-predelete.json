@@ -1,0 +1,121 @@
+{
+  "created_at": "2026-11-03T16:27:13.855234+05:00",
+  "database": "fyphub_p1",
+  "host": "127.0.0.1",
+  "port": 55732,
+  "alembic_version": "kl5e6f7a8b9c",
+  "tables": {
+    "evaluation_records": {
+      "columns": [
+        "id",
+        "student_id",
+        "group_id",
+        "evaluator_id",
+        "evaluator_role",
+        "evaluation_category",
+        "maximum_marks",
+        "obtained_marks",
+        "feedback",
+        "status",
+        "submitted_at",
+        "approved_at",
+        "published_at",
+        "created_at",
+        "updated_at"
+      ],
+      "rows": []
+    },
+    "evaluation_audit_events": {
+      "columns": [
+        "id",
+        "evaluation_id",
+        "actor_id",
+        "action",
+        "previous_marks",
+        "new_marks",
+        "reason",
+        "changed_values",
+        "created_at"
+      ],
+      "rows": []
+    },
+    "evaluation_corrections": {
+      "columns": [
+        "id",
+        "evaluation_id",
+        "authorized_by_id",
+        "previous_marks",
+        "new_marks",
+        "reason",
+        "created_at"
+      ],
+      "rows": []
+    },
+    "panel_evaluations": {
+      "columns": [
+        "id",
+        "schedule_id",
+        "evaluator_id",
+        "status",
+        "overall_score",
+        "overall_feedback",
+        "decision",
+        "disagreement_detected",
+        "resolution_note",
+        "created_at",
+        "updated_at"
+      ],
+      "rows": []
+    },
+    "panel_evaluation_scores": {
+      "columns": [
+        "id",
+        "evaluation_id",
+        "criterion_key",
+        "score",
+        "max_score",
+        "feedback"
+      ],
+      "rows": []
+    },
+    "evaluation_rubrics": {
+      "columns": [
+        "id",
+        "created_at"
+      ],
+      "rows": []
+    },
+    "evaluation_rubric_versions": {
+      "columns": [
+        "id",
+        "rubric_id",
+        "version_number",
+        "name",
+        "description",
+        "created_by_id",
+        "created_at"
+      ],
+      "rows": []
+    },
+    "evaluation_rubric_criteria": {
+      "columns": [
+        "id",
+        "rubric_version_id",
+        "name",
+        "description",
+        "display_order"
+      ],
+      "rows": []
+    }
+  },
+  "discovered_evaluation_tables": [
+    "evaluation_audit_events",
+    "evaluation_corrections",
+    "evaluation_records",
+    "evaluation_rubric_criteria",
+    "evaluation_rubric_versions",
+    "evaluation_rubrics",
+    "panel_evaluation_scores",
+    "panel_evaluations"
+  ]
+}

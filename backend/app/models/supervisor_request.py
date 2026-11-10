@@ -60,6 +60,11 @@ class SupervisorRequest(Base):
     requester_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     team_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     supervisor_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    proposal_type: Mapped[str] = mapped_column(String(5), nullable=False, default="SHORT", server_default="SHORT")
+    problem_statement: Mapped[str | None] = mapped_column(Text, nullable=True)
+    objectives: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scope: Mapped[str | None] = mapped_column(Text, nullable=True)
+    methodology: Mapped[str | None] = mapped_column(Text, nullable=True)
     assignment_id: Mapped[int | None] = mapped_column(ForeignKey("supervisor_assignments.id", ondelete="RESTRICT"), nullable=True)
     document_id: Mapped[int | None] = mapped_column(ForeignKey("supervisor_request_documents.id", ondelete="RESTRICT", use_alter=True), nullable=True)
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
@@ -82,7 +87,7 @@ class SupervisorRequestDocument(Base):
     __table_args__ = (
         CheckConstraint("version > 0", name="ck_supervisor_request_documents_version_positive"),
         CheckConstraint("file_size > 0", name="ck_supervisor_request_documents_file_size_positive"),
-        CheckConstraint("page_count = 1", name="ck_supervisor_request_documents_one_page"),
+        CheckConstraint("page_count > 0", name="ck_supervisor_request_documents_page_count_positive"),
         CheckConstraint("extraction_status IN ('PENDING','EXTRACTED','FAILED','CONFIRMED')", name="ck_supervisor_request_documents_extraction_status"),
         Index("uq_supervisor_request_document_version", "request_id", "version", unique=True),
     )

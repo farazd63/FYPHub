@@ -8,6 +8,7 @@ from sqlalchemy import text
 from app.auth import SESSION_COOKIE_NAME
 from tests import test_group_channels as fixtures
 from tests.test_auth_sessions import request
+from app.group_ai import generate
 
 class GroupAITests(unittest.TestCase):
     setUpClass = classmethod(fixtures.GroupChannelTests.setUpClass.__func__)
@@ -36,3 +37,17 @@ class GroupAITests(unittest.TestCase):
             with self.subTest(exception=exception),patch('app.group_ai.settings',settings),patch('app.group_ai.build_opener') as opener:
                 if exception: opener.return_value.open.side_effect=exception
                 code,_,body=self.call(self.student_token,data={'body':'question'}); self.assertEqual(code,503); self.assertNotIn('private failure',str(body)); self.assertEqual(self.count(),0)
+
+    def test_agent_model_falls_back_to_configured_local_model(self):
+        settings = SimpleNamespace(
+            ollama_url='http://127.0.0.1:11434',
+            ollama_agent_model='llama3.2:3b',
+            ollama_fallback_model='llama3.1:8b',
+        )
+        response = io.BytesIO(json.dumps({'message': {'content': 'fallback advisory response'}}).encode())
+        with patch('app.group_ai.settings', settings), patch('app.group_ai.build_opener') as opener:
+            opener.return_value.open.side_effect = [URLError('primary model is unavailable'), response]
+            self.assertEqual(generate('team question'), 'fallback advisory response')
+            self.assertEqual(opener.return_value.open.call_count, 2)
+            sent = json.loads(opener.return_value.open.call_args.args[0].data)
+            self.assertEqual(sent['model'], 'llama3.1:8b')

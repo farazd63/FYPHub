@@ -99,7 +99,7 @@ def _task_out(row: ProjectTask) -> dict:
 
 def _health(milestones: list[ProjectMilestone], tasks: list[ProjectTask]) -> str:
     overdue = sum(1 for row in [*milestones, *tasks] if row.due_at and row.due_at < utc_now() and row.completion_percent < 100)
-    if overdue >= 3 or any(row.due_at and row.due_at < utc_now() - __import__("datetime").timedelta(days=14) and row.completion_percent < 50 for row in tasks):
+    if overdue >= 3:
         return "Critical"
     if overdue or any(row.completion_percent < 50 for row in milestones):
         return "Attention Required"

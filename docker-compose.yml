@@ -1,0 +1,155 @@
+name: fyphub-p1
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.6-pg17-trixie
+    container_name: fyphub-p1-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fyphub_p1}
+      POSTGRES_USER: ${POSTGRES_USER:-fyphub_p1_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set and non-empty}
+    volumes:
+      - fyphub-p1-postgres-data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-55732}:5432"
+    networks:
+      - fyphub-p1-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - fyphub-p1-network
+    command: ["alembic", "-c", "alembic.ini", "upgrade", "head"]
+    restart: "no"
+
+  ollama:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    volumes:
+      - fyphub-p1-ollama-models:/root/.ollama
+    expose:
+      - "11434"
+    networks:
+      - fyphub-p1-network
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  ollama-init:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_PROPOSAL_MODEL: ${OLLAMA_PROPOSAL_MODEL:-llama3.2:3b}
+      OLLAMA_AGENT_MODEL: ${OLLAMA_AGENT_MODEL:-llama3.2:3b}
+      OLLAMA_FALLBACK_MODEL: ${OLLAMA_FALLBACK_MODEL:-llama3.1:8b}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - fyphub-p1-network
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      ollama pull "$${OLLAMA_PROPOSAL_MODEL}" &&
+      if [ "$${OLLAMA_AGENT_MODEL}" != "$${OLLAMA_PROPOSAL_MODEL}" ]; then ollama pull "$${OLLAMA_AGENT_MODEL}"; fi &&
+      if [ -n "$${OLLAMA_FALLBACK_MODEL}" ] && [ "$${OLLAMA_FALLBACK_MODEL}" != "$${OLLAMA_PROPOSAL_MODEL}" ] && [ "$${OLLAMA_FALLBACK_MODEL}" != "$${OLLAMA_AGENT_MODEL}" ]; then ollama pull "$${OLLAMA_FALLBACK_MODEL}"; fi
+    restart: "no"
+
+  storage-init:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    user: "0:0"
+    volumes:
+      - fyphub-p1-document-data:/app/storage/document-requirements
+    command: ["sh", "-c", "mkdir -p /app/storage/document-requirements && chown -R fyphub:fyphub /app/storage/document-requirements"]
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      DOCUMENT_STORAGE_ROOT: /app/storage/document-requirements
+      AI_PROVIDER: ${AI_PROVIDER:-ollama}
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_ALLOWED_HOSTS: ollama
+      OLLAMA_PROPOSAL_MODEL: ${OLLAMA_PROPOSAL_MODEL:-llama3.2:3b}
+      OLLAMA_AGENT_MODEL: ${OLLAMA_AGENT_MODEL:-llama3.2:3b}
+      OLLAMA_FALLBACK_MODEL: ${OLLAMA_FALLBACK_MODEL:-llama3.1:8b}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      ollama-init:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8010:8000"
+    volumes:
+      - fyphub-p1-document-data:/app/storage/document-requirements
+    networks:
+      - fyphub-p1-network
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8010}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5173:80"
+    networks:
+      - fyphub-p1-network
+    restart: unless-stopped
+
+volumes:
+  fyphub-p1-postgres-data:
+    name: fyphub-p1-postgres-data
+  fyphub-p1-document-data:
+    name: fyphub-p1-document-data
+  fyphub-p1-ollama-models:
+    name: fyphub-p1-ollama-models
+
+networks:
+  fyphub-p1-network:
+    name: fyphub-p1-network

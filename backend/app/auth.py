@@ -18,8 +18,13 @@ logger = logging.getLogger(__name__)
 SESSION_COOKIE_NAME = "fyphub_session"
 # Deliberately fixed for this checkpoint; changing it is a reviewed configuration change.
 SESSION_LIFETIME_HOURS = settings.session_lifetime_hours
-ALLOWED_BROWSER_ORIGIN = "http://127.0.0.1:5174"
-ALLOWED_BROWSER_ORIGINS = (ALLOWED_BROWSER_ORIGIN, "http://localhost:5173")
+ALLOWED_BROWSER_ORIGIN = "http://127.0.0.1:5173"
+# Explicit local Vite origins. Credentials remain restricted; no wildcard is
+# permitted because the application uses cookie-backed sessions.
+ALLOWED_BROWSER_ORIGINS = (
+    ALLOWED_BROWSER_ORIGIN,
+    "http://localhost:5173",
+)
 _TEMPORARY_DIAGNOSTIC_PATHS = {"/api/v1/auth/login", "/api/v1/auth/me", "/api/v1/admin/me"}
 
 
@@ -31,6 +36,8 @@ def log_temporary_auth_diagnostic(request: Request, event: str, **metadata: obje
         "path": request.url.path,
         "origin": request.headers.get("origin"),
         "host": request.headers.get("host"),
+        "cookie_name": SESSION_COOKIE_NAME,
+        "request_id": getattr(request.state, "request_id", None),
         **metadata,
     }
     logger.warning("TEMP_AUTH_DIAGNOSTIC %s %s", event, safe_metadata)
@@ -92,6 +99,7 @@ def get_current_user(request: Request, session: Session = Depends(get_db)) -> Us
             request,
             "session_rejected",
             session_cookie_present=False,
+            session_lookup_success=False,
             session_lookup="not found",
             response_status=status.HTTP_401_UNAUTHORIZED,
             reason="missing cookie",
@@ -108,6 +116,7 @@ def get_current_user(request: Request, session: Session = Depends(get_db)) -> Us
             request,
             "session_rejected",
             session_cookie_present=True,
+            session_lookup_success=False,
             session_lookup="not found",
             response_status=status.HTTP_401_UNAUTHORIZED,
             reason="invalid session",
@@ -116,6 +125,7 @@ def get_current_user(request: Request, session: Session = Depends(get_db)) -> Us
     auth_session, user = record
     common_metadata = {
         "session_cookie_present": True,
+        "session_lookup_success": True,
         "session_lookup": "found",
         "user_id": user.id,
         "user_active": user.is_active,

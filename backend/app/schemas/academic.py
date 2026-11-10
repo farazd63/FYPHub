@@ -5,7 +5,7 @@ class CycleOut(BaseModel):
  id:int; code:str; display_name:str; registration_open:bool; created_at:datetime; updated_at:datetime
  model_config=ConfigDict(from_attributes=True)
 class PolicyOut(BaseModel):
- id:int; academic_cycle_id:int; max_group_size:int; created_at:datetime; updated_at:datetime
+ id:int; academic_cycle_id:int; max_group_size:int; min_group_size:int = 1; formation_deadline:datetime|None = None; matching_weights:dict = {}; created_at:datetime; updated_at:datetime
  model_config=ConfigDict(from_attributes=True)
 class CycleCreate(BaseModel):
  model_config=ConfigDict(extra="forbid")
@@ -33,9 +33,14 @@ class CycleUpdate(BaseModel):
  def update_name(cls,value:str|None)->str|None:return CycleCreate.name_value(value) if value is not None else value
 class PolicyUpdate(BaseModel):
  model_config=ConfigDict(extra="forbid")
- max_group_size:int
+ max_group_size:int; min_group_size:int = 1; formation_deadline:datetime|None = None; matching_weights:dict = {}
  @field_validator("max_group_size")
  @classmethod
  def positive(cls,value:int)->int:
   if value<=0: raise ValueError("max_group_size must be positive.")
+  return value
+ @field_validator("min_group_size")
+ @classmethod
+ def minimum_positive(cls,value:int)->int:
+  if value<=0: raise ValueError("min_group_size must be positive.")
   return value

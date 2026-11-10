@@ -32,3 +32,5 @@ htmlcov/
 # Runtime uploads
 uploads/
 runtime/uploads/
+backend/storage/
+frontend/.audit-working/

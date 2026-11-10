@@ -10,7 +10,7 @@ from .auth import get_current_user, validate_mutating_origin
 from .config import settings
 from .database import get_db
 from .group_channels import MessageWrite, output
-from .models import GroupMessage, Team, User, UserRole
+from .models import AcademicDeadline, AcademicDeadlineVersion, AcademicGroupPolicy, GroupMessage, ProjectTask, SupervisorAssignment, Team, User, UserRole
 
 router = APIRouter(prefix="/api/v1/group-ai")
 
@@ -20,32 +20,66 @@ class NoRedirect(HTTPRedirectHandler):
 
 def require_team(session, actor, team_id):
     team = session.get(Team, team_id)
-    if actor.role != UserRole.STUDENT or team is None or team.shared_user_id != actor.id:
+    if team is None or not (actor.role in (UserRole.ADMIN, UserRole.COORDINATOR) or (actor.role == UserRole.STUDENT and team.shared_user_id == actor.id)):
         raise HTTPException(status_code=403, detail="Team access is not permitted.")
+    return team
+
+
+def scoped_context(session, team):
+    messages = session.scalars(select(GroupMessage).where(GroupMessage.team_id == team.id, GroupMessage.channel != "group_ai").order_by(GroupMessage.id.desc()).limit(60)).all()
+    policy = session.scalar(select(AcademicGroupPolicy).where(AcademicGroupPolicy.academic_cycle_id == team.academic_cycle_id))
+    deadlines = session.scalars(select(AcademicDeadlineVersion).join(AcademicDeadline, AcademicDeadline.id == AcademicDeadlineVersion.academic_deadline_id).where(AcademicDeadline.academic_cycle_id == team.academic_cycle_id).order_by(AcademicDeadlineVersion.due_at_utc)).all()
+    tasks = session.scalars(select(ProjectTask).where(ProjectTask.team_id == team.id).order_by(ProjectTask.due_at.nulls_last()).limit(40)).all()
+    return {
+        "team_id": team.id,
+        "cycle_id": team.academic_cycle_id,
+        "group_policy": {"min_size": policy.min_group_size, "max_size": policy.max_group_size} if policy else {},
+        "deadlines": [{"name": version.name, "due_at": version.due_at_utc.isoformat()} for version in deadlines],
+        "tasks": [{"title": task.title, "due_at": task.due_at.isoformat() if task.due_at else None, "completion_percent": task.completion_percent} for task in tasks],
+        "recent_channel_messages": [{"channel": row.channel, "body": row.body[:1000]} for row in reversed(messages)],
+    }
 
 def unavailable():
     return HTTPException(status_code=503, detail="Group AI chatbot is unavailable. Check the configured local runtime and model.")
 
-def generate(question):
+def generate(question, context=None):
     url = settings.ollama_url.strip().rstrip("/")
-    model = settings.ollama_model.strip()
-    try:
-        parts = urlsplit(url)
-        if not model or parts.scheme != "http" or parts.hostname not in ("127.0.0.1", "localhost", "::1") or parts.username or parts.password or parts.query or parts.fragment:
-            raise unavailable()
-        payload = json.dumps({"model": model, "stream": False, "messages": [{"role": "system", "content": "You are an advisory group assistant. Your output is AI-generated advice, not an academic decision."}, {"role": "user", "content": question}]}).encode("utf-8")
-        request = UrlRequest(url + "/api/chat", data=payload, headers={"Content-Type": "application/json"}, method="POST")
-        with build_opener(NoRedirect()).open(request, timeout=30) as response:
-            raw = response.read(65537)
-        if len(raw) > 65536: raise ValueError("response too large")
-        data = json.loads(raw)
-        content = data["message"]["content"]
-        if not isinstance(content, str) or not content.strip() or len(content) > 16000: raise ValueError("invalid response")
-        return content
-    except HTTPException:
-        raise
-    except (ValueError, KeyError, TypeError, UnicodeError, URLError, HTTPError, TimeoutError, OSError):
+    primary = str(getattr(settings, "ollama_agent_model", getattr(settings, "ollama_model", ""))).strip()
+    fallback = str(getattr(settings, "ollama_fallback_model", "")).strip()
+    models = [model for index, model in enumerate((primary, fallback)) if model and model not in (primary, fallback)[:index]]
+    parts = urlsplit(url)
+    allowed_hosts = getattr(
+        settings,
+        "ollama_allowed_hosts",
+        ("127.0.0.1", "localhost", "::1"),
+    )
+    hostname = (parts.hostname or "").lower()
+    if not models or parts.scheme != "http" or hostname not in allowed_hosts or parts.username or parts.password or parts.query or parts.fragment:
+        raise unavailable()
+    system = "You are an advisory group assistant. Your output is AI-generated advice, not an academic decision."
+    if context:
+        system += " You are strictly scoped to this group context and must not reveal other group data:\n" + json.dumps(context, sort_keys=True)
+    last_error: Exception | None = None
+    for model in models:
+        try:
+            payload = json.dumps({"model": model, "stream": False, "messages": [{"role": "system", "content": system}, {"role": "user", "content": question}]}).encode("utf-8")
+            request = UrlRequest(url + "/api/chat", data=payload, headers={"Content-Type": "application/json"}, method="POST")
+            with build_opener(NoRedirect()).open(request, timeout=30) as response:
+                raw = response.read(65537)
+            if len(raw) > 65536:
+                raise ValueError("response too large")
+            data = json.loads(raw)
+            content = data["message"]["content"]
+            if not isinstance(content, str) or not content.strip() or len(content) > 16000:
+                raise ValueError("invalid response")
+            return content
+        except HTTPException:
+            raise
+        except (ValueError, KeyError, TypeError, UnicodeError, URLError, HTTPError, TimeoutError, OSError) as error:
+            last_error = error
+    if last_error is not None:
         raise unavailable() from None
+    raise unavailable()
 
 @router.get("/{team_id}")
 def history(team_id: int, before_id: int | None = Query(None, gt=0), actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
@@ -57,8 +91,9 @@ def history(team_id: int, before_id: int | None = Query(None, gt=0), actor: User
 @router.post("/{team_id}", status_code=201)
 def chat(team_id: int, payload: MessageWrite, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     validate_mutating_origin(request)
-    require_team(session, actor, team_id)
-    answer = generate(payload.body)
+    team = require_team(session, actor, team_id)
+    context = scoped_context(session, team)
+    answer = generate(payload.body, context)
     try:
         user_message = GroupMessage(team_id=team_id, channel="group_ai", author_id=actor.id, author_kind="TEAM", body=payload.body)
         ai_message = GroupMessage(team_id=team_id, channel="group_ai", author_id=actor.id, author_kind="AI", body=answer)

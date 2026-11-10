@@ -1,0 +1,168 @@
+/* Student content presentation only. Shell geometry is owned by the shared
+   PortalShell/dashboard navigation styles. */
+.student-overview,
+.student-phase-page { animation: student-content-enter 300ms ease-out both; }
+
+.student-overview__hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(112 127 242 / 0.2);
+  border-radius: 22px;
+  background: linear-gradient(125deg, #3543d7, #5966f2);
+  box-shadow: 0 18px 44px rgb(25 38 66 / 0.12);
+  color: #fff;
+  padding: clamp(28px, 4vw, 48px);
+}
+
+.student-overview__hero::after {
+  position: absolute;
+  top: -150px;
+  right: -55px;
+  width: 300px;
+  height: 300px;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 50%;
+  box-shadow: 0 0 0 42px rgb(255 255 255 / 0.035), 0 0 0 90px rgb(255 255 255 / 0.025);
+  content: "";
+}
+
+.student-overview__eyebrow {
+  margin: 0 0 10px;
+  color: #dce7ff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.student-overview__hero h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(1.8rem, 3vw, 2.65rem);
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.student-overview__hero p:last-child {
+  max-width: 580px;
+  margin: 12px 0 0;
+  color: #fff;
+  line-height: 1.6;
+}
+
+.student-overview__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 22px;
+  border: 1px solid #dfe8f6;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 8px 22px rgb(31 61 119 / 0.06);
+}
+
+.student-overview__summary div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 24px;
+}
+
+.student-overview__summary div + div { border-left: 1px solid #e6ecf5; }
+.student-overview__summary strong { color: #173c77; font-size: 1.65rem; }
+.student-overview__summary span { color: #62738e; font-size: 12px; font-weight: 700; }
+
+.student-overview__heading { margin: 30px 0 16px; }
+.student-overview__heading h2 { margin: 0; color: #1a3158; font-size: 20px; }
+.student-overview__heading p { margin: 6px 0 0; color: #6b7c96; font-size: 14px; }
+
+.student-overview__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 16px;
+}
+
+.student-phase-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 15px;
+  border: 1px solid #e2e6ee;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 26px rgb(31 45 76 / 0.07);
+  padding: 19px;
+  text-align: left;
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.student-phase-card:hover {
+  transform: translateY(-3px);
+  border-color: #9ab6ee;
+  box-shadow: 0 15px 32px rgb(39 80 157 / 0.16);
+}
+
+.student-phase-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.student-phase-card strong { min-height: 44px; color: #1a3158; font-size: 16px; line-height: 1.35; }
+.student-phase-card__open { color: #365fc0; font-size: 13px; font-weight: 800; }
+
+.student-status--implemented { border-color: #b8e2c9; background: #e4f5eb; color: #187347; }
+.student-status--partial { border-color: #c7d5f5; background: #eef5ff; color: #315db4; }
+.student-status--future { border-color: #d8dfea; background: #f1f4f8; color: #62738e; }
+
+.student-page-heading { margin-bottom: 20px; }
+.student-page-heading h1 { margin: 0; color: #172b4d; font-size: clamp(1.65rem, 2.2vw, 2.15rem); letter-spacing: -0.03em; line-height: 1.15; }
+.student-page-heading p:last-child { max-width: 700px; margin: 9px 0 0; color: #607087; line-height: 1.55; }
+
+.student-placeholder {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  border: 1px solid #e2e6ee;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 26px rgb(31 45 76 / 0.07);
+  padding: 26px;
+}
+
+.student-placeholder__icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  border-radius: 13px;
+  background: #eaf1ff;
+  color: #315db4;
+}
+
+.student-placeholder__icon svg { width: 17px; height: 17px; }
+.student-placeholder h2 { margin: 12px 0 6px; color: #1a3158; font-size: 19px; }
+.student-placeholder p { margin: 0; color: #607087; line-height: 1.55; }
+
+@keyframes student-content-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 767px) {
+  .student-overview__summary { grid-template-columns: 1fr; }
+  .student-overview__summary div { padding: 14px 12px; }
+  .student-overview__summary span { font-size: 10px; }
+  .student-overview__summary strong { font-size: 1.35rem; }
+  .student-overview__summary div + div { border-top: 1px solid #e6ecf5; border-left: 0; }
+  .student-overview__grid { grid-template-columns: 1fr; }
+  .student-placeholder { flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .student-overview,
+  .student-phase-page,
+  .student-phase-card { animation: none; transition: none; }
+  .student-phase-card:hover { transform: none; }
+}

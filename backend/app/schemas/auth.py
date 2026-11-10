@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
 
 from ..models import UserRole
-from ..security import validate_password
+from ..security import validate_full_name, validate_password
 from .email import normalize_email
 
 
@@ -23,6 +23,11 @@ class RegistrationRequest(BaseModel):
     @classmethod
     def normalized_email(cls, value: object) -> object:
         return normalize_email(value)
+
+    @field_validator("full_name")
+    @classmethod
+    def normalized_name(cls, value: str) -> str:
+        return validate_full_name(value)
 
     @field_validator("password")
     @classmethod

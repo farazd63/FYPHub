@@ -1,12 +1,43 @@
+import { RoleSidebar, SidebarIcon, type RoleSidebarItem } from "../shared/RoleSidebar";
 import type { ReactNode } from "react";
 
 export type StudentPhase = { id: string; name: string; route: string; status: "Implemented" | "Partial"; icon: ReactNode };
-type Props = { phases: readonly StudentPhase[]; activeId: string; collapsed: boolean; mobileOpen: boolean; onSelect: (phase: StudentPhase) => void; onOverview: () => void; onToggleCollapse: () => void; onCloseMobile: () => void };
+
+type Props = {
+  phases: readonly StudentPhase[];
+  activeId: string;
+  collapsed: boolean;
+  mobileOpen: boolean;
+  onSelect: (phase: StudentPhase) => void;
+  onOverview: () => void;
+  onToggleCollapse: () => void;
+  onCloseMobile: () => void;
+};
+
+const sectionFor = (id: string) => id === "overview" ? "Workspace" : id === "search" || id === "archive" ? "Knowledge & Archive" : "Project Journey";
 
 export function StudentSidebar({ phases, activeId, collapsed, mobileOpen, onSelect, onOverview, onToggleCollapse, onCloseMobile }: Props) {
-  return <><aside className={`student-sidebar ${mobileOpen ? "student-sidebar--open" : ""} ${collapsed ? "student-sidebar--collapsed" : ""}`}>
-    <div className="student-sidebar__mobile-head"><span className="student-sidebar__section-label">Student workspace</span><button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onCloseMobile}>×</button></div>
-    <button type="button" className="student-sidebar__collapse" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={onToggleCollapse}><span aria-hidden="true">{collapsed ? "›" : "‹"}</span></button>
-    <nav aria-label="Student workspace navigation" className="student-sidebar__nav"><button type="button" title={collapsed ? "Overview" : undefined} aria-current={activeId === "overview" ? "page" : undefined} className="student-sidebar__item" onClick={() => { onOverview(); onCloseMobile(); }}><span className="student-sidebar__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></span><span className="student-sidebar__label">Overview</span></button>{phases.map((phase) => <button key={phase.id} type="button" title={collapsed ? phase.name : undefined} aria-current={activeId === phase.id ? "page" : undefined} className="student-sidebar__item" data-future-route={phase.route} onClick={() => { onSelect(phase); onCloseMobile(); }}><span className="student-sidebar__icon" aria-hidden="true">{phase.icon}</span><span className="student-sidebar__label">{phase.name}</span></button>)}</nav>
-  </aside><button type="button" aria-label="Close navigation" className={`student-sidebar__overlay ${mobileOpen ? "student-sidebar__overlay--open" : ""}`} onClick={onCloseMobile} /></>;
+  const items: RoleSidebarItem[] = [
+    { id: "overview", label: "Overview", icon: <SidebarIcon name="overview" />, section: "Workspace" },
+    ...phases.map((phase) => ({ id: phase.id, label: phase.name, icon: phase.icon, section: sectionFor(phase.id) })),
+  ];
+
+  return <RoleSidebar
+    ariaLabel="Student workspace navigation"
+    workspaceLabel="Student workspace"
+    items={items}
+    active={activeId}
+    collapsed={collapsed}
+    mobileOpen={mobileOpen}
+    onSelect={(id) => {
+      if (id === "overview") {
+        onOverview();
+        return;
+      }
+      const phase = phases.find((item) => item.id === id);
+      if (phase) onSelect(phase);
+    }}
+    onToggle={onToggleCollapse}
+    onClose={onCloseMobile}
+  />;
 }

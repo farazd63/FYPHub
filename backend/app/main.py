@@ -1,23 +1,33 @@
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
+import json
+import logging
+import time
+import uuid
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .database import engine, get_db
+from .config import settings
 from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
 from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, SupervisorCapacityPolicy, SupervisorAssignment, SupervisorRequest, SupervisorRequestStatus
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
+from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
 from .models import EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion
 from .models import AcademicDeadline, AcademicDeadlineVersion
-from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
 from .schemas.evaluation_rubrics import RubricDetailOut, RubricListOut, RubricVersionOut, RubricVersionWrite
 from .schemas.academic_deadlines import DeadlineCreate, DeadlineDetailOut, DeadlineListOut, DeadlinePreviewOut, DeadlinePreviewRequest, DeadlineVersionOut, DeadlineWrite
+from .dashboard_requirements import router as dashboard_requirements_router
+from .document_requirements import router as document_requirements_router, student_router as student_document_requirements_router
+from .coordinator_operations import router as coordinator_operations_router
+from .academic_cycle_overview import router as academic_cycle_overview_router
 from .schemas.academic import CycleCreate, CycleOut, CycleUpdate, PolicyOut, PolicyUpdate
 from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
 from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange
@@ -26,6 +36,8 @@ from .schemas.team_registration import TeamMemberInput, TeamRegistrationRequest,
 from .security import generate_session_token, hash_password, hash_session_token, validate_password, verify_password
 from .registration_policy import DEMO_MODE_WARNING, RegistrationMode, registration_mode, roster_validation_required
 from .project_workflow import router as project_workflow_router
+from .evaluations import router as evaluations_router
+from .modules.module_03_proposal.router import router as proposal_compliance_router
 from .auth import (
     ALLOWED_BROWSER_ORIGINS,
     SESSION_COOKIE_NAME,
@@ -41,13 +53,51 @@ from .auth import (
 )
 
 app = FastAPI(title="FYPHub API")
+settings.document_storage_root.mkdir(parents=True, exist_ok=True)
+
+logger = logging.getLogger("fyphub.request")
+
+
+def _workflow_name(path: str) -> str:
+    if "/proposals" in path: return "proposal"
+    if "/agent-supervision" in path: return "supervision"
+    if "/auth/" in path: return "auth"
+    if "/academic-cycles" in path: return "academic_cycle"
+    return "api"
+
+
+class StructuredRequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        request.state.request_id = request_id
+        started = time.monotonic()
+        path = request.url.path
+        logger.info(json.dumps({"event": "request.start", "request_id": request_id, "method": request.method, "path": path, "workflow": _workflow_name(path), "stage": "request", "origin": request.headers.get("origin") if request.method == "OPTIONS" else None, "requested_method": request.headers.get("access-control-request-method") if request.method == "OPTIONS" else None}, separators=(",", ":")))
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            logger.exception(json.dumps({"event": "request.failure", "request_id": request_id, "method": request.method, "path": path, "workflow": _workflow_name(path), "status": 500, "duration_ms": round((time.monotonic() - started) * 1000, 2), "failure_stage": "unhandled_exception", "error_type": type(exc).__name__}, separators=(",", ":")))
+            raise
+        response.headers["X-Request-ID"] = request_id
+        status_code = response.status_code
+        level = logging.ERROR if status_code >= 500 else logging.WARNING if status_code >= 400 else logging.INFO
+        logger.log(level, json.dumps({"event": "request.complete", "request_id": request_id, "method": request.method, "path": path, "workflow": _workflow_name(path), "status": status_code, "duration_ms": round((time.monotonic() - started) * 1000, 2), "failure_stage": None if status_code < 400 else "response"}, separators=(",", ":")))
+        return response
+
+
+app.add_middleware(StructuredRequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(ALLOWED_BROWSER_ORIGINS),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "PUT"],
-    allow_headers=["Content-Type", "X-File-Name", "X-Preview-Token"],
+    allow_methods=["GET", "POST", "OPTIONS", "PATCH", "PUT"],
+    allow_headers=["Content-Type", "Accept", "Authorization", "X-File-Name", "X-Preview-Token"],
 )
+app.include_router(document_requirements_router)
+app.include_router(student_document_requirements_router)
+app.include_router(coordinator_operations_router)
+app.include_router(academic_cycle_overview_router)
+app.include_router(proposal_compliance_router)
 
 _DUMMY_PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=4$FkrCX/M1V29q1Jj4yMHSiw$rONBAdg5KlI9DhIbVoDaHB3lM5HJXojJYVeAaLlbGwI"
 
@@ -435,9 +485,26 @@ def template_reference_detail(
 def create_template_reference(payload:TemplateCreate,request:Request,actor:User=Depends(require_roles(UserRole.ADMIN)),session:Session=Depends(get_db)):
  validate_mutating_origin(request)
  try:
-  session.execute(text("SELECT pg_advisory_xact_lock(98137242)")); root=TemplateReference(template_type=payload.template_type); session.add(root); session.flush(); ref=TemplateReferenceVersion(template_reference_id=root.id,version_number=1,title=payload.title.strip(),provenance=payload.provenance,source_note=payload.source_note.strip(),created_by_id=actor.id); session.add(ref); session.flush(); rule=AcademicRuleVersion(template_reference_version_id=ref.id,version_number=1,provenance=payload.provenance,rules=payload.rules.model_dump(exclude_none=True),created_by_id=actor.id); session.add(rule); add_admin_audit_event(session,actor_id=actor.id,affected_user_id=None,target_type="TEMPLATE_REFERENCE",target_id=ref.id,action="template_reference_version_created",changed_values={"template_type":payload.template_type.value,"version":1,"provenance":payload.provenance}); session.commit(); session.refresh(ref); session.refresh(rule); return {"reference_id":root.id,"template_type":root.template_type,"versions":[{"template":ref,"rules":[rule]}]}
+  session.execute(text("SELECT pg_advisory_xact_lock(98137242)"))
+  root = session.scalar(select(TemplateReference).where(TemplateReference.template_type == payload.template_type))
+  if root is None:
+   root = TemplateReference(template_type=payload.template_type)
+   session.add(root)
+   session.flush()
+  number = (session.execute(select(func.max(TemplateReferenceVersion.version_number)).where(TemplateReferenceVersion.template_reference_id == root.id)).scalar_one() or 0) + 1
+  ref = TemplateReferenceVersion(template_reference_id=root.id, version_number=number, title=payload.title.strip(), provenance=payload.provenance, source_note=payload.source_note.strip(), created_by_id=actor.id)
+  session.add(ref)
+  session.flush()
+  rule = AcademicRuleVersion(template_reference_version_id=ref.id, version_number=1, provenance=payload.provenance, rules=payload.rules.model_dump(exclude_none=True), created_by_id=actor.id)
+  session.add(rule)
+  add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="TEMPLATE_REFERENCE", target_id=ref.id, action="template_reference_version_created", changed_values={"template_type": payload.template_type.value, "version": number, "provenance": payload.provenance})
+  session.commit()
+  session.refresh(ref)
+  session.refresh(rule)
+  return {"reference_id": root.id, "template_type": root.template_type, "versions": [{"template": ref, "rules": [rule]}]}
  except Exception as error:
-  session.rollback(); raise HTTPException(status_code=500,detail="Template reference could not be saved.") from error
+  session.rollback()
+  raise HTTPException(status_code=500, detail="Template reference could not be saved.") from error
 @app.post("/api/v1/admin/template-references/{reference_id}/versions",status_code=201,response_model=TemplateOut)
 def create_template_version(reference_id:int,payload:TemplateVersionCreate,request:Request,actor:User=Depends(require_roles(UserRole.ADMIN)),session:Session=Depends(get_db)):
  validate_mutating_origin(request); root=session.get(TemplateReference,reference_id)
@@ -677,13 +744,15 @@ def set_group_policy(cycle_id: int, payload: PolicyUpdate, request: Request, act
     validate_mutating_origin(request)
     cycle, policy = locked_cycle_and_policy(session, cycle_id)
     largest = largest_active_team_size(session, cycle.id)
+    if payload.min_group_size > payload.max_group_size:
+        raise cycle_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid_group_size_range", "Minimum group size cannot exceed maximum group size.")
     if payload.max_group_size < largest:
         raise cycle_error(status.HTTP_409_CONFLICT, "existing_team_exceeds_limit", "Existing active team membership exceeds that maximum.")
     created = policy is None
     if policy is None:
-        policy = AcademicGroupPolicy(academic_cycle_id=cycle.id, max_group_size=payload.max_group_size); session.add(policy); session.flush()
+        policy = AcademicGroupPolicy(academic_cycle_id=cycle.id, max_group_size=payload.max_group_size, min_group_size=payload.min_group_size, formation_deadline=payload.formation_deadline, matching_weights=payload.matching_weights); session.add(policy); session.flush()
     else:
-        previous = policy.max_group_size; policy.max_group_size = payload.max_group_size
+        previous = policy.max_group_size; policy.max_group_size = payload.max_group_size; policy.min_group_size = payload.min_group_size; policy.formation_deadline = payload.formation_deadline; policy.matching_weights = payload.matching_weights
     add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_GROUP_POLICY", target_id=policy.id, action="group_policy_created" if created else "group_policy_updated", changed_values={"academic_cycle_id": cycle.id, "max_group_size": payload.max_group_size, "previous_max_group_size": None if created else previous})
     session.commit(); session.refresh(policy)
     return policy
@@ -1435,6 +1504,9 @@ def register_team(
             for index, member in enumerate(all_members)
         ]
         session.add_all(created_members)
+        session.flush()
+        from .team_lifecycle import refresh_team_status
+        refresh_team_status(session, team)
         if request is not None:
             add_admin_audit_event(
                 session,
@@ -1609,6 +1681,8 @@ app.include_router(supervisor_assignments_router)
 
 from .group_channels import router as group_channels_router
 app.include_router(group_channels_router)
+from .module2_collaboration import router as module2_collaboration_router
+app.include_router(module2_collaboration_router)
 
 from .group_ai import router as group_ai_router
 app.include_router(group_ai_router)
@@ -1631,22 +1705,25 @@ app.include_router(join_requests_router)
 from .invitations import router as invitations_router
 app.include_router(invitations_router)
 
-from .supervisor_requests import router as supervisor_requests_router
+from .supervisor_requests import proposal_router, router as supervisor_requests_router
 app.include_router(supervisor_requests_router)
+app.include_router(proposal_router)
 
 from .proposal_reference import router as proposal_reference_router
 app.include_router(proposal_reference_router)
 
 from .supervisor_request_conversations import router as supervisor_request_conversations_router
 app.include_router(supervisor_request_conversations_router)
+from .agent_supervision import router as agent_supervision_router
+app.include_router(agent_supervision_router)
 
 from .archived_projects import router as archived_projects_router
 app.include_router(archived_projects_router)
 
-from .modules.module_03_proposal.router import router as module03_router
-app.include_router(module03_router)
 from .fyp_registry import router as fyp_registry_router
 app.include_router(fyp_registry_router)
 from .password_reset import router as password_reset_router
 app.include_router(password_reset_router)
+app.include_router(dashboard_requirements_router)
 app.include_router(project_workflow_router)
+app.include_router(evaluations_router)

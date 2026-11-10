@@ -8,4 +8,5 @@ class TeamPreference(Base):
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id", ondelete="RESTRICT"), primary_key=True)
     opted_in: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     answers: Mapped[dict] = mapped_column(JSON, nullable=False)
+    structured_answers: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

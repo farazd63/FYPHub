@@ -1,0 +1,134 @@
+/* Student portal uses the same visual language as the Admin workspace. */
+.student-shell {
+  --student-primary: #4663ff;
+  --student-primary-hover: #354fe0;
+  --student-selected: #eef1ff;
+  --student-text: #183047;
+  --student-muted: #607087;
+  --student-page: #f4f6fb;
+  --student-surface: #ffffff;
+  --student-border: #dce3ed;
+  background: var(--student-page);
+  color: var(--student-text);
+}
+
+.student-shell .student-header {
+  border-bottom-color: #d9e2ee;
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 1px 0 rgb(24 47 70 / 0.04);
+}
+
+.student-shell .student-brand { color: #172b4d; }
+.student-shell .student-brand svg { color: var(--student-primary); }
+.student-shell .student-role,
+.student-shell .student-status {
+  border-color: #c7d5f5;
+  background: linear-gradient(110deg, #eef5ff, #eef1ff);
+  color: #315db4;
+}
+.student-shell .student-account__name { color: var(--student-text); }
+.student-shell .student-avatar {
+  border-color: #c7d6f4;
+  background: linear-gradient(135deg, #e4efff, #eef1ff);
+  color: #315db4;
+}
+.student-shell .student-logout {
+  border-color: #bbcae6;
+  color: #315db4;
+}
+.student-shell .student-logout:hover { background: #f3f7ff; border-color: #7897d2; }
+
+.student-shell .student-overview__hero {
+  background: linear-gradient(115deg, #4663ff, #354fe0 62%, #2e4fc0);
+  box-shadow: 0 16px 32px rgb(24 56 112 / 0.16);
+}
+.student-shell .student-overview__summary,
+.student-shell .student-phase-card,
+.student-shell .student-placeholder {
+  border-color: var(--student-border);
+  background: var(--student-surface);
+  box-shadow: 0 8px 24px rgb(24 56 112 / 0.055);
+}
+.student-shell .student-phase-card:hover {
+  border-color: #c8d8ef;
+  box-shadow: 0 15px 32px rgb(39 80 157 / 0.12);
+}
+.student-shell .student-phase-card strong,
+.student-shell .student-overview__heading h2,
+.student-shell .student-placeholder h2 { color: #172b4d; }
+.student-shell .student-phase-card__open { color: var(--student-primary); }
+.student-shell .student-status--implemented {
+  border-color: #b8e2c9;
+  background: #e4eee7;
+  color: #176b66;
+}
+.student-shell .student-status--partial {
+  border-color: #c7d5f5;
+  background: var(--student-selected);
+  color: #315db4;
+}
+.student-shell .student-status--future {
+  border-color: var(--student-border);
+  background: #f1f4f8;
+  color: var(--student-muted);
+}
+
+.student-shell .student-page-heading h1 { color: #172b4d; }
+.student-shell .student-page-heading p:last-child,
+.student-shell .student-placeholder p,
+.student-shell .student-overview__heading p { color: var(--student-muted); }
+.student-shell .student-placeholder__icon {
+  background: var(--student-selected);
+  color: #315db4;
+}
+
+/* Shared student cards and controls now use the Admin surface system. */
+.student-shell .student-request-card,
+.student-shell .compliance-card,
+.student-shell .compliance-summary,
+.student-shell .compliance-final,
+.student-shell .student-extraction-preview {
+  border-color: var(--student-border);
+  background: var(--student-surface);
+  box-shadow: 0 8px 24px rgb(24 56 112 / 0.055);
+}
+.student-shell .student-request-input,
+.student-shell input:not([type="checkbox"]):not([type="radio"]),
+.student-shell select,
+.student-shell textarea {
+  border-color: #cfdbea;
+  background: #fbfdff;
+  color: var(--student-text);
+}
+.student-shell .student-request-input:focus,
+.student-shell input:not([type="checkbox"]):not([type="radio"]):focus,
+.student-shell select:focus,
+.student-shell textarea:focus {
+  border-color: var(--student-primary);
+  box-shadow: 0 0 0 3px rgb(70 99 255 / 0.12);
+}
+.student-shell .student-request-actions button,
+.student-shell .student-request-list article > button,
+.student-shell .archive-result-card button {
+  border-color: var(--student-primary);
+  background: var(--student-primary);
+}
+.student-shell .student-request-actions button:hover,
+.student-shell .student-request-list article > button:hover,
+.student-shell .archive-result-card button:hover { background: var(--student-primary-hover); }
+.student-shell .student-request-actions button:first-child,
+.student-shell .archive-back-button {
+  border-color: #bbcae6;
+  background: var(--student-surface);
+  color: #315db4;
+}
+.student-shell .student-request-alert {
+  border-color: #c7d5f5;
+  background: var(--student-selected);
+  color: #315db4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .student-shell .student-overview__hero,
+  .student-shell .student-phase-card { transition: none; }
+}

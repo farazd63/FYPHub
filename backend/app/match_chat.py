@@ -1,12 +1,13 @@
 """Temporary team-to-team match conversations."""
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 from .auth import get_current_user, utc_now, validate_mutating_origin
-from .database import get_db
+from .database import SessionLocal, get_db
 from .group_channels import MessageWrite
-from .models import MatchChat, MatchMessage, MatchConsent, Team, TeamPreference, User
+from .models import AuthSession, MatchChat, MatchMessage, MatchConsent, Module2MatchReport, Team, TeamPreference, User
+from .security import hash_session_token
 from .team_matching import assessments, owned
 from .team_compatibility import aggregate_compatibility
 
@@ -14,6 +15,9 @@ router = APIRouter(prefix="/api/v1/match-chats")
 class OpenChat(BaseModel):
     model_config = ConfigDict(extra="forbid")
     team_id: StrictInt = Field(gt=0)
+class ReportBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reason: str = Field(min_length=3, max_length=2000)
 def fail(status=403): return HTTPException(status, "Match chat is unavailable.")
 def lock_pair(session, first, second):
     teams = session.scalars(select(Team).where(Team.id.in_([first,second])).order_by(Team.id).with_for_update()).all()
@@ -88,3 +92,52 @@ def close(chat_id:int,request:Request,actor:User=Depends(get_current_user),sessi
         chat.closed_at=utc_now(); session.commit(); return {"closed":True}
     except HTTPException: session.rollback(); raise
     except Exception: session.rollback(); raise HTTPException(500,"Match chat could not be closed.") from None
+
+@router.post("/{chat_id}/report", status_code=201)
+def report(chat_id: int, payload: ReportBody, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    try:
+        team = owned(session, actor)
+        chat = session.get(MatchChat, chat_id)
+        if chat is None or team.id not in (chat.team_a_id, chat.team_b_id):
+            raise fail()
+        row = Module2MatchReport(chat_id=chat.id, reporter_user_id=actor.id, reason=payload.reason.strip())
+        session.add(row); session.commit(); session.refresh(row)
+        return {"id": row.id, "status": row.status}
+    except HTTPException:
+        session.rollback(); raise
+    except Exception:
+        session.rollback(); raise HTTPException(500, "Match chat report could not be saved.") from None
+
+@router.websocket("/ws/{chat_id}")
+async def websocket_messages(websocket: WebSocket, chat_id: int):
+    """Live match chat transport; PostgreSQL remains the source of truth."""
+    session = SessionLocal()
+    try:
+        token = websocket.cookies.get("fyphub_session")
+        record = session.execute(select(AuthSession, User).join(User, User.id == AuthSession.user_id).where(AuthSession.token_hash == hash_session_token(token or ""))).one_or_none()
+        if record is None or record[0].revoked_at is not None or record[0].expires_at <= utc_now():
+            await websocket.close(code=4401); return
+        actor = record[1]
+        team = owned(session, actor)
+        chat = session.get(MatchChat, chat_id)
+        if chat is None or chat.closed_at is not None or team.id not in (chat.team_a_id, chat.team_b_id):
+            await websocket.close(code=4403); return
+        await websocket.accept()
+        while True:
+            payload = await websocket.receive_json()
+            body = str(payload.get("body", "")).strip() if isinstance(payload, dict) else ""
+            if not body or len(body) > 4000:
+                await websocket.send_json({"error": "Message must contain 1 to 4000 characters."}); continue
+            row = MatchMessage(chat_id=chat.id, team_id=team.id, body=body)
+            session.add(row); session.commit(); session.refresh(row)
+            await websocket.send_json({"id": row.id, "team_id": row.team_id, "body": row.body, "created_at": row.created_at.isoformat()})
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
+    finally:
+        session.close()

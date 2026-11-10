@@ -1,308 +1,479 @@
-"""Module 03 API with existing cookie-session authorization."""
+"""Module 3 APIs: template ingestion, proposal submissions, and reports."""
 
 from __future__ import annotations
 
-import hashlib
-import asyncio
-import os
 import re
-from datetime import datetime, timezone
-from pathlib import PurePath
-from uuid import uuid4
+import uuid
+from pathlib import Path
+from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import FileResponse, Response
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from sqlalchemy import desc, select, update
 from sqlalchemy.orm import Session
 
-from ...auth import get_current_user, validate_mutating_origin
+from ...auth import get_current_user, require_roles, utc_now, validate_mutating_origin
+from ...config import settings
 from ...database import get_db
-from ...models import SupervisorRequest, SupervisorRequestStatus, User, UserRole
-from .models import M03CheckRun, M03ComplianceFinding, M03ComplianceReport, M03ExtractionStatus, M03ProposalDocument, M03ProposalType, M03ReferenceTemplate, M03TemplateRule
-from .schemas_baseline import MetadataVersionWrite, RuleVersionWrite
-from .schemas_report import ReportOut
-from .services.admin_template_extractor import extract_baseline_rules
-from .services.ast_parser import parse_document
-from .services.check_1_visual import run_visual_check
-from .services.check_2_structural import run_structural_check
-from .services.check_3_semantic_llm import run_semantic_check
-from .services.compliance_aggregator import aggregate_report
-from .services.template_repository import active_template, latest_rule_version, next_template_version, rule_content_hash, save_rules
+from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, SupervisorAssignment, Team, TeamMember, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
+from ...pdf_extraction import PdfExtractionError, extract_proposal_document
+from .compliance_engine import build_compliance_report
+from .template_extractor import extract_template_rules
+from ...team_lifecycle import lock_team
 
-router = APIRouter(prefix="/api/v1/module-03")
-MAX_BYTES = int(os.getenv("FYPHUB_M03_MAX_BYTES", str(15 * 1024 * 1024)))
-READ_ROLES = (UserRole.STUDENT, UserRole.SUPERVISOR, UserRole.COORDINATOR, UserRole.ADMIN)
+router = APIRouter(prefix="/api/v1/proposal-compliance", tags=["module-3-proposal-compliance"])
+REVIEW_ROLES = (UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR, UserRole.PANEL_MEMBER)
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
 
-def _error(code: str, message: str, code_status: int = status.HTTP_409_CONFLICT) -> HTTPException:
-    return HTTPException(code_status, detail={"code": code, "message": message})
+def _error(code: str, message: str, http_status: int = 400) -> HTTPException:
+    return HTTPException(status_code=http_status, detail={"code": code, "message": message})
 
 
-def _actor(request: Request, session: Session = Depends(get_db)) -> User:
-    return get_current_user(request, session)
+def _safe_filename(filename: str | None) -> str:
+    value = Path(filename or "proposal").name
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", value)[:180] or "proposal"
 
 
-def _require(actor: User, *roles: UserRole) -> User:
-    if actor.role not in roles:
-        raise _error("forbidden", "Insufficient permissions.", status.HTTP_403_FORBIDDEN)
-    return actor
+def _storage_path(kind: str, identifier: str, filename: str) -> Path:
+    root = settings.document_storage_root / "module-3" / kind / identifier
+    root.mkdir(parents=True, exist_ok=True)
+    return root / _safe_filename(filename)
 
 
-def _safe_filename(value: str) -> str:
-    name = PurePath(value.replace("\\", "/")).name
-    name = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._")
-    return name[:255] or "module-03-document"
+def _template_rules(session: Session, version_id: int) -> dict[str, Any]:
+    rule = session.scalar(select(AcademicRuleVersion).where(AcademicRuleVersion.template_reference_version_id == version_id).order_by(desc(AcademicRuleVersion.version_number)).limit(1))
+    return dict(rule.rules) if rule else {}
 
 
-def _validate_upload(file: UploadFile, content: bytes) -> str:
-    filename = _safe_filename(file.filename or "module-03-document")
-    suffix = filename.casefold().rsplit(".", 1)[-1] if "." in filename else ""
-    if suffix not in {"pdf", "docx"} or not content:
-        raise _error("invalid_document", "Module 03 accepts readable PDF or DOCX documents.", status.HTTP_422_UNPROCESSABLE_CONTENT)
-    if len(content) > MAX_BYTES:
-        raise _error("document_too_large", "The document exceeds the configured Module 03 size limit.", status.HTTP_422_UNPROCESSABLE_CONTENT)
-    if suffix == "pdf" and not content.startswith(b"%PDF"):
-        raise _error("invalid_pdf", "The uploaded file is not a readable PDF.", status.HTTP_422_UNPROCESSABLE_CONTENT)
-    if suffix == "docx" and not content.startswith(b"PK"):
-        raise _error("invalid_docx", "The uploaded file is not a readable DOCX.", status.HTTP_422_UNPROCESSABLE_CONTENT)
-    return filename
+def _template_out(session: Session, version: TemplateReferenceVersion) -> dict[str, Any]:
+    return {"id": version.id, "reference_id": version.template_reference_id, "template_type": version.template_type.value if hasattr(version.template_type, "value") else str(version.template_type), "version": version.version_number, "title": version.title, "provenance": version.provenance, "source_note": version.source_note, "is_active": version.is_active, "activated_at": version.activated_at, "rules": _template_rules(session, version.id)}
 
 
-def _template_out(row: M03ReferenceTemplate) -> dict:
-    assessment = _baseline_assessment(row)
-    return {"id": row.id, "template_type": row.template_type, "filename": row.filename, "version": row.version, "version_label": f"v{row.version} {row.version_kind.casefold()}", "version_kind": row.version_kind, "parent_template_id": row.parent_template_id, "template_metadata": row.template_metadata, "provenance": row.provenance, "extraction_status": row.extraction_status, "extracted_rules": row.extracted_rules, "extraction_warnings": row.extraction_warnings, "confidence": row.confidence, "baseline_status": assessment["status"], "missing_fields": assessment["missing_fields"], "activation_mode": row.activation_mode, "is_active": row.is_active, "sha256": row.sha256, "file_size": row.file_size, "created_at": row.created_at, "activated_at": row.activated_at}
+def _active_template(session: Session, proposal_type: str) -> tuple[TemplateReferenceVersion, dict[str, Any]] | None:
+    reference = session.scalar(select(TemplateReference).where(TemplateReference.template_type == TemplateType(proposal_type)).limit(1))
+    if reference is None:
+        return None
+    version = session.scalar(select(TemplateReferenceVersion).where(TemplateReferenceVersion.template_reference_id == reference.id, TemplateReferenceVersion.is_active.is_(True)).order_by(desc(TemplateReferenceVersion.version_number), desc(TemplateReferenceVersion.id)).limit(1))
+    return (version, _template_rules(session, version.id)) if version else None
 
 
-def _baseline_assessment(row: M03ReferenceTemplate) -> dict[str, object]:
-    rules = row.extracted_rules if isinstance(row.extracted_rules, dict) else {}
-    missing = [str(item) for item in rules.get("missing_fields", []) if str(item).strip()]
-    if not missing and not rules.get("baseline_status") == "COMPLETE":
-        if not rules.get("expected_sections"):
-            missing.append("Expected sections")
-        if not rules.get("heading_order"):
-            missing.append("Heading order")
-        if not rules.get("heading_hierarchy") or any(item.get("level") is None for item in rules.get("heading_hierarchy", []) if isinstance(item, dict)):
-            missing.append("Heading hierarchy")
-        for key, label in (("margins", "Margins"), ("default_font_family", "Font family"), ("default_font_size_pt", "Font size"), ("line_spacing", "Line spacing"), ("paragraph_spacing", "Paragraph spacing")):
-            value = rules.get(key)
-            if key == "margins" and isinstance(value, dict):
-                value = value if all(side in value and value.get(side) not in (None, "unknown", "") for side in ("left_mm", "right_mm", "top_mm", "bottom_mm")) else "unknown"
-            if value is None or value == "unknown" or value == "Not detected in reference template" or value == {} or value == []:
-                missing.append(label)
-    confidence = str(row.confidence or "UNKNOWN").upper()
-    if confidence != "HIGH":
-        missing.append(f"Confidence {confidence}")
-    if str(row.extraction_status).upper() != "EXTRACTED":
-        missing.append(f"Extraction status {row.extraction_status}")
-    deduped = list(dict.fromkeys(missing))
-    return {"status": "COMPLETE" if not deduped else "INCOMPLETE", "missing_fields": deduped}
+def _allowed_upload(filename: str | None, content_type: str | None) -> bool:
+    suffix = (filename or "").lower().rsplit(".", 1)[-1]
+    return suffix in {"pdf", "docx", "txt"} or (content_type or "").lower() in {"application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
 
 
-def _proposal_out(row: M03ProposalDocument) -> dict:
-    return {"proposal_id": row.proposal_id, "proposal_type": row.proposal_type, "document_id": str(row.id), "version": row.version, "extraction_status": row.extraction_status, "ast": row.ast, "extraction_warnings": row.extraction_warnings}
+def _allowed_template_upload(filename: str | None, content_type: str | None) -> bool:
+    suffix = (filename or "").lower().rsplit(".", 1)[-1]
+    return suffix in {"pdf", "docx"} or (content_type or "").lower() in {
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
 
 
-def _report_out(row: M03ComplianceReport) -> dict:
-    return {"report_id": row.report_id, "proposal_id": row.proposal_id, "proposal_type": row.proposal_type, "report_version": row.report_version, "status": row.status, "check_1": row.check_1, "check_2": row.check_2, "check_3": row.check_3, "total_findings": sum(row.severity_counts.values()), "severity_counts": row.severity_counts, "remediation": row.remediation, "advisory_summary": row.advisory_summary, "runtime_metadata": row.runtime_metadata, "generated_at": row.generated_at}
+def _detected_headings(text: str) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    page = 1
+    seen: set[str] = set()
+    for raw in text.splitlines():
+        line = raw.strip()
+        page_match = re.match(r"\[PAGE\s+(\d+)\]", line, re.IGNORECASE)
+        if page_match:
+            page = int(page_match.group(1))
+            continue
+        if not line or len(line) > 140 or line.endswith((".", ",", ";")):
+            continue
+        numbered = re.match(r"^(?:chapter\s+\d+|\d+(?:\.\d+)*[.)]?)\s+.+$", line, re.IGNORECASE)
+        uppercase = re.match(r"^[A-Z][A-Z\s&:/()\-]{4,}$", line)
+        if not (numbered or uppercase):
+            continue
+        key = re.sub(r"\s+", " ", line.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append({"name": line, "page": page})
+    return result[:100]
 
 
-def _active_proposal(session: Session, proposal_id: str) -> M03ProposalDocument:
-    row = session.scalar(select(M03ProposalDocument).where(M03ProposalDocument.proposal_id == proposal_id, M03ProposalDocument.is_active.is_(True)).order_by(M03ProposalDocument.version.desc()))
-    if row is None:
-        raise _error("proposal_not_found", "The proposal document was not found.", status.HTTP_404_NOT_FOUND)
-    return row
+def _submission_out(session: Session, row: ProposalComplianceSubmission) -> dict[str, Any]:
+    report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
+    summary = report.report.get("reportSummary", {}) if report else {}
+    return {"id": row.id, "proposal_key": row.proposal_key, "title": row.title, "proposal_type": row.proposal_type, "version": row.version, "status": row.status, "processing_status": row.processing_status, "filename": row.filename, "page_count": row.page_count, "created_at": row.created_at, "score": summary.get("score"), "report_status": summary.get("status"), "report_available": report is not None}
 
 
-def _authorized_proposal(session: Session, proposal_id: str, actor: User) -> M03ProposalDocument:
-    row = _active_proposal(session, proposal_id)
-    if actor.role == UserRole.ADMIN:
-        return row
-    if actor.role == UserRole.STUDENT and str(actor.id) == row.owner_user_id:
-        return row
-    if actor.role == UserRole.SUPERVISOR:
-        try:
-            requester_id = int(row.owner_user_id); supervisor_id = int(actor.id)
-        except (TypeError, ValueError):
-            requester_id = supervisor_id = -1
-        if requester_id > 0 and session.scalar(select(SupervisorRequest.id).where(SupervisorRequest.requester_user_id == requester_id, SupervisorRequest.supervisor_id == supervisor_id, SupervisorRequest.status == SupervisorRequestStatus.ACCEPTED.value)):
-            return row
-    if actor.role == UserRole.COORDINATOR:
-        return row
-    raise _error("proposal_forbidden", "This proposal is outside your authorized scope.", status.HTTP_403_FORBIDDEN)
+def _can_view(session: Session, actor: User, row: ProposalComplianceSubmission) -> bool:
+    if row.owner_user_id == actor.id or actor.role in (UserRole.ADMIN, UserRole.COORDINATOR, UserRole.PANEL_MEMBER):
+        return True
+    if actor.role != UserRole.SUPERVISOR:
+        return False
+    owner = session.get(User, row.owner_user_id)
+    if owner is None:
+        return False
+    assignment = session.scalar(
+        select(SupervisorAssignment.id)
+        .join(TeamMember, TeamMember.team_id == SupervisorAssignment.team_id)
+        .where(
+            SupervisorAssignment.supervisor_id == actor.id,
+            SupervisorAssignment.ended_at.is_(None),
+            TeamMember.university_email == owner.email,
+            TeamMember.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    return assignment is not None
 
 
-def _audit(session: Session, actor: User, action: str, target_id: str, values: dict) -> None:
-    from ...main import add_admin_audit_event
+@router.post("/templates/upload", status_code=status.HTTP_201_CREATED)
+async def upload_template(
+    request: Request,
+    template_type: str = Form(...),
+    title: str = Form(..., min_length=1, max_length=160),
+    source_note: str = Form("Uploaded official university template", max_length=500),
+    template_file: UploadFile = File(...),
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+):
+    validate_mutating_origin(request)
+    if template_type not in {"SHORT", "LONG"}:
+        raise _error("invalid_template_type", "Template type must be SHORT or LONG.", 422)
+    if not _allowed_template_upload(template_file.filename, template_file.content_type):
+        raise _error("unsupported_template", "Only PDF and DOCX templates are supported.", 422)
+    data = await template_file.read()
+    if not data or len(data) > MAX_UPLOAD_BYTES:
+        raise _error("invalid_template_size", "The template must be non-empty and 5 MiB or smaller.", 422)
     try:
-        actor_id = int(actor.id)
-    except (TypeError, ValueError):
-        return
-    add_admin_audit_event(session, actor_id=actor_id, affected_user_id=None, target_type="MODULE_03", target_id=abs(hash(target_id)) % 2147483647 or 1, action=action, changed_values=values)
+        rules = extract_template_rules(data, template_file.content_type, template_file.filename)
+    except PdfExtractionError as error:
+        raise _error(error.code, error.message, 422) from error
+    reference = session.scalar(select(TemplateReference).where(TemplateReference.template_type == TemplateType(template_type)).limit(1))
+    if reference is None:
+        reference = TemplateReference(template_type=TemplateType(template_type))
+        session.add(reference)
+        session.flush()
+    number = (session.scalar(select(TemplateReferenceVersion.version_number).where(TemplateReferenceVersion.template_reference_id == reference.id).order_by(desc(TemplateReferenceVersion.version_number)).limit(1)) or 0) + 1
+    key = str(uuid.uuid4())
+    path = _storage_path("templates", key, template_file.filename or "template")
+    path.write_bytes(data)
+    rules["source"]["storage_key"] = str(path.relative_to(settings.document_storage_root))
+    version = TemplateReferenceVersion(template_reference_id=reference.id, version_number=number, title=title.strip(), provenance="UPLOADED_DOCUMENT", source_note=source_note.strip(), created_by_id=actor.id, is_active=False)
+    session.add(version)
+    session.flush()
+    session.add(AcademicRuleVersion(template_reference_version_id=version.id, version_number=1, provenance="UPLOADED_DOCUMENT", rules=rules, created_by_id=actor.id))
+    session.commit()
+    session.refresh(version)
+    return _template_out(session, version)
 
 
-@router.get("/admin/templates")
-def list_templates(actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    _require(actor, UserRole.ADMIN)
-    return [_template_out(row) for row in session.scalars(select(M03ReferenceTemplate).order_by(M03ReferenceTemplate.template_type, M03ReferenceTemplate.version.desc())).all()]
+@router.get("/templates")
+def list_templates(actor: User = Depends(require_roles(*REVIEW_ROLES)), session: Session = Depends(get_db)):
+    versions = session.scalars(select(TemplateReferenceVersion).order_by(TemplateReferenceVersion.template_reference_id, desc(TemplateReferenceVersion.version_number))).all()
+    return [_template_out(session, version) for version in versions]
 
 
-@router.post("/admin/templates", status_code=status.HTTP_201_CREATED)
-@router.post("/admin/templates/upload", status_code=status.HTTP_201_CREATED)
-async def upload_template(request: Request, template_type: str = Form(...), document: UploadFile = File(...), actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    _require(actor, UserRole.ADMIN); validate_mutating_origin(request)
-    template_type = template_type.strip().upper()
-    if template_type not in {M03ProposalType.SHORT.value, M03ProposalType.LONG.value}:
-        raise _error("invalid_template_type", "Template type must be SHORT or LONG.", status.HTTP_422_UNPROCESSABLE_CONTENT)
-    content = await document.read(); filename = _validate_upload(document, content)
-    ast = parse_document(content, filename, document.content_type); extracted = extract_baseline_rules(ast); version = next_template_version(session, template_type)
-    row = M03ReferenceTemplate(template_type=template_type, filename=filename, storage_key=f"module-03/templates/{template_type.lower()}/v{version}-{filename}", sha256=hashlib.sha256(content).hexdigest(), mime_type=document.content_type or "application/octet-stream", file_size=len(content), content=content, version=version, version_kind="REFERENCE", template_metadata={}, provenance="Observed reference property", extraction_status="EXTRACTED" if ast.get("pages") or ast.get("paragraphs") else "FAILED", extracted_rules=extracted["rules"], extraction_warnings=extracted["warnings"], confidence=extracted["confidence"], uploaded_by_user_id=str(actor.id), is_active=False)
-    session.add(row); session.flush(); save_rules(session, row, provenance=row.provenance); _audit(session, actor, "module03_template_uploaded", str(row.id), {"template_type": template_type, "version": version, "version_kind": row.version_kind, "sha256": row.sha256}); session.commit(); session.refresh(row)
-    return _template_out(row)
+@router.post("/templates/{version_id}/activate")
+def activate_template(version_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    version = session.get(TemplateReferenceVersion, version_id)
+    if version is None:
+        raise _error("template_not_found", "Template version was not found.", 404)
+    rules = _template_rules(session, version.id)
+    if not rules.get("required_sections") and not any(key in rules for key in ("page_size", "font_family", "font_size_pt", "margin_mm", "line_spacing")):
+        raise _error("template_incomplete", "The template has no confirmed extractable rules and cannot be activated.", 409)
+    session.execute(update(TemplateReferenceVersion).where(TemplateReferenceVersion.template_reference_id == version.template_reference_id).values(is_active=False, activated_at=None, activated_by_id=None))
+    version.is_active = True
+    version.activated_at = utc_now()
+    version.activated_by_id = actor.id
+    session.commit()
+    session.refresh(version)
+    return _template_out(session, version)
 
 
-@router.get("/admin/templates/{template_id}")
-def template_detail(template_id: int, actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    _require(actor, UserRole.ADMIN); row = session.get(M03ReferenceTemplate, template_id)
-    if row is None: raise _error("template_not_found", "The baseline template was not found.", status.HTTP_404_NOT_FOUND)
-    return _template_out(row)
+@router.post("/templates/{version_id}/deactivate")
+def deactivate_template(version_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
+    """Stop using a baseline without deleting its immutable version history."""
+    validate_mutating_origin(request)
+    version = session.get(TemplateReferenceVersion, version_id)
+    if version is None:
+        raise _error("template_not_found", "Template version was not found.", 404)
+    version.is_active = False
+    version.activated_at = None
+    version.activated_by_id = None
+    session.commit()
+    session.refresh(version)
+    return _template_out(session, version)
 
 
-@router.post("/admin/templates/{template_id}/activate")
-def activate_template(template_id: int, request: Request, active: bool = Form(True), activation_mode: str = Form("COMPLETE"), confirm_partial: bool = Form(False), actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    _require(actor, UserRole.ADMIN); validate_mutating_origin(request); row = session.get(M03ReferenceTemplate, template_id)
-    if row is None: raise _error("template_not_found", "The baseline template was not found.", status.HTTP_404_NOT_FOUND)
-    if active:
-        assessment = _baseline_assessment(row)
-        mode = activation_mode.strip().upper()
-        if mode not in {"COMPLETE", "PARTIAL"}:
-            raise _error("invalid_activation_mode", "Activation mode must be COMPLETE or PARTIAL.", status.HTTP_422_UNPROCESSABLE_CONTENT)
-        if assessment["status"] == "INCOMPLETE" and (mode != "PARTIAL" or not confirm_partial):
-            raise _error("incomplete_baseline", "This baseline is incomplete. Confirm partial activation to continue.")
-        if assessment["status"] == "COMPLETE" and mode == "PARTIAL":
-            raise _error("invalid_activation_mode", "A complete baseline must be activated as COMPLETE.", status.HTTP_422_UNPROCESSABLE_CONTENT)
-        for previous in session.scalars(select(M03ReferenceTemplate).where(M03ReferenceTemplate.template_type == row.template_type, M03ReferenceTemplate.id != row.id, M03ReferenceTemplate.is_active.is_(True))).all(): previous.is_active = False
-        row.is_active = True; row.activation_mode = mode; row.activated_at = datetime.now(timezone.utc); action = "module03_template_activated"
+@router.post("/templates/{version_id}/rules")
+def save_template_rules(
+    version_id: int,
+    request: Request,
+    rules: dict[str, Any] = Body(...),
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+):
+    """Save an admin-confirmed rule review as a new immutable rule snapshot."""
+    validate_mutating_origin(request)
+    version = session.get(TemplateReferenceVersion, version_id)
+    if version is None:
+        raise _error("template_not_found", "Template version was not found.", 404)
+    allowed = {"page_size", "margin_mm", "right_margin_mm", "top_margin_mm", "bottom_margin_mm", "font_family", "font_size_pt", "line_spacing", "page_numbering", "table_count", "figure_count", "required_sections", "source"}
+    cleaned: dict[str, Any] = {key: value for key, value in rules.items() if key in allowed}
+    for key in ("margin_mm", "right_margin_mm", "top_margin_mm", "bottom_margin_mm", "font_size_pt", "line_spacing", "table_count", "figure_count"):
+        if key in cleaned and cleaned[key] not in (None, ""):
+            try:
+                number = float(cleaned[key])
+                cleaned[key] = int(number) if number.is_integer() and key in {"table_count", "figure_count"} else number
+            except (TypeError, ValueError) as error:
+                raise _error("invalid_rule_value", f"{key} must be numeric.", 422) from error
+    if "page_numbering" in cleaned and isinstance(cleaned["page_numbering"], str):
+        cleaned["page_numbering"] = cleaned["page_numbering"].strip().casefold() in {"true", "yes", "1", "present", "required"}
+    sections = cleaned.get("required_sections")
+    if sections is not None:
+        if not isinstance(sections, list):
+            raise _error("invalid_required_sections", "Required sections must be sent as a list.", 422)
+        cleaned["required_sections"] = [str(item).strip() for item in sections if str(item).strip()]
+    latest = session.scalar(select(AcademicRuleVersion.version_number).where(AcademicRuleVersion.template_reference_version_id == version.id).order_by(desc(AcademicRuleVersion.version_number)).limit(1)) or 0
+    session.add(AcademicRuleVersion(template_reference_version_id=version.id, version_number=latest + 1, provenance="ADMIN_CONFIRMED", rules=cleaned, created_by_id=actor.id))
+    session.commit()
+    session.refresh(version)
+    return _template_out(session, version)
+
+
+@router.post("/submissions", status_code=status.HTTP_201_CREATED)
+async def submit_proposal(
+    request: Request,
+    proposal_type: str = Form(...),
+    title: str = Form(..., min_length=1, max_length=200),
+    proposal_key: str | None = Form(None),
+    action: str = Form("submit"),
+    proposal_file: UploadFile = File(...),
+    actor: User = Depends(require_roles(UserRole.STUDENT)),
+    session: Session = Depends(get_db),
+):
+    validate_mutating_origin(request)
+    if proposal_type not in {"SHORT", "LONG"}:
+        raise _error("invalid_proposal_type", "Proposal type must be SHORT or LONG.", 422)
+    if not _allowed_upload(proposal_file.filename, proposal_file.content_type):
+        raise _error("unsupported_proposal", "Only PDF, DOCX, and TXT proposals are supported.", 422)
+    active = _active_template(session, proposal_type)
+    if active is None:
+        raise _error("active_template_missing", "No active university template exists for this proposal type.", 409)
+    data = await proposal_file.read()
+    if not data or len(data) > MAX_UPLOAD_BYTES:
+        raise _error("invalid_proposal_size", "The proposal must be non-empty and 5 MiB or smaller.", 422)
+    try:
+        extracted = extract_proposal_document(data, proposal_file.content_type, proposal_file.filename)
+    except PdfExtractionError as error:
+        raise _error(error.code, error.message, 422) from error
+    key = (proposal_key or str(uuid.uuid4())).strip()
+    previous = session.scalar(select(ProposalComplianceSubmission).where(ProposalComplianceSubmission.proposal_key == key, ProposalComplianceSubmission.owner_user_id == actor.id).order_by(desc(ProposalComplianceSubmission.version)).limit(1))
+    if proposal_key and previous is None:
+        raise _error("proposal_not_found", "The proposal version history could not be found.", 404)
+    version_number = (previous.version + 1) if previous else 1
+    path = _storage_path("submissions", key, f"v{version_number}-{proposal_file.filename or 'proposal'}")
+    path.write_bytes(data)
+    fields = {**extracted.extracted_fields, "detected_headings": _detected_headings(extracted.extracted_text)}
+    template_version, rules = active
+    if action not in {"draft", "submit"}:
+        raise _error("invalid_submission_action", "Action must be draft or submit.", 422)
+    is_draft = action == "draft"
+    team = session.scalar(select(Team).where(Team.shared_user_id == actor.id, Team.status != "dissolved").order_by(Team.id).limit(1))
+    row = ProposalComplianceSubmission(proposal_key=key, owner_user_id=actor.id, team_id=team.id if team else None, proposal_type=proposal_type, title=title.strip(), version=version_number, status="DRAFT" if is_draft else ("RESUBMITTED" if previous else "SUBMITTED"), processing_status="PENDING" if is_draft else "COMPLETED", filename=proposal_file.filename or "proposal", content_type=extracted.content_type, file_size=extracted.file_size, sha256=extracted.sha256, page_count=extracted.page_count, storage_key=str(path.relative_to(settings.document_storage_root)), extracted_text=extracted.extracted_text, extracted_fields=fields, template_reference_version_id=template_version.id)
+    session.add(row)
+    session.flush()
+    if is_draft:
+        session.commit()
+        return {"submission": _submission_out(session, row), "report": None}
+    history = [{"version": item.version, "filename": item.filename, "score": (session.scalar(select(ProposalComplianceReport.score).where(ProposalComplianceReport.submission_id == item.id).limit(1)))} for item in session.scalars(select(ProposalComplianceSubmission).where(ProposalComplianceSubmission.proposal_key == key, ProposalComplianceSubmission.owner_user_id == actor.id).order_by(ProposalComplianceSubmission.version)).all()]
+    report = build_compliance_report(submission=row, rules=rules, previous_versions=history)
+    session.add(ProposalComplianceReport(submission_id=row.id, status=report["reportSummary"]["status"], score=report["reportSummary"]["score"], total_checks=report["finalResults"]["totalChecks"], report=report))
+    session.commit()
+    if team is not None and not is_draft:
+        lock_team(session, team.id, "proposal_submitted")
+        session.commit()
+    return {"submission": _submission_out(session, row), "report": report}
+
+
+def _run_submission(session: Session, row: ProposalComplianceSubmission, template_version: TemplateReferenceVersion, rules: dict[str, Any]) -> dict[str, Any]:
+    history = [{"version": item.version, "filename": item.filename, "score": session.scalar(select(ProposalComplianceReport.score).where(ProposalComplianceReport.submission_id == item.id).limit(1))} for item in session.scalars(select(ProposalComplianceSubmission).where(ProposalComplianceSubmission.proposal_key == row.proposal_key, ProposalComplianceSubmission.owner_user_id == row.owner_user_id).order_by(ProposalComplianceSubmission.version)).all() if item.id != row.id]
+    row.template_reference_version_id = template_version.id
+    row.status = "SUBMITTED" if row.status == "DRAFT" else row.status
+    row.processing_status = "COMPLETED"
+    row.error_message = None
+    report_data = build_compliance_report(submission=row, rules=rules, previous_versions=history)
+    saved = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
+    if saved is None:
+        saved = ProposalComplianceReport(submission_id=row.id, status=report_data["reportSummary"]["status"], score=report_data["reportSummary"]["score"], total_checks=report_data["finalResults"]["totalChecks"], report=report_data)
+        session.add(saved)
     else:
-        row.is_active = False; action = "module03_template_deactivated"
-    _audit(session, actor, action, str(row.id), {"template_type": row.template_type, "version": row.version, "is_active": active, "activation_mode": row.activation_mode, "confidence": row.confidence, "missing_fields": _baseline_assessment(row)["missing_fields"]}); session.commit(); session.refresh(row); return _template_out(row)
+        saved.status = report_data["reportSummary"]["status"]
+        saved.score = report_data["reportSummary"]["score"]
+        saved.total_checks = report_data["finalResults"]["totalChecks"]
+        saved.report = report_data
+    session.commit()
+    session.refresh(row)
+    return {"submission": _submission_out(session, row), "report": report_data}
 
 
-@router.post("/admin/templates/{template_id}/deactivate")
-def deactivate_template(template_id: int, request: Request, actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    _require(actor, UserRole.ADMIN); validate_mutating_origin(request)
-    row = session.get(M03ReferenceTemplate, template_id)
-    if row is None:
-        raise _error("template_not_found", "The baseline template was not found.", status.HTTP_404_NOT_FOUND)
-    row.is_active = False
-    _audit(session, actor, "module03_template_deactivated", str(row.id), {"template_type": row.template_type, "version": row.version, "is_active": False})
-    session.commit(); session.refresh(row)
-    return _template_out(row)
+@router.post("/submissions/{submission_id}/submit")
+def submit_draft(submission_id: int, request: Request, actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or row.owner_user_id != actor.id:
+        raise _error("submission_not_found", "The proposal draft was not found.", 404)
+    if row.status != "DRAFT":
+        raise _error("invalid_submission_state", "Only a draft proposal can be submitted.", 409)
+    active = _active_template(session, row.proposal_type)
+    if active is None:
+        raise _error("active_template_missing", "No active university template exists for this proposal type.", 409)
+    return _run_submission(session, row, *active)
 
 
-@router.get("/admin/templates/{template_id}/rules")
-def template_rules(template_id: int, actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    _require(actor, UserRole.ADMIN)
-    if session.get(M03ReferenceTemplate, template_id) is None: raise _error("template_not_found", "The baseline template was not found.", status.HTTP_404_NOT_FOUND)
-    return [{"id": row.id, "reference_template_id": row.reference_template_id, "rule_key": row.rule_key, "rule_value": row.rule_value, "rule_version": row.rule_version, "content_hash": row.content_hash, "source": row.source, "provenance": row.provenance, "confidence": row.confidence, "created_at": row.created_at} for row in session.scalars(select(M03TemplateRule).where(M03TemplateRule.reference_template_id == template_id).order_by(M03TemplateRule.rule_version, M03TemplateRule.id)).all()]
+@router.get("/submissions/mine")
+def my_submissions(actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
+    rows = session.scalars(select(ProposalComplianceSubmission).where(ProposalComplianceSubmission.owner_user_id == actor.id).order_by(desc(ProposalComplianceSubmission.created_at), desc(ProposalComplianceSubmission.version))).all()
+    return [_submission_out(session, row) for row in rows]
 
 
-@router.post("/admin/templates/{template_id}/metadata-version", status_code=status.HTTP_201_CREATED)
-def create_metadata_version(template_id: int, payload: MetadataVersionWrite, request: Request, actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    _require(actor, UserRole.ADMIN); validate_mutating_origin(request)
-    source = session.get(M03ReferenceTemplate, template_id)
-    if source is None:
-        raise _error("template_not_found", "The baseline template was not found.", status.HTTP_404_NOT_FOUND)
-    if payload.template_metadata == source.template_metadata and not payload.confirm_duplicate:
-        raise _error("duplicate_metadata_version", "Metadata is unchanged. Confirm explicitly to create a duplicate version.", status.HTTP_409_CONFLICT)
-    version = next_template_version(session, source.template_type)
-    row = M03ReferenceTemplate(template_type=source.template_type, filename=source.filename, storage_key=f"module-03/templates/{source.template_type.lower()}/v{version}-{source.filename}", sha256=source.sha256, mime_type=source.mime_type, file_size=source.file_size, content=source.content, version=version, version_kind="METADATA", parent_template_id=source.id, template_metadata=payload.template_metadata, provenance=payload.provenance, extraction_status=source.extraction_status, extracted_rules=source.extracted_rules, extraction_warnings=source.extraction_warnings, confidence=source.confidence, uploaded_by_user_id=str(actor.id), is_active=False)
-    session.add(row); session.flush(); save_rules(session, row, provenance=payload.provenance); _audit(session, actor, "module03_template_metadata_version_created", str(row.id), {"template_type": row.template_type, "version": row.version, "version_kind": row.version_kind, "provenance": payload.provenance}); session.commit(); session.refresh(row)
-    return _template_out(row)
+@router.get("/reports")
+def report_queue(actor: User = Depends(require_roles(*REVIEW_ROLES)), session: Session = Depends(get_db)):
+    rows = session.scalars(select(ProposalComplianceSubmission).order_by(desc(ProposalComplianceSubmission.created_at), desc(ProposalComplianceSubmission.version))).all()
+    return [_submission_out(session, row) for row in rows if _can_view(session, actor, row)]
 
 
-@router.post("/admin/templates/{template_id}/rule-version", status_code=status.HTTP_201_CREATED)
-def create_rule_version(template_id: int, payload: RuleVersionWrite, request: Request, actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    _require(actor, UserRole.ADMIN); validate_mutating_origin(request)
-    row = session.get(M03ReferenceTemplate, template_id)
-    if row is None:
-        raise _error("template_not_found", "The baseline template was not found.", status.HTTP_404_NOT_FOUND)
-    if payload.rules is not None:
-        row.extracted_rules = payload.rules
-    next_version = latest_rule_version(session, row.id) + 1
-    content_hash = rule_content_hash(row.extracted_rules)
-    duplicate = session.scalar(select(M03TemplateRule.id).where(M03TemplateRule.reference_template_id == row.id, M03TemplateRule.content_hash == content_hash))
-    if duplicate is not None and not payload.confirm_duplicate:
-        raise _error("duplicate_rule_version", "Formatting rules are unchanged. Confirm explicitly to create a duplicate version.", status.HTTP_409_CONFLICT)
-    rule_version, created = save_rules(session, row, rule_version=next_version, provenance=payload.provenance, confirm_duplicate=True)
-    _audit(session, actor, "module03_template_rule_version_created", str(row.id), {"template_type": row.template_type, "rule_version": rule_version, "provenance": payload.provenance, "created": created})
-    session.commit(); session.refresh(row)
-    return {"template": _template_out(row), "rule_version": rule_version, "created": created, "provenance": payload.provenance}
+@router.get("/reports/{submission_id}")
+def get_report(submission_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or not _can_view(session, actor, row):
+        raise _error("report_not_found", "The compliance report was not found.", 404)
+    report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
+    if report is None:
+        raise _error("report_pending", "The compliance report is not available yet.", 409)
+    return report.report
 
 
-@router.post("/student/proposals/upload", status_code=status.HTTP_201_CREATED)
-async def upload_proposal(request: Request, proposal_type: str = Form(...), document: UploadFile = File(...), actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    _require(actor, UserRole.STUDENT); validate_mutating_origin(request); proposal_type = proposal_type.strip().upper()
-    if proposal_type not in {M03ProposalType.SHORT.value, M03ProposalType.LONG.value}: raise _error("invalid_proposal_type", "Proposal type must be SHORT or LONG.", status.HTTP_422_UNPROCESSABLE_CONTENT)
-    baseline = active_template(session, proposal_type)
-    if baseline is None: raise _error("active_baseline_missing", "An active Admin baseline is required for this proposal type.")
-    content = await document.read(); filename = _validate_upload(document, content); ast = parse_document(content, filename, document.content_type); proposal_id = str(uuid4())
-    row = M03ProposalDocument(proposal_id=proposal_id, proposal_type=proposal_type, owner_user_id=str(actor.id), filename=filename, storage_key=f"module-03/proposals/{proposal_id}/v1-{filename}", sha256=hashlib.sha256(content).hexdigest(), mime_type=document.content_type or "application/octet-stream", file_size=len(content), content=content, version=1, extraction_status=M03ExtractionStatus.EXTRACTED.value if ast.get("pages") or ast.get("paragraphs") else M03ExtractionStatus.FAILED.value, ast=ast, extraction_warnings=ast.get("warnings", []))
-    session.add(row); session.flush(); _audit(session, actor, "module03_proposal_uploaded", proposal_id, {"proposal_type": proposal_type, "version": 1, "sha256": row.sha256}); session.commit(); session.refresh(row); return _proposal_out(row)
+@router.post("/reports/{submission_id}/run")
+def rerun_report(submission_id: int, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    """Explicitly re-run a report against the current active baseline."""
+    validate_mutating_origin(request)
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or not _can_view(session, actor, row):
+        raise _error("report_not_found", "The compliance report was not found.", 404)
+    active = _active_template(session, row.proposal_type)
+    if active is None:
+        raise _error("active_template_missing", "No active university template exists for this proposal type.", 409)
+    return _run_submission(session, row, *active)["report"]
 
 
-def _run_report(session: Session, proposal: M03ProposalDocument, actor: User) -> M03ComplianceReport:
-    baseline = active_template(session, proposal.proposal_type)
-    if baseline is None: raise _error("active_baseline_missing", "The active baseline for this proposal no longer exists.")
-    check_1 = run_visual_check(proposal.ast, baseline.extracted_rules); check_2 = run_structural_check(proposal.ast, baseline.extracted_rules); check_3 = asyncio.run(run_semantic_check(proposal.ast)); aggregate = aggregate_report(proposal.proposal_type, _template_out(baseline), _proposal_out(proposal), check_1, check_2, check_3)
-    report_version = int(session.scalar(select(func.max(M03ComplianceReport.report_version)).where(M03ComplianceReport.proposal_id == proposal.proposal_id)) or 0) + 1; report_id = str(uuid4())
-    report = M03ComplianceReport(report_id=report_id, proposal_id=proposal.proposal_id, proposal_document_id=str(proposal.id), baseline_template_id=str(baseline.id), proposal_type=proposal.proposal_type, report_version=report_version, status=aggregate["status"], check_1=check_1, check_2=check_2, check_3=check_3, severity_counts=aggregate["severity_counts"], remediation=aggregate["remediation"], advisory_summary=aggregate["advisory_summary"], runtime_metadata=aggregate["runtime_metadata"], generated_by_user_id=str(actor.id))
-    session.add(report); session.flush()
-    for finding in list(check_1.get("findings", [])) + list(check_2.get("findings", [])):
-        session.add(M03ComplianceFinding(report_id=report_id, check_name=finding["check_name"], severity=finding["severity"], rule_reference=finding["rule_reference"], student_value=finding.get("student_value") if isinstance(finding.get("student_value"), dict) else {"value": finding.get("student_value")}, baseline_value=finding.get("baseline_value") if isinstance(finding.get("baseline_value"), dict) else {"value": finding.get("baseline_value")}, evidence=finding.get("evidence", {}), remediation=finding.get("remediation", ""), confidence=finding.get("confidence", "UNKNOWN")))
-    for name, result in (("CHECK_1_VISUAL", check_1), ("CHECK_2_STRUCTURAL", check_2), ("CHECK_3_SEMANTIC_LLM", check_3)):
-        session.add(M03CheckRun(proposal_id=proposal.proposal_id, report_id=report_id, check_name=name, status=result.get("status", "UNKNOWN"), runtime=str(result.get("runtime", "deterministic")), model=result.get("model"), result=result))
-    _audit(session, actor, "module03_compliance_report_generated", report_id, {"proposal_id": proposal.proposal_id, "report_version": report_version, "status": report.status}); session.commit(); session.refresh(report); return report
+@router.get("/reports/{submission_id}/original")
+def get_original(submission_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or not _can_view(session, actor, row):
+        raise _error("document_not_found", "The original proposal was not found.", 404)
+    path = settings.document_storage_root / row.storage_key
+    if not path.is_file():
+        raise _error("document_missing", "The original proposal file is no longer available.", 404)
+    return FileResponse(path, media_type=row.content_type, filename=row.filename)
 
 
-@router.post("/student/proposals/{proposal_id}/audit", response_model=ReportOut)
-def audit_proposal(proposal_id: str, actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    proposal = _authorized_proposal(session, proposal_id, _require(actor, UserRole.STUDENT)); return _report_out(_run_report(session, proposal, actor))
+@router.get("/reports/{submission_id}/annotated")
+def get_annotated_document(submission_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    """Return a safe annotated copy; the student's original file is never modified."""
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or not _can_view(session, actor, row):
+        raise _error("document_not_found", "The annotated proposal was not found.", 404)
+    saved = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
+    if saved is None:
+        raise _error("report_pending", "The compliance report is not available yet.", 409)
+    path = settings.document_storage_root / row.storage_key
+    if not path.is_file():
+        raise _error("document_missing", "The original proposal file is no longer available.", 404)
+    try:
+        data = _render_annotated_document(path.read_bytes(), row.content_type, row.filename, saved.report)
+    except PdfExtractionError as error:
+        raise _error(error.code, error.message, 422) from error
+    return Response(content=data, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="annotated-{_safe_filename(row.filename.rsplit(".", 1)[0])}.pdf"'})
 
 
-@router.get("/student/proposals/{proposal_id}/reports", response_model=list[ReportOut])
-def student_reports(proposal_id: str, actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    proposal = _authorized_proposal(session, proposal_id, _require(actor, *READ_ROLES)); return [_report_out(row) for row in session.scalars(select(M03ComplianceReport).where(M03ComplianceReport.proposal_id == proposal.proposal_id).order_by(M03ComplianceReport.report_version.desc())).all()]
+@router.get("/reports/{submission_id}/pdf")
+def download_report_pdf(submission_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or not _can_view(session, actor, row):
+        raise _error("report_not_found", "The compliance report was not found.", 404)
+    saved = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
+    if saved is None:
+        raise _error("report_pending", "The compliance report is not available yet.", 409)
+    data = _render_pdf(saved.report)
+    return Response(content=data, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="compliance-report-{submission_id}.pdf"'})
 
 
-@router.get("/student/proposals/{proposal_id}/reports/{report_id}", response_model=ReportOut)
-def student_report(proposal_id: str, report_id: str, actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    _authorized_proposal(session, proposal_id, _require(actor, *READ_ROLES)); row = session.scalar(select(M03ComplianceReport).where(M03ComplianceReport.proposal_id == proposal_id, M03ComplianceReport.report_id == report_id))
-    if row is None: raise _error("report_not_found", "The compliance report was not found.", status.HTTP_404_NOT_FOUND)
-    return _report_out(row)
+def _render_pdf(report: dict[str, Any]) -> bytes:
+    from io import BytesIO
+
+    stream = BytesIO()
+    document = SimpleDocTemplate(stream, pagesize=A4, rightMargin=16 * mm, leftMargin=16 * mm, topMargin=16 * mm, bottomMargin=16 * mm)
+    styles = getSampleStyleSheet()
+    summary = report.get("reportSummary", {})
+    story = [Paragraph("FYPHub Compliance Report", styles["Title"]), Paragraph(f"{report.get('proposal', {}).get('title', 'Proposal')} · Score {summary.get('score', 0)}% · {summary.get('status', 'Review Required')}", styles["Normal"]), Spacer(1, 8)]
+    story.append(Table([["Passed", "Failed", "Partial", "Total"], [summary.get("metrics", {}).get("passed", 0), summary.get("metrics", {}).get("failed", 0), summary.get("metrics", {}).get("partial", 0), summary.get("metrics", {}).get("total", 0)]], colWidths=[38 * mm] * 4, style=TableStyle([["BACKGROUND", (0, 0), (-1, 0), "#1E2436"], ["TEXTCOLOR", (0, 0), (-1, 0), "white"], ["GRID", (0, 0), (-1, -1), 0.25, "#D8E0EA"], ["ALIGN", (0, 0), (-1, -1), "CENTER"], ["BACKGROUND", (0, 1), (-1, 1), "#F5F8FC"]])))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("Detailed Violations", styles["Heading2"]))
+    for violation in report.get("violations", []):
+        story.extend([Paragraph(f"{violation.get('id')} · {violation.get('severity')} · {violation.get('title')}", styles["Heading3"]), Paragraph(f"Location: {violation.get('location', 'Document')} · Requirement: {violation.get('requirement')} · Detected: {violation.get('detected')}", styles["BodyText"]), Paragraph(str(violation.get("evidence", "")), styles["BodyText"]), Spacer(1, 6)])
+    document.build(story)
+    return stream.getvalue()
 
 
-@router.get("/supervisor/proposals/{proposal_id}/reports/{report_id}", response_model=ReportOut)
-def supervisor_report(proposal_id: str, report_id: str, actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    _authorized_proposal(session, proposal_id, _require(actor, UserRole.SUPERVISOR, UserRole.ADMIN)); row = session.scalar(select(M03ComplianceReport).where(M03ComplianceReport.proposal_id == proposal_id, M03ComplianceReport.report_id == report_id))
-    if row is None: raise _error("report_not_found", "The compliance report was not found.", status.HTTP_404_NOT_FOUND)
-    return _report_out(row)
+def _render_annotated_document(data: bytes, content_type: str, filename: str, report: dict[str, Any]) -> bytes:
+    """Annotate each affected page with red issue callouts and append full evidence."""
+    from io import BytesIO
+    try:
+        import fitz
+    except ImportError as error:
+        raise PdfExtractionError("pdf_annotation_unavailable", "PDF annotation is unavailable on this server.") from error
+    if not filename.casefold().endswith(".pdf") or not content_type.casefold().endswith("pdf"):
+        raise PdfExtractionError("pdf_annotation_unavailable", "Annotated preview is currently available for PDF proposals only.")
+    try:
+        document = fitz.open(stream=data, filetype="pdf")
+    except Exception as error:
+        raise PdfExtractionError("invalid_pdf", "The proposal PDF could not be opened for annotation.") from error
+    violations = report.get("violations", [])
+    by_page: dict[int, list[dict[str, Any]]] = {}
+    for violation in violations:
+        page_number = violation.get("pageNumber") or (violation.get("location", {}).get("page") if isinstance(violation.get("location"), dict) else None) or 1
+        by_page.setdefault(max(1, int(page_number)), []).append(violation)
+    for page_number, page_violations in by_page.items():
+        if page_number > document.page_count:
+            continue
+        page = document[page_number - 1]
+        for index, violation in enumerate(page_violations[:6]):
+            top = 24 + index * 43
+            rect = fitz.Rect(24, top, page.rect.width - 24, top + 35)
+            page.draw_rect(rect, color=(0.88, 0.08, 0.14), fill=(1, 0.93, 0.94), width=1.6, overlay=True)
+            label = f"{violation.get('id', 'Issue')} | {violation.get('title', 'Compliance issue')} | Expected: {display_value(violation.get('requirement'))} | Detected: {display_value(violation.get('detected'))}"
+            page.insert_textbox(rect + (5, 4, -5, -4), label[:300], fontsize=8, color=(0.55, 0.05, 0.08), overlay=True)
+    appendix = document.new_page()
+    appendix.insert_text((36, 45), "FYPHub - Annotated Compliance Findings", fontsize=16, color=(0.1, 0.18, 0.3))
+    y = 75
+    for violation in violations:
+        text = f"{violation.get('id', 'Issue')} | {violation.get('severity', 'Review')} | {violation.get('title', 'Compliance issue')}\nLocation: {violation.get('location', 'Document')}\nExpected: {display_value(violation.get('requirement'))}\nDetected: {display_value(violation.get('detected'))}\nEvidence: {violation.get('evidence', '')}"
+        box = fitz.Rect(36, y, appendix.rect.width - 36, y + 70)
+        appendix.draw_rect(box, color=(0.88, 0.08, 0.14), fill=(1, 0.95, 0.95), width=1.2, overlay=True)
+        appendix.insert_textbox(box + (8, 7, -8, -7), text[:700], fontsize=8, color=(0.18, 0.2, 0.25), overlay=True)
+        y += 82
+        if y > appendix.rect.height - 90:
+            appendix = document.new_page(); y = 45
+    output = BytesIO()
+    document.save(output, garbage=4, deflate=True)
+    document.close()
+    return output.getvalue()
 
 
-@router.get("/supervisor/proposals/{proposal_id}/reports", response_model=list[ReportOut])
-def supervisor_reports(proposal_id: str, actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    proposal = _authorized_proposal(session, proposal_id, _require(actor, UserRole.SUPERVISOR, UserRole.ADMIN))
-    rows = session.scalars(select(M03ComplianceReport).where(M03ComplianceReport.proposal_id == proposal.proposal_id).order_by(M03ComplianceReport.report_version.desc())).all()
-    return [_report_out(row) for row in rows]
-
-
-@router.get("/coordinator/proposals/{proposal_id}/reports/{report_id}", response_model=ReportOut)
-def coordinator_report(proposal_id: str, report_id: str, actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    _authorized_proposal(session, proposal_id, _require(actor, UserRole.COORDINATOR, UserRole.ADMIN)); row = session.scalar(select(M03ComplianceReport).where(M03ComplianceReport.proposal_id == proposal_id, M03ComplianceReport.report_id == report_id))
-    if row is None: raise _error("report_not_found", "The compliance report was not found.", status.HTTP_404_NOT_FOUND)
-    return _report_out(row)
-
-
-@router.get("/coordinator/proposals/{proposal_id}/reports", response_model=list[ReportOut])
-def coordinator_reports(proposal_id: str, actor: User = Depends(_actor), session: Session = Depends(get_db)):
-    proposal = _authorized_proposal(session, proposal_id, _require(actor, UserRole.COORDINATOR, UserRole.ADMIN))
-    rows = session.scalars(select(M03ComplianceReport).where(M03ComplianceReport.proposal_id == proposal.proposal_id).order_by(M03ComplianceReport.report_version.desc())).all()
-    return [_report_out(row) for row in rows]
+def display_value(value: Any) -> str:
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value)
+    return "Not available" if value is None or value == "" else str(value)
