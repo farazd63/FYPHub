@@ -6,7 +6,7 @@ from zipfile import BadZipFile, ZipFile
 from io import BytesIO
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from .auth import get_current_user, require_roles, validate_mutating_origin
@@ -101,6 +101,26 @@ def create_requirement(payload: RequirementWrite, _: object = Depends(validate_m
         db.rollback()
         logger.exception("document_requirement_create_failed", extra={"error_type": "persistence_or_mapping_error"})
         raise HTTPException(500, "The document requirement could not be created.") from None
+
+@router.delete("/{requirement_id}", status_code=204)
+def delete_requirement(requirement_id: int, _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(*ADMIN)), db: Session = Depends(get_db)):
+    """Remove an unused draft requirement while preserving published/history records."""
+    req = db.get(DocumentUploadRequirement, requirement_id)
+    if req is None:
+        raise HTTPException(404, "Requirement not found.")
+    if req.status != "DRAFT":
+        raise HTTPException(409, "Only draft requirements can be deleted; archive active requirements instead.")
+    submissions = db.scalar(select(func.count(DocumentSubmission.id)).where(DocumentSubmission.requirement_id == req.id)) or 0
+    if submissions:
+        raise HTTPException(409, "This requirement has student submissions and cannot be deleted.")
+    _audit(db, actor, "document_requirement_deleted", req.id, {"status": req.status})
+    db.delete(req)
+    try:
+        db.commit()
+    except SQLAlchemyError as error:
+        db.rollback()
+        raise HTTPException(409, "This requirement is in use and cannot be deleted.") from error
+
 
 @router.get("", response_model=list[RequirementOut])
 def list_requirements(actor: User = Depends(get_current_user), db: Session = Depends(get_db)):

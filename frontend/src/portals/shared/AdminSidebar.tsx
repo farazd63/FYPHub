@@ -5,12 +5,12 @@ type Props = { groups: readonly AdminNavGroup[]; active: string; collapsed: bool
 
 function iconFor(page: string) {
   if (page === "overview") return <SidebarIcon name="overview" />;
-  if (page === "users" || page === "eligibility" || page === "registry") return <SidebarIcon name="people" />;
+  if (page === "users") return <SidebarIcon name="people" />;
   if (page === "cycles" || page === "schedule") return <SidebarIcon name="schedule" />;
   if (page === "templates" || page === "documentRequirements") return <SidebarIcon name="documents" />;
   if (page === "capacity") return <SidebarIcon name="capacity" />;
   if (page === "supervisorRequests") return <SidebarIcon name="requests" />;
-  if (page === "workflow" || page === "rubrics" || page === "deadlines" || page === "reminders") return <SidebarIcon name="criteria" />;
+  if (page === "rubrics" || page === "deadlines" || page === "reminders") return <SidebarIcon name="criteria" />;
   if (page === "archive") return <SidebarIcon name="archive" />;
   return <SidebarIcon name="history" />;
 }

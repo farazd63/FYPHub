@@ -1,0 +1,11 @@
+{
+  "module_id": "module-01",
+  "name": "governance and academic configuration",
+  "frontend_entrypoints": ["frontend/src/AdminPortal.tsx", "frontend/src/AdminUsersRoles.tsx", "frontend/src/AdminCycleManager.tsx", "frontend/src/AdminSupervisorCapacity.tsx", "frontend/src/AdminDeadlines.tsx", "frontend/src/AdminReminderRules.tsx"],
+  "backend_routes": ["/api/v1/admin/users", "/api/v1/admin/supervisor-capacities", "/api/v1/academic-cycles", "/api/v1/admin/deadlines", "/api/v1/admin/reminder-rules"],
+  "database_tables": ["users", "academic_cycles", "academic_group_policies", "supervisor_capacity_policies", "supervisor_assignments", "academic_deadlines", "academic_deadline_versions", "reminder_rules", "admin_audit_events"],
+  "roles": ["ADMIN", "COORDINATOR"],
+  "permissions": ["Existing FastAPI role dependencies and server-side scope checks"],
+  "tests": ["backend/tests/test_admin_users.py", "backend/tests/test_cycle_concurrency.py", "backend/tests/test_supervisor_capacity.py", "backend/tests/test_academic_deadlines.py", "backend/tests/test_reminder_rules.py"],
+  "status": "implemented"
+}

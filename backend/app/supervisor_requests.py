@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .auth import get_current_user, require_roles, utc_now, validate_mutating_origin
+from .collaboration_channels import ensure_collaboration_channel
 from .database import get_db
 from .config import settings
 from .pdf_extraction import EXTRACTION_RUNTIME, PdfExtractionError, extract_proposal_document
@@ -205,11 +206,12 @@ def _lock_capacity(session: Session, supervisor_id: int, cycle_id: int) -> tuple
     ).scalar_one_or_none()
     if supervisor is None or supervisor.role != UserRole.SUPERVISOR or not supervisor.is_active:
         raise failure("supervisor_ineligible", "The selected supervisor is not active.")
+    cycle = session.get(AcademicCycle, cycle_id)
     policy = session.execute(
         select(SupervisorCapacityPolicy)
         .where(
             SupervisorCapacityPolicy.supervisor_id == supervisor_id,
-            SupervisorCapacityPolicy.academic_cycle_id == cycle_id,
+            or_(SupervisorCapacityPolicy.academic_year == cycle.academic_year, SupervisorCapacityPolicy.academic_cycle_id == cycle_id) if cycle and cycle.academic_year is not None else SupervisorCapacityPolicy.academic_cycle_id == cycle_id,
         )
         .with_for_update()
     ).scalar_one_or_none()
@@ -219,16 +221,17 @@ def _lock_capacity(session: Session, supervisor_id: int, cycle_id: int) -> tuple
 
 
 def _capacity_used(session: Session, supervisor_id: int, cycle_id: int, *, exclude_request_id: int | None = None) -> int:
+    cycle = session.get(AcademicCycle, cycle_id)
     assignment_count = session.scalar(
-        select(func.count(SupervisorAssignment.id)).where(
+        select(func.count(SupervisorAssignment.id)).outerjoin(AcademicCycle, AcademicCycle.id == SupervisorAssignment.academic_cycle_id).where(
             SupervisorAssignment.supervisor_id == supervisor_id,
-            SupervisorAssignment.academic_cycle_id == cycle_id,
             SupervisorAssignment.ended_at.is_(None),
+            (or_(SupervisorAssignment.academic_year == cycle.academic_year, (SupervisorAssignment.academic_year.is_(None)) & (AcademicCycle.academic_year == cycle.academic_year)) if cycle and cycle.academic_year is not None else SupervisorAssignment.academic_cycle_id == cycle_id),
         )
     ) or 0
     individual_request = select(func.count(SupervisorRequest.id)).where(
         SupervisorRequest.supervisor_id == supervisor_id,
-        SupervisorRequest.academic_cycle_id == cycle_id,
+        SupervisorRequest.academic_cycle_id.in_(select(AcademicCycle.id).where(AcademicCycle.academic_year == cycle.academic_year)) if cycle and cycle.academic_year is not None else SupervisorRequest.academic_cycle_id == cycle_id,
         SupervisorRequest.status == SupervisorRequestStatus.ACCEPTED.value,
         SupervisorRequest.assignment_id.is_(None),
     )
@@ -399,7 +402,7 @@ def _out(session: Session, row: SupervisorRequest, *, include_history: bool = Tr
     capacity_policy = session.scalar(
         select(SupervisorCapacityPolicy).where(
             SupervisorCapacityPolicy.supervisor_id == row.supervisor_id,
-            SupervisorCapacityPolicy.academic_cycle_id == row.academic_cycle_id,
+            or_(SupervisorCapacityPolicy.academic_year == cycle.academic_year, SupervisorCapacityPolicy.academic_cycle_id == row.academic_cycle_id) if cycle and cycle.academic_year is not None else SupervisorCapacityPolicy.academic_cycle_id == row.academic_cycle_id,
         )
     )
     capacity_limit = capacity_policy.max_group_capacity if capacity_policy else None
@@ -469,7 +472,7 @@ def eligible_supervisors(
         select(SupervisorCapacityPolicy)
         .join(User, User.id == SupervisorCapacityPolicy.supervisor_id)
         .where(
-            SupervisorCapacityPolicy.academic_cycle_id == cycle.id,
+            or_(SupervisorCapacityPolicy.academic_year == cycle.academic_year, SupervisorCapacityPolicy.academic_cycle_id == cycle.id) if cycle.academic_year is not None else SupervisorCapacityPolicy.academic_cycle_id == cycle.id,
             User.role == UserRole.SUPERVISOR,
             User.is_active.is_(True),
         )
@@ -855,6 +858,7 @@ def decide_request(
             assignment = SupervisorAssignment(team_id=team.id, academic_cycle_id=cycle.id, supervisor_id=actor.id, assigned_by_id=actor.id)
             session.add(assignment)
             session.flush()
+            ensure_collaboration_channel(session, assignment, team)
             row.assignment_id = assignment.id
             _audit(
                 session,

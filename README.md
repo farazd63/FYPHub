@@ -17,7 +17,7 @@ FYPHub is a final-year-project platform built with React/Vite, FastAPI, PostgreS
 - `docs/` — project documentation and workflow records.
 - `frontend/` — React/Vite application and Docker build files.
 - `scripts/` — administrative and development seed scripts.
-- `modules/` — feature documentation.
+- `docs/modules/` — module documentation and manifests; see `docs/architecture/module-inventory.md` for the source map.
 
 ## Docker Desktop setup
 

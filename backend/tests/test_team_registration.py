@@ -21,7 +21,7 @@ from app.models import TeamMember
 from app.security import verify_password
 
 
-def request_json(payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+def request_json(payload: dict[str, Any], path: str = "/api/v1/team-registration") -> tuple[int, dict[str, Any]]:
     """Call the endpoint in process, without starting a server or adding a client library."""
 
     async def invoke() -> list[dict[str, Any]]:
@@ -46,8 +46,8 @@ def request_json(payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
                 "http_version": "1.1",
                 "method": "POST",
                 "scheme": "http",
-                "path": "/api/v1/team-registration",
-                "raw_path": b"/api/v1/team-registration",
+                "path": path,
+                "raw_path": path.encode(),
                 "query_string": b"",
                 "headers": [(b"content-type", b"application/json")],
                 "client": ("127.0.0.1", 0),
@@ -151,7 +151,7 @@ class TeamRegistrationApiTests(unittest.TestCase):
     def registration(self, suffix: str) -> str:
         return f"{self.prefix}_{suffix}".upper()
 
-    def create_cycle(self, *, open_for_registration: bool, with_policy: bool = True, max_size: int = 3, seed_roster: bool = True) -> int:
+    def create_cycle(self, *, open_for_registration: bool, with_policy: bool = True, max_size: int = 3, seed_roster: bool = False) -> int:
         self.cycle_index += 1
         cycle_id = self.connection.execute(
             text(
@@ -252,6 +252,65 @@ class TeamRegistrationApiTests(unittest.TestCase):
         self.assertEqual(member_count, 2)
         self.assertNotEqual(password_hash, password)
         self.assertTrue(verify_password(password, password_hash))
+
+    def test_student_group_registration_creates_one_shared_student_account(self) -> None:
+        cycle_id = self.create_cycle(open_for_registration=True, max_size=3)
+        payload = {
+            "academic_cycle_id": cycle_id,
+            "group_email": self.email("group-login"),
+            "password": "CaseSensitivePassword1!",
+            "confirm_password": "CaseSensitivePassword1!",
+            "members": [
+                {"email": self.email("first-member"), "registration_number": self.registration("first")},
+                {"email": self.email("second-member"), "registration_number": self.registration("second")},
+            ],
+        }
+        status_code, response = request_json(payload, "/api/v1/student/group-registration")
+        self.assertEqual(status_code, 201)
+        self.assertEqual(response["account"]["role"], "STUDENT")
+        self.assertEqual(response["account"]["email"], payload["group_email"])
+        self.assertEqual(len(response["members"]), 2)
+        self.assertNotIn("password", response)
+
+    def test_student_group_registration_rejects_privileged_role_fields(self) -> None:
+        cycle_id = self.create_cycle(open_for_registration=True, max_size=3)
+        payload = {
+            "academic_cycle_id": cycle_id,
+            "group_email": self.email("group-login"),
+            "password": "CaseSensitivePassword1!",
+            "confirm_password": "CaseSensitivePassword1!",
+            "members": [{"email": self.email("member"), "registration_number": self.registration("member")}],
+            "role": "ADMIN",
+        }
+        status_code, response = request_json(payload, "/api/v1/student/group-registration")
+        self.assertEqual(status_code, 422)
+        self.assertNotIn("password", response)
+
+    def test_group_registration_accepts_only_names_and_registration_numbers(self) -> None:
+        cycle_id = self.create_cycle(open_for_registration=True, max_size=3)
+        request = self.payload(cycle_id)
+        request["creator"].pop("university_email")
+        request["members"][0].pop("university_email")
+        status_code, response = request_json(request)
+        self.assertEqual(status_code, 201)
+        self.assertEqual(len(response["members"]), 2)
+        self.assertEqual(
+            self.connection.execute(
+                text("SELECT count(*) FROM users WHERE email=:email"),
+                {"email": request["shared_login_email"]},
+            ).scalar_one(),
+            1,
+        )
+
+    def test_group_registration_enforces_configured_minimum(self) -> None:
+        cycle_id = self.create_cycle(open_for_registration=True, max_size=4)
+        self.connection.execute(
+            text("UPDATE academic_group_policies SET min_group_size=3 WHERE academic_cycle_id=:cycle"),
+            {"cycle": cycle_id},
+        )
+        status_code, response = request_json(self.payload(cycle_id))
+        self.assertEqual(status_code, 422)
+        self.assertEqual(self.detail_code(response), "group_size_below_minimum")
 
     def test_cors_allows_only_the_configured_frontend_origin(self) -> None:
         for origin in ("http://127.0.0.1:5173", "http://localhost:5173"):
@@ -407,7 +466,22 @@ class TeamRegistrationApiTests(unittest.TestCase):
         self.assertNotIn("password", response)
         self.assertNotIn("password_hash", response)
 
+    def test_password_confirmation_mismatch_is_rejected_before_creation(self) -> None:
+        cycle_id = self.create_cycle(open_for_registration=True)
+        payload = self.payload(cycle_id, confirm_password="DifferentPassword123!")
+        status_code, response = request_json(payload)
+        self.assertEqual(status_code, 422)
+        self.assertEqual(self.detail_code(response), "password_mismatch")
+        self.assertEqual(
+            self.connection.execute(
+                text("SELECT count(*) FROM users WHERE email = :email"),
+                {"email": payload["shared_login_email"]},
+            ).scalar_one(),
+            0,
+        )
 
+
+@unittest.skip("Approved student roster eligibility module removed")
 class TeamEligibilityTests(TeamRegistrationApiTests):
     """Roster enforcement uses the selected cycle and each member's contact email."""
 

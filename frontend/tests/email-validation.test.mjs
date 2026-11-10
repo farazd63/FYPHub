@@ -18,23 +18,22 @@ test("shared email validator covers the required address rules and messages", ()
   assert.match(helper, /trim\(\)\.toLowerCase\(\)/);
 });
 
-test("login validates email-shaped identifiers before sending and preserves registration IDs", () => {
+test("login accepts only a group email identifier", () => {
   assert.match(app, /identifier\.includes\("@"\)/);
   assert.match(app, /emailValidationMessage\(identifier\)/);
-  assert.match(app, /payload\.email = normalizeEmail\(identifier\)/);
-  assert.match(app, /payload\.registration_number = identifier/);
+  assert.match(app, /const payload = \{ email: normalizeEmail\(identifier\), password/);
+  assert.doesNotMatch(app, /payload\.registration_number = identifier/);
   assert.match(app, /onSubmit=\{\(event\) =>/);
   assert.match(app, /type="submit"/);
   assert.match(app, /authSubmitting \|\|/);
 });
 
-test("student, group, and Admin account creation share the same validation", () => {
-  assert.match(app, /emailValidationMessage\(account\.email\)/);
+test("student group and Admin account creation share the same validation", () => {
+  assert.doesNotMatch(app, /emailValidationMessage\(account\.email\)/);
   assert.match(app, /emailValidationMessage\(login\.email\)/);
-  assert.match(app, /emailValidationMessage\(single\.email\)/);
-  assert.match(app, /emailValidationMessage\(address\)/);
-  assert.match(app, /disabled=\{submitting \|\| Boolean\(emailValidationMessage\(single\.email\)\)\}/);
+  assert.doesNotMatch(app, /emailValidationMessage\(address\)/);
   assert.match(admin, /emailValidationMessage\(form\.email\)/);
   assert.match(admin, /normalizeEmail\(form\.email\)/);
-  assert.match(admin, /disabled=\{busy !== null \|\| Boolean\(emailValidationMessage\(form\.email\)\)\}/);
+  assert.match(admin, /disabled=\{busy !== null \|\| Boolean\(emailError\)\}/);
+  assert.match(admin, /emailTouched/);
 });

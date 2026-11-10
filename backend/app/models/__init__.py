@@ -17,27 +17,9 @@ __all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "Supervis
 
 from .reminder_rule import ReminderRule, ReminderRuleVersion
 
-from .student_roster import ApprovedStudent, RosterImport
-
-from .workflow_policy import WorkflowPolicy, WorkflowPolicyVersion
-
 from .supervisor_assignment import SupervisorAssignment
 
 from .group_message import GroupMessage
-
-from .team_preference import TeamPreference
-
-from .match_chat import MatchChat, MatchMessage, MatchConsent
-
-from .individual_verification import IdentityChallenge, IdentityProof
-
-from .anonymous_verification import AnonymousVerificationContext, AnonymousVerificationChallenge, AnonymousIdentityProof
-
-from .join_request import JoinRequest, JoinRequestAudit
-
-from .invitation import Invitation, InvitationAudit
-
-from .invitation import InvitationOutbox
 
 from .supervisor_request import SupervisorRequest, SupervisorRequestDocument, SupervisorRequestExtractionStatus, SupervisorRequestStatus, SupervisorRequestStatusHistory, SupervisorRequestSubmissionNoteVersion
 from .proposal import Proposal, ProposalVersion
@@ -45,8 +27,7 @@ from .proposal_ai_review import ProposalAIReviewRun
 from .proposal_reference import ProposalReference, ProposalReferenceDocument
 from .proposal_compliance import ProposalComplianceSubmission, ProposalComplianceReport
 from .supervisor_request_conversation import SupervisorRequestMessage
-from .fyp_registry import FypRegistryMetadata
 from .archived_project import ArchivedProject, ArchivedProjectDocument, ArchivedProjectDocumentType
 from .project_workflow import ProjectMilestone, ProjectTask, SupervisionMeeting, DefenseSchedule, DefensePanelMember, PanelEvaluation, PanelEvaluationScore
-from .module2_collaboration import Module2Notification, Module2ChannelRead, Module2MatchReport, Module2ChatbotSession
+from .module2_collaboration import Module2Notification, Module2ChannelRead, Module2ChatbotSession, CollaborationChannel, CollaborationParticipant, CollaborationMessage
 from .agent_supervision import SupervisionAgentRun

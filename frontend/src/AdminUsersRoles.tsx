@@ -46,6 +46,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [notice, setNotice] = useState("");
+  const [emailTouched, setEmailTouched] = useState(false);
   const [busy, setBusy] = useState<number | "create" | null>(null);
   const [confirm, setConfirm] = useState<{
     user: User;
@@ -60,6 +61,9 @@ export function AdminUsersRoles({ api }: { api: string }) {
     registration_number: "",
   });
   const [fieldError, setFieldError] = useState("");
+  const emailError = emailTouched && form.email.trim()
+    ? emailValidationMessage(form.email)
+    : undefined;
   const load = useCallback(async () => {
     setState("loading");
     const query = new URLSearchParams({ page: String(page), page_size: "20" });
@@ -86,7 +90,8 @@ export function AdminUsersRoles({ api }: { api: string }) {
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
     if (busy) return;
-    const emailError = emailValidationMessage(form.email);
+    setEmailTouched(true);
+    const emailError = form.email.trim() ? emailValidationMessage(form.email) : undefined;
     if (emailError) {
       setFieldError(emailError);
       return;
@@ -108,9 +113,13 @@ export function AdminUsersRoles({ api }: { api: string }) {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
+          full_name: form.full_name,
           email: normalizeEmail(form.email),
-          registration_number: form.registration_number.trim() || null,
+          password: form.password,
+          role: form.role,
+          ...(form.role === "STUDENT"
+            ? { registration_number: form.registration_number.trim() }
+            : {}),
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -125,6 +134,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
         role: "SUPERVISOR",
         registration_number: "",
       });
+      setEmailTouched(false);
       setNotice("Account created.");
       setPage(1);
       await load();
@@ -376,16 +386,17 @@ export function AdminUsersRoles({ api }: { api: string }) {
                 required
                 className={input}
                 type="email"
-                aria-invalid={Boolean(emailValidationMessage(form.email))}
+                aria-invalid={Boolean(emailError)}
                 value={form.email}
                 onChange={(event) => {
                   setForm({ ...form, email: event.target.value });
                   setFieldError("");
                 }}
+                onBlur={() => setEmailTouched(true)}
               />
-              {emailValidationMessage(form.email) && (
+              {emailError && (
                 <span className="text-sm font-normal text-[#a43a33]">
-                  {emailValidationMessage(form.email)}
+                  {emailError}
                 </span>
               )}
             </label>
@@ -400,38 +411,41 @@ export function AdminUsersRoles({ api }: { api: string }) {
               <select
                 className={`${input} min-w-0 pr-10`}
                 value={form.role}
-                onChange={(event) =>
-                  setForm({ ...form, role: event.target.value as Role })
-                }
+                onChange={(event) => {
+                  const nextRole = event.target.value as Role;
+                  setFieldError("");
+                  setForm({
+                    ...form,
+                    role: nextRole,
+                    ...(nextRole === "STUDENT" ? {} : { registration_number: "" }),
+                  });
+                }}
               >
                 {roles.map((item) => (
                   <option key={item} value={item}>{roleLabel[item]}</option>
                 ))}
               </select>
             </label>
-            <label className="grid gap-1 text-sm font-semibold">
-              Registration number{" "}
-              {form.role === "STUDENT" ? (
-                <span className="text-[#a43a33]">(required)</span>
-              ) : (
-                <span className="font-normal text-[#60716b]">(optional)</span>
-              )}
-              <input
-                required={form.role === "STUDENT"}
-                className={input}
-                value={form.registration_number}
-                onChange={(event) =>
-                  setForm({ ...form, registration_number: event.target.value })
-                }
-              />
-            </label>
+            {form.role === "STUDENT" && (
+              <label className="grid gap-1 text-sm font-semibold">
+                Registration number <span className="text-[#a43a33]">(required)</span>
+                <input
+                  required
+                  className={input}
+                  value={form.registration_number}
+                  onChange={(event) =>
+                    setForm({ ...form, registration_number: event.target.value })
+                  }
+                />
+              </label>
+            )}
             {fieldError && (
               <p role="alert" className="text-sm text-[#a43a33]">
                 {fieldError}
               </p>
             )}
             <button
-              disabled={busy !== null || Boolean(emailValidationMessage(form.email))}
+              disabled={busy !== null || Boolean(emailError)}
               className="rounded-lg bg-[#176b66] px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:bg-[#125650] disabled:opacity-60"
             >
               {busy === "create" ? "Creating…" : "Create account"}

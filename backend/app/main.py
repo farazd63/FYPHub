@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from .database import engine, get_db
 from .config import settings
 from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
-from .models import AcademicCycle, AcademicGroupPolicy, ApprovedStudent, SupervisorCapacityPolicy, SupervisorAssignment, SupervisorRequest, SupervisorRequestStatus
+from .models import AcademicCycle, AcademicGroupPolicy, SupervisorCapacityPolicy, SupervisorAssignment, SupervisorRequest, SupervisorRequestStatus
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
 from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
 from .models import EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion
@@ -31,10 +31,10 @@ from .academic_cycle_overview import router as academic_cycle_overview_router
 from .schemas.academic import CycleCreate, CycleOut, CycleUpdate, PolicyOut, PolicyUpdate
 from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
 from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange
-from .schemas.supervisor_capacity import SupervisorCapacityOut, SupervisorCapacityWrite
-from .schemas.team_registration import TeamMemberInput, TeamRegistrationRequest, TeamRegistrationResponse
+from .schemas.supervisor_capacity import CapacitySession, SupervisorCapacityOut, SupervisorCapacityWrite
+from .schemas.team_registration import StudentGroupRegistrationRequest, TeamMemberInput, TeamRegistrationRequest, TeamRegistrationResponse
 from .security import generate_session_token, hash_password, hash_session_token, validate_password, verify_password
-from .registration_policy import DEMO_MODE_WARNING, RegistrationMode, registration_mode, roster_validation_required
+from .registration_policy import DEMO_MODE_WARNING, RegistrationMode, registration_mode
 from .project_workflow import router as project_workflow_router
 from .evaluations import router as evaluations_router
 from .modules.module_03_proposal.router import router as proposal_compliance_router
@@ -132,11 +132,11 @@ def registration_error(
     return HTTPException(status_code=status_code, detail=detail)
 
 
-def normalize_team_member(member: TeamMemberInput, path: str) -> dict[str, str]:
+def normalize_team_member(member: TeamMemberInput, path: str) -> dict[str, str | None]:
     """Apply the established identifier conventions and field-length rules."""
     full_name = member.full_name.strip()
     registration_number = member.registration_number.strip().upper()
-    university_email = str(member.university_email).strip().lower()
+    university_email = str(member.university_email).strip().lower() if member.university_email else None
 
     if not full_name or len(full_name) > 255:
         raise registration_error(
@@ -152,7 +152,7 @@ def normalize_team_member(member: TeamMemberInput, path: str) -> dict[str, str]:
             "Registration number must be between 1 and 100 non-whitespace characters.",
             f"{path}.registration_number",
         )
-    if len(university_email) > 320:
+    if university_email is not None and len(university_email) > 320:
         raise registration_error(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "invalid_university_email",
@@ -707,11 +707,13 @@ def create_evaluation_rubric_version(
 @app.post("/api/v1/admin/academic-cycles", status_code=status.HTTP_201_CREATED, response_model=CycleOut)
 def create_cycle(payload: CycleCreate, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> AcademicCycle:
     validate_mutating_origin(request)
-    cycle = AcademicCycle(code=payload.code, display_name=payload.display_name, registration_open=False)
+    cycle_code = f"{payload.academic_year}-{payload.session.value}"
+    display_name = f"{payload.session.value.title()} {payload.academic_year}"
+    cycle = AcademicCycle(code=cycle_code, display_name=display_name, academic_year=payload.academic_year, session=payload.session.value, registration_open=False)
     session.add(cycle)
     try:
         session.flush()
-        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_CYCLE", target_id=cycle.id, action="academic_cycle_created", changed_values={"code": cycle.code, "display_name": cycle.display_name, "registration_open": False})
+        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_CYCLE", target_id=cycle.id, action="academic_cycle_created", changed_values={"academic_year": cycle.academic_year, "session": cycle.session, "code": cycle.code, "display_name": cycle.display_name, "registration_open": False})
         session.commit(); session.refresh(cycle)
     except IntegrityError as error:
         session.rollback()
@@ -739,6 +741,25 @@ def update_cycle(cycle_id: int, payload: CycleUpdate, request: Request, actor: U
     return cycle
 
 
+@app.delete("/api/v1/admin/academic-cycles/{cycle_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_cycle(cycle_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> Response:
+    validate_mutating_origin(request)
+    cycle = session.execute(select(AcademicCycle).where(AcademicCycle.id == cycle_id).with_for_update()).scalar_one_or_none()
+    if cycle is None:
+        raise cycle_error(status.HTTP_404_NOT_FOUND, "cycle_not_found", "Academic cycle was not found.")
+    if cycle.registration_open:
+        raise cycle_error(status.HTTP_409_CONFLICT, "cycle_open", "Close registration before deleting this academic cycle.")
+    try:
+        session.delete(cycle)
+        session.flush()
+    except IntegrityError as error:
+        session.rollback()
+        raise cycle_error(status.HTTP_409_CONFLICT, "cycle_in_use", "This academic cycle has related records and cannot be deleted.") from error
+    add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_CYCLE", target_id=cycle_id, action="academic_cycle_deleted", changed_values={"academic_year": cycle.academic_year, "session": cycle.session})
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @app.put("/api/v1/admin/academic-cycles/{cycle_id}/group-policy", response_model=PolicyOut)
 def set_group_policy(cycle_id: int, payload: PolicyUpdate, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> AcademicGroupPolicy:
     validate_mutating_origin(request)
@@ -756,6 +777,22 @@ def set_group_policy(cycle_id: int, payload: PolicyUpdate, request: Request, act
     add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_GROUP_POLICY", target_id=policy.id, action="group_policy_created" if created else "group_policy_updated", changed_values={"academic_cycle_id": cycle.id, "max_group_size": payload.max_group_size, "previous_max_group_size": None if created else previous})
     session.commit(); session.refresh(policy)
     return policy
+
+
+@app.delete("/api/v1/admin/academic-cycles/{cycle_id}/group-policy", status_code=status.HTTP_204_NO_CONTENT)
+def delete_group_policy(cycle_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> Response:
+    validate_mutating_origin(request)
+    cycle, policy = locked_cycle_and_policy(session, cycle_id)
+    if policy is None:
+        raise cycle_error(status.HTTP_404_NOT_FOUND, "group_policy_not_found", "No group-size policy exists for this academic cycle.")
+    if cycle.registration_open:
+        raise cycle_error(status.HTTP_409_CONFLICT, "group_policy_in_use", "Close registration before deleting the group-size policy.")
+    if largest_active_team_size(session, cycle.id) > 0:
+        raise cycle_error(status.HTTP_409_CONFLICT, "group_policy_in_use", "This group-size policy has active team records and cannot be deleted.")
+    add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_GROUP_POLICY", target_id=policy.id, action="group_policy_deleted", changed_values={"academic_cycle_id": cycle.id})
+    session.delete(policy)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.get("/health")
@@ -794,7 +831,7 @@ def login(
     request: Request,
     response: Response,
     session: Session = Depends(get_db),
-) -> User:
+) -> dict[str, object]:
     """Authenticate an active account and issue a new opaque cookie session."""
     validate_mutating_origin(request)
     if credentials.email is not None:
@@ -802,15 +839,20 @@ def login(
             select(User).where(User.email == str(credentials.email).strip().lower())
         ).scalar_one_or_none()
     else:
-        user = session.execute(
-            select(User).where(User.registration_number == credentials.registration_number)
-        ).scalar_one_or_none()
+        # Student access is group-account-only: registration numbers are never
+        # accepted as login identifiers.
+        user = None
     password_hash = user.password_hash if user is not None else _DUMMY_PASSWORD_HASH
     password_valid = verify_password(credentials.password, password_hash)
+    group_linked = user is not None and (
+        user.role != UserRole.STUDENT
+        or session.scalar(select(Team.id).where(Team.shared_user_id == user.id, Team.status != "dissolved").limit(1)) is not None
+    )
     if (
         user is None
         or not password_valid
         or not user.is_active
+        or not group_linked
         or (credentials.requested_role is not None and user.role != credentials.requested_role)
     ):
         log_temporary_auth_diagnostic(
@@ -851,11 +893,31 @@ def login(
         cookie_samesite="lax",
         cookie_max_age=SESSION_LIFETIME_HOURS * 60 * 60,
     )
-    return user
+    return account_response(session, user)
+
+
+def account_response(session: Session, user: User) -> dict[str, object]:
+    """Return saved account role plus the group context owned by that account."""
+    group_id = session.scalar(
+        select(Team.id)
+        .where(Team.shared_user_id == user.id, Team.status != "dissolved")
+        .order_by(Team.id)
+        .limit(1)
+    )
+    return {
+        "id": user.id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "registration_number": user.registration_number,
+        "role": user.role,
+        "is_active": user.is_active,
+        "group_id": group_id if user.role == UserRole.STUDENT else None,
+        "group_email": user.email if user.role == UserRole.STUDENT and group_id is not None else None,
+    }
 
 
 @app.get("/api/v1/auth/me", response_model=CurrentUserResponse)
-def current_user(request: Request, current_user: User = Depends(get_current_user)) -> User:
+def current_user(request: Request, current_user: User = Depends(get_current_user), session: Session = Depends(get_db)) -> dict[str, object]:
     """Return the authenticated active account's safe fields."""
     log_temporary_auth_diagnostic(
         request,
@@ -866,14 +928,15 @@ def current_user(request: Request, current_user: User = Depends(get_current_user
         role_comparison="not applicable",
         response_status=status.HTTP_200_OK,
     )
-    return current_user
+    return account_response(session, current_user)
 
 
 @app.get("/api/v1/admin/me", response_model=CurrentUserResponse)
 def admin_current_user(
     request: Request,
     current_user: User = Depends(require_roles(UserRole.ADMIN)),
-) -> User:
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
     """Return the current account only when its persisted role is ADMIN."""
     log_temporary_auth_diagnostic(
         request,
@@ -884,7 +947,7 @@ def admin_current_user(
         role_comparison="matched",
         response_status=status.HTTP_200_OK,
     )
-    return current_user
+    return account_response(session, current_user)
 
 
 @app.get("/api/v1/admin/registration-mode")
@@ -947,21 +1010,63 @@ def revoke_user_sessions(session: Session, user_id: int) -> None:
     )
 
 
+def supervisor_capacity_counts(session: Session, supervisor_id: int, academic_year: int | None) -> dict[str, int]:
+    if academic_year is None:
+        return {"FALL": 0, "SPRING": 0, "total": 0}
+    rows = session.execute(
+        select(SupervisorAssignment, AcademicCycle.session, AcademicCycle.academic_year)
+        .outerjoin(AcademicCycle, AcademicCycle.id == SupervisorAssignment.academic_cycle_id)
+        .where(
+            SupervisorAssignment.supervisor_id == supervisor_id,
+            SupervisorAssignment.ended_at.is_(None),
+            (SupervisorAssignment.academic_year == academic_year)
+            | ((SupervisorAssignment.academic_year.is_(None)) & (AcademicCycle.academic_year == academic_year)),
+        )
+    ).all()
+    counts = {"FALL": 0, "SPRING": 0, "total": 0}
+    for assignment, cycle_session, _ in rows:
+        period_session = assignment.session or cycle_session
+        if period_session in ("FALL", "SPRING"):
+            counts[period_session] += 1
+        counts["total"] += 1
+    return counts
+
+
 def supervisor_capacity_out(policy: SupervisorCapacityPolicy, session: Session) -> dict[str, object]:
     supervisor = policy.supervisor
     cycle = policy.academic_cycle
-    assigned = session.scalar(select(func.count(SupervisorAssignment.id)).where(SupervisorAssignment.supervisor_id == policy.supervisor_id, SupervisorAssignment.academic_cycle_id == policy.academic_cycle_id, SupervisorAssignment.ended_at.is_(None))) or 0
-    assigned += session.scalar(select(func.count(SupervisorRequest.id)).where(SupervisorRequest.supervisor_id == policy.supervisor_id, SupervisorRequest.academic_cycle_id == policy.academic_cycle_id, SupervisorRequest.status == SupervisorRequestStatus.ACCEPTED.value, SupervisorRequest.assignment_id.is_(None))) or 0
+    academic_year = policy.academic_year if policy.academic_year is not None else cycle.academic_year if cycle else None
+    counts = supervisor_capacity_counts(session, policy.supervisor_id, academic_year)
+    assigned = counts["total"]
+    eligible = supervisor.is_active and supervisor.role == UserRole.SUPERVISOR
+    if not eligible:
+        status_value = "INACTIVE"
+    elif assigned > policy.max_group_capacity:
+        status_value = "OVER_CAPACITY"
+    elif assigned >= policy.max_group_capacity:
+        status_value = "FULL"
+    elif assigned * 100 >= policy.max_group_capacity * 80:
+        status_value = "NEARLY_FULL"
+    else:
+        status_value = "AVAILABLE"
+    remaining_capacity = max(policy.max_group_capacity - assigned, 0)
     return {
-        "assigned": assigned, "remaining": max(policy.max_group_capacity - assigned, 0), "full": assigned >= policy.max_group_capacity,
+        "assigned": assigned, "remaining": remaining_capacity, "full": assigned >= policy.max_group_capacity,
+        "assigned_groups": assigned, "remaining_groups": remaining_capacity, "status": status_value,
         "id": policy.id,
         "supervisor_id": supervisor.id,
         "supervisor_name": supervisor.full_name,
         "supervisor_email": supervisor.email,
-        "supervisor_is_eligible": supervisor.is_active and supervisor.role == UserRole.SUPERVISOR,
-        "academic_cycle_id": cycle.id,
-        "academic_cycle_name": cycle.display_name,
+        "supervisor_is_eligible": eligible,
+        "academic_cycle_id": cycle.id if cycle else None,
+        "academic_cycle_name": cycle.display_name if cycle else None,
+        "academic_year": academic_year,
+        "fall_assigned": counts["FALL"],
+        "spring_assigned": counts["SPRING"],
+        "total_assigned": assigned,
+        "remaining_capacity": remaining_capacity,
         "max_group_capacity": policy.max_group_capacity,
+        "maximum_groups": policy.max_group_capacity,
         "created_at": policy.created_at,
         "updated_at": policy.updated_at,
     }
@@ -978,6 +1083,20 @@ def locked_eligible_supervisor_and_cycle(session: Session, supervisor_id: int, c
     if not supervisor.is_active or supervisor.role != UserRole.SUPERVISOR:
         raise admin_user_error(status.HTTP_409_CONFLICT, "supervisor_ineligible", "Capacity can be configured only for an active SUPERVISOR account.")
     return supervisor, cycle
+
+
+def locked_eligible_supervisor_and_period(session: Session, supervisor_id: int, academic_year: int) -> User:
+    """Lock an active supervisor before changing annual capacity."""
+    supervisor = session.execute(select(User).where(User.id == supervisor_id).with_for_update()).scalar_one_or_none()
+    if supervisor is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "supervisor_not_found", "Supervisor account was not found.")
+    if not supervisor.is_active or supervisor.role != UserRole.SUPERVISOR:
+        raise admin_user_error(status.HTTP_409_CONFLICT, "supervisor_ineligible", "Capacity can be configured only for an active SUPERVISOR account.")
+    return supervisor
+
+
+def assigned_groups_for_period(session: Session, supervisor_id: int, academic_year: int) -> int:
+    return supervisor_capacity_counts(session, supervisor_id, academic_year)["total"]
 
 
 @app.get("/api/v1/admin/users", response_model=AdminUserPage)
@@ -1149,22 +1268,26 @@ def create_supervisor_capacity(
     # Serialize capacity writes before taking row locks. This prevents a
     # create and an update from acquiring policy/account locks in a cycle.
     session.execute(text("SELECT pg_advisory_xact_lock(98137243)"))
-    locked_eligible_supervisor_and_cycle(session, payload.supervisor_id, payload.academic_cycle_id)
+    locked_eligible_supervisor_and_period(session, payload.supervisor_id, payload.academic_year)
     existing = session.execute(select(SupervisorCapacityPolicy).where(
         SupervisorCapacityPolicy.supervisor_id == payload.supervisor_id,
-        SupervisorCapacityPolicy.academic_cycle_id == payload.academic_cycle_id,
+        SupervisorCapacityPolicy.academic_year == payload.academic_year,
     )).scalar_one_or_none()
     if existing is not None:
-        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and cycle.")
-    policy = SupervisorCapacityPolicy(**payload.model_dump())
+        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and academic year.")
+    policy = SupervisorCapacityPolicy(
+        supervisor_id=payload.supervisor_id,
+        academic_year=payload.academic_year,
+        max_group_capacity=payload.maximum_groups,
+    )
     session.add(policy)
     try:
         session.flush()
-        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=payload.supervisor_id, target_type="SUPERVISOR_CAPACITY_POLICY", target_id=policy.id, action="supervisor_capacity_created", changed_values={"academic_cycle_id": payload.academic_cycle_id, "max_group_capacity": payload.max_group_capacity})
+        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=payload.supervisor_id, target_type="SUPERVISOR_CAPACITY_POLICY", target_id=policy.id, action="supervisor_capacity_created", changed_values={"academic_year": payload.academic_year, "maximum_groups": payload.maximum_groups})
         session.commit(); session.refresh(policy)
     except IntegrityError as error:
         session.rollback()
-        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and cycle.") from error
+        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and academic year.") from error
     except SQLAlchemyError as error:
         session.rollback()
         raise admin_user_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "capacity_save_failed", "Supervisor capacity could not be saved.") from error
@@ -1182,30 +1305,62 @@ def update_supervisor_capacity(
     policy = session.execute(select(SupervisorCapacityPolicy).where(SupervisorCapacityPolicy.id == policy_id).with_for_update()).scalar_one_or_none()
     if policy is None:
         raise admin_user_error(status.HTTP_404_NOT_FOUND, "capacity_policy_not_found", "Supervisor capacity policy was not found.")
-    locked_eligible_supervisor_and_cycle(session, payload.supervisor_id, payload.academic_cycle_id)
+    locked_eligible_supervisor_and_period(session, payload.supervisor_id, payload.academic_year)
     duplicate = session.execute(select(SupervisorCapacityPolicy.id).where(
         SupervisorCapacityPolicy.supervisor_id == payload.supervisor_id,
-        SupervisorCapacityPolicy.academic_cycle_id == payload.academic_cycle_id,
+        SupervisorCapacityPolicy.academic_year == payload.academic_year,
         SupervisorCapacityPolicy.id != policy.id,
     )).scalar_one_or_none()
     if duplicate is not None:
-        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and cycle.")
-    assigned = session.scalar(select(func.count(SupervisorAssignment.id)).where(SupervisorAssignment.supervisor_id == policy.supervisor_id, SupervisorAssignment.academic_cycle_id == policy.academic_cycle_id, SupervisorAssignment.ended_at.is_(None))) or 0
-    if assigned and (policy.supervisor_id != payload.supervisor_id or policy.academic_cycle_id != payload.academic_cycle_id or payload.max_group_capacity < assigned):
-        raise admin_user_error(status.HTTP_409_CONFLICT, "capacity_in_use", "The policy cannot be moved or reduced below its current assignments.")
-    previous = {"supervisor_id": policy.supervisor_id, "academic_cycle_id": policy.academic_cycle_id, "max_group_capacity": policy.max_group_capacity}
-    policy.supervisor_id = payload.supervisor_id; policy.academic_cycle_id = payload.academic_cycle_id; policy.max_group_capacity = payload.max_group_capacity
+        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and academic year.")
+    old_year = policy.academic_year or (policy.academic_cycle.academic_year if policy.academic_cycle else payload.academic_year)
+    assigned = assigned_groups_for_period(session, policy.supervisor_id, old_year)
+    if payload.maximum_groups < assigned:
+        raise admin_user_error(status.HTTP_409_CONFLICT, "capacity_in_use", "Annual capacity cannot be lower than the currently assigned groups.")
+    previous = {"supervisor_id": policy.supervisor_id, "academic_year": policy.academic_year, "maximum_groups": policy.max_group_capacity}
+    policy.supervisor_id = payload.supervisor_id; policy.academic_year = payload.academic_year; policy.max_group_capacity = payload.maximum_groups
     try:
         session.flush()
-        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=payload.supervisor_id, target_type="SUPERVISOR_CAPACITY_POLICY", target_id=policy.id, action="supervisor_capacity_updated", changed_values={"before": previous, "after": payload.model_dump()})
+        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=payload.supervisor_id, target_type="SUPERVISOR_CAPACITY_POLICY", target_id=policy.id, action="supervisor_capacity_updated", changed_values={"before": previous, "after": {"supervisor_id": payload.supervisor_id, "academic_year": payload.academic_year, "maximum_groups": payload.maximum_groups}})
         session.commit(); session.refresh(policy)
     except IntegrityError as error:
         session.rollback()
-        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and cycle.") from error
+        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_capacity_policy", "A capacity policy already exists for this supervisor and academic year.") from error
     except SQLAlchemyError as error:
         session.rollback()
         raise admin_user_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "capacity_save_failed", "Supervisor capacity could not be saved.") from error
     return supervisor_capacity_out(policy, session)
+
+
+@app.delete("/api/v1/admin/supervisor-capacities/{policy_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_supervisor_capacity(
+    policy_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)
+) -> Response:
+    validate_mutating_origin(request)
+    session.execute(text("SELECT pg_advisory_xact_lock(98137243)"))
+    policy = session.execute(
+        select(SupervisorCapacityPolicy).where(SupervisorCapacityPolicy.id == policy_id).with_for_update()
+    ).scalar_one_or_none()
+    if policy is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "capacity_policy_not_found", "Supervisor capacity policy was not found.")
+    year = policy.academic_year if policy.academic_year is not None else (policy.academic_cycle.academic_year if policy.academic_cycle else None)
+    assigned = assigned_groups_for_period(session, policy.supervisor_id, year) if year is not None else 0
+    if assigned:
+        raise admin_user_error(status.HTTP_409_CONFLICT, "capacity_in_use", "This capacity policy has active assignments and cannot be deleted.")
+    active_requests = session.scalar(select(func.count(SupervisorRequest.id)).where(
+        SupervisorRequest.supervisor_id == policy.supervisor_id,
+        SupervisorRequest.status.in_((SupervisorRequestStatus.DRAFT.value, SupervisorRequestStatus.SUBMITTED.value, SupervisorRequestStatus.CHANGES_REQUESTED.value, SupervisorRequestStatus.ACCEPTED.value)),
+    )) or 0
+    if active_requests:
+        raise admin_user_error(status.HTTP_409_CONFLICT, "capacity_in_use", "This capacity policy has active supervisor requests and cannot be deleted.")
+    add_admin_audit_event(session, actor_id=actor.id, affected_user_id=policy.supervisor_id, target_type="SUPERVISOR_CAPACITY_POLICY", target_id=policy.id, action="supervisor_capacity_deleted", changed_values={})
+    session.delete(policy)
+    try:
+        session.commit()
+    except SQLAlchemyError as error:
+        session.rollback()
+        raise admin_user_error(status.HTTP_409_CONFLICT, "capacity_delete_failed", "The capacity policy could not be deleted because it is still in use.") from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.post("/api/v1/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -1237,63 +1392,16 @@ def logout(
 def register_student(
     registration: RegistrationRequest, session: Session = Depends(get_db)
 ) -> User:
-    """Create a student account without accepting public role assignment."""
-    full_name = registration.full_name.strip()
-    registration_number = registration.registration_number.strip().upper()
-    email = str(registration.email).strip().lower()
+    """Reject the retired individual public signup flow.
 
-    if not full_name or len(full_name) > 255:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="full_name must be between 1 and 255 non-whitespace characters.",
-        )
-    if not registration_number or len(registration_number) > 100:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="registration_number must be between 1 and 100 non-whitespace characters.",
-        )
-    if len(email) > 320:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="email must not exceed 320 characters.",
-        )
-    try:
-        validate_password(registration.password)
-    except ValueError as error:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(error),
-        ) from error
-
-    user = User(
-        full_name=full_name,
-        email=email,
-        registration_number=registration_number,
-        password_hash=hash_password(registration.password),
-        role=UserRole.STUDENT,
+    Public student registration is group-based.  Keep this route as an explicit
+    compatibility response so older clients cannot silently create accounts
+    outside the group-registration workflow.
+    """
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Individual student signup is no longer available. Create a student group account instead.",
     )
-    session.add(user)
-    try:
-        session.flush()
-        add_admin_audit_event(
-            session,
-            actor_id=user.id,
-            affected_user_id=user.id,
-            target_type="REGISTRATION",
-            target_id=user.id,
-            action="student_registration_created",
-            changed_values={"registration_mode": registration_mode().value},
-        )
-        session.commit()
-        session.refresh(user)
-    except IntegrityError as error:
-        session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="An account with that email or registration number already exists.",
-        ) from error
-
-    return user
 
 
 @app.post(
@@ -1330,6 +1438,13 @@ def register_team(
             "Password must be between 8 and 128 characters.",
             "password",
         )
+    if registration.confirm_password is not None and registration.password != registration.confirm_password:
+        raise registration_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "password_mismatch",
+            "Password and confirmation password must match.",
+            "confirm_password",
+        )
     try:
         validate_password(registration.password)
     except ValueError as error:
@@ -1353,7 +1468,7 @@ def register_team(
                 "Registration numbers must be unique within the team.",
                 f"{prefix}.registration_number",
             )
-        if university_email in email_paths:
+        if university_email is not None and university_email in email_paths:
             raise registration_error(
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 "duplicate_request_university_email",
@@ -1361,7 +1476,8 @@ def register_team(
                 f"{prefix}.university_email",
             )
         registration_paths[registration_number] = prefix
-        email_paths[university_email] = prefix
+        if university_email is not None:
+            email_paths[university_email] = prefix
 
     try:
         cycle = session.execute(
@@ -1403,12 +1519,19 @@ def register_team(
                 "Team size exceeds the configured maximum.",
                 "members",
             )
+        if len(all_members) < policy.min_group_size:
+            raise registration_error(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                "group_size_below_minimum",
+                "Team size is below the configured minimum.",
+                "members",
+            )
 
         existing_user = session.execute(
             select(User.email, User.registration_number).where(
                 or_(
                     User.email == shared_login_email,
-                    User.registration_number == creator["registration_number"],
+                    User.registration_number.in_(registration_paths),
                 )
             )
         ).all()
@@ -1427,14 +1550,20 @@ def register_team(
                     "An account with that creator registration number already exists.",
                     "creator.registration_number",
                 )
+            if registration_number in registration_paths:
+                raise registration_error(
+                    status.HTTP_409_CONFLICT,
+                    "member_registration_exists",
+                    "A registration number already belongs to another account.",
+                    f"{registration_paths[registration_number]}.registration_number",
+                )
 
         existing_member = session.execute(
             select(TeamMember.registration_number, TeamMember.university_email).where(
-                TeamMember.academic_cycle_id == cycle.id,
                 TeamMember.is_active.is_(True),
                 or_(
                     TeamMember.registration_number.in_(registration_paths),
-                    TeamMember.university_email.in_(email_paths),
+                    TeamMember.university_email.in_(email_paths) if email_paths else False,
                 ),
             )
         ).all()
@@ -1443,42 +1572,16 @@ def register_team(
                 raise registration_error(
                     status.HTTP_409_CONFLICT,
                     "member_registration_exists",
-                    "An active member with that registration number already exists in this cycle.",
+                    "An active member with that registration number already belongs to another group.",
                     f"{registration_paths[registration_number]}.registration_number",
                 )
             if university_email in email_paths:
                 raise registration_error(
                     status.HTTP_409_CONFLICT,
                     "member_university_email_exists",
-                    "An active member with that university email already exists in this cycle.",
+                    "An active member with that university email already belongs to another group.",
                     f"{email_paths[university_email]}.university_email",
                 )
-
-        if roster_validation_required():
-            # Import confirmation takes this same cycle lock before inserting roster rows.
-            # Keep it until registration commits so the eligibility decision is stable.
-            roster = session.execute(
-                select(ApprovedStudent.registration_number, ApprovedStudent.university_email, ApprovedStudent.semester)
-                .where(
-                    ApprovedStudent.academic_cycle_id == cycle.id,
-                    func.lower(ApprovedStudent.registration_number).in_(
-                        [member["registration_number"].lower() for member in all_members]
-                    ),
-                )
-            ).all()
-            eligible = {
-                (number.lower(), email.lower())
-                for number, email, semester in roster if semester in (7, 8)
-            }
-            for index, member in enumerate(all_members):
-                if (member["registration_number"].lower(), member["university_email"].lower()) not in eligible:
-                    prefix = "creator" if index == 0 else f"members.{index - 1}"
-                    raise registration_error(
-                        status.HTTP_422_UNPROCESSABLE_CONTENT,
-                        "student_not_eligible",
-                        "Registration number and university email could not be verified for this academic cycle.",
-                        f"{prefix}.registration_number",
-                    )
 
         user = User(
             full_name=creator["full_name"],
@@ -1499,7 +1602,7 @@ def register_team(
                 team_id=team.id,
                 academic_cycle_id=cycle.id,
                 is_creator=index == 0,
-                **member,
+                **{**member, "university_email": member["university_email"] or f"{member['registration_number'].lower()}@group.invalid"},
             )
             for index, member in enumerate(all_members)
         ]
@@ -1549,6 +1652,34 @@ def register_team(
         "cycle": cycle,
         "members": created_members,
     }
+
+
+@app.post(
+    "/api/v1/student/group-registration",
+    status_code=status.HTTP_201_CREATED,
+    response_model=TeamRegistrationResponse,
+)
+def register_student_group(
+    registration: StudentGroupRegistrationRequest,
+    session: Session = Depends(get_db),
+    *,
+    request: Request = None,
+) -> dict[str, object]:
+    """Create one shared STUDENT group account from member contacts only."""
+    if not registration.members:
+        raise registration_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "members_required", "Add at least one group member.", "members")
+    first, *remaining = registration.members
+    def member_name(email: str) -> str:
+        return email.split("@", 1)[0].replace(".", " ").replace("_", " ").strip().title() or "Group member"
+    legacy = TeamRegistrationRequest(
+        academic_cycle_id=registration.academic_cycle_id,
+        creator=TeamMemberInput(full_name=member_name(str(first.email)), registration_number=first.registration_number, university_email=first.email),
+        shared_login_email=registration.group_email,
+        password=registration.password,
+        confirm_password=registration.confirm_password,
+        members=[TeamMemberInput(full_name=member_name(str(member.email)), registration_number=member.registration_number, university_email=member.email) for member in remaining],
+    )
+    return register_team(legacy, session, request=request)
 
 
 # Non-operational reminder/escalation configuration.
@@ -1670,12 +1801,6 @@ def create_reminder_rule_version(rule_id: int, payload: ReminderWrite, request: 
 from .audit_history import router as audit_history_router
 app.include_router(audit_history_router)
 
-from .student_roster import router as student_roster_router
-app.include_router(student_roster_router)
-
-from .workflow_policy import router as workflow_policy_router
-app.include_router(workflow_policy_router)
-
 from .supervisor_assignments import router as supervisor_assignments_router
 app.include_router(supervisor_assignments_router)
 
@@ -1683,27 +1808,13 @@ from .group_channels import router as group_channels_router
 app.include_router(group_channels_router)
 from .module2_collaboration import router as module2_collaboration_router
 app.include_router(module2_collaboration_router)
-
+from .collaboration_channels import router as collaboration_channels_router
+app.include_router(collaboration_channels_router)
 from .group_ai import router as group_ai_router
 app.include_router(group_ai_router)
 
-from .team_matching import router as team_matching_router
-app.include_router(team_matching_router)
-
-from .match_chat import router as match_chat_router
-app.include_router(match_chat_router)
-
-from .individual_verification import router as individual_verification_router
-app.include_router(individual_verification_router)
-
-from .anonymous_verification import router as anonymous_verification_router
-app.include_router(anonymous_verification_router)
-
-from .join_requests import router as join_requests_router
-app.include_router(join_requests_router)
-
-from .invitations import router as invitations_router
-app.include_router(invitations_router)
+from .notifications import router as notifications_router
+app.include_router(notifications_router)
 
 from .supervisor_requests import proposal_router, router as supervisor_requests_router
 app.include_router(supervisor_requests_router)
@@ -1717,11 +1828,10 @@ app.include_router(supervisor_request_conversations_router)
 from .agent_supervision import router as agent_supervision_router
 app.include_router(agent_supervision_router)
 
-from .archived_projects import router as archived_projects_router
+from .archived_projects import admin_archive_router, router as archived_projects_router
 app.include_router(archived_projects_router)
+app.include_router(admin_archive_router)
 
-from .fyp_registry import router as fyp_registry_router
-app.include_router(fyp_registry_router)
 from .password_reset import router as password_reset_router
 app.include_router(password_reset_router)
 app.include_router(dashboard_requirements_router)

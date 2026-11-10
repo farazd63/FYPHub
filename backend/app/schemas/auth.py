@@ -89,5 +89,7 @@ class CurrentUserResponse(BaseModel):
     registration_number: str | None
     role: UserRole
     is_active: bool
+    group_id: int | None = None
+    group_email: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

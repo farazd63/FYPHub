@@ -1,0 +1,11 @@
+{
+  "module_id": "module-02",
+  "name": "student teams and collaboration",
+  "frontend_entrypoints": ["frontend/src/portals/student/modules/Module2Workspace.tsx", "frontend/src/GroupChannels.tsx"],
+  "backend_routes": ["/api/v1/module-2", "/api/v1/group-channels", "/api/v1/team-registration"],
+  "database_tables": ["teams", "team_members", "group_messages", "module2_channel_reads", "module2_notifications", "supervisor_assignments"],
+  "roles": ["STUDENT", "SUPERVISOR", "COORDINATOR", "ADMIN"],
+  "permissions": ["Existing team ownership and role-scoped API dependencies"],
+  "tests": ["backend/tests/test_team_registration.py", "backend/tests/test_team_constraints.py", "backend/tests/test_group_channels.py", "backend/tests/test_group_ai.py"],
+  "status": "implemented"
+}

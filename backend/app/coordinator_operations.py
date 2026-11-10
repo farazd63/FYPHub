@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from .auth import require_roles
 from .database import get_db
-from .models import AcademicCycle, AdminAuditEvent, EvaluationRubric, EvaluationRubricVersion, SupervisorCapacityPolicy, TemplateReference, TemplateReferenceVersion, User, UserRole, WorkflowPolicy, WorkflowPolicyVersion
+from .models import AcademicCycle, AdminAuditEvent, EvaluationRubric, EvaluationRubricVersion, SupervisorAssignment, SupervisorCapacityPolicy, TemplateReference, TemplateReferenceVersion, User, UserRole
 
 router = APIRouter(prefix="/api/v1/coordinator", tags=["coordinator-operations"])
 COORDINATOR_ROLES = (UserRole.ADMIN, UserRole.COORDINATOR)
@@ -17,17 +17,36 @@ def supervisor_capacity(_: User = Depends(require_roles(*COORDINATOR_ROLES)), se
     rows = session.execute(
         select(SupervisorCapacityPolicy, User, AcademicCycle)
         .join(User, User.id == SupervisorCapacityPolicy.supervisor_id)
-        .join(AcademicCycle, AcademicCycle.id == SupervisorCapacityPolicy.academic_cycle_id)
-        .order_by(AcademicCycle.id, User.full_name, User.id)
+        .outerjoin(AcademicCycle, AcademicCycle.id == SupervisorCapacityPolicy.academic_cycle_id)
+        .order_by(SupervisorCapacityPolicy.academic_year, User.full_name, User.id)
     ).all()
-    return [{
+    result = []
+    for policy, user, cycle in rows:
+        assignments = session.execute(select(SupervisorAssignment, AcademicCycle.session).outerjoin(AcademicCycle, AcademicCycle.id == SupervisorAssignment.academic_cycle_id).where(SupervisorAssignment.supervisor_id == policy.supervisor_id, SupervisorAssignment.ended_at.is_(None), (SupervisorAssignment.academic_year == policy.academic_year) | ((SupervisorAssignment.academic_year.is_(None)) & (AcademicCycle.academic_year == policy.academic_year)))).all()
+        fall_assigned = sum(1 for assignment, cycle_session in assignments if (assignment.session or cycle_session) == "FALL")
+        spring_assigned = sum(1 for assignment, cycle_session in assignments if (assignment.session or cycle_session) == "SPRING")
+        assigned = len(assignments)
+        remaining = max(policy.max_group_capacity - assigned, 0)
+        eligible = user.is_active and user.role == UserRole.SUPERVISOR
+        status = "INACTIVE" if not eligible else "OVER_CAPACITY" if assigned > policy.max_group_capacity else "FULL" if assigned == policy.max_group_capacity else "NEARLY_FULL" if assigned * 100 >= policy.max_group_capacity * 80 else "AVAILABLE"
+        result.append({
         "id": policy.id,
         "supervisor_id": user.id,
         "supervisor_name": user.full_name,
-        "academic_cycle_id": cycle.id,
-        "academic_cycle": cycle.display_name,
+        "academic_cycle_id": cycle.id if cycle else None,
+        "academic_cycle": cycle.display_name if cycle else None,
         "max_group_capacity": policy.max_group_capacity,
-    } for policy, user, cycle in rows]
+        "academic_year": policy.academic_year or cycle.academic_year,
+        "maximum_groups": policy.max_group_capacity,
+        "assigned_groups": assigned,
+        "remaining_groups": remaining,
+        "fall_assigned": fall_assigned,
+        "spring_assigned": spring_assigned,
+        "total_assigned": assigned,
+        "remaining_capacity": remaining,
+        "status": status,
+        })
+    return result
 
 
 @router.get("/audit-history")
@@ -41,13 +60,6 @@ def audit_history(_: User = Depends(require_roles(*COORDINATOR_ROLES)), session:
         "target_id": event.target_id,
         "created_at": event.created_at,
     } for event in rows]
-
-
-@router.get("/workflow-policies")
-def workflow_policies(_: User = Depends(require_roles(*COORDINATOR_ROLES)), session: Session = Depends(get_db)):
-    latest = select(WorkflowPolicyVersion.policy_id, func.max(WorkflowPolicyVersion.version_number).label("version")).group_by(WorkflowPolicyVersion.policy_id).subquery()
-    rows = session.execute(select(WorkflowPolicyVersion).join(latest, (latest.c.policy_id == WorkflowPolicyVersion.policy_id) & (latest.c.version == WorkflowPolicyVersion.version_number)).order_by(WorkflowPolicyVersion.policy_id)).scalars().all()
-    return [{"id": row.policy_id, "name": row.name, "latest_version_number": row.version_number, "states": row.states, "transition_count": len(row.transitions)} for row in rows]
 
 
 @router.get("/proposal-templates")

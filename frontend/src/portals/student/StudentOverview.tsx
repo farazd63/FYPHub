@@ -1,14 +1,51 @@
-import { StudentRequiredDocumentsDashboard } from "./modules/StudentRequiredDocumentsDashboard";
-import { API } from "../../App";
-import type { StudentPhase } from "./StudentSidebar";
+import { useEffect, useState } from "react";
 
-type Props = { phases: readonly StudentPhase[]; onSelect: (phase: StudentPhase) => void };
+type Notification = {
+  id: number;
+  kind: string;
+  payload?: Record<string, unknown> | null;
+  read_at?: string | null;
+  created_at: string;
+};
 
-export function StudentOverview({ phases, onSelect }: Props) {
-  const implemented = phases.filter((phase) => phase.status === "Implemented").length;
-  return <section className="student-overview" aria-labelledby="student-overview-heading"><header className="student-overview__hero"><p className="student-overview__eyebrow">Student workspace</p><h1 id="student-overview-heading">Your FYP workspace</h1><p>Use the collaboration, supervisor-request, and archive tools currently available to your account.</p></header><div className="student-overview__summary" aria-label="Student workspace summary"><div><strong>{phases.length}</strong><span>available areas</span></div><div><strong>{implemented}</strong><span>fully implemented</span></div><div><strong>{phases.length - implemented}</strong><span>partial areas</span></div></div><div className="student-overview__heading"><div><h2>Available student features</h2><p>Each area below is backed by an existing component and authorized API.</p></div></div><div className="student-overview__grid">{phases.map((phase) => <button key={phase.id} type="button" className="student-phase-card" onClick={() => onSelect(phase)} data-route={phase.route}><span className="student-phase-card__top"><span className="student-phase-card__icon" aria-hidden="true">{phase.icon}</span><span className={`student-status student-status--${phase.status === "Implemented" ? "implemented" : "partial"}`}>{phase.status}</span></span><strong>{phase.name}</strong><span className="student-phase-card__open">Open feature <span aria-hidden="true">→</span></span></button>)}</div></section>;
+type Props = { api: string };
+
+const notificationText = (notification: Notification) => {
+  const payload = notification.payload;
+  const message = payload && typeof payload.message === "string" ? payload.message : null;
+  return message || notification.kind.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+};
+
+export function StudentOverview({ api }: Props) {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch(`${api}/api/v1/notifications`, { credentials: "include", signal: controller.signal });
+        if (!response.ok) throw new Error();
+        const body = await response.json() as unknown;
+        if (!controller.signal.aborted) {
+          setNotifications(Array.isArray(body) ? body as Notification[] : []);
+          setState("ready");
+        }
+      } catch {
+        if (!controller.signal.aborted) setState("error");
+      }
+    })();
+    return () => controller.abort();
+  }, [api]);
+
+  return <section className="student-overview" aria-labelledby="student-overview-heading">
+    <header className="student-overview__hero"><p className="student-overview__eyebrow">Student workspace</p><h1 id="student-overview-heading">Your FYP workspace</h1><p>Important updates for your group appear here.</p></header>
+    {state === "loading" && <p className="mt-6 text-sm text-slate-600">Loading notifications…</p>}
+    {state === "error" && <p role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Notifications could not be loaded.</p>}
+    {state === "ready" && notifications.length > 0 && <section className="mt-6 rounded-2xl border border-[#dce4de] bg-white p-6" aria-labelledby="student-notifications-heading"><div className="flex items-center justify-between gap-3"><h2 id="student-notifications-heading" className="text-xl font-semibold">Notifications</h2><span className="text-sm text-slate-500">{notifications.length}</span></div><div className="mt-4 grid gap-3">{notifications.map((notification) => <article key={notification.id} className={`rounded-xl border p-4 ${notification.read_at ? "border-[#e3e8e5]" : "border-[#b9ddc8] bg-[#f4fbf6]"}`}><div className="flex flex-wrap items-start justify-between gap-3"><p className="font-semibold">{notificationText(notification)}</p>{!notification.read_at && <span className="rounded-full bg-[#176B66] px-2.5 py-1 text-xs font-semibold text-white">New</span>}</div><time className="mt-1 block text-xs text-slate-500">{new Date(notification.created_at).toLocaleString()}</time></article>)}</div></section>}
+  </section>;
 }
 
 export function StudentOverviewWithDocuments(props: Props) {
-  return <><StudentOverview {...props} /><StudentRequiredDocumentsDashboard api={API} /></>;
+  return <StudentOverview {...props} />;
 }

@@ -25,8 +25,6 @@ from app.main import (
 from app.models import (
     AcademicCycle,
     AcademicGroupPolicy,
-    ApprovedStudent,
-    RosterImport,
     AdminAuditEvent,
     AuthSession,
     Team,
@@ -91,8 +89,6 @@ class CycleConcurrencyTests(unittest.TestCase):
             if user_ids:
                 session.execute(delete(AuthSession).where(AuthSession.user_id.in_(user_ids)))
                 session.execute(delete(User).where(User.id.in_(user_ids)))
-            session.execute(delete(ApprovedStudent).where(ApprovedStudent.academic_cycle_id == self.cycle_id))
-            session.execute(delete(RosterImport).where(RosterImport.academic_cycle_id == self.cycle_id))
             if self.admin_id is not None:
                 session.execute(delete(AuthSession).where(AuthSession.user_id == self.admin_id))
                 session.execute(delete(User).where(User.id == self.admin_id))
@@ -143,15 +139,6 @@ class CycleConcurrencyTests(unittest.TestCase):
             }
         )
 
-        with SessionLocal() as session:
-            batch = RosterImport(academic_cycle_id=self.cycle_id, imported_by_id=self.admin_id, confirmation_hash=uuid4().hex)
-            session.add(batch)
-            session.flush()
-            for member in (payload.creator, *payload.members):
-                session.add(ApprovedStudent(academic_cycle_id=self.cycle_id, import_id=batch.id,
-                    name=member.full_name, registration_number=member.registration_number,
-                    university_email=member.university_email.lower(), semester=7, group_code="fixture"))
-            session.commit()
         return payload
 
     def _register_in_thread(

@@ -24,7 +24,24 @@ def _docx_formatting(document: Document) -> dict[str, object]:
     families: list[str] = []
     sizes: list[float] = []
     spacings: list[float] = []
+    alignments: list[str] = []
+    heading_styles: list[str] = []
+    caption_count = 0
+    reference_count = 0
+    appendix_count = 0
     for paragraph in document.paragraphs:
+        paragraph_text = paragraph.text.strip()
+        if paragraph.alignment is not None:
+            alignments.append(str(paragraph.alignment).split(".")[-1].split("(", 1)[0].strip().upper())
+        style_name = getattr(getattr(paragraph, "style", None), "name", "") or ""
+        if style_name.casefold().startswith("heading"):
+            heading_styles.append(style_name)
+        if re.match(r"^(?:figure|fig\.?|table)\s*\d+", paragraph_text, re.IGNORECASE):
+            caption_count += 1
+        if re.match(r"^(?:references|bibliography)\b", paragraph_text, re.IGNORECASE):
+            reference_count += 1
+        if re.match(r"^(?:appendix|appendices)\b", paragraph_text, re.IGNORECASE):
+            appendix_count += 1
         if paragraph.paragraph_format.line_spacing is not None:
             spacing = paragraph.paragraph_format.line_spacing
             if isinstance(spacing, (int, float)):
@@ -50,9 +67,16 @@ def _docx_formatting(document: Document) -> dict[str, object]:
         result["font_size_pt"] = round(float(median(sizes)), 2)
     if spacings:
         result["line_spacing"] = round(float(median(spacings)), 2)
+    if alignments:
+        result["alignment"] = Counter(alignments).most_common(1)[0][0]
+    if heading_styles:
+        result["heading_style"] = Counter(heading_styles).most_common(1)[0][0]
     result["table_count"] = len(document.tables)
     result["figure_count"] = len(getattr(document, "inline_shapes", ()))
     result["page_numbering"] = any("PAGE" in paragraph.text.upper() for paragraph in document.paragraphs)
+    result["caption_count"] = caption_count
+    result["reference_count"] = reference_count
+    result["appendix_count"] = appendix_count
     return result
 
 
@@ -85,6 +109,9 @@ def _pdf_formatting(data: bytes) -> dict[str, object]:
         table_count = 0
         figure_count = 0
         page_numbering = False
+        caption_count = 0
+        reference_count = 0
+        appendix_count = 0
         for page in document:
             page_rect = page.rect
             blocks = page.get_text("dict").get("blocks", [])
@@ -92,6 +119,9 @@ def _pdf_formatting(data: bytes) -> dict[str, object]:
             figure_count += len(page.get_images(full=True))
             page_text = page.get_text("text")
             page_numbering = page_numbering or bool(re.search(r"(?:page\s+\d+|\b\d+\s*(?:of|/)\s*\d+\b)", page_text, re.IGNORECASE))
+            caption_count += len(re.findall(r"^(?:figure|fig\.?|table)\s*\d+", page_text, re.IGNORECASE | re.MULTILINE))
+            reference_count += len(re.findall(r"^\s*(?:references|bibliography)\b", page_text, re.IGNORECASE | re.MULTILINE))
+            appendix_count += len(re.findall(r"^\s*(?:appendix|appendices)\b", page_text, re.IGNORECASE | re.MULTILINE))
             previous_line_bottom: float | None = None
             for block in blocks:
                 if block.get("type") != 0:
@@ -127,6 +157,9 @@ def _pdf_formatting(data: bytes) -> dict[str, object]:
         result["table_count"] = table_count
         result["figure_count"] = figure_count
         result["page_numbering"] = page_numbering
+        result["caption_count"] = caption_count
+        result["reference_count"] = reference_count
+        result["appendix_count"] = appendix_count
         return result
     finally:
         document.close()

@@ -108,6 +108,12 @@ class RegistrationIntegrationTests(unittest.TestCase):
         self.assertTrue(verify_password(password, password_hash))
         self.assertFalse(verify_password("Case Sensitive Password?", password_hash))
 
+    def test_individual_public_registration_is_rejected(self) -> None:
+        status_code, response = request_json(self.payload())
+        self.assertEqual(status_code, 403)
+        self.assertIn("group account", response["detail"])
+
+    @unittest.skip("Individual public registration was retired in favor of team registration.")
     def test_successful_student_registration_stores_only_hash(self) -> None:
         password = "ValidPass123!"
         status_code, response = request_json(
@@ -128,6 +134,7 @@ class RegistrationIntegrationTests(unittest.TestCase):
         self.assertNotEqual(user, password)
         self.assertTrue(verify_password(password, user))
 
+    @unittest.skip("Individual public registration was retired in favor of team registration.")
     def test_demo_mode_allows_unlisted_student_and_records_mode(self) -> None:
         with patch.dict("os.environ", {"REGISTRATION_MODE": "demo"}):
             status_code, response = request_json(
@@ -140,6 +147,7 @@ class RegistrationIntegrationTests(unittest.TestCase):
         ).scalar_one()
         self.assertEqual(mode, "demo")
 
+    @unittest.skip("Individual public registration was retired in favor of team registration.")
     def test_duplicate_normalized_email_returns_conflict(self) -> None:
         self.assertEqual(
             request_json(self.payload(email="duplicate-email@example.com", registration_number="FYP-201"))[0],
@@ -152,6 +160,7 @@ class RegistrationIntegrationTests(unittest.TestCase):
         self.assertNotIn("password", response)
         self.assertNotIn("password_hash", response)
 
+    @unittest.skip("Individual public registration was retired in favor of team registration.")
     def test_common_consumer_and_institutional_domains_are_accepted(self) -> None:
         for index, address in enumerate(
             ("person@gmail.com", "person@outlook.com", "person@yahoo.com", "person@szabist-isb.pk"),
@@ -164,6 +173,7 @@ class RegistrationIntegrationTests(unittest.TestCase):
                 self.assertEqual(status_code, 201)
                 self.assertEqual(response["email"], address)
 
+    @unittest.skip("Individual public registration was retired in favor of team registration.")
     def test_duplicate_normalized_registration_number_returns_conflict(self) -> None:
         self.assertEqual(
             request_json(self.payload(email="registration-one@example.com", registration_number="fyp-301"))[0],
@@ -176,6 +186,7 @@ class RegistrationIntegrationTests(unittest.TestCase):
         self.assertNotIn("password", response)
         self.assertNotIn("password_hash", response)
 
+    @unittest.skip("Individual public registration was retired in favor of team registration.")
     def test_invalid_email_missing_fields_and_password_lengths_are_rejected(self) -> None:
         for invalid_email in (
             "not-an-email",
@@ -207,9 +218,11 @@ class RegistrationIntegrationTests(unittest.TestCase):
         )
 
     def test_privileged_request_fields_are_rejected(self) -> None:
-        self.assertEqual(
-            request_json(self.payload(email="role@example.com", role="ADMIN"))[0], 422
-        )
+        for role in ("SUPERVISOR", "PANEL_MEMBER", "COORDINATOR", "ADMIN"):
+            with self.subTest(role=role):
+                status_code, response = request_json(self.payload(email=f"{role.lower()}@example.com", role=role))
+                self.assertEqual(status_code, 422)
+                self.assertTrue(response.get("detail"))
         self.assertEqual(
             request_json(self.payload(email="active@example.com", is_active=False))[0], 422
         )

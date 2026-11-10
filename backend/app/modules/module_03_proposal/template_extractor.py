@@ -57,7 +57,8 @@ def extract_template_rules(data: bytes, content_type: str | None, filename: str 
     }
     measurable = (
         "page_size", "margin_mm", "right_margin_mm", "top_margin_mm", "bottom_margin_mm",
-        "font_family", "font_size_pt", "line_spacing", "table_count", "figure_count", "page_numbering",
+        "font_family", "font_size_pt", "line_spacing", "alignment", "heading_style",
+        "table_count", "figure_count", "caption_count", "reference_count", "appendix_count", "page_numbering",
     )
     for name in measurable:
         if name in fields and fields[name] is not None:

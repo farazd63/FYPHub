@@ -9,17 +9,19 @@ from .email import normalize_email
 
 
 class TeamMemberInput(BaseModel):
-    """One creator or additional team contact record."""
+    """One group leader or colleague record; contact email is legacy-only."""
 
     model_config = ConfigDict(extra="forbid")
 
     full_name: str
     registration_number: str
-    university_email: EmailStr
+    university_email: EmailStr | None = None
 
     @field_validator("university_email", mode="before")
     @classmethod
     def normalized_email(cls, value: object) -> object:
+        if value is None or value == "":
+            return None
         return normalize_email(value)
 
 
@@ -32,6 +34,7 @@ class TeamRegistrationRequest(BaseModel):
     creator: TeamMemberInput
     shared_login_email: EmailStr
     password: str
+    confirm_password: str | None = None
     members: list[TeamMemberInput]
 
     @field_validator("shared_login_email", mode="before")
@@ -72,7 +75,7 @@ class SafeTeamMemberOut(BaseModel):
     id: int
     full_name: str
     registration_number: str
-    university_email: str
+    university_email: str | None
     is_creator: bool
     is_active: bool
     created_at: datetime
@@ -85,3 +88,36 @@ class TeamRegistrationResponse(BaseModel):
     team: SafeTeamOut
     cycle: SafeCycleOut
     members: list[SafeTeamMemberOut]
+
+
+class StudentGroupMemberInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    email: EmailStr
+    registration_number: str
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalized_member_email(cls, value: object) -> object:
+        return normalize_email(value)
+
+    @field_validator("registration_number")
+    @classmethod
+    def normalized_registration(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if not normalized or len(normalized) > 100:
+            raise ValueError("registration_number must be between 1 and 100 characters.")
+        return normalized
+
+
+class StudentGroupRegistrationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    academic_cycle_id: int
+    group_email: EmailStr
+    password: str
+    confirm_password: str
+    members: list[StudentGroupMemberInput]
+
+    @field_validator("group_email", mode="before")
+    @classmethod
+    def normalized_group_email(cls, value: object) -> object:
+        return normalize_email(value)

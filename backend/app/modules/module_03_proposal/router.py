@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel, ConfigDict, Field
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
@@ -19,15 +20,23 @@ from sqlalchemy.orm import Session
 from ...auth import get_current_user, require_roles, utc_now, validate_mutating_origin
 from ...config import settings
 from ...database import get_db
-from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, SupervisorAssignment, Team, TeamMember, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
+from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, SupervisorAssignment, Team, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
 from ...pdf_extraction import PdfExtractionError, extract_proposal_document
-from .compliance_engine import build_compliance_report
+from .compliance_engine import build_change_summary, build_compliance_report
 from .template_extractor import extract_template_rules
 from ...team_lifecycle import lock_team
 
 router = APIRouter(prefix="/api/v1/proposal-compliance", tags=["module-3-proposal-compliance"])
 REVIEW_ROLES = (UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR, UserRole.PANEL_MEMBER)
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+PROPOSAL_REVIEW_STATUSES = {"CHANGES_REQUESTED", "APPROVED", "REJECTED"}
+
+
+class ProposalStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str = Field(min_length=1, max_length=32)
+    comment: str | None = Field(default=None, max_length=2000)
 
 
 def _error(code: str, message: str, http_status: int = 400) -> HTTPException:
@@ -105,22 +114,41 @@ def _submission_out(session: Session, row: ProposalComplianceSubmission) -> dict
     return {"id": row.id, "proposal_key": row.proposal_key, "title": row.title, "proposal_type": row.proposal_type, "version": row.version, "status": row.status, "processing_status": row.processing_status, "filename": row.filename, "page_count": row.page_count, "created_at": row.created_at, "score": summary.get("score"), "report_status": summary.get("status"), "report_available": report is not None}
 
 
+def _version_history(session: Session, row: ProposalComplianceSubmission) -> list[dict[str, Any]]:
+    previous = session.scalars(
+        select(ProposalComplianceSubmission)
+        .where(
+            ProposalComplianceSubmission.proposal_key == row.proposal_key,
+            ProposalComplianceSubmission.owner_user_id == row.owner_user_id,
+            ProposalComplianceSubmission.version < row.version,
+        )
+        .order_by(ProposalComplianceSubmission.version)
+    ).all()
+    history: list[dict[str, Any]] = []
+    for item in previous:
+        score = session.scalar(select(ProposalComplianceReport.score).where(ProposalComplianceReport.submission_id == item.id).limit(1))
+        history.append({
+            "version": item.version,
+            "filename": item.filename,
+            "score": score,
+            "changeSummary": build_change_summary(item.extracted_fields, row.extracted_fields, item.version, row.version),
+        })
+    return history
+
+
 def _can_view(session: Session, actor: User, row: ProposalComplianceSubmission) -> bool:
     if row.owner_user_id == actor.id or actor.role in (UserRole.ADMIN, UserRole.COORDINATOR, UserRole.PANEL_MEMBER):
         return True
     if actor.role != UserRole.SUPERVISOR:
         return False
-    owner = session.get(User, row.owner_user_id)
-    if owner is None:
+    if row.team_id is None:
         return False
     assignment = session.scalar(
         select(SupervisorAssignment.id)
-        .join(TeamMember, TeamMember.team_id == SupervisorAssignment.team_id)
         .where(
             SupervisorAssignment.supervisor_id == actor.id,
+            SupervisorAssignment.team_id == row.team_id,
             SupervisorAssignment.ended_at.is_(None),
-            TeamMember.university_email == owner.email,
-            TeamMember.is_active.is_(True),
         )
         .limit(1)
     )
@@ -220,9 +248,9 @@ def save_template_rules(
     version = session.get(TemplateReferenceVersion, version_id)
     if version is None:
         raise _error("template_not_found", "Template version was not found.", 404)
-    allowed = {"page_size", "margin_mm", "right_margin_mm", "top_margin_mm", "bottom_margin_mm", "font_family", "font_size_pt", "line_spacing", "page_numbering", "table_count", "figure_count", "required_sections", "source"}
+    allowed = {"page_size", "margin_mm", "right_margin_mm", "top_margin_mm", "bottom_margin_mm", "font_family", "font_size_pt", "line_spacing", "alignment", "heading_style", "page_numbering", "table_count", "figure_count", "caption_count", "reference_count", "appendix_count", "required_sections", "required_references", "required_appendices", "required_captions", "source"}
     cleaned: dict[str, Any] = {key: value for key, value in rules.items() if key in allowed}
-    for key in ("margin_mm", "right_margin_mm", "top_margin_mm", "bottom_margin_mm", "font_size_pt", "line_spacing", "table_count", "figure_count"):
+    for key in ("margin_mm", "right_margin_mm", "top_margin_mm", "bottom_margin_mm", "font_size_pt", "line_spacing", "table_count", "figure_count", "caption_count", "reference_count", "appendix_count", "required_references", "required_appendices", "required_captions"):
         if key in cleaned and cleaned[key] not in (None, ""):
             try:
                 number = float(cleaned[key])
@@ -262,14 +290,19 @@ async def submit_proposal(
     active = _active_template(session, proposal_type)
     if active is None:
         raise _error("active_template_missing", "No active university template exists for this proposal type.", 409)
-    data = await proposal_file.read()
+    data = await proposal_file.read(MAX_UPLOAD_BYTES + 1)
     if not data or len(data) > MAX_UPLOAD_BYTES:
         raise _error("invalid_proposal_size", "The proposal must be non-empty and 5 MiB or smaller.", 422)
     try:
         extracted = extract_proposal_document(data, proposal_file.content_type, proposal_file.filename)
     except PdfExtractionError as error:
         raise _error(error.code, error.message, 422) from error
+    title_value = title.strip()
+    if not title_value:
+        raise _error("invalid_proposal_title", "Proposal title is required.", 422)
     key = (proposal_key or str(uuid.uuid4())).strip()
+    if len(key) > 64:
+        raise _error("invalid_proposal_key", "Proposal key is too long.", 422)
     previous = session.scalar(select(ProposalComplianceSubmission).where(ProposalComplianceSubmission.proposal_key == key, ProposalComplianceSubmission.owner_user_id == actor.id).order_by(desc(ProposalComplianceSubmission.version)).limit(1))
     if proposal_key and previous is None:
         raise _error("proposal_not_found", "The proposal version history could not be found.", 404)
@@ -282,13 +315,13 @@ async def submit_proposal(
         raise _error("invalid_submission_action", "Action must be draft or submit.", 422)
     is_draft = action == "draft"
     team = session.scalar(select(Team).where(Team.shared_user_id == actor.id, Team.status != "dissolved").order_by(Team.id).limit(1))
-    row = ProposalComplianceSubmission(proposal_key=key, owner_user_id=actor.id, team_id=team.id if team else None, proposal_type=proposal_type, title=title.strip(), version=version_number, status="DRAFT" if is_draft else ("RESUBMITTED" if previous else "SUBMITTED"), processing_status="PENDING" if is_draft else "COMPLETED", filename=proposal_file.filename or "proposal", content_type=extracted.content_type, file_size=extracted.file_size, sha256=extracted.sha256, page_count=extracted.page_count, storage_key=str(path.relative_to(settings.document_storage_root)), extracted_text=extracted.extracted_text, extracted_fields=fields, template_reference_version_id=template_version.id)
+    row = ProposalComplianceSubmission(proposal_key=key, owner_user_id=actor.id, team_id=team.id if team else None, proposal_type=proposal_type, title=title_value, version=version_number, status="DRAFT" if is_draft else ("RESUBMITTED" if previous else "SUBMITTED"), processing_status="PENDING" if is_draft else "COMPLETED", filename=proposal_file.filename or "proposal", content_type=extracted.content_type, file_size=extracted.file_size, sha256=extracted.sha256, page_count=extracted.page_count, storage_key=str(path.relative_to(settings.document_storage_root)), extracted_text=extracted.extracted_text, extracted_fields=fields, template_reference_version_id=template_version.id)
     session.add(row)
     session.flush()
     if is_draft:
         session.commit()
         return {"submission": _submission_out(session, row), "report": None}
-    history = [{"version": item.version, "filename": item.filename, "score": (session.scalar(select(ProposalComplianceReport.score).where(ProposalComplianceReport.submission_id == item.id).limit(1)))} for item in session.scalars(select(ProposalComplianceSubmission).where(ProposalComplianceSubmission.proposal_key == key, ProposalComplianceSubmission.owner_user_id == actor.id).order_by(ProposalComplianceSubmission.version)).all()]
+    history = _version_history(session, row)
     report = build_compliance_report(submission=row, rules=rules, previous_versions=history)
     session.add(ProposalComplianceReport(submission_id=row.id, status=report["reportSummary"]["status"], score=report["reportSummary"]["score"], total_checks=report["finalResults"]["totalChecks"], report=report))
     session.commit()
@@ -299,7 +332,7 @@ async def submit_proposal(
 
 
 def _run_submission(session: Session, row: ProposalComplianceSubmission, template_version: TemplateReferenceVersion, rules: dict[str, Any]) -> dict[str, Any]:
-    history = [{"version": item.version, "filename": item.filename, "score": session.scalar(select(ProposalComplianceReport.score).where(ProposalComplianceReport.submission_id == item.id).limit(1))} for item in session.scalars(select(ProposalComplianceSubmission).where(ProposalComplianceSubmission.proposal_key == row.proposal_key, ProposalComplianceSubmission.owner_user_id == row.owner_user_id).order_by(ProposalComplianceSubmission.version)).all() if item.id != row.id]
+    history = _version_history(session, row)
     row.template_reference_version_id = template_version.id
     row.status = "SUBMITTED" if row.status == "DRAFT" else row.status
     row.processing_status = "COMPLETED"
@@ -333,10 +366,54 @@ def submit_draft(submission_id: int, request: Request, actor: User = Depends(req
     return _run_submission(session, row, *active)
 
 
+@router.post("/submissions/{submission_id}/withdraw")
+def withdraw_submission(submission_id: int, request: Request, actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
+    """Withdraw a student-owned draft/submission without deleting its history."""
+    validate_mutating_origin(request)
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or row.owner_user_id != actor.id:
+        raise _error("submission_not_found", "The proposal submission was not found.", 404)
+    if row.status not in {"DRAFT", "SUBMITTED", "RESUBMITTED", "CHANGES_REQUESTED"}:
+        raise _error("invalid_submission_state", "This proposal cannot be withdrawn in its current state.", 409)
+    row.status = "WITHDRAWN"
+    row.processing_status = "COMPLETED"
+    session.commit()
+    session.refresh(row)
+    return _submission_out(session, row)
+
+
+@router.patch("/submissions/{submission_id}/status")
+def update_submission_status(submission_id: int, payload: ProposalStatusUpdate, request: Request, actor: User = Depends(require_roles(*REVIEW_ROLES)), session: Session = Depends(get_db)):
+    """Allow an authorized reviewer to record a lifecycle decision."""
+    validate_mutating_origin(request)
+    desired = payload.status.strip().upper()
+    if desired not in PROPOSAL_REVIEW_STATUSES:
+        raise _error("invalid_submission_status", "Review status must be CHANGES_REQUESTED, APPROVED, or REJECTED.", 422)
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or not _can_view(session, actor, row):
+        raise _error("submission_not_found", "The proposal submission was not found.", 404)
+    if row.status == "WITHDRAWN":
+        raise _error("invalid_submission_state", "A withdrawn proposal cannot be reviewed.", 409)
+    row.status = desired
+    row.processing_status = "COMPLETED"
+    session.commit()
+    session.refresh(row)
+    return _submission_out(session, row)
+
+
 @router.get("/submissions/mine")
 def my_submissions(actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
     rows = session.scalars(select(ProposalComplianceSubmission).where(ProposalComplianceSubmission.owner_user_id == actor.id).order_by(desc(ProposalComplianceSubmission.created_at), desc(ProposalComplianceSubmission.version))).all()
     return [_submission_out(session, row) for row in rows]
+
+
+@router.get("/submissions/{submission_id}")
+def get_submission(submission_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or not _can_view(session, actor, row):
+        raise _error("submission_not_found", "The proposal submission was not found.", 404)
+    report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
+    return {"submission": _submission_out(session, row), "report": report.report if report else None, "versionHistory": _version_history(session, row)}
 
 
 @router.get("/reports")

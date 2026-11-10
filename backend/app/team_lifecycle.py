@@ -1,6 +1,6 @@
 """Deterministic Module 2 lifecycle helpers shared by modules 2, 3 and 5."""
 from datetime import datetime, timezone
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from .models import AcademicGroupPolicy, Team, TeamMember
 
@@ -26,6 +26,6 @@ def lock_team(session: Session, team_id: int, reason: str) -> Team | None:
 
 
 def cancel_open_team_requests(session: Session, team_id: int, status: str = "cancelled") -> None:
-    from .models import Invitation, JoinRequest
-    session.execute(update(JoinRequest).where(JoinRequest.team_id == team_id, JoinRequest.status == "pending").values(status=status))
-    session.execute(update(Invitation).where(Invitation.team_id == team_id, Invitation.status == "pending").values(status=status))
+    # Invitation and join-request workflows were removed. Keep this lifecycle hook
+    # as a no-op so unrelated team dissolution/leave flows remain compatible.
+    return None

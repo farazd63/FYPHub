@@ -2,8 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import "./module-3.css";
 
 type Template = { id: number; template_type: "SHORT" | "LONG"; version: number; title: string; source_note: string; is_active: boolean; rules: Record<string, unknown>; };
-type EditableRule = "page_size" | "margin_mm" | "right_margin_mm" | "top_margin_mm" | "bottom_margin_mm" | "font_family" | "font_size_pt" | "line_spacing" | "page_numbering" | "table_count" | "figure_count";
-const editableRules: EditableRule[] = ["page_size", "margin_mm", "right_margin_mm", "top_margin_mm", "bottom_margin_mm", "font_family", "font_size_pt", "line_spacing", "page_numbering", "table_count", "figure_count"];
+type EditableRule = "page_size" | "margin_mm" | "right_margin_mm" | "top_margin_mm" | "bottom_margin_mm" | "font_family" | "font_size_pt" | "line_spacing" | "alignment" | "heading_style" | "page_numbering" | "table_count" | "figure_count" | "caption_count" | "reference_count" | "appendix_count" | "required_captions" | "required_references" | "required_appendices";
+const editableRules: EditableRule[] = ["page_size", "margin_mm", "right_margin_mm", "top_margin_mm", "bottom_margin_mm", "font_family", "font_size_pt", "line_spacing", "alignment", "heading_style", "page_numbering", "table_count", "figure_count", "caption_count", "reference_count", "appendix_count", "required_captions", "required_references", "required_appendices"];
 const value = (item: unknown) => item === null || item === undefined || item === "" ? "Not detected" : String(item);
 
 export function AdminProposalTemplates({ api }: { api: string }) {
@@ -86,7 +86,7 @@ export function AdminProposalTemplates({ api }: { api: string }) {
     {error && <p className="module3-alert module3-alert--error" role="alert">{error}</p>}
     <div className="module3-admin-grid">
       <form className="module3-panel module3-template-upload" onSubmit={(event) => void upload(event)}>
-        <div className="module3-panel-heading"><div><span className="module3-kicker">Official source</span><h2>Upload and extract</h2></div><span className="module3-live-dot">Admin only</span></div>
+        <div className="module3-panel-heading"><div><h2>Upload and extract</h2></div></div>
         <p className="module3-muted">Use the approved university PDF or DOCX. No template values are hardcoded.</p>
         <label>Proposal type<select value={type} onChange={(event) => setType(event.target.value as "SHORT" | "LONG")}><option value="SHORT">Short proposal</option><option value="LONG">Long proposal</option></select></label>
         <label>Template title<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Uses filename if blank" /></label>

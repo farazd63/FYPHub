@@ -1,4 +1,4 @@
-"""Centralized, reversible policy for public registration eligibility checks."""
+"""Centralized, reversible policy for public registration behavior."""
 
 import os
 from enum import StrEnum
@@ -10,7 +10,7 @@ class RegistrationMode(StrEnum):
 
 
 REGISTRATION_MODE_ENV = "REGISTRATION_MODE"
-DEMO_MODE_WARNING = "Demo registration mode is active. Approved roster validation is temporarily bypassed."
+DEMO_MODE_WARNING = "Demo registration mode is active."
 
 
 def get_registration_mode(value: str | None = None) -> RegistrationMode:
@@ -23,7 +23,3 @@ def registration_mode() -> RegistrationMode:
     """Read the current process configuration without exposing it publicly."""
     return get_registration_mode()
 
-
-def roster_validation_required() -> bool:
-    """Keep approved-roster validation enabled unless demo mode is explicit."""
-    return registration_mode() is RegistrationMode.RESTRICTED

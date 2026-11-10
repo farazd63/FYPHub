@@ -1,0 +1,11 @@
+{
+  "module_id": "module-03",
+  "name": "proposal, review, workflow, and archive",
+  "frontend_entrypoints": ["frontend/src/modules/module-3", "frontend/src/portals/student/modules/supervisor-selection", "frontend/src/portals/supervisor/modules/supervisor-requests", "frontend/src/portals/admin/modules/archive"],
+  "backend_routes": ["/api/v1/proposals", "/api/v1/supervisor-requests", "/api/v1/project-workflow", "/api/v1/fyp-registry", "/api/v1/evaluations"],
+  "database_tables": ["supervisor_requests", "supervisor_request_documents", "proposal_compliance_submissions", "proposal_reference", "archived_projects", "evaluation_rubrics", "project_milestones", "project_tasks"],
+  "roles": ["STUDENT", "SUPERVISOR", "PANEL_MEMBER", "COORDINATOR", "ADMIN"],
+  "permissions": ["Existing role dependencies, assignment scope, and immutable history checks"],
+  "tests": ["backend/tests/test_module3_compliance_engine.py", "backend/tests/test_project_workflow.py", "backend/tests/test_supervisor_requests.py", "backend/tests/test_archived_projects.py", "backend/tests/test_evaluations.py"],
+  "status": "implemented"
+}

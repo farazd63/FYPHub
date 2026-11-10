@@ -37,7 +37,7 @@ def team_payload(session: Session, team: Team) -> dict:
         "min_group_size": policy.min_group_size if policy else None, "max_group_size": policy.max_group_size if policy else None,
         "formation_deadline": policy.formation_deadline if policy else None,
         "formation_deadline_passed": bool(policy and policy.formation_deadline and policy.formation_deadline <= utc_now() and team.status == "forming"),
-        "members": [{"id": m.id, "student_id": m.student_id, "name": m.full_name, "registration_number": m.registration_number, "email": m.university_email, "is_creator": m.is_creator} for m in members],
+        "members": [{"id": m.id, "name": m.full_name, "registration_number": m.registration_number, "email": m.university_email, "is_creator": m.is_creator} for m in members],
         "channels": [{"id": item.value, "label": item.value.replace("_", " ").title()} for item in Channel],
     }
 

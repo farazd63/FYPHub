@@ -1,7 +1,6 @@
 import { RoleSidebar, SidebarIcon, type RoleSidebarItem } from "../shared/RoleSidebar";
 
 export const coordinatorNav: readonly RoleSidebarItem[] = [
-  { id: "registry", label: "FYP Students & Projects", icon: <SidebarIcon name="people" />, section: "Workspace" },
   { id: "requests", label: "Supervisor Requests", icon: <SidebarIcon name="requests" />, section: "People & Access" },
 ];
 

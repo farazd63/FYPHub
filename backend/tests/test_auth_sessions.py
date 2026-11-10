@@ -111,6 +111,7 @@ class AuthSessionTests(unittest.TestCase):
         status, headers, body = self.login(Origin="http://127.0.0.1:5173")
         self.assertEqual(status, 200)
         self.assertEqual(body["email"], self.email)
+        self.assertEqual(body["role"], "STUDENT")
         self.assertNotIn("password", body)
         self.assertNotIn("token", body)
         cookie = headers["set-cookie"].lower()

@@ -9,7 +9,6 @@ def test_coordinator_read_only_routes_are_registered():
     assert {route.path for route in router.routes} == {
         "/api/v1/coordinator/supervisor-capacity",
         "/api/v1/coordinator/audit-history",
-        "/api/v1/coordinator/workflow-policies",
         "/api/v1/coordinator/proposal-templates",
         "/api/v1/coordinator/evaluation-criteria",
     }

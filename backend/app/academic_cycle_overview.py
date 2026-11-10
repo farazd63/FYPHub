@@ -47,7 +47,7 @@ def cycle_overview(cycle_id: int, _: User = Depends(require_roles(*COORDINATOR_R
     members = db.scalars(select(TeamMember).where(TeamMember.academic_cycle_id == cycle_id, TeamMember.is_active.is_(True)).order_by(TeamMember.team_id, TeamMember.id)).all()
     assignments = db.scalars(select(SupervisorAssignment).where(SupervisorAssignment.academic_cycle_id == cycle_id, SupervisorAssignment.ended_at.is_(None)).order_by(SupervisorAssignment.id)).all()
     requests = db.scalars(select(SupervisorRequest).where(SupervisorRequest.academic_cycle_id == cycle_id).order_by(SupervisorRequest.updated_at.desc(), SupervisorRequest.id.desc())).all()
-    policies = {row.supervisor_id: row for row in db.scalars(select(SupervisorCapacityPolicy).where(SupervisorCapacityPolicy.academic_cycle_id == cycle_id)).all()}
+    policies = {row.supervisor_id: row for row in db.scalars(select(SupervisorCapacityPolicy).where(SupervisorCapacityPolicy.academic_year == cycle.academic_year if cycle.academic_year is not None else SupervisorCapacityPolicy.academic_cycle_id == cycle_id)).all()}
     requirements = db.scalars(select(DocumentUploadRequirement).where(DocumentUploadRequirement.academic_cycle_id == cycle_id).order_by(DocumentUploadRequirement.due_at, DocumentUploadRequirement.id)).all()
     requirement_ids = [item.id for item in requirements]
     submissions = db.scalars(select(DocumentSubmission).where(DocumentSubmission.requirement_id.in_(requirement_ids))).all() if requirement_ids else []

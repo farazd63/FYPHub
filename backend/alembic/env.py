@@ -10,7 +10,7 @@ if str(BACKEND_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIRECTORY))
 
 from app.database import Base, engine  # noqa: E402
-from app.models import AnonymousVerificationContext, AnonymousVerificationChallenge, AnonymousIdentityProof, IdentityChallenge, IdentityProof, MatchChat, MatchMessage, MatchConsent, TeamPreference, GroupMessage, SupervisorAssignment, WorkflowPolicy, WorkflowPolicyVersion, ApprovedStudent, RosterImport, ReminderRule, ReminderRuleVersion, AcademicCycle, AcademicDeadline, AcademicDeadlineVersion, AcademicGroupPolicy, SupervisorCapacityPolicy, AuthSession, PasswordResetToken, EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion, Team, TeamMember, User, SupervisorRequest, SupervisorRequestDocument, SupervisorRequestStatusHistory, ProposalReference, ProposalReferenceDocument, SupervisorRequestMessage, ArchivedProject, ArchivedProjectDocument  # noqa: F401, E402
+from app.models import GroupMessage, SupervisorAssignment, ReminderRule, ReminderRuleVersion, AcademicCycle, AcademicDeadline, AcademicDeadlineVersion, AcademicGroupPolicy, SupervisorCapacityPolicy, AuthSession, PasswordResetToken, EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion, Team, TeamMember, User, SupervisorRequest, SupervisorRequestDocument, SupervisorRequestStatusHistory, ProposalReference, ProposalReferenceDocument, SupervisorRequestMessage, ArchivedProject, ArchivedProjectDocument  # noqa: F401, E402
 from app.models import ProjectMilestone, ProjectTask, SupervisionMeeting, DefenseSchedule, DefensePanelMember, PanelEvaluation, PanelEvaluationScore, ProposalAIReviewRun, ProposalComplianceSubmission, ProposalComplianceReport  # noqa: F401, E402
 
 config = context.config

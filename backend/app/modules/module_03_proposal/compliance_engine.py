@@ -44,6 +44,71 @@ def _similar_section(expected: str, actual_sections: list[str]) -> str | None:
     return None
 
 
+def _field_value(fields: dict[str, Any], name: str) -> str:
+    value = fields.get(name)
+    if isinstance(value, dict):
+        value = value.get("value")
+    return _text(value)
+
+
+def _tokens(value: str) -> set[str]:
+    stop_words = {"about", "after", "also", "and", "are", "because", "been", "being", "between", "from", "have", "into", "more", "that", "their", "there", "these", "they", "this", "through", "with", "will", "would"}
+    return {token for token in re.findall(r"[a-z0-9]{4,}", value.casefold()) if token not in stop_words}
+
+
+def _consistency_item(name: str, left_name: str, right_name: str, left: str, right: str) -> dict[str, Any]:
+    left_tokens = _tokens(left)
+    right_tokens = _tokens(right)
+    overlap = len(left_tokens & right_tokens) / max(1, min(len(left_tokens), len(right_tokens)))
+    if not left or not right:
+        status = "UNVERIFIABLE"
+        evidence = f"{left_name} or {right_name} was not detected."
+    elif overlap >= 0.2:
+        status = "PASS"
+        evidence = f"{round(overlap * 100)}% of the smaller vocabulary overlaps between {left_name} and {right_name}."
+    elif overlap >= 0.08:
+        status = "PARTIAL"
+        evidence = f"Only {round(overlap * 100)}% of the smaller vocabulary overlaps between {left_name} and {right_name}."
+    else:
+        status = "FAIL"
+        evidence = f"No meaningful vocabulary overlap was detected between {left_name} and {right_name}."
+    return {
+        "id": f"academic-consistency-{name}",
+        "name": name,
+        "category": "Academic Consistency",
+        "status": status,
+        "expected": f"{left_name} is aligned with {right_name}",
+        "actual": round(overlap, 3) if left and right else None,
+        "difference": None,
+        "location": {"scope": "document", "page": 1, "document_level": True},
+        "evidence": evidence,
+    }
+
+
+def build_change_summary(previous_fields: dict[str, Any] | None, current_fields: dict[str, Any] | None, previous_version: int, current_version: int) -> dict[str, Any]:
+    """Produce a safe, auditable AI-style summary without sending proposal text externally."""
+    before = previous_fields or {}
+    after = current_fields or {}
+    changed: list[str] = []
+    for key in ("purpose", "objectives", "methodology", "scope", "proposed_solution", "expected_outcomes", "detected_headings"):
+        before_value = before.get(key)
+        after_value = after.get(key)
+        if key != "detected_headings":
+            before_value = before_value.get("value") if isinstance(before_value, dict) else before_value
+            after_value = after_value.get("value") if isinstance(after_value, dict) else after_value
+        if _text(before_value) != _text(after_value):
+            changed.append(key.replace("_", " ").title())
+    return {
+        "source": "AI_ASSISTED_DETERMINISTIC",
+        "model": "local-change-analyzer",
+        "fromVersion": previous_version,
+        "toVersion": current_version,
+        "summary": "No substantive section changes detected." if not changed else f"Updated {', '.join(changed)}.",
+        "changedSections": changed,
+        "advisory": True,
+    }
+
+
 def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_versions: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     actual = submission.extracted_fields or {}
     checks: list[dict[str, Any]] = []
@@ -59,9 +124,14 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
         ("Font Formatting", "font_family", "Font Family"),
         ("Font Formatting", "font_size_pt", "Font Size"),
         ("Paragraph Formatting", "line_spacing", "Line Spacing"),
+        ("Paragraph Formatting", "alignment", "Alignment"),
+        ("Heading Styles", "heading_style", "Heading Style"),
         ("Headers and Footers", "page_numbering", "Page Numbering"),
         ("Tables and Figures", "table_count", "Table Count"),
         ("Tables and Figures", "figure_count", "Figure Count"),
+        ("Tables and Figures", "caption_count", "Caption Count"),
+        ("Document Structure", "reference_count", "References"),
+        ("Document Structure", "appendix_count", "Appendices"),
     )
     for category, key, label in fields:
         if key not in rules:
@@ -101,6 +171,43 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
             item = {"id": "sequence-order", "name": "Section Sequence", "category": "Section Sequence", "status": "FAIL", "expected": expected_sections, "actual": actual_sections, "difference": None, "location": {"scope": "document", "page": actual_heading_rows[0].get("page") if actual_heading_rows else None, "section_number": "order", "section_name": "Required section sequence"}, "evidence": "The detected section order differs from the active university template."}
             checks.append(item)
             category_items.setdefault("Section Sequence", []).append(item)
+
+    # Optional structural rules let an administrator require references,
+    # appendices, and captions without hard-coding a particular university format.
+    structural_counts = (
+        ("required_references", "reference_count", "References"),
+        ("required_appendices", "appendix_count", "Appendices"),
+        ("required_captions", "caption_count", "Captions"),
+    )
+    for rule_key, actual_key, label in structural_counts:
+        if rule_key not in rules:
+            continue
+        expected = rules.get(rule_key)
+        try:
+            expected_number = int(expected)
+        except (TypeError, ValueError):
+            continue
+        detected = actual.get(actual_key)
+        status = "UNVERIFIABLE" if detected is None else "PASS" if int(detected) >= expected_number else "FAIL"
+        item = {"id": f"structure-{actual_key}", "name": label, "category": "Document Structure", "status": status, "expected": expected_number, "actual": detected, "difference": None, "location": {"scope": "document", "page": 1, "document_level": True}, "evidence": f"At least {expected_number} {label.lower()} required."}
+        checks.append(item)
+        category_items.setdefault("Document Structure", []).append(item)
+        if status == "FAIL":
+            violations.append(_violation(item, len(violations) + 1, "Document Structure"))
+
+    consistency_pairs = (
+        ("Problem / Objectives", "problem_statement", "objectives"),
+        ("Objectives / Methodology", "objectives", "methodology"),
+        ("Problem / Proposed Solution", "purpose", "proposed_solution"),
+        ("Objectives / Expected Outcomes", "objectives", "expected_outcomes"),
+        ("Scope / Methodology", "scope", "methodology"),
+    )
+    for name, left_key, right_key in consistency_pairs:
+        item = _consistency_item(name, left_key.replace("_", " ").title(), right_key.replace("_", " ").title(), _field_value(actual, left_key), _field_value(actual, right_key))
+        checks.append(item)
+        category_items.setdefault("Academic Consistency", []).append(item)
+        if item["status"] == "FAIL":
+            violations.append(_violation(item, len(violations) + 1, "Academic Consistency"))
             violations.append(_violation(item, len(violations) + 1, "Section Sequence"))
         else:
             item = {"id": "sequence-order", "name": "Section Sequence", "category": "Section Sequence", "status": "PASS", "expected": expected_sections, "actual": actual_sections, "difference": None, "location": {"scope": "document", "page": actual_heading_rows[0].get("page") if actual_heading_rows else None, "section_number": "order", "section_name": "Required section sequence"}, "evidence": "The detected sections follow the active template order."}
@@ -125,6 +232,7 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
         "proposal": {"id": submission.id, "proposalKey": submission.proposal_key, "title": submission.title, "type": submission.proposal_type, "version": submission.version, "processingStatus": submission.processing_status},
         "template": {"versionId": getattr(submission, "template_reference_version_id", None), "rules": rules},
         "versionHistory": previous_versions or [],
+        "academicConsistency": category_items.get("Academic Consistency", []),
         "engine": {"name": "FYPHub deterministic compliance engine", "source": "PYTHON", "advisory": False},
     }
 

@@ -1,4 +1,3 @@
-import { GroupChannels } from "./GroupChannels";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AdminPortal } from "./AdminPortal";
 import { PasswordField } from "./PasswordField";
@@ -8,21 +7,21 @@ import {
   normalizeEmail,
 } from "./emailValidation";
 import { StudentPortal } from "./portals/student/StudentPortal";
-import { fullNameValidationMessage } from "./inputValidation";
 import { SupervisorPortal } from "./portals/supervisor/SupervisorPortal";
 import { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";
 import { StudentEvaluatorPortal as EvaluatorPortal } from "./portals/student/modules/StudentEvaluatorPortal";
 import signInStudentsImage from "./assets/sign-in-students.webp";
 
-type Member = { id: string; name: string; registration: string; email: string };
-type Details = { name: string; registration: string; email: string };
+type Member = { id: string; email: string; registration: string };
 type Cycle = {
   id: number;
   code: string;
   display_name: string;
+  academic_year?: number | null;
+  session?: string | null;
   registration_open: boolean;
 };
-type Policy = { max_group_size: number };
+type Policy = { min_group_size: number; max_group_size: number };
 type FieldErrors = Record<string, string>;
 type ApiDetail = {
   code?: string;
@@ -39,6 +38,8 @@ type SafeUser = {
   registration_number: string | null;
   role: string;
   is_active: boolean;
+  group_id?: number | null;
+  group_email?: string | null;
 };
 type PasswordResetDeliveryStatus = {
   development_mode: boolean;
@@ -46,11 +47,16 @@ type PasswordResetDeliveryStatus = {
 };
 type DevelopmentResetLinkState = "idle" | "loading" | "ready" | "missing" | "error";
 type PublicPage = "in" | "up" | "recover";
-type StudentSignupMode = "single" | "group";
+type StudentSignupMode = "group";
 type PublicRoute = { page: PublicPage; signupRole: LoginRole | null; step: 1 | 2 | 3; studentMode: StudentSignupMode | null };
+type DashboardPage = "account" | "admin-portal";
 
-const STEPS = ["Account Details", "Login Details", "Team Members"];
-export const API = (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8010").replace(/\/$/, "");
+const STEPS = ["Academic Cycle", "Group Members", "Group Credentials"];
+const configuredApi = (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8010").replace(/\/$/, "");
+const localBrowserHost = typeof window !== "undefined" ? window.location.hostname : "";
+export const API = /:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(configuredApi) && localBrowserHost
+  ? configuredApi.replace(/:\/\/(localhost|127\.0\.0\.1)/, `://${localBrowserHost}`)
+  : configuredApi;
 const INPUT =
   "w-full rounded-lg border border-[#DCE3ED] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#4663FF] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
 const PRIMARY =
@@ -62,19 +68,26 @@ const academicCycleError = (status: number) => ({ 401: "Your session has expired
 
 const newMember = (): Member => ({
   id: crypto.randomUUID(),
-  name: "",
-  registration: "",
   email: "",
+  registration: "",
 });
 const registration = (value: string) => value.trim().toUpperCase();
-const email = (value: string) => value.trim().toLowerCase();
-const memberKey = (id: string, field: keyof Details) => `member.${id}.${field}`;
-const isLoginRole = (value: unknown): value is LoginRole => typeof value === "string" && ["STUDENT", "SUPERVISOR", "PANEL_MEMBER", "COORDINATOR", "ADMIN"].includes(value);
-const publicRoute = (page: PublicPage, signupRole: LoginRole | null = null, step: 1 | 2 | 3 = 1, studentMode: StudentSignupMode | null = null): PublicRoute => ({ page, signupRole: page === "up" ? signupRole : null, step: page === "up" && signupRole === "STUDENT" && studentMode === "group" ? step : 1, studentMode: page === "up" && signupRole === "STUDENT" ? studentMode : null });
+const memberKey = (id: string, field: keyof Omit<Member, "id">) => `member.${id}.${field}`;
+export const dashboardPageForRole = (role: unknown): DashboardPage | null => {
+  if (role === "ADMIN") return "admin-portal";
+  if (role === "STUDENT" || role === "SUPERVISOR" || role === "PANEL_MEMBER" || role === "COORDINATOR") return "account";
+  return null;
+};
+const isDashboardPage = (value: unknown): value is DashboardPage => value === "account" || value === "admin-portal";
+const publicRoute = (page: PublicPage, signupRole: LoginRole | null = null, step: 1 | 2 | 3 = 1, studentMode: StudentSignupMode | null = null): PublicRoute => {
+  void signupRole;
+  void studentMode;
+  return { page, signupRole: page === "up" ? "STUDENT" : null, step: page === "up" ? step : 1, studentMode: page === "up" ? "group" : null };
+};
 const readPublicRoute = (value: unknown): PublicRoute | null => {
   const route = (value as { fyphubNavigation?: unknown } | null)?.fyphubNavigation as Partial<PublicRoute> | undefined;
-  if (!route || (route.page !== "in" && route.page !== "up" && route.page !== "recover") || (route.signupRole !== null && !isLoginRole(route.signupRole)) || (route.step !== 1 && route.step !== 2 && route.step !== 3) || (route.studentMode !== undefined && route.studentMode !== null && route.studentMode !== "single" && route.studentMode !== "group")) return null;
-  return publicRoute(route.page, route.signupRole, route.step, route.studentMode === "single" || route.studentMode === "group" ? route.studentMode : null);
+  if (!route || (route.page !== "in" && route.page !== "up" && route.page !== "recover") || (route.step !== 1 && route.step !== 2 && route.step !== 3)) return null;
+  return publicRoute(route.page, "STUDENT", route.step, "group");
 };
 
 function Logo({ compact = false, auth = false, authMobile = false }: { compact?: boolean; auth?: boolean; authMobile?: boolean }) {
@@ -114,100 +127,12 @@ function Logo({ compact = false, auth = false, authMobile = false }: { compact?:
   );
 }
 
-const ROLES: { value: LoginRole; label: string }[] = [
-  { value: "STUDENT", label: "Student" },
-  { value: "SUPERVISOR", label: "Supervisor" },
-  { value: "PANEL_MEMBER", label: "Evaluator" },
-  { value: "COORDINATOR", label: "Coordinator" },
-  { value: "ADMIN", label: "Administrator" },
-];
-
-function RoleIcon({ role }: { role: LoginRole }) {
-  const paths =
-    role === "STUDENT"
-      ? ["M3 10 12 5l9 5-9 5-9-5Z", "M6 12v4c2 2 10 2 12 0v-4", "M21 10v5"]
-      : role === "SUPERVISOR"
-        ? [
-            "M8 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
-            "M3 20c0-3 2-5 5-5s5 2 5 5",
-            "M14 6h7v13h-7zM16 10h3M16 13h3",
-          ]
-        : role === "COORDINATOR"
-          ? [
-              "M5 5h4v4H5zM15 5h4v4h-4zM10 16h4v4h-4z",
-              "M9 7h6M17 9v4l-5 3M7 9v4l5 3",
-            ]
-          : role === "PANEL_MEMBER"
-            ? ["M7 3h10v18H7zM10 3v3h4V3", "M10 12l2 2 4-4"]
-            : [
-                "M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6l7-3Z",
-                "M12 9v6m-3-3h6",
-                "M18 15l1 1m0-3-1 1",
-              ];
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      className="h-5 w-5"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {paths.map((d) => (
-        <path key={d} d={d} />
-      ))}
-    </svg>
-  );
-}
-
 function AuthPhotoBackground() {
   return <div aria-hidden="true" className="auth-photo-background pointer-events-none absolute inset-0 overflow-hidden"><img src={signInStudentsImage} alt="" width="1200" height="800" className="h-full w-full object-cover object-[58%_center]" /><div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(10,40,55,.82),rgba(11,70,78,.6)_55%,rgba(10,35,50,.5))]" /></div>;
 }
 
 function AuthLayout({ children, actions, compact = false }: { children: ReactNode; actions?: ReactNode; compact?: boolean }) {
   return <main className="relative min-h-screen overflow-x-hidden px-4 py-7 text-[#243746] sm:px-6 sm:py-10 lg:py-5"><AuthPhotoBackground /><div className="relative mx-auto grid max-w-[1280px] gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(460px,500px)] lg:items-center lg:gap-16"><section className="hidden max-w-lg self-center text-white lg:block"><Logo auth /><h1 className="mt-14 text-4xl font-bold leading-[1.15] tracking-tight">From Your First Idea to Your Final Defense.</h1><p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-white/90">Bring your team, proposals, feedback, and progress together in one FYP workspace.</p><p className="mt-6 text-[15px] font-medium tracking-wide text-[#b9ddcf]">Stay focused. Build together.</p></section><div className={`auth-card mx-auto w-full max-w-[500px] rounded-3xl p-5 ${compact ? "sm:p-6" : "sm:p-7"}`}><header className={`mb-6 flex gap-4 ${actions ? "flex-col items-start sm:flex-row sm:items-center sm:justify-between" : "items-center justify-between lg:hidden"}`}><div className="lg:hidden"><Logo authMobile /></div>{actions && <div className="sm:ml-auto">{actions}</div>}</header>{children}</div></div></main>;
-}
-
-function RoleCards({
-  value,
-  onChange,
-  disabled = false,
-  includeAdmin = false,
-  compact = false,
-}: {
-  value: LoginRole;
-  onChange: (role: LoginRole) => void;
-  disabled?: boolean;
-  includeAdmin?: boolean;
-  compact?: boolean;
-}) {
-  const roles = includeAdmin ? ROLES : ROLES;
-  return (
-    <div
-      className={`grid grid-cols-2 ${compact ? "gap-[10px]" : "gap-3"}`}
-      role="radiogroup"
-      aria-label="Account type"
-    >
-      {roles.map((role) => (
-        <button
-          key={role.value}
-          type="button"
-          role="radio"
-          aria-checked={value === role.value}
-          disabled={disabled}
-          onClick={() => onChange(role.value)}
-          className={`flex ${compact ? "min-h-[54px]" : "min-h-[64px]"} items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors ${value === role.value ? "border-[#4663FF] bg-[#eef0ff] ring-1 ring-[#4663FF]" : "border-[#dce4de] bg-white/75 hover:border-[#8b9aff]"}`}
-        >
-          <span className="block shrink-0 text-[#4663FF]">
-            <RoleIcon role={role.value} />
-          </span>
-          <span className="text-sm font-bold">{role.label}</span>
-        </button>
-      ))}
-    </div>
-  );
 }
 
 function Field({
@@ -322,9 +247,6 @@ function StepProgress({ step }: { step: number }) {
 
 export default function App() {
   const [page, setPage] = useState<string>("in");
-  const [loginRole, setLoginRole] = useState<LoginRole>("STUDENT");
-  const [signupRole, setSignupRole] = useState<LoginRole | null>(null);
-  const [studentMode, setStudentMode] = useState<StudentSignupMode | null>(null);
   const [authUser, setAuthUser] = useState<SafeUser | null>(null);
   const authUserRef = useRef<SafeUser | null>(null);
   useEffect(() => { authUserRef.current = authUser; }, [authUser]);
@@ -333,17 +255,8 @@ export default function App() {
   const [step, setStep] = useState(1);
   const [notice, setNotice] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [account, setAccount] = useState<Details>({
-    name: "",
-    registration: "",
-    email: "",
-  });
-  const [single, setSingle] = useState({ name: "", registration: "", email: "", password: "", confirm: "" });
   const [login, setLogin] = useState({ email: "", password: "", confirm: "" });
-  const [members, setMembers] = useState<Member[]>(() => [
-    newMember(),
-    newMember(),
-  ]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [signIn, setSignIn] = useState({ email: "", password: "" });
   const [recoveryView, setRecoveryView] = useState<"forgot" | "reset">(
     () => window.location.pathname === "/reset-password" ? "reset" : "forgot",
@@ -376,7 +289,6 @@ export default function App() {
     teamId: number;
     cycle: string;
   } | null>(null);
-  const [individualSuccess, setIndividualSuccess] = useState(false);
   const publicNavigationRef = useRef<(route: PublicRoute, mode?: "push" | "replace" | "pop") => void>(() => undefined);
 
   useEffect(() => {
@@ -435,6 +347,15 @@ export default function App() {
     return () => controller.abort();
   }, [cycleId]);
   useEffect(() => {
+    if (!policy) return;
+    queueMicrotask(() => {
+      setMembers((current) => {
+        if (current.length >= policy.min_group_size) return current;
+        return [...current, ...Array.from({ length: policy.min_group_size - current.length }, () => newMember())];
+      });
+    });
+  }, [policy]);
+  useEffect(() => {
     if (window.location.pathname === "/reset-password") return;
     void (async () => {
       try {
@@ -442,8 +363,16 @@ export default function App() {
           credentials: "include",
         });
         if (response.ok) {
-          setAuthUser((await response.json()) as SafeUser);
-          setPage("account");
+          const user = (await response.json()) as SafeUser;
+          const destination = dashboardPageForRole(user.role);
+          if (!destination || !user.is_active) {
+            setAuthUser(null);
+            setAuthError("Your account has no valid dashboard role. Please contact an administrator.");
+            publicNavigationRef.current(publicRoute("in"), "replace");
+            return;
+          }
+          setAuthUser(user);
+          setPage(destination);
         }
       } catch {
         /* A local API may not be running while the public signup form is used. */
@@ -463,30 +392,10 @@ export default function App() {
       });
     return () => { active = false; };
   }, [page, recoveryView]);
-  useEffect(() => {
-    if (authUser?.role !== "ADMIN") return;
-    void (async () => {
-      try {
-        const response = await fetch(`${API}/api/v1/admin/me`, {
-          credentials: "include",
-        });
-        if (response.ok) setPage("admin-portal");
-        else {
-          setAuthUser(null);
-          setPage("in");
-          setAuthError(
-            "Administrator access is not available for this account.",
-          );
-        }
-      } catch {
-        setAuthError("Administrator access could not be verified.");
-      }
-    })();
-  }, [authUser]);
-
   const selectedCycle = cycles.find((cycle) => String(cycle.id) === cycleId);
+  const minimum = policy?.min_group_size ?? 1;
   const maximum = policy?.max_group_size;
-  const teamSize = members.length + 1;
+  const teamSize = members.length;
   const clear = (key: string) => {
     setErrors((current) => {
       const next = { ...current };
@@ -495,20 +404,11 @@ export default function App() {
     });
     setNotice("");
   };
-  const updateAccount = (field: keyof Details, value: string) => {
-    setAccount((current) => ({ ...current, [field]: value }));
-    clear(`account.${field}`);
-  };
-  const updateSingle = (field: keyof Details | "password" | "confirm", value: string) => {
-    setSingle((current) => ({ ...current, [field]: value }));
-    clear(`single.${field}`);
-    setNotice("");
-  };
   const updateLogin = (field: keyof typeof login, value: string) => {
     setLogin((current) => ({ ...current, [field]: value }));
     clear(`login.${field}`);
   };
-  const updateMember = (id: string, field: keyof Details, value: string) => {
+  const updateMember = (id: string, field: keyof Omit<Member, "id">, value: string) => {
     setMembers((current) =>
       current.map((member) =>
         member.id === id ? { ...member, [field]: value } : member,
@@ -520,13 +420,6 @@ export default function App() {
   function validate(target: number): FieldErrors {
     const next: FieldErrors = {};
     if (target === 1 || target === 0) {
-      const accountNameError = fullNameValidationMessage(account.name);
-      if (accountNameError) next["account.name"] = accountNameError;
-      if (!registration(account.registration))
-        next["account.registration"] =
-          "Enter the creator's registration number.";
-      const accountEmailError = emailValidationMessage(account.email);
-      if (accountEmailError) next["account.email"] = accountEmailError;
       if (!cycleId) next["account.cycle"] = "Choose an academic cycle.";
       else if (!selectedCycle?.registration_open)
         next["account.cycle"] = "Registration is closed for this cycle.";
@@ -538,69 +431,56 @@ export default function App() {
         next["account.cycle"] = "Group policy could not be loaded.";
     }
     if (target === 2 || target === 0) {
-      const sharedEmailError = emailValidationMessage(login.email);
-      if (sharedEmailError) next["login.email"] = sharedEmailError;
-      const groupPasswordError = passwordPolicyError(login.password);
-      if (groupPasswordError) next["login.password"] = groupPasswordError;
-      if (login.password !== login.confirm)
-        next["login.confirm"] = "Passwords do not match.";
-    }
-    if (target === 3 || target === 0) {
       const registrations = new Map<string, string>();
       const emails = new Map<string, string>();
-      [{ id: "creator", ...account }, ...members].forEach((member) => {
-        const prefix =
-          member.id === "creator" ? "account" : `member.${member.id}`;
+      members.forEach((member) => {
+        const prefix = `member.${member.id}`;
         const reg = registration(member.registration);
-        const address = email(member.email);
-        const memberNameError = fullNameValidationMessage(member.name);
-        if (memberNameError) next[`${prefix}.name`] = memberNameError;
+        const emailError = emailValidationMessage(member.email);
+        if (emailError) next[`${prefix}.name`] = "Enter a valid member email address.";
         if (!reg)
           next[`${prefix}.registration`] = "Enter a registration number.";
-        const memberEmailError = emailValidationMessage(address);
-        if (memberEmailError) next[`${prefix}.email`] = memberEmailError;
+        const normalizedEmail = normalizeEmail(member.email);
+        if (normalizedEmail && emails.has(normalizedEmail)) {
+          next[`${prefix}.name`] = "Member emails must be unique in this group.";
+          next[emails.get(normalizedEmail)!] = "Member emails must be unique in this group.";
+        }
+        if (normalizedEmail) emails.set(normalizedEmail, `${prefix}.name`);
         if (reg && registrations.has(reg)) {
           next[`${prefix}.registration`] =
             "Registration number is already used in this team.";
           next[registrations.get(reg)!] =
             "Registration number is already used in this team.";
         }
-        if (address && emails.has(address)) {
-          next[`${prefix}.email`] =
-            "University email is already used in this team.";
-          next[emails.get(address)!] =
-            "University email is already used in this team.";
-        }
         if (reg) registrations.set(reg, `${prefix}.registration`);
-        if (address) emails.set(address, `${prefix}.email`);
       });
       if (!maximum)
         next["members.configuration"] =
           "Choose a cycle with an available group policy.";
+      if (minimum && teamSize < minimum)
+        next["members.configuration"] =
+          `This group has ${teamSize} members; the selected cycle requires at least ${minimum}. Add members before submitting.`;
       if (maximum && teamSize > maximum)
         next["members.configuration"] =
           `This team has ${teamSize} members; the selected cycle allows ${maximum}. Remove members before submitting.`;
     }
-    return next;
-  }
-  function validateSingle(): FieldErrors {
-    const next: FieldErrors = {};
-    const singleNameError = fullNameValidationMessage(single.name);
-    if (singleNameError) next["single.name"] = singleNameError;
-    if (!registration(single.registration)) next["single.registration"] = "Enter your registration number.";
-    const singleEmailError = emailValidationMessage(single.email);
-    if (singleEmailError) next["single.email"] = singleEmailError;
-    const singlePasswordError = passwordPolicyError(single.password);
-    if (singlePasswordError) next["single.password"] = singlePasswordError;
-    if (single.password !== single.confirm) next["single.confirm"] = "Passwords do not match.";
+    if (target === 3 || target === 0) {
+      const sharedEmailError = emailValidationMessage(login.email);
+      if (sharedEmailError) next["login.email"] = "Enter a valid group email address.";
+      const groupPasswordError = passwordPolicyError(login.password);
+      if (groupPasswordError) next["login.password"] = groupPasswordError;
+      if (login.password !== login.confirm) next["login.confirm"] = "Passwords do not match.";
+    }
     return next;
   }
   const stepFor = (key?: string) =>
-    !key || key.startsWith("member") || key.startsWith("members")
-      ? 3
-      : key.startsWith("login")
+    !key || key.startsWith("account")
+      ? 1
+      : key.startsWith("member") || key.startsWith("members")
         ? 2
-        : 1;
+        : key.startsWith("login")
+          ? 3
+          : 1;
   function navigatePublic(route: PublicRoute, mode: "push" | "replace" | "pop" = "push") {
     let next = publicRoute(route.page, route.signupRole, route.step, route.studentMode);
     let nextErrors: FieldErrors = {};
@@ -612,8 +492,6 @@ export default function App() {
       }
     }
     setPage(next.page);
-    setSignupRole(next.signupRole);
-    setStudentMode(next.studentMode);
     setStep(next.step);
     setErrors(nextErrors);
     setNotice(Object.keys(nextErrors).length ? "Please correct the highlighted fields." : "");
@@ -640,19 +518,18 @@ export default function App() {
     }
     const onPopState = (event: PopStateEvent) => {
       const destination = (event.state as { fyphubNavigation?: { page?: string } } | null)?.fyphubNavigation?.page;
-      if (destination === "admin-portal" && authUserRef.current?.role === "ADMIN") {
-        void fetch(`${API}/api/v1/admin/me`, { credentials: "include" }).then(async response => {
-          if (!response.ok) {
-            setAuthUser(null);
-            publicNavigationRef.current(publicRoute("in"), "pop");
-            return;
-          }
-          setAuthUser((await response.json()) as SafeUser);
-          setPage("admin-portal");
-        }).catch(() => {
+      if (isDashboardPage(destination)) {
+        const user = authUserRef.current;
+        const permitted = user ? dashboardPageForRole(user.role) : null;
+        if (!permitted) {
           setAuthUser(null);
-          publicNavigationRef.current(publicRoute("in"), "pop");
-        });
+          publicNavigationRef.current(publicRoute("in"), "replace");
+          return;
+        }
+        if (destination !== permitted) {
+          window.history.replaceState({ fyphubNavigation: { page: permitted } }, "", window.location.href);
+        }
+        setPage(permitted);
         return;
       }
       publicNavigationRef.current(readPublicRoute(event.state) ?? publicRoute("in"), "pop");
@@ -672,24 +549,21 @@ export default function App() {
   function mapPath(path?: string) {
     if (!path) return undefined;
     const basic: Record<string, string> = {
-      "creator.full_name": "account.name",
-      "creator.registration_number": "account.registration",
-      "creator.university_email": "account.email",
       shared_login_email: "login.email",
+      group_email: "login.email",
       password: "login.password",
       academic_cycle_id: "account.cycle",
       members: "members.configuration",
     };
     if (basic[path]) return basic[path];
     const match = path.match(
-      /^members\.(\d+)\.(full_name|registration_number|university_email)$/,
+      /^members\.(\d+)\.(email|registration_number)$/,
     );
     if (!match || !members[Number(match[1])]) return undefined;
     const field = {
-      full_name: "name",
+      email: "email",
       registration_number: "registration",
-      university_email: "email",
-    }[match[2]] as keyof Details;
+    }[match[2]] as keyof Omit<Member, "id">;
     return memberKey(members[Number(match[1])].id, field);
   }
   function applyError(detail: ApiDetail) {
@@ -707,7 +581,7 @@ export default function App() {
       );
       setStep(Math.min(...fields.map(stepFor)));
     }
-    setNotice(detail.message ?? "Team account could not be created.");
+    setNotice(detail.message ?? "Student group account could not be created.");
   }
   const canSubmit = Boolean(
     selectedCycle?.registration_open &&
@@ -730,21 +604,16 @@ export default function App() {
     setErrors({});
     const payload = {
       academic_cycle_id: Number(cycleId),
-      creator: {
-        full_name: account.name.trim(),
-        registration_number: registration(account.registration),
-        university_email: normalizeEmail(account.email),
-      },
-      shared_login_email: normalizeEmail(login.email),
+      group_email: normalizeEmail(login.email),
       password: login.password,
+      confirm_password: login.confirm,
       members: members.map((member) => ({
-        full_name: member.name.trim(),
+        email: normalizeEmail(member.email),
         registration_number: registration(member.registration),
-        university_email: normalizeEmail(member.email),
       })),
     };
     try {
-      const response = await fetch(`${API}/api/v1/team-registration`, {
+      const response = await fetch(`${API}/api/v1/student/group-registration`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -768,67 +637,23 @@ export default function App() {
     }
   }
 
-  async function submitSingle() {
-    const next = validateSingle();
-    if (Object.keys(next).length) {
-      setErrors(next);
-      setNotice("Please correct the highlighted fields.");
-      return;
-    }
-    if (submitting) return;
-    setSubmitting(true);
-    setErrors({});
-    setNotice("");
-    try {
-      const response = await fetch(`${API}/api/v1/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: single.name.trim(),
-          registration_number: registration(single.registration),
-          email: normalizeEmail(single.email),
-          password: single.password,
-        }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const detail = data.detail;
-        setNotice(typeof detail === "string" ? detail : "Student account could not be created.");
-        return;
-      }
-      setIndividualSuccess(true);
-      setSingle((current) => ({ ...current, password: "", confirm: "" }));
-    } catch {
-      setNotice("The registration service is unavailable. Your entered details were kept.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   async function performLogin() {
     if (authSubmitting) return;
     const identifier = signIn.email.trim();
     if (!identifier || !signIn.password) {
       setAuthError(
-        "Enter your registered email or creator registration number and password.",
+        "Enter the group email and password.",
       );
       return;
     }
-    if (identifier.includes("@")) {
-      const identifierError = emailValidationMessage(identifier);
-      if (identifierError) {
-        setAuthError(identifierError);
-        return;
-      }
+    const identifierError = emailValidationMessage(identifier);
+    if (identifierError) {
+      setAuthError(identifierError);
+      return;
     }
     setAuthSubmitting(true);
     setAuthError("");
-    const payload: Record<string, string> = {
-      password: signIn.password,
-      requested_role: loginRole,
-    };
-    if (identifier.includes("@")) payload.email = normalizeEmail(identifier);
-    else payload.registration_number = identifier;
+    const payload = { email: normalizeEmail(identifier), password: signIn.password };
     try {
       const response = await fetch(`${API}/api/v1/auth/login`, {
         method: "POST",
@@ -839,12 +664,18 @@ export default function App() {
       if (!response.ok) {
         setAuthError(
           response.status === 401
-            ? "The selected account type or credentials are incorrect."
+            ? "The email or password is incorrect, or the account is inactive."
             : "Sign in could not be completed. Please check your details.",
         );
         return;
       }
-      await response.json();
+      const loginUser = (await response.json()) as SafeUser;
+      const loginDestination = dashboardPageForRole(loginUser.role);
+      if (!loginDestination || !loginUser.is_active) {
+        setAuthUser(null);
+        setAuthError("Your account has no valid dashboard role. Please contact an administrator.");
+        return;
+      }
       const sessionResponse = await fetch(`${API}/api/v1/auth/me`, {
         credentials: "include",
       });
@@ -858,9 +689,14 @@ export default function App() {
         return;
       }
       const confirmedUser = (await sessionResponse.json()) as SafeUser;
+      const destination = dashboardPageForRole(confirmedUser.role);
+      if (!destination || !confirmedUser.is_active) {
+        setAuthUser(null);
+        setAuthError("Your account has no valid dashboard role. Please contact an administrator.");
+        return;
+      }
       setAuthUser(confirmedUser);
       setSignIn((current) => ({ ...current, password: "" }));
-      const destination = confirmedUser.role === "ADMIN" ? "admin-portal" : "account";
       window.history.pushState({ fyphubNavigation: { page: destination } }, "", window.location.href);
       setPage(destination);
     } catch {
@@ -1019,7 +855,18 @@ export default function App() {
     );
   if (page === "account" && authUser?.role === "PANEL_MEMBER")
     return <EvaluatorPortal api={API} user={authUser} onLogout={() => void signOut()} />;
-  if (page === "account" && authUser)
+  if ((page === "account" || page === "admin-portal") && authUser && !dashboardPageForRole(authUser.role)) {
+    return (
+      <AuthLayout compact>
+        <div className="space-y-4">
+          <h1 className="text-2xl font-bold">Dashboard unavailable</h1>
+          <p role="alert" className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">Your account has no recognized dashboard role. Please contact an administrator.</p>
+          <button type="button" onClick={() => void signOut()} className={`${AUTH_PRIMARY} w-full`}>Log out</button>
+        </div>
+      </AuthLayout>
+    );
+  }
+  if (page === "account" && authUser && dashboardPageForRole(authUser.role) === "account")
     return (
       <main className="min-h-screen bg-[#F7F5EF] px-4 py-8 text-[#243746]">
         <div className="mx-auto max-w-md">
@@ -1059,7 +906,6 @@ export default function App() {
               Log out
             </button>
           </section>
-          {(authUser.role === "STUDENT" || authUser.role === "SUPERVISOR") && <GroupChannels api={API} role={authUser.role} />}
         </div>
       </main>
     );
@@ -1083,19 +929,14 @@ export default function App() {
         </header>
         <div className="mx-auto flex max-w-6xl flex-col md:flex-row">
           <aside className="border-b border-[#dce4de] bg-white p-4 md:min-h-[calc(100vh-65px)] md:w-60 md:border-b-0 md:border-r">
-            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-[#4f6470]">
-              Administration
-            </p>
             <nav aria-label="Admin navigation" className="grid gap-1">
               {[
                 "Overview",
                 "Users & Roles",
                 "Academic Cycles & Policies",
                 "Supervisor Capacity",
-                "Evaluation Criteria",
                 "Deadlines",
                 "Reminders & Escalations",
-                "Audit History",
               ].map((item, index) => (
                 <span
                   key={item}
@@ -1107,12 +948,9 @@ export default function App() {
             </nav>
           </aside>
           <section className="flex-1 p-5 sm:p-8">
-            <p className="text-sm font-semibold text-[#3984E8]">
-              Administrator portal
-            </p>
             <h1 className="mt-1 text-2xl font-bold">Overview</h1>
             <p className="mt-3 max-w-xl text-sm text-[#4f6470]">
-              Your administrator session is verified. Management data and
+              Your session is verified. Management data and
               controls will be added checkpoint by checkpoint; no statistics or
               management actions are shown until backed by real APIs.
             </p>
@@ -1130,7 +968,7 @@ export default function App() {
         </div>
       </main>
     );
-  if (page === "admin-portal" && authUser)
+  if (page === "admin-portal" && authUser && dashboardPageForRole(authUser.role) === "admin-portal")
     return (
       <AdminPortal api={API} user={authUser} onLogout={() => void signOut()} />
     );
@@ -1183,25 +1021,15 @@ export default function App() {
         )}
       </AuthLayout>
     );
-  if (page === "up" && studentMode === "single" && individualSuccess)
-    return (
-      <AuthLayout>
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-[#176B66]">Student account created</h1>
-          <p className="mt-3 text-sm text-[#4f6470]">Your individual student account is ready. You can now sign in.</p>
-          <button type="button" onClick={() => navigatePublic(publicRoute("in"))} className={`${AUTH_PRIMARY} mt-6 w-full`}>Go to Login</button>
-        </div>
-      </AuthLayout>
-    );
   if (page === "up" && success)
     return (
       <AuthLayout>
           <div className="text-center">
             <h1 className="text-2xl font-bold text-[#176B66]">
-              Team account created
+              Student group account created successfully.
             </h1>
             <p className="mt-3 text-sm text-[#4f6470]">
-              Your shared team account for {success.cycle} was created. Team ID:{" "}
+              Group ID: {success.teamId}. Academic cycle: {success.cycle}. Your group login is ready.
               {success.teamId}.
             </p>
             <button
@@ -1214,96 +1042,6 @@ export default function App() {
           </div>
       </AuthLayout>
     );
-  if (page === "up" && signupRole === null)
-    return (
-      <AuthLayout>
-          <div>
-            <h1 className="text-2xl font-bold">Create Your Account</h1>
-            <p className="mt-2 mb-6 text-sm text-[#4f6470]">
-              Join the FYP Intelligence Hub.
-            </p>
-            <RoleCards value="STUDENT" onChange={(role) => navigatePublic(publicRoute("up", role, 1))} />
-            <p className="mt-6 text-center text-sm text-[#4f6470]">
-              Already have an account?{" "}
-              <button
-                type="button"
-                onClick={() => navigatePublic(publicRoute("in"))}
-                className="font-semibold text-[#176B66] underline"
-              >
-                Login
-              </button>
-            </p>
-          </div>
-      </AuthLayout>
-    );
-  if (page === "up" && signupRole === "STUDENT" && studentMode === null)
-    return (
-      <AuthLayout>
-        <div>
-          <h1 className="text-2xl font-bold">Choose a Student Account</h1>
-          <p className="mt-2 mb-6 text-sm text-[#4f6470]">Select how you want to join FYPHub.</p>
-          <div className="grid gap-3">
-            <button type="button" onClick={() => { setIndividualSuccess(false); setSuccess(null); navigatePublic(publicRoute("up", "STUDENT", 1, "single")); }} className="rounded-xl border border-[#dce4de] bg-white p-4 text-left transition-colors hover:border-[#4663FF] hover:bg-[#eef0ff]">
-              <span className="block text-base font-bold">Single Student</span>
-              <span className="mt-1 block text-sm text-[#4f6470]">Create an individual student account.</span>
-            </button>
-            <button type="button" onClick={() => { setIndividualSuccess(false); setSuccess(null); navigatePublic(publicRoute("up", "STUDENT", 1, "group")); }} className="rounded-xl border border-[#dce4de] bg-white p-4 text-left transition-colors hover:border-[#4663FF] hover:bg-[#eef0ff]">
-              <span className="block text-base font-bold">Group</span>
-              <span className="mt-1 block text-sm text-[#4f6470]">Create a shared group account.</span>
-            </button>
-          </div>
-          <button type="button" onClick={() => navigatePublic(publicRoute("up"))} className="mt-6 w-full text-sm font-semibold text-[#176B66] underline">Choose another account type</button>
-        </div>
-      </AuthLayout>
-    );
-  if (page === "up" && signupRole === "STUDENT" && studentMode === "single")
-    return (
-      <AuthLayout>
-        <form onSubmit={(event) => { event.preventDefault(); void submitSingle(); }}>
-          <h1 className="text-2xl font-bold">Create Single Student Account</h1>
-          <p className="mt-2 mb-6 text-sm text-[#4f6470]">Use your university details to create an individual student account.</p>
-          <div className="grid gap-4">
-            <Field label="Full name" autoComplete="name" value={single.name} disabled={submitting} error={errors["single.name"]} onChange={(value) => updateSingle("name", value)} />
-            <Field label="Registration number" value={single.registration} disabled={submitting} error={errors["single.registration"]} onChange={(value) => updateSingle("registration", value)} />
-            <Field label="University email" type="email" value={single.email} disabled={submitting} error={errors["single.email"] ?? (single.email ? emailValidationMessage(single.email) : undefined)} onChange={(value) => updateSingle("email", value)} />
-            <PasswordField label="Password" value={single.password} disabled={submitting} error={errors["single.password"]} onChange={(value) => updateSingle("password", value)} />
-            <PasswordField label="Confirm password" value={single.confirm} confirm disabled={submitting} error={errors["single.confirm"]} onChange={(value) => updateSingle("confirm", value)} />
-          </div>
-          {notice && <p role="alert" className="mt-4 rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{notice}</p>}
-          <div className="mt-6 grid gap-3">
-            <button type="submit" disabled={submitting || Boolean(emailValidationMessage(single.email))} className={`${AUTH_PRIMARY} min-h-[46px] w-full`}>{submitting ? "Creating account..." : "Create Account"}</button>
-            <button type="button" disabled={submitting} onClick={() => navigatePublic(publicRoute("up", "STUDENT", 1, null))} className="w-full text-sm font-semibold text-[#176B66] underline">Back to Student options</button>
-          </div>
-        </form>
-      </AuthLayout>
-    );
-  if (page === "up" && signupRole !== "STUDENT")
-    return (
-      <AuthLayout>
-          <div>
-            <h1 className="text-2xl font-bold">Restricted registration</h1>
-            <p className="mt-3 text-sm text-[#4f6470]">
-              {ROLES.find((role) => role.value === signupRole)?.label} accounts
-              are created through an authorized invitation or administrator
-              approval.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigatePublic(publicRoute("up"))}
-              className={`${AUTH_PRIMARY} mt-6 w-full`}
-            >
-              Choose another account type
-            </button>
-            <button
-              type="button"
-              onClick={() => navigatePublic(publicRoute("in"))}
-              className="mt-4 w-full text-sm font-semibold text-[#176B66] underline"
-            >
-              Back to Login
-            </button>
-          </div>
-      </AuthLayout>
-    );
   if (page === "in")
     return (
       <AuthLayout compact>
@@ -1312,22 +1050,16 @@ export default function App() {
             <p className="mt-1.5 mb-4 text-sm text-[#4f6470]">
               Sign in to your FYP workspace.
             </p>
-            <RoleCards
-              value={loginRole}
-              onChange={setLoginRole}
-              disabled={authSubmitting}
-              compact
-            />
             <form
-              className="mt-4 space-y-3"
+              className="mt-5 space-y-3"
               onSubmit={(event) => {
                 event.preventDefault();
                 void performLogin();
               }}
             >
               <Field
-                label="Email or Registration ID"
-                type={signIn.email.includes("@") ? "email" : "text"}
+                label="Group email"
+                type="email"
                 autoComplete="username"
                 value={signIn.email}
                 error={signIn.email.includes("@") ? emailValidationMessage(signIn.email) : undefined}
@@ -1399,7 +1131,7 @@ export default function App() {
               <h1 className="mb-7 text-center text-2xl font-bold">Sign In</h1>
               <div className="space-y-5">
                 <Field
-                  label="Shared login email"
+                  label="Group email"
                   type="email"
                   autoComplete="username"
                   value={signIn.email}
@@ -1438,20 +1170,19 @@ export default function App() {
           ) : success ? (
             <div className="space-y-5 py-5 text-center">
               <h1 className="text-2xl font-bold text-[#176B66]">
-                Team account created
+                Student group account created successfully.
               </h1>
               <p className="text-sm text-[#4f6470]">
-                Your shared team account for {success.cycle} was created. Team
-                ID: {success.teamId}.
+                Group ID: {success.teamId}. Academic cycle: {success.cycle}.
               </p>
               <p className="text-sm text-[#4f6470]">
-                Sign In will be available when authentication is implemented.
+                Use the group email and password to sign in.
               </p>
             </div>
           ) : (
             <>
               <h1 className="text-center text-lg font-bold">
-                Create Team Account
+              Create Student Group Account
               </h1>
               <p className="mt-2 mb-6 text-center text-sm text-[#4f6470]">
                 Your team will use one email and password.
@@ -1484,8 +1215,8 @@ export default function App() {
                       </option>
                       {cycles.map((cycle) => (
                         <option key={cycle.id} value={cycle.id}>
-                          {cycle.display_name} ({cycle.code})
-                          {cycle.registration_open ? "" : " — closed"}
+                          {cycle.display_name} ({cycle.academic_year ?? "Year"} {cycle.session ?? ""})
+                          {cycle.registration_open ? " — open" : " — closed"}
                         </option>
                       ))}
                     </select>
@@ -1506,149 +1237,25 @@ export default function App() {
                     )}
                     {selectedCycle && policyState === "ready" && maximum && (
                       <p className="text-sm text-[#4f6470]">
-                        This cycle allows up to {maximum} members, including the
-                        creator.
+                        This cycle allows {minimum}–{maximum} group members.
                       </p>
                     )}
                   </div>
-                  <div className="sm:col-span-2">
-                    <Field
-                      label="Full name"
-                      autoComplete="name"
-                      value={account.name}
-                      disabled={submitting}
-                      error={errors["account.name"]}
-                      onChange={(value) => updateAccount("name", value)}
-                    />
-                  </div>
-                  <Field
-                    label="Registration number"
-                    value={account.registration}
-                    disabled={submitting}
-                    error={errors["account.registration"]}
-                    onChange={(value) => updateAccount("registration", value)}
-                  />
-                  <Field
-                    label="University email"
-                    type="email"
-                    value={account.email}
-                    disabled={submitting}
-                    error={errors["account.email"]}
-                    onChange={(value) => updateAccount("email", value)}
-                  />
                 </div>
               )}
               {step === 2 && (
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <Field
-                      label="Shared login email"
-                      type="email"
-                      autoComplete="username"
-                      value={login.email}
-                      disabled={submitting}
-                      error={errors["login.email"]}
-                      onChange={(value) => updateLogin("email", value)}
-                    />
-                  </div>
-                  <PasswordField
-                    label="Password"
-                    value={login.password}
-                    disabled={submitting}
-                    error={errors["login.password"]}
-                    onChange={(value) => updateLogin("password", value)}
-                  />
-                  <PasswordField
-                    label="Confirm password"
-                    value={login.confirm}
-                    disabled={submitting}
-                    error={errors["login.confirm"]}
-                    onChange={(value) => updateLogin("confirm", value)}
-                  />
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-[#4f6470]">{teamSize} of {maximum ?? "—"} members added</p><button type="button" disabled={submitting || !maximum || teamSize >= maximum} onClick={() => setMembers((current) => [...current, newMember()])} className="rounded-lg border border-[#176B66] px-3 py-2 text-sm font-semibold text-[#176B66] disabled:cursor-not-allowed disabled:border-[#cbd6d0] disabled:text-[#4f6470]">+ Add member</button></div>
+                  {maximum && teamSize >= maximum && <p className="text-sm text-[#4f6470]">Maximum group size reached for this cycle.</p>}
+                  {errors["members.configuration"] && <p role="alert" className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{errors["members.configuration"]}</p>}
+                  {members.map((member, index) => <article key={member.id} className="rounded-xl border border-[#dce4de] bg-[#f4f8f5] p-4"><div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-bold">Member {index + 1}</h3><button type="button" disabled={submitting || members.length <= minimum} aria-label={`Remove Member ${index + 1}`} onClick={() => setMembers((current) => current.filter((item) => item.id !== member.id))} className="text-xs font-semibold text-[#176B66] underline disabled:text-[#4f6470]">Remove</button></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Member email" type="email" value={member.email} disabled={submitting} error={errors[memberKey(member.id, "email")]} onChange={(value) => updateMember(member.id, "email", value)} /><Field label="Registration number" value={member.registration} disabled={submitting} error={errors[memberKey(member.id, "registration")]} onChange={(value) => updateMember(member.id, "registration", value)} /></div></article>)}
                 </div>
               )}
               {step === 3 && (
                 <div className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-[#4f6470]">
-                      Creator is Member 1.{" "}
-                      {maximum
-                        ? `${teamSize} of ${maximum} members.`
-                        : "Choose a cycle to see the team limit."}
-                    </p>
-                    <button
-                      type="button"
-                      disabled={submitting || !maximum || teamSize >= maximum}
-                      onClick={() =>
-                        setMembers((current) => [...current, newMember()])
-                      }
-                      className="rounded-lg border border-[#176B66] px-3 py-2 text-sm font-semibold text-[#176B66] disabled:cursor-not-allowed disabled:border-[#cbd6d0] disabled:text-[#4f6470]"
-                    >
-                      + Add Member
-                    </button>
-                  </div>
-                  {errors["members.configuration"] && (
-                    <p className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">
-                      {errors["members.configuration"]}
-                    </p>
-                  )}
-                  {members.map((member, index) => (
-                    <article
-                      key={member.id}
-                      className="rounded-xl border border-[#dce4de] bg-[#f4f8f5] p-4"
-                    >
-                      <div className="mb-4 flex items-center justify-between">
-                        <h3 className="text-sm font-bold">
-                          Member {index + 2}
-                        </h3>
-                        <button
-                          type="button"
-                          disabled={submitting}
-                          aria-label={`Remove Member ${index + 2}`}
-                          onClick={() =>
-                            setMembers((current) =>
-                              current.filter((item) => item.id !== member.id),
-                            )
-                          }
-                          className="text-xs font-semibold text-[#176B66] underline disabled:text-[#4f6470]"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="sm:col-span-2">
-                          <Field
-                            label="Full name"
-                            value={member.name}
-                            disabled={submitting}
-                            error={errors[memberKey(member.id, "name")]}
-                            onChange={(value) =>
-                              updateMember(member.id, "name", value)
-                            }
-                          />
-                        </div>
-                        <Field
-                          label="Registration number"
-                          value={member.registration}
-                          disabled={submitting}
-                          error={errors[memberKey(member.id, "registration")]}
-                          onChange={(value) =>
-                            updateMember(member.id, "registration", value)
-                          }
-                        />
-                        <Field
-                          label="University email"
-                          type="email"
-                          value={member.email}
-                          disabled={submitting}
-                          error={errors[memberKey(member.id, "email")]}
-                          onChange={(value) =>
-                            updateMember(member.id, "email", value)
-                          }
-                        />
-                      </div>
-                    </article>
-                  ))}
+                  <Field label="Group email" type="email" autoComplete="username" value={login.email} disabled={submitting} error={errors["login.email"]} onChange={(value) => updateLogin("email", value)} />
+                  <PasswordField label="Password" value={login.password} disabled={submitting} error={errors["login.password"]} onChange={(value) => updateLogin("password", value)} />
+                  <PasswordField label="Confirm password" value={login.confirm} disabled={submitting} error={errors["login.confirm"]} onChange={(value) => updateLogin("confirm", value)} />
                 </div>
               )}
               {notice && (
@@ -1686,7 +1293,7 @@ export default function App() {
                     onClick={() => void submit()}
                     className={`${AUTH_PRIMARY} ml-auto`}
                   >
-                    {submitting ? "Creating..." : "Create Team Account"}
+                    {submitting ? "Creating..." : "Create Student Group Account"}
                   </button>
                 )}
               </div>

@@ -4,6 +4,7 @@ import test from "node:test";
 
 const root = new URL("../src/", import.meta.url);
 const dashboard = fs.readFileSync(new URL("AcademicCycleDashboard.tsx", root), "utf8");
+const manager = fs.readFileSync(new URL("AdminCycleManager.tsx", root), "utf8");
 const admin = fs.readFileSync(new URL("AdminPortal.tsx", root), "utf8");
 const coordinator = fs.readFileSync(new URL("portals/coordinator/CoordinatorPortal.tsx", root), "utf8");
 
@@ -41,4 +42,28 @@ test("detail dashboard provides the required summary and data tabs", () => {
   }
   assert.match(dashboard, /View details/);
   assert.match(dashboard, /No .* are recorded for this cycle/);
+});
+
+test("academic-cycle creation uses only year and Fall/Spring session", () => {
+  assert.match(manager, /Academic year/);
+  assert.match(manager, /type="number"/);
+  assert.match(manager, /<option value="FALL">Fall<\/option>/);
+  assert.match(manager, /<option value="SPRING">Spring<\/option>/);
+  assert.doesNotMatch(manager, /createForm\.code/);
+  assert.doesNotMatch(manager, /createForm\.display_name/);
+  assert.match(manager, /academic_year:Number\(createForm\.academic_year\)/);
+  assert.match(manager, /session:createForm\.session/);
+  assert.doesNotMatch(manager, /POST",\{code:|POST",\{display_name:/);
+  assert.match(manager, /Academic year is required/);
+  assert.match(manager, /Session is required/);
+});
+
+test("academic-cycle settings do not expose or update legacy cycle code/name", () => {
+  assert.doesNotMatch(manager, /Cycle code/);
+  assert.doesNotMatch(manager, /Display name/);
+  assert.doesNotMatch(manager, /edit\.code|edit\.display_name/);
+  assert.doesNotMatch(manager, /code:edit|display_name:edit/);
+  assert.match(manager, /Academic cycle/);
+  assert.match(manager, /academic_year/);
+  assert.match(manager, /session/);
 });

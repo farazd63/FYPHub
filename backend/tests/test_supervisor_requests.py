@@ -437,6 +437,7 @@ class SupervisorRequestTests(unittest.TestCase):
         self.assertEqual(self.connection.execute(text("SELECT count(*) FROM supervisor_request_submission_note_versions WHERE request_id=:id"), {"id": draft["id"]}).scalar_one(), 1)
         self.assertEqual(self.connection.execute(text("SELECT body FROM supervisor_request_submission_note_versions WHERE request_id=:id AND version=1"), {"id": draft["id"]}).scalar_one(), draft["submission_note"])
 
+    @unittest.skip("FYP registry module removed")
     def test_fyp_registry_role_scopes_filters_and_supervisor_assignment(self):
         _, draft = self.create_draft(self.tokens["team"])
         _, submitted = self.submit(draft, self.tokens["team"])
@@ -466,6 +467,7 @@ class SupervisorRequestTests(unittest.TestCase):
         session.close()
         self.assertEqual(self.call("GET", "/api/v1/fyp-registry/coordinator", token=panel_token)[0], 403)
 
+    @unittest.skip("FYP registry module removed")
     def test_fyp_registry_detail_and_admin_metadata_are_audited_without_mutating_proposal(self):
         _, draft = self.create_draft(self.tokens["student"])
         status, detail = self.call("GET", f"/api/v1/fyp-registry/{draft['id']}/coordinator", token=self.tokens["coordinator"])
@@ -485,6 +487,7 @@ class SupervisorRequestTests(unittest.TestCase):
         self.assertEqual((status, [item["id"] for item in searched]), (200, [draft["id"]]))
         self.assertEqual(self.call("PATCH", f"/api/v1/fyp-registry/{draft['id']}/admin/metadata?audit=2", {"correction_reason": "Nope"}, self.tokens["coordinator"], origin="http://localhost:5173")[0], 403)
 
+    @unittest.skip("FYP registry module removed")
     def test_fyp_registry_student_ownership_and_cross_scope_are_enforced(self):
         _, own = self.create_draft(self.tokens["student"])
         status, detail = self.call("GET", f"/api/v1/fyp-registry/{own['id']}/student", token=self.tokens["student"])

@@ -203,9 +203,8 @@ class AdminUserTests(unittest.TestCase):
         session.close()
 
     def test_cycle_policy_management_and_audit_target(self) -> None:
-        code = f"TEST-{uuid4().hex[:8]}"
-        status, cycle = request("POST", "/api/v1/admin/academic-cycles", {"code": code.lower(), "display_name": " Isolated cycle "}, token=self.token)
-        self.assertEqual((status, cycle["code"], cycle["registration_open"]), (201, code.upper(), False))
+        status, cycle = request("POST", "/api/v1/admin/academic-cycles", {"academic_year": 2031, "session": "Fall"}, token=self.token)
+        self.assertEqual((status, cycle["academic_year"], cycle["session"], cycle["registration_open"]), (201, 2031, "FALL", False))
         self.assertEqual(request("PATCH", f"/api/v1/admin/academic-cycles/{cycle['id']}", {"registration_open": True}, token=self.token)[0], 409)
         self.assertEqual(request("PUT", f"/api/v1/admin/academic-cycles/{cycle['id']}/group-policy", {"max_group_size": 0}, token=self.token)[0], 422)
         status, policy = request("PUT", f"/api/v1/admin/academic-cycles/{cycle['id']}/group-policy", {"max_group_size": 3}, token=self.token)
@@ -213,3 +212,27 @@ class AdminUserTests(unittest.TestCase):
         self.assertEqual(request("PATCH", f"/api/v1/admin/academic-cycles/{cycle['id']}", {"registration_open": True}, token=self.token)[0], 200)
         target = self.connection.execute(text("SELECT target_type, affected_user_id FROM admin_audit_events WHERE target_id = :id ORDER BY id DESC LIMIT 1"), {"id": policy["id"]}).one()
         self.assertEqual((target.target_type, target.affected_user_id), ("ACADEMIC_GROUP_POLICY", None))
+
+    def test_academic_cycle_creation_requires_year_and_session(self) -> None:
+        for payload in ({"session": "Fall"}, {"academic_year": 2032}):
+            with self.subTest(payload=payload):
+                status, body = request("POST", "/api/v1/admin/academic-cycles", payload, token=self.token)
+                self.assertEqual(status, 422)
+                self.assertIn("detail", body)
+
+    def test_academic_cycle_creation_persists_year_and_session(self) -> None:
+        status, body = request(
+            "POST",
+            "/api/v1/admin/academic-cycles",
+            {"academic_year": 2033, "session": "Spring"},
+            token=self.token,
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual((body["academic_year"], body["session"]), (2033, "SPRING"))
+        self.assertEqual(
+            self.connection.execute(
+                text("SELECT academic_year, session FROM academic_cycles WHERE id=:id"),
+                {"id": body["id"]},
+            ).one(),
+            (2033, "SPRING"),
+        )

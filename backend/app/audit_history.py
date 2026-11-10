@@ -23,8 +23,6 @@ SAFE_KEYS = {
     "supervisor_request_changes_requested": {"previous_status"},
     "supervisor_assignment_created": {"team_id", "academic_cycle_id", "supervisor_id"},
     "supervisor_assignment_ended": {"team_id", "academic_cycle_id", "supervisor_id"},
-    "workflow_policy_version_created": {"version", "name", "state_count", "transition_count"},
-    "student_roster_imported": {"academic_cycle_id", "record_count"},
     "account_created": {"email", "role", "is_active"},
     "account_status_changed": {"is_active", "previous_is_active"},
     "account_role_changed": {"role", "previous_role"},
@@ -34,8 +32,12 @@ SAFE_KEYS = {
     "academic_cycle_updated": {"before", "after"},
     "group_policy_created": {"academic_cycle_id", "max_group_size", "previous_max_group_size"},
     "group_policy_updated": {"academic_cycle_id", "max_group_size", "previous_max_group_size"},
-    "supervisor_capacity_created": {"academic_cycle_id", "max_group_capacity"},
+    "supervisor_capacity_created": {"academic_year", "session", "maximum_groups", "academic_cycle_id", "max_group_capacity"},
     "supervisor_capacity_updated": {"before", "after"},
+    "supervisor_capacity_deleted": set(),
+    "group_policy_deleted": {"academic_cycle_id"},
+    "academic_cycle_deleted": {"academic_year", "session"},
+    "document_requirement_deleted": {"status"},
     "academic_rule_version_created": {"version", "provenance"},
     "evaluation_rubric_version_created": {"version", "name", "criteria"},
     "academic_deadline_version_created": {"academic_cycle_id", "version", "name", "due_at_utc", "time_zone", "utc_offset", "operational"},
@@ -46,9 +48,8 @@ SAFE_KEYS = {
     "archived_project_activated": {"is_active"},
     "archived_project_deactivated": {"is_active"},
     "archived_project_document_uploaded": {"document_type", "version", "file_hash"},
-    "fyp_registry_metadata_updated": {"before", "after"},
 }
-NESTED_KEYS = {"academic_cycle_updated": {"code", "display_name", "registration_open"}, "supervisor_capacity_updated": {"academic_cycle_id", "supervisor_id", "max_group_capacity"}, "archived_project_updated": {"title", "abstract_summary", "keywords", "academic_year", "department_program", "project_scope", "completion_stage", "implemented_scope", "remaining_gaps", "future_work", "supervisor_display_reference", "source_label", "source_metadata"}, "archived_project_metadata_rolled_back": {"title", "abstract_summary", "keywords", "academic_year", "department_program", "project_scope", "completion_stage", "implemented_scope", "remaining_gaps", "future_work", "supervisor_display_reference", "source_label", "source_metadata"}, "fyp_registry_metadata_updated": {"department_section", "project_scope", "team_label", "administrative_notes", "correction_reason"}}
+NESTED_KEYS = {"academic_cycle_updated": {"code", "display_name", "registration_open"}, "supervisor_capacity_updated": {"academic_year", "session", "maximum_groups", "supervisor_id", "academic_cycle_id", "max_group_capacity"}, "archived_project_updated": {"title", "abstract_summary", "keywords", "academic_year", "department_program", "project_scope", "completion_stage", "implemented_scope", "remaining_gaps", "future_work", "supervisor_display_reference", "source_label", "source_metadata"}, "archived_project_metadata_rolled_back": {"title", "abstract_summary", "keywords", "academic_year", "department_program", "project_scope", "completion_stage", "implemented_scope", "remaining_gaps", "future_work", "supervisor_display_reference", "source_label", "source_metadata"}}
 
 def scalar(value: Any) -> bool:
     return value is None or type(value) in (str, int, float, bool)

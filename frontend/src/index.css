@@ -3,6 +3,14 @@
 * { box-sizing: border-box; } body { margin: 0; min-width: 320px; }
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline: 3px solid rgb(70 99 255 / .28); outline-offset: 2px; }
 
+/* Keep dashboard headers focused on the feature itself; role/section eyebrow labels are intentionally omitted. */
+.cycle-overview__eyebrow,
+.academic-cycle-dashboard__eyebrow,
+.student-overview__eyebrow,
+.module3-eyebrow,
+.module3-kicker,
+.supervisor-page-heading > p { display: none !important; }
+
 @keyframes admin-page-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes admin-card-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .admin-enter { animation: admin-page-enter 300ms ease-out both; }

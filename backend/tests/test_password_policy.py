@@ -41,6 +41,22 @@ class PasswordPolicyTests(unittest.TestCase):
                 "role": "SUPERVISOR",
             })
 
+    def test_admin_registration_number_is_role_dependent(self) -> None:
+        supervisor = AdminUserCreate.model_validate({
+            "full_name": "Supervisor",
+            "email": "supervisor@example.com",
+            "password": "ValidPass123!",
+            "role": "SUPERVISOR",
+        })
+        self.assertIsNone(supervisor.registration_number)
+        with self.assertRaisesRegex(ValidationError, "registration_number is required"):
+            AdminUserCreate.model_validate({
+                "full_name": "Student",
+                "email": "student@example.com",
+                "password": "ValidPass123!",
+                "role": "STUDENT",
+            })
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,10 +2,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import { StudentOverviewWithDocuments as StudentOverview } from "./StudentOverview";
 import { StudentSidebar, type StudentPhase } from "./StudentSidebar";
 import { StudentPhasePlaceholder } from "./modules/StudentPhasePlaceholder";
-import { StudentTeamPhase } from "./modules/StudentTeamPhase";
+import { StudentRequiredDocumentsDashboard } from "./modules/StudentRequiredDocumentsDashboard";
 import { StudentSupervisorSelection } from "./modules/supervisor-selection/StudentSupervisorSelection";
 import { KnowledgeSearch } from "./modules/knowledge-search/KnowledgeSearch";
 import { ProposalComplianceWorkspace } from "../../modules/module-3/ProposalComplianceWorkspace";
+import { CollaborationChannels } from "../shared/CollaborationChannels";
 import "./student.css";
 import "./student-admin-theme.css";
 import "./modules/archive-knowledge.css";
@@ -33,8 +34,8 @@ const icon = (kind: "team" | "proposal" | "search" | "supervisor" | "review" | "
 export const STUDENT_PHASES: readonly StudentPhase[] = [
   { id: "documents", name: "Required Documents & Uploads", route: "/student/documents", status: "Implemented", icon: icon("proposal") },
   { id: "proposal", name: "Proposal Compliance Check", route: "/student/proposal", status: "Implemented", icon: icon("compliance") },
-  { id: "team", name: "Student Team & Collaboration Hub", route: "/student/team", status: "Implemented", icon: icon("team") },
   { id: "supervisors", name: "Supervisor Selection & Proposal Requests", route: "/student/supervisors", status: "Partial", icon: icon("supervisor") },
+  { id: "collaboration", name: "Group Collaboration Channel", route: "/student/collaboration", status: "Implemented", icon: icon("team") },
   { id: "progress", name: "Project Progress & Supervision Dashboard", route: "/student/progress", status: "Partial", icon: icon("progress") },
   { id: "search", name: "FYP Archive & Knowledge Search", route: "/student/search", status: "Implemented", icon: icon("knowledge") },
 ];
@@ -56,13 +57,15 @@ export function StudentPortal({ api, user, onLogout }: { api: string; user: Stud
   const initials = user.full_name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "S";
   const select = (item: StudentPhase) => setActiveId(item.id);
   const content = activeId === "overview"
-    ? <StudentOverview phases={STUDENT_PHASES} onSelect={select} />
-      : phase?.id === "team"
-      ? <StudentTeamPhase api={api} />
+    ? <StudentOverview api={api} />
+      : phase?.id === "documents"
+        ? <StudentRequiredDocumentsDashboard api={api} />
       : phase?.id === "proposal"
         ? <ProposalComplianceWorkspace api={api} />
       : phase?.id === "supervisors"
         ? <StudentSupervisorSelection api={api} userId={user.id} />
+      : phase?.id === "collaboration"
+        ? <CollaborationChannels api={api} role="student" />
         : phase?.id === "search" || phase?.id === "archive"
           ? <KnowledgeSearch api={api} />
           : phase ? <StudentPhasePlaceholder phase={phase} api={api} /> : null;

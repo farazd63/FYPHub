@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Doc = { id: number; document_type: string; display_name: string; version: number; is_active: boolean; created_at: string; document_url: string };
-type Archive = { id: number; title: string; abstract_summary: string; keywords: string[]; academic_year: string; department_program: string; project_scope: string; completion_stage: string; implemented_scope: string; remaining_gaps: string; future_work: string; source_label: string; is_active: boolean; documents: Doc[] };
+type Archive = { id: number; title: string; abstract_summary: string; keywords: string[]; academic_year: string; department_program: string; project_scope: string; completion_stage: string; implemented_scope: string; remaining_gaps: string; future_work: string; source_label: string; is_active: boolean; is_visible_to_students?: boolean; documents: Doc[] };
 type Audit = { id: number; action: string; created_at: string; changed_values: Record<string, unknown> };
 const documentTypes = ["SHORT_PROPOSAL", "LONG_PROPOSAL", "CHAPTER_1", "CHAPTER_2", "CHAPTER_3", "CHAPTER_4", "FINAL_REPORT", "FINAL_PACKAGE", "REFERENCES", "OTHER"];
 const empty = { title: "", abstract_summary: "", keywords: "", academic_year: "", department_program: "", project_scope: "", completion_stage: "", implemented_scope: "", remaining_gaps: "", future_work: "", source_label: "ADMIN_CURATED" };
