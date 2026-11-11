@@ -10,7 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from sqlalchemy import func, or_, select, text, update
+from sqlalchemy import delete, func, or_, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -90,7 +90,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=list(ALLOWED_BROWSER_ORIGINS),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS", "PATCH", "PUT"],
+    allow_methods=["GET", "POST", "OPTIONS", "PATCH", "PUT", "DELETE"],
     allow_headers=["Content-Type", "Accept", "Authorization", "X-File-Name", "X-Preview-Token"],
 )
 app.include_router(document_requirements_router)
@@ -442,6 +442,38 @@ def create_academic_deadline_version(
         session.rollback()
         raise deadline_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "deadline_save_failed", "Academic deadline version could not be saved.") from error
 
+
+@app.delete("/api/v1/admin/academic-deadlines/{deadline_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_academic_deadline(
+    deadline_id: int,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> Response:
+    """Remove a deadline and its recorded versions when no rule references it."""
+    validate_mutating_origin(request)
+    deadline = session.get(AcademicDeadline, deadline_id)
+    if deadline is None:
+        raise deadline_error(status.HTTP_404_NOT_FOUND, "deadline_not_found", "Academic deadline was not found.")
+    referenced = session.scalar(
+        select(ReminderRuleVersion.id).where(
+            ReminderRuleVersion.deadline_version_id.in_(
+                select(AcademicDeadlineVersion.id).where(AcademicDeadlineVersion.academic_deadline_id == deadline_id)
+            )
+        ).limit(1)
+    )
+    if referenced is not None:
+        raise deadline_error(status.HTTP_409_CONFLICT, "deadline_in_use", "This deadline is referenced by a reminder rule; remove that rule first.")
+    try:
+        session.execute(delete(AcademicDeadlineVersion).where(AcademicDeadlineVersion.academic_deadline_id == deadline_id))
+        session.delete(deadline)
+        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_DEADLINE", target_id=deadline_id, action="academic_deadline_deleted", changed_values={})
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise deadline_error(status.HTTP_409_CONFLICT, "deadline_in_use", "This deadline is referenced by other configuration and cannot be deleted.") from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 @app.get("/api/v1/admin/template-references", response_model=list[TemplateListOut])
 def list_template_references(_: User=Depends(require_roles(UserRole.ADMIN)), session: Session=Depends(get_db)):
  return [
@@ -519,6 +551,25 @@ def create_rule_version(version_id:int,payload:RuleCreate,request:Request,actor:
  try:
   number=(session.execute(select(func.max(AcademicRuleVersion.version_number)).where(AcademicRuleVersion.template_reference_version_id==ref.id)).scalar_one() or 0)+1; rule=AcademicRuleVersion(template_reference_version_id=ref.id,version_number=number,provenance=payload.provenance,rules=payload.rules.model_dump(exclude_none=True),created_by_id=actor.id); session.add(rule); session.flush(); add_admin_audit_event(session,actor_id=actor.id,affected_user_id=None,target_type="ACADEMIC_RULE_VERSION",target_id=rule.id,action="academic_rule_version_created",changed_values={"version":number,"provenance":payload.provenance}); session.commit(); session.refresh(rule); return rule
  except Exception as error: session.rollback(); raise HTTPException(status_code=500,detail="Academic rule version could not be saved.") from error
+
+
+@app.delete("/api/v1/admin/template-reference-versions/{version_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_template_reference_version(version_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> Response:
+    validate_mutating_origin(request)
+    version = session.get(TemplateReferenceVersion, version_id)
+    if version is None:
+        raise HTTPException(status_code=404, detail={"code": "template_version_not_found", "message": "Template version was not found."})
+    if version.is_active:
+        raise HTTPException(status_code=409, detail={"code": "template_active", "message": "Deactivate the active template before deleting it."})
+    try:
+        session.execute(delete(AcademicRuleVersion).where(AcademicRuleVersion.template_reference_version_id == version_id))
+        session.delete(version)
+        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="TEMPLATE_REFERENCE", target_id=version_id, action="template_reference_version_deleted", changed_values={})
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise HTTPException(status_code=409, detail={"code": "template_in_use", "message": "This template version is referenced by historical submissions and cannot be deleted."}) from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def rubric_version_out(session: Session, version: EvaluationRubricVersion) -> dict[str, object]:
@@ -897,13 +948,31 @@ def login(
 
 
 def account_response(session: Session, user: User) -> dict[str, object]:
-    """Return saved account role plus the group context owned by that account."""
-    group_id = session.scalar(
-        select(Team.id)
-        .where(Team.shared_user_id == user.id, Team.status != "dissolved")
+    """Return an account principal and, for students, its shared group context."""
+    member_match = select(TeamMember.id).where(
+        TeamMember.team_id == Team.id,
+        TeamMember.academic_cycle_id == Team.academic_cycle_id,
+        TeamMember.is_active.is_(True),
+        (TeamMember.registration_number == user.registration_number) | (TeamMember.university_email == user.email),
+    ).exists()
+    team = session.scalar(
+        select(Team)
+        .where(Team.status != "dissolved", (Team.shared_user_id == user.id) | member_match)
         .order_by(Team.id)
         .limit(1)
     )
+    group_id = team.id if team is not None else None
+    shared_account = session.get(User, team.shared_user_id) if team is not None else None
+    cycle = session.get(AcademicCycle, team.academic_cycle_id) if team is not None else None
+    members = session.execute(
+        select(TeamMember)
+        .where(TeamMember.team_id == team.id, TeamMember.is_active.is_(True))
+        .order_by(TeamMember.is_creator.desc(), TeamMember.id)
+    ).scalars().all() if team is not None else []
+    group_name = None
+    if members:
+        leader = next((member for member in members if member.is_creator), members[0])
+        group_name = f"{leader.full_name}'s Group"
     return {
         "id": user.id,
         "full_name": user.full_name,
@@ -911,8 +980,23 @@ def account_response(session: Session, user: User) -> dict[str, object]:
         "registration_number": user.registration_number,
         "role": user.role,
         "is_active": user.is_active,
+        "principal_type": "GROUP" if user.role == UserRole.STUDENT and team is not None else "ACCOUNT",
         "group_id": group_id if user.role == UserRole.STUDENT else None,
-        "group_email": user.email if user.role == UserRole.STUDENT and group_id is not None else None,
+        "group_email": shared_account.email if user.role == UserRole.STUDENT and group_id is not None and shared_account is not None else None,
+        "group_name": group_name if user.role == UserRole.STUDENT else None,
+        "academic_cycle": cycle.display_name if user.role == UserRole.STUDENT and cycle is not None else None,
+        "group_status": ("ACTIVE" if user.is_active else "INACTIVE") if user.role == UserRole.STUDENT and team is not None else None,
+        "members": [
+            {
+                "id": member.id,
+                "full_name": member.full_name,
+                "registration_number": member.registration_number,
+                "email": member.university_email,
+                "designation": "LEADER" if member.is_creator else "MEMBER",
+                "is_active": member.is_active,
+            }
+            for member in members
+        ] if user.role == UserRole.STUDENT else [],
     }
 
 
@@ -1240,6 +1324,36 @@ def change_admin_user_role(
     return user
 
 
+@app.delete("/api/v1/admin/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_admin_user(
+    user_id: int,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> Response:
+    """Permanently remove an unused account; linked records stay protected by FK guards."""
+    validate_mutating_origin(request)
+    if actor.id == user_id:
+        raise admin_user_error(status.HTTP_409_CONFLICT, "cannot_delete_self", "You cannot delete the account used for this admin session.")
+    user = session.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one_or_none()
+    if user is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "account_not_found", "Account was not found.")
+    if user.role == UserRole.ADMIN and user.is_active:
+        lock_and_protect_last_active_admin(session, user, will_remain_active_admin=False)
+    audit_exists = session.scalar(select(AdminAuditEvent.id).where(or_(AdminAuditEvent.actor_id == user_id, AdminAuditEvent.affected_user_id == user_id)).limit(1))
+    if audit_exists is not None:
+        raise admin_user_error(status.HTTP_409_CONFLICT, "account_has_audit_history", "This account has audit history; deactivate it instead of permanently deleting it.")
+    if shared_team_account(session, user_id):
+        raise admin_user_error(status.HTTP_409_CONFLICT, "account_in_use", "This account is attached to a team; deactivate it instead.")
+    try:
+        session.delete(user)
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise admin_user_error(status.HTTP_409_CONFLICT, "account_in_use", "This account is referenced by portal data; deactivate it instead of deleting it.") from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @app.get("/api/v1/admin/supervisor-capacities", response_model=list[SupervisorCapacityOut])
 def list_supervisor_capacities(
     _: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)
@@ -1248,6 +1362,48 @@ def list_supervisor_capacities(
         select(SupervisorCapacityPolicy).order_by(SupervisorCapacityPolicy.id)
     ).scalars().all()
     return [supervisor_capacity_out(policy, session) for policy in policies]
+
+
+@app.get("/api/v1/supervisor/capacity")
+def supervisor_capacity_workspace(
+    actor: User = Depends(require_roles(UserRole.SUPERVISOR)), session: Session = Depends(get_db)
+) -> list[dict[str, object]]:
+    """Return the signed-in supervisor's read-only annual capacity and assignment detail."""
+    policies = session.scalars(
+        select(SupervisorCapacityPolicy)
+        .where(SupervisorCapacityPolicy.supervisor_id == actor.id)
+        .order_by(SupervisorCapacityPolicy.academic_year, SupervisorCapacityPolicy.id)
+    ).all()
+    result: list[dict[str, object]] = []
+    for policy in policies:
+        item = supervisor_capacity_out(policy, session)
+        academic_year = item.get("academic_year")
+        assignments = session.execute(
+            select(SupervisorAssignment, AcademicCycle, Team)
+            .join(AcademicCycle, AcademicCycle.id == SupervisorAssignment.academic_cycle_id)
+            .join(Team, Team.id == SupervisorAssignment.team_id)
+            .where(
+                SupervisorAssignment.supervisor_id == actor.id,
+                SupervisorAssignment.ended_at.is_(None),
+                (SupervisorAssignment.academic_year == academic_year)
+                | ((SupervisorAssignment.academic_year.is_(None)) & (AcademicCycle.academic_year == academic_year)),
+            )
+            .order_by(AcademicCycle.academic_year, AcademicCycle.session, Team.id)
+        ).all() if academic_year is not None else []
+        item["assignments"] = [
+            {
+                "assignment_id": assignment.id,
+                "team_id": team.id,
+                "academic_cycle_id": cycle.id,
+                "academic_cycle": cycle.display_name,
+                "academic_year": assignment.academic_year or cycle.academic_year,
+                "session": assignment.session or cycle.session,
+                "assigned_at": assignment.created_at,
+            }
+            for assignment, cycle, team in assignments
+        ]
+        result.append(item)
+    return result
 
 
 @app.get("/api/v1/admin/supervisor-capacities/{policy_id}", response_model=SupervisorCapacityOut)
@@ -1656,6 +1812,11 @@ def register_team(
 
 @app.post(
     "/api/v1/student/group-registration",
+    response_model=TeamRegistrationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+@app.post(
+    "/api/v1/auth/group-signup",
     status_code=status.HTTP_201_CREATED,
     response_model=TeamRegistrationResponse,
 )
@@ -1671,15 +1832,179 @@ def register_student_group(
     first, *remaining = registration.members
     def member_name(email: str) -> str:
         return email.split("@", 1)[0].replace(".", " ").replace("_", " ").strip().title() or "Group member"
+    leader_count = sum(1 for member in registration.members if (member.designation or "").strip().upper() == "LEADER")
+    if leader_count > 1:
+        raise registration_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "multiple_leaders", "A group can have only one leader.", "members")
+    if leader_count == 1:
+        first = next(member for member in registration.members if (member.designation or "").strip().upper() == "LEADER")
+        remaining = [member for member in registration.members if member is not first]
     legacy = TeamRegistrationRequest(
         academic_cycle_id=registration.academic_cycle_id,
-        creator=TeamMemberInput(full_name=member_name(str(first.email)), registration_number=first.registration_number, university_email=first.email),
+        creator=TeamMemberInput(full_name=first.full_name or member_name(str(first.email)), registration_number=first.registration_number, university_email=first.email),
         shared_login_email=registration.group_email,
         password=registration.password,
         confirm_password=registration.confirm_password,
-        members=[TeamMemberInput(full_name=member_name(str(member.email)), registration_number=member.registration_number, university_email=member.email) for member in remaining],
+        members=[TeamMemberInput(full_name=member.full_name or member_name(str(member.email)), registration_number=member.registration_number, university_email=member.email) for member in remaining],
     )
     return register_team(legacy, session, request=request)
+
+
+def student_group_detail(session: Session, team: Team) -> dict[str, object]:
+    """Serialize the shared student principal without exposing credentials."""
+    account = session.get(User, team.shared_user_id)
+    cycle = session.get(AcademicCycle, team.academic_cycle_id)
+    members = session.execute(
+        select(TeamMember)
+        .where(TeamMember.team_id == team.id)
+        .order_by(TeamMember.is_creator.desc(), TeamMember.id)
+    ).scalars().all()
+    assignment = session.scalar(select(SupervisorAssignment).where(SupervisorAssignment.team_id == team.id, SupervisorAssignment.ended_at.is_(None)).order_by(SupervisorAssignment.id.desc()).limit(1))
+    supervisor = session.get(User, assignment.supervisor_id) if assignment else None
+    latest_request = session.scalar(select(SupervisorRequest).where(SupervisorRequest.team_id == team.id).order_by(SupervisorRequest.updated_at.desc(), SupervisorRequest.id.desc()).limit(1))
+    leader = next((member for member in members if member.is_creator), members[0] if members else None)
+    return {
+        "id": team.id,
+        "group_id": team.id,
+        "group_name": f"{leader.full_name}'s Group" if leader else f"Group {team.id}",
+        "group_email": account.email if account else None,
+        "academic_cycle_id": team.academic_cycle_id,
+        "academic_cycle": cycle.display_name if cycle else None,
+        "status": "ACTIVE" if account and account.is_active and team.status != "dissolved" else "INACTIVE",
+        "is_active": bool(account and account.is_active and team.status != "dissolved"),
+        "created_at": team.created_at,
+        "project": {"title": latest_request.title, "status": latest_request.status, "updated_at": latest_request.updated_at} if latest_request else None,
+        "supervisor": {"id": supervisor.id, "name": supervisor.full_name} if supervisor else None,
+        "supervisor_assignment": {"id": assignment.id, "academic_cycle_id": assignment.academic_cycle_id, "assigned_at": assignment.created_at} if assignment else None,
+        "members": [
+            {
+                "id": member.id,
+                "full_name": member.full_name,
+                "registration_number": member.registration_number,
+                "email": member.university_email,
+                "designation": "LEADER" if member.is_creator else "MEMBER",
+                "is_creator": member.is_creator,
+                "is_active": member.is_active,
+            }
+            for member in members
+        ],
+    }
+
+
+def current_student_team(session: Session, actor: User) -> Team:
+    member_match = select(TeamMember.id).where(
+        TeamMember.team_id == Team.id,
+        TeamMember.academic_cycle_id == Team.academic_cycle_id,
+        TeamMember.is_active.is_(True),
+        (TeamMember.registration_number == actor.registration_number) | (TeamMember.university_email == actor.email),
+    ).exists()
+    team = session.scalar(
+        select(Team)
+        .where(Team.status != "dissolved", (Team.shared_user_id == actor.id) | member_match)
+        .order_by(Team.id)
+        .limit(1)
+    )
+    if team is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student group was not found.")
+    return team
+
+
+@app.get("/api/v1/student/group/me")
+def student_group_me(
+    actor: User = Depends(require_roles(UserRole.STUDENT)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    return student_group_detail(session, current_student_team(session, actor))
+
+
+@app.get("/api/v1/student/group/members")
+def student_group_members(
+    actor: User = Depends(require_roles(UserRole.STUDENT)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    group = current_student_team(session, actor)
+    return {"group_id": group.id, "members": student_group_detail(session, group)["members"]}
+
+
+@app.get("/api/v1/admin/student-groups")
+def list_student_groups(
+    search: str | None = Query(default=None, max_length=320),
+    is_active: bool | None = None,
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    statement = select(Team).join(User, User.id == Team.shared_user_id).where(User.role == UserRole.STUDENT, Team.status != "dissolved")
+    if search and search.strip():
+        needle = f"%{search.strip()}%"
+        statement = statement.where(or_(User.email.ilike(needle), User.full_name.ilike(needle)))
+    if is_active is not None:
+        statement = statement.where(User.is_active.is_(is_active))
+    groups = session.execute(statement.order_by(Team.id.desc())).scalars().all()
+    return {"items": [student_group_detail(session, group) for group in groups], "total": len(groups)}
+
+
+@app.get("/api/v1/admin/student-groups/{group_id}")
+def get_student_group(
+    group_id: int,
+    _: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    group = session.get(Team, group_id)
+    if group is None or group.status == "dissolved":
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "group_not_found", "Student group was not found.")
+    return student_group_detail(session, group)
+
+
+def set_student_group_status(
+    group_id: int,
+    active: bool,
+    request: Request,
+    actor: User,
+    session: Session,
+) -> dict[str, object]:
+    validate_mutating_origin(request)
+    group = session.execute(select(Team).where(Team.id == group_id).with_for_update()).scalar_one_or_none()
+    if group is None or group.status == "dissolved":
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "group_not_found", "Student group was not found.")
+    account = session.execute(select(User).where(User.id == group.shared_user_id).with_for_update()).scalar_one()
+    account.is_active = active
+    if not active:
+        revoke_user_sessions(session, account.id)
+    add_admin_audit_event(session, actor_id=actor.id, affected_user_id=account.id, target_type="STUDENT_GROUP", target_id=group.id, action="student_group_activated" if active else "student_group_deactivated", changed_values={"is_active": active})
+    session.commit()
+    session.refresh(group)
+    return student_group_detail(session, group)
+
+
+@app.patch("/api/v1/admin/student-groups/{group_id}/activate")
+def activate_student_group(group_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> dict[str, object]:
+    return set_student_group_status(group_id, True, request, actor, session)
+
+
+@app.patch("/api/v1/admin/student-groups/{group_id}/deactivate")
+def deactivate_student_group(group_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> dict[str, object]:
+    return set_student_group_status(group_id, False, request, actor, session)
+
+
+@app.delete("/api/v1/admin/student-groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_student_group(group_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> Response:
+    validate_mutating_origin(request)
+    group = session.execute(select(Team).where(Team.id == group_id).with_for_update()).scalar_one_or_none()
+    if group is None or group.status == "dissolved":
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "group_not_found", "Student group was not found.")
+    account = session.get(User, group.shared_user_id)
+    if account is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "group_account_not_found", "The shared group account was not found.")
+    try:
+        session.execute(delete(AuthSession).where(AuthSession.user_id == account.id))
+        session.execute(delete(AdminAuditEvent).where(or_(AdminAuditEvent.actor_id == account.id, AdminAuditEvent.affected_user_id == account.id)))
+        session.execute(delete(TeamMember).where(TeamMember.team_id == group.id))
+        session.delete(group)
+        session.delete(account)
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise admin_user_error(status.HTTP_409_CONFLICT, "group_in_use", "This group is referenced by portal records and cannot be permanently deleted.") from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # Non-operational reminder/escalation configuration.
@@ -1798,6 +2123,28 @@ def create_reminder_rule_version(rule_id: int, payload: ReminderWrite, request: 
         raise deadline_error(500, "rule_save_failed", "Rule configuration could not be saved.") from error
 
 
+@app.delete("/api/v1/admin/reminder-rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_reminder_rule(
+    rule_id: int,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> Response:
+    validate_mutating_origin(request)
+    rule = session.get(ReminderRule, rule_id)
+    if rule is None:
+        raise deadline_error(404, "rule_not_found", "Rule was not found.")
+    try:
+        session.execute(delete(ReminderRuleVersion).where(ReminderRuleVersion.rule_id == rule_id))
+        session.delete(rule)
+        add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="REMINDER_RULE", target_id=rule_id, action="reminder_rule_deleted", changed_values={})
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise deadline_error(409, "rule_in_use", "This reminder rule is referenced by other data and cannot be deleted.") from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 from .audit_history import router as audit_history_router
 app.include_router(audit_history_router)
 
@@ -1837,3 +2184,5 @@ app.include_router(password_reset_router)
 app.include_router(dashboard_requirements_router)
 app.include_router(project_workflow_router)
 app.include_router(evaluations_router)
+from .supervisor_workspace import router as supervisor_workspace_router
+app.include_router(supervisor_workspace_router)

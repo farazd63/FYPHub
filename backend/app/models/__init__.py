@@ -13,7 +13,7 @@ from .dashboard_requirement import DashboardRequirement
 from .academic_deadline import AcademicDeadline, AcademicDeadlineVersion
 from .document_requirement import DocumentUploadRequirement, DocumentSubmission, DocumentSubmissionVersion
 
-__all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "PasswordResetToken", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion", "EvaluationRecord", "EvaluationAuditEvent", "EvaluationCorrection", "EvaluationAggregationConfig", "AcademicDeadline", "AcademicDeadlineVersion", "DashboardRequirement", "DocumentUploadRequirement", "DocumentSubmission", "DocumentSubmissionVersion"]
+__all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "PasswordResetToken", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion", "EvaluationRecord", "EvaluationAuditEvent", "EvaluationCorrection", "EvaluationAggregationConfig", "AcademicDeadline", "AcademicDeadlineVersion", "DashboardRequirement", "DocumentUploadRequirement", "DocumentSubmission", "DocumentSubmissionVersion", "ArchivedProject", "ArchivedProjectDocument", "ArchivedProjectDocumentType", "ArchiveImportBatch"]
 
 from .reminder_rule import ReminderRule, ReminderRuleVersion
 
@@ -28,6 +28,7 @@ from .proposal_reference import ProposalReference, ProposalReferenceDocument
 from .proposal_compliance import ProposalComplianceSubmission, ProposalComplianceReport
 from .supervisor_request_conversation import SupervisorRequestMessage
 from .archived_project import ArchivedProject, ArchivedProjectDocument, ArchivedProjectDocumentType
+from .archive_import_batch import ArchiveImportBatch
 from .project_workflow import ProjectMilestone, ProjectTask, SupervisionMeeting, DefenseSchedule, DefensePanelMember, PanelEvaluation, PanelEvaluationScore
 from .module2_collaboration import Module2Notification, Module2ChannelRead, Module2ChatbotSession, CollaborationChannel, CollaborationParticipant, CollaborationMessage
 from .agent_supervision import SupervisionAgentRun

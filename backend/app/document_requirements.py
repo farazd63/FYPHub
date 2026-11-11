@@ -11,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from .auth import get_current_user, require_roles, validate_mutating_origin
 from .database import get_db
-from .models import AcademicCycle, DocumentUploadRequirement, DocumentSubmission, DocumentSubmissionVersion, Team, TeamMember, User, UserRole
+from .models import AcademicCycle, DocumentUploadRequirement, DocumentSubmission, DocumentSubmissionVersion, SupervisorAssignment, SupervisorRequest, Team, TeamMember, User, UserRole
 from .schemas.document_requirements import RequirementWrite, RequirementPatch, RequirementOut, SubmissionOut, VersionOut
 from .config import settings
 
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/v1/document-requirements", tags=["document-requi
 student_router = APIRouter(tags=["document-requirements"])
 ADMIN = (UserRole.ADMIN, UserRole.COORDINATOR)
 logger = logging.getLogger(__name__)
-SECTION_STATUS = {"DRAFT", "ACTIVE", "ARCHIVED"}
+SECTION_STATUS = {"DRAFT", "PUBLISHED", "CLOSED", "ARCHIVED", "ACTIVE"}
 MIMES = {"pdf":"application/pdf","doc":"application/msword","docx":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","tex":"application/x-tex","txt":"text/plain","md":"text/markdown","jpg":"image/jpeg","jpeg":"image/jpeg","png":"image/png","gif":"image/gif","webp":"image/webp","svg":"image/svg+xml","mp4":"video/mp4","mov":"video/quicktime","avi":"video/x-msvideo","mkv":"video/x-matroska","webm":"video/webm","mp3":"audio/mpeg","wav":"audio/wav","m4a":"audio/mp4","ogg":"audio/ogg","xls":"application/vnd.ms-excel","xlsx":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","csv":"text/csv","ppt":"application/vnd.ms-powerpoint","pptx":"application/vnd.openxmlformats-officedocument.presentationml.presentation","zip":"application/zip","rar":"application/vnd.rar","7z":"application/x-7z-compressed"}
 
 def _audit(db, actor, action, target, values=None, affected=None):
@@ -28,14 +28,11 @@ def _audit(db, actor, action, target, values=None, affected=None):
 
 def _student_cycle_ids(user, db):
     """Resolve the student's current cycle without trusting a client-supplied cycle."""
-    team_cycle_ids = set(db.scalars(select(Team.academic_cycle_id).where(Team.shared_user_id == user.id)).all())
+    team_cycle_ids = set(db.scalars(select(Team.academic_cycle_id).where(Team.shared_user_id == user.id, Team.status != "dissolved")).all())
     member_cycle_ids = set(db.scalars(select(TeamMember.academic_cycle_id).where(
         TeamMember.is_active.is_(True),
         or_(TeamMember.registration_number == user.registration_number, TeamMember.university_email == user.email),
     )).all())
-    open_cycles = set(db.scalars(select(AcademicCycle.id).where(AcademicCycle.registration_open.is_(True))).all())
-    if open_cycles:
-        return team_cycle_ids | member_cycle_ids | open_cycles
     cycle_ids = team_cycle_ids | member_cycle_ids
     if cycle_ids:
         return cycle_ids
@@ -52,6 +49,10 @@ def _student_team_ids(user, db):
     return team_ids
 
 
+def _student_group(user, db):
+    return db.scalar(select(Team).where(Team.shared_user_id == user.id, Team.status != "dissolved").order_by(Team.id).limit(1))
+
+
 def _current_active_cycle_id(db):
     return db.scalar(select(AcademicCycle.id).where(AcademicCycle.registration_open.is_(True)).order_by(AcademicCycle.id).limit(1))
 
@@ -59,6 +60,8 @@ def _current_active_cycle_id(db):
 def _visible(req, user, db=None):
     if user.role in ADMIN:
         return True
+    if req.status not in {"PUBLISHED", "CLOSED", "ACTIVE"}:
+        return False
     visible_roles = {str(role).upper() for role in (req.visible_to_roles or [])}
     if user.role != UserRole.STUDENT or "STUDENT" not in visible_roles:
         return False
@@ -68,7 +71,11 @@ def _visible(req, user, db=None):
         return False
     return req.assigned_group_id is None or req.assigned_group_id in _student_team_ids(user, db)
 
-def _out(req): return RequirementOut.model_validate(req)
+def _out(req, db=None):
+    result = RequirementOut.model_validate(req)
+    if db is not None:
+        result = result.model_copy(update={"submission_count": int(db.scalar(select(func.count(DocumentSubmission.id)).where(DocumentSubmission.requirement_id == req.id)) or 0)})
+    return result
 def _now(): return datetime.now(timezone.utc)
 def _stored_path(reference: str) -> Path:
     root = settings.document_storage_root.resolve()
@@ -93,7 +100,7 @@ def create_requirement(payload: RequirementWrite, _: object = Depends(validate_m
             assigned = db.get(User, assigned_user_id)
             if assigned is None or assigned.role != UserRole.STUDENT: raise HTTPException(422, "Assigned To must identify a student.")
         req = DocumentUploadRequirement(**values, description=payload.description, academic_cycle_id=cycle_id, module=payload.module or "General", visible_to_roles=["STUDENT"], assigned_user_id=assigned_user_id, due_at=due, created_by_id=actor.id, status="DRAFT", allowed_file_types=payload.allowed_file_types)
-        db.add(req); db.flush(); _audit(db, actor, "document_requirement_created", req.id, {"status": req.status}); db.commit(); db.refresh(req); return _out(req)
+        db.add(req); db.flush(); _audit(db, actor, "document_requirement_created", req.id, {"status": req.status}); db.commit(); db.refresh(req); return _out(req, db)
     except HTTPException:
         db.rollback()
         raise
@@ -125,14 +132,15 @@ def delete_requirement(requirement_id: int, _: object = Depends(validate_mutatin
 @router.get("", response_model=list[RequirementOut])
 def list_requirements(actor: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.scalars(select(DocumentUploadRequirement).order_by(DocumentUploadRequirement.due_at)).all()
-    return [_out(r) for r in rows if _visible(r, actor, db)]
+    return [_out(r, db) for r in rows if _visible(r, actor, db)]
 
 @router.get("/{requirement_id}", response_model=RequirementOut)
+@student_router.get("/api/v1/student/group/requirements/{requirement_id}", response_model=RequirementOut)
 def get_requirement(requirement_id: int, actor: User = Depends(get_current_user), db: Session = Depends(get_db)):
     req = db.get(DocumentUploadRequirement, requirement_id)
     if req is None or not _visible(req, actor, db):
         raise HTTPException(404, "Requirement not found.")
-    return _out(req)
+    return _out(req, db)
 
 @router.patch("/{requirement_id}", response_model=RequirementOut)
 def update_requirement(requirement_id: int, payload: RequirementPatch, _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(*ADMIN)), db: Session = Depends(get_db)):
@@ -140,25 +148,37 @@ def update_requirement(requirement_id: int, payload: RequirementPatch, _: object
     if not req: raise HTTPException(404, "Requirement not found.")
     if req.status == "ARCHIVED": raise HTTPException(409, "Archived requirements cannot be edited.")
     for key, value in payload.model_dump(exclude_unset=True).items(): setattr(req, key, value)
-    _audit(db, actor, "document_requirement_updated", req.id, {"status": req.status}); db.commit(); db.refresh(req); return _out(req)
+    _audit(db, actor, "document_requirement_updated", req.id, {"status": req.status}); db.commit(); db.refresh(req); return _out(req, db)
 
 def _state(requirement_id, action, actor, db, late=False):
     req = db.get(DocumentUploadRequirement, requirement_id)
     if not req: raise HTTPException(404, "Requirement not found.")
+    if action == "PUBLISHED" and req.status == "ARCHIVED":
+        raise HTTPException(409, "Archived requirements cannot be published.")
     req.status = action
-    if action == "ACTIVE" and late: req.late_upload_allowed = True
-    _audit(db, actor, {"ACTIVE":"document_requirement_published", "ARCHIVED":"document_requirement_archived"}.get(action, "document_requirement_reopened"), req.id, {"status": action}); db.commit(); db.refresh(req); return _out(req)
+    if action == "PUBLISHED" and late: req.late_upload_allowed = True
+    _audit(db, actor, {"PUBLISHED":"document_requirement_published", "CLOSED":"document_requirement_closed", "ARCHIVED":"document_requirement_archived", "DRAFT":"document_requirement_unpublished"}.get(action, "document_requirement_updated"), req.id, {"status": action}); db.commit(); db.refresh(req); return _out(req, db)
 
 @router.post("/{requirement_id}/publish", response_model=RequirementOut)
-def publish(requirement_id: int, _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(*ADMIN)), db: Session = Depends(get_db)): return _state(requirement_id, "ACTIVE", actor, db)
+def publish(requirement_id: int, _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(*ADMIN)), db: Session = Depends(get_db)): return _state(requirement_id, "PUBLISHED", actor, db)
+@router.post("/{requirement_id}/unpublish", response_model=RequirementOut)
+def unpublish(requirement_id: int, _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(*ADMIN)), db: Session = Depends(get_db)): return _state(requirement_id, "DRAFT", actor, db)
+@router.post("/{requirement_id}/close", response_model=RequirementOut)
+def close(requirement_id: int, _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(*ADMIN)), db: Session = Depends(get_db)): return _state(requirement_id, "CLOSED", actor, db)
 @router.post("/{requirement_id}/archive", response_model=RequirementOut)
 def archive(requirement_id: int, _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(*ADMIN)), db: Session = Depends(get_db)): return _state(requirement_id, "ARCHIVED", actor, db)
 @router.post("/{requirement_id}/reopen", response_model=RequirementOut)
-def reopen(requirement_id: int, _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(*ADMIN)), db: Session = Depends(get_db)): return _state(requirement_id, "ACTIVE", actor, db, True)
+def reopen(requirement_id: int, _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(*ADMIN)), db: Session = Depends(get_db)): return _state(requirement_id, "PUBLISHED", actor, db, True)
 
 def _submission(req, actor, db):
     if not _visible(req, actor, db): raise HTTPException(403, "You are not authorized for this requirement.")
-    row = db.scalar(select(DocumentSubmission).where(DocumentSubmission.requirement_id == req.id, DocumentSubmission.student_id == actor.id))
+    group = _student_group(actor, db) if actor.role == UserRole.STUDENT else None
+    statement = select(DocumentSubmission).where(DocumentSubmission.requirement_id == req.id)
+    if group is not None:
+        statement = statement.where(or_(DocumentSubmission.group_id == group.id, DocumentSubmission.student_id == actor.id))
+    else:
+        statement = statement.where(DocumentSubmission.student_id == actor.id)
+    row = db.scalar(statement.order_by(DocumentSubmission.id.desc()))
     return row
 
 def _validate(req, upload, data):
@@ -185,24 +205,31 @@ def _validate(req, upload, data):
 
 def _submission_out(row, db):
     versions = db.scalars(select(DocumentSubmissionVersion).where(DocumentSubmissionVersion.submission_id == row.id).order_by(DocumentSubmissionVersion.version_number)).all()
-    return SubmissionOut(id=row.id, requirement_id=row.requirement_id, status=row.status, is_late=row.is_late, review_comment=row.review_comment, uploaded_at=row.uploaded_at, updated_at=row.updated_at, versions=[VersionOut.model_validate(v) for v in versions])
+    return SubmissionOut(id=row.id, requirement_id=row.requirement_id, status=row.status, is_late=row.is_late, review_comment=row.review_comment, uploaded_at=row.uploaded_at, updated_at=row.updated_at, versions=[VersionOut.model_validate(v).model_copy(update={"download_url": f"/api/v1/document-requirements/submissions/{row.id}/versions/{v.id}/download"}) for v in versions])
 
 @router.get("/student", response_model=list[RequirementOut])
 @student_router.get("/api/v1/student/document-requirements", response_model=list[RequirementOut])
+@student_router.get("/api/v1/student/group/requirements", response_model=list[RequirementOut])
 def student_requirements(actor: User = Depends(require_roles(UserRole.STUDENT)), db: Session = Depends(get_db)):
-    return [_out(r) for r in db.scalars(select(DocumentUploadRequirement).where(DocumentUploadRequirement.status == "ACTIVE").order_by(DocumentUploadRequirement.due_at)).all() if r.status == "ACTIVE" and _visible(r, actor, db)]
+    return [_out(r, db) for r in db.scalars(select(DocumentUploadRequirement).where(DocumentUploadRequirement.status.in_(["PUBLISHED", "CLOSED", "ACTIVE"])).order_by(DocumentUploadRequirement.due_at)).all() if _visible(r, actor, db)]
 
 @router.post("/{requirement_id}/upload", response_model=SubmissionOut)
+@student_router.post("/api/v1/student/group/requirements/{requirement_id}/upload", response_model=SubmissionOut)
+@student_router.post("/api/v1/student/group/requirements/{requirement_id}/resubmit", response_model=SubmissionOut)
 async def upload(requirement_id: int, file: UploadFile = File(...), _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(UserRole.STUDENT)), db: Session = Depends(get_db)):
     req = db.get(DocumentUploadRequirement, requirement_id)
-    if not req or req.status != "ACTIVE": raise HTTPException(404, "Requirement is not available.")
+    if not req or req.status not in {"PUBLISHED", "CLOSED", "ACTIVE"}: raise HTTPException(404, "Requirement is not available.")
+    if req.status == "CLOSED": raise HTTPException(409, "This requirement is closed and cannot accept uploads.")
     if not _visible(req, actor, db): raise HTTPException(403, "You are not authorized for this requirement.")
     late = _now() > req.due_at
     if late and not req.late_upload_allowed: raise HTTPException(409, "The deadline has passed; late uploads are closed.")
     data = await file.read(); suffix = _validate(req, file, data)
-    row = db.scalar(select(DocumentSubmission).where(DocumentSubmission.requirement_id == req.id, DocumentSubmission.student_id == actor.id))
-    if row is None: row = DocumentSubmission(requirement_id=req.id, student_id=actor.id, status="UPLOADED", is_late=late); db.add(row); db.flush()
+    group = _student_group(actor, db)
+    if group is None or group.academic_cycle_id != req.academic_cycle_id: raise HTTPException(409, "Your group is not assigned to this academic cycle.")
+    row = db.scalar(select(DocumentSubmission).where(DocumentSubmission.requirement_id == req.id, DocumentSubmission.group_id == group.id))
+    if row is None: row = DocumentSubmission(requirement_id=req.id, student_id=actor.id, group_id=group.id, academic_cycle_id=req.academic_cycle_id, uploaded_by_id=actor.id, status="UPLOADED", is_late=late); db.add(row); db.flush()
     else: row.status = "UPLOADED"; row.is_late = row.is_late or late
+    row.uploaded_by_id = actor.id
     previous = db.scalar(select(DocumentSubmissionVersion.version_number).where(DocumentSubmissionVersion.submission_id == row.id).order_by(DocumentSubmissionVersion.version_number.desc())) or 0
     stored = f"document-requirements/{req.id}/{actor.id}/{token_hex(16)}.{suffix}"
     path = _stored_path(stored); path.parent.mkdir(parents=True, exist_ok=True); temporary = path.with_suffix(path.suffix + ".uploading")
@@ -217,10 +244,31 @@ async def upload(requirement_id: int, file: UploadFile = File(...), _: object = 
         raise
 
 @router.get("/{requirement_id}/submission", response_model=SubmissionOut)
+@student_router.get("/api/v1/student/group/requirements/{requirement_id}/submission", response_model=SubmissionOut)
 def submission(requirement_id: int, actor: User = Depends(get_current_user), db: Session = Depends(get_db)):
     req = db.get(DocumentUploadRequirement, requirement_id); row = _submission(req, actor, db) if req else None
     if row is None: raise HTTPException(404, "Submission not found.")
     return _submission_out(row, db)
+
+
+@router.get("/{requirement_id}/submissions")
+def all_submissions(requirement_id: int, actor: User = Depends(require_roles(*ADMIN)), db: Session = Depends(get_db)):
+    """Return every student's submission and every uploaded version for an admin requirement view."""
+    req = db.get(DocumentUploadRequirement, requirement_id)
+    if req is None:
+        raise HTTPException(404, "Requirement not found.")
+    rows = db.scalars(select(DocumentSubmission).where(DocumentSubmission.requirement_id == req.id).order_by(DocumentSubmission.uploaded_at.desc(), DocumentSubmission.id.desc())).all()
+    result = []
+    for row in rows:
+        student = db.get(User, row.student_id)
+        group = db.get(Team, row.group_id) if row.group_id is not None else None
+        submission = _submission_out(row, db)
+        result.append({
+            **submission.model_dump(mode="json"),
+            "student": {"id": student.id, "name": student.full_name, "email": student.email, "registration_number": student.registration_number} if student else {"id": row.student_id, "name": "Unknown student", "email": None, "registration_number": None},
+            "group_id": group.id if group else row.group_id,
+        })
+    return result
 
 @router.get("/{requirement_id}/submission/versions", response_model=list[VersionOut])
 def versions(requirement_id: int, actor: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -233,7 +281,10 @@ def download(submission_id: int, version_id: int, actor: User = Depends(get_curr
     row = db.get(DocumentSubmission, submission_id); version = db.get(DocumentSubmissionVersion, version_id)
     if not row or not version or version.submission_id != row.id: raise HTTPException(404, "Document version not found.")
     req = db.get(DocumentUploadRequirement, row.requirement_id)
-    if actor.role not in ADMIN and not (actor.role == UserRole.STUDENT and row.student_id == actor.id) and not (actor.role == UserRole.SUPERVISOR and req and _visible(req, actor)): raise HTTPException(403, "You are not authorized to download this document.")
+    assigned = actor.role == UserRole.SUPERVISOR and row.group_id is not None and db.scalar(select(SupervisorAssignment.id).where(SupervisorAssignment.team_id == row.group_id, SupervisorAssignment.supervisor_id == actor.id, SupervisorAssignment.ended_at.is_(None))) is not None
+    if actor.role == UserRole.SUPERVISOR and row.group_id is not None and req:
+        assigned = assigned or db.scalar(select(SupervisorRequest.id).where(SupervisorRequest.team_id == row.group_id, SupervisorRequest.supervisor_id == actor.id, SupervisorRequest.academic_cycle_id == req.academic_cycle_id, SupervisorRequest.status.in_(["SUBMITTED", "CHANGES_REQUESTED"]))) is not None
+    if actor.role not in ADMIN and not (actor.role == UserRole.STUDENT and (row.student_id == actor.id or row.group_id in _student_team_ids(actor, db))) and not assigned: raise HTTPException(403, "You are not authorized to download this document.")
     path = _stored_path(version.storage_reference)
     if not path.is_file(): raise HTTPException(410, "The stored document is no longer available.")
     return FileResponse(path, media_type=version.mime_type, filename=version.original_filename)
@@ -245,8 +296,8 @@ def _review(requirement_id, submission_id, decision, comment, actor, db):
     row.status = decision; row.review_comment = comment; row.reviewed_by_id = actor.id; row.reviewed_at = _now(); _audit(db, actor, "document_submission_" + decision.lower(), row.id, {"status": decision}, row.student_id); db.commit(); db.refresh(row); return _submission_out(row, db)
 
 @router.post("/{requirement_id}/submissions/{submission_id}/approve", response_model=SubmissionOut)
-def approve(requirement_id:int, submission_id:int, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "APPROVED", None, actor, db)
+def approve(requirement_id:int, submission_id:int, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "ACCEPTED", None, actor, db)
 @router.post("/{requirement_id}/submissions/{submission_id}/reject", response_model=SubmissionOut)
 def reject(requirement_id:int, submission_id:int, comment:str|None=None, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "REJECTED", comment, actor, db)
 @router.post("/{requirement_id}/submissions/{submission_id}/request-replacement", response_model=SubmissionOut)
-def replacement(requirement_id:int, submission_id:int, comment:str|None=None, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "REPLACEMENT_REQUESTED", comment, actor, db)
+def replacement(requirement_id:int, submission_id:int, comment:str|None=None, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "RESUBMISSION_REQUIRED", comment, actor, db)

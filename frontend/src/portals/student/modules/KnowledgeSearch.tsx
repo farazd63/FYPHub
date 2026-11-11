@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArchivedProjectDetail } from "./ArchivedProjectDetail";
 
-type Result = { rank: number; id: number; title: string; short_summary: string; academic_year: string; session?: string; project_scope: string; completion_stage: string; implemented_scope: string; remaining_gaps: string; available_documents_count: number; match_reason: string };
+type Result = { rank: number; id: number; title: string; short_summary: string; academic_year: string; session?: string; group_name?: string | null; supervisor_name?: string | null; domain?: string | null; technologies_used?: string | null; completion_percentage?: number | null; project_status?: string | null; project_scope: string; completion_stage: string; implemented_scope: string; remaining_gaps: string; available_documents_count: number; match_reason: string };
 type Filters = { academic_year: string; session_name: string; department: string; supervisor: string; technology: string };
 
 export function KnowledgeSearch({ api }: { api: string }) {

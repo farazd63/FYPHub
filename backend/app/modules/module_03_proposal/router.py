@@ -14,13 +14,13 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from sqlalchemy import desc, select, update
+from sqlalchemy import delete, desc, or_, select, update
 from sqlalchemy.orm import Session
 
 from ...auth import get_current_user, require_roles, utc_now, validate_mutating_origin
 from ...config import settings
 from ...database import get_db
-from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, SupervisorAssignment, Team, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
+from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, SupervisorAssignment, Team, TeamMember, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
 from ...pdf_extraction import PdfExtractionError, extract_proposal_document
 from .compliance_engine import build_change_summary, build_compliance_report
 from .template_extractor import extract_template_rules
@@ -41,6 +41,30 @@ class ProposalStatusUpdate(BaseModel):
 
 def _error(code: str, message: str, http_status: int = 400) -> HTTPException:
     return HTTPException(status_code=http_status, detail={"code": code, "message": message})
+
+
+def _student_team(session: Session, actor: User) -> Team | None:
+    """Resolve the existing shared project group for its login or an active member."""
+    member_match = select(TeamMember.id).where(
+        TeamMember.team_id == Team.id,
+        TeamMember.academic_cycle_id == Team.academic_cycle_id,
+        TeamMember.is_active.is_(True),
+        (TeamMember.registration_number == actor.registration_number) | (TeamMember.university_email == actor.email),
+    ).exists()
+    return session.scalar(
+        select(Team).where(
+            Team.status != "dissolved",
+            (Team.shared_user_id == actor.id) | member_match,
+        ).order_by(Team.id).limit(1)
+    )
+
+
+def _same_group(row: ProposalComplianceSubmission, team: Team | None) -> bool:
+    return team is not None and row.team_id == team.id
+
+
+def _owner_scope(row: ProposalComplianceSubmission, actor: User, team: Team | None) -> bool:
+    return row.owner_user_id == actor.id or _same_group(row, team)
 
 
 def _safe_filename(filename: str | None) -> str:
@@ -115,11 +139,12 @@ def _submission_out(session: Session, row: ProposalComplianceSubmission) -> dict
 
 
 def _version_history(session: Session, row: ProposalComplianceSubmission) -> list[dict[str, Any]]:
+    owner_scope = or_(ProposalComplianceSubmission.team_id == row.team_id, ProposalComplianceSubmission.owner_user_id == row.owner_user_id) if row.team_id is not None else ProposalComplianceSubmission.owner_user_id == row.owner_user_id
     previous = session.scalars(
         select(ProposalComplianceSubmission)
         .where(
             ProposalComplianceSubmission.proposal_key == row.proposal_key,
-            ProposalComplianceSubmission.owner_user_id == row.owner_user_id,
+            owner_scope,
             ProposalComplianceSubmission.version < row.version,
         )
         .order_by(ProposalComplianceSubmission.version)
@@ -137,7 +162,8 @@ def _version_history(session: Session, row: ProposalComplianceSubmission) -> lis
 
 
 def _can_view(session: Session, actor: User, row: ProposalComplianceSubmission) -> bool:
-    if row.owner_user_id == actor.id or actor.role in (UserRole.ADMIN, UserRole.COORDINATOR, UserRole.PANEL_MEMBER):
+    team = _student_team(session, actor) if actor.role == UserRole.STUDENT else None
+    if _owner_scope(row, actor, team) or actor.role in (UserRole.ADMIN, UserRole.COORDINATOR, UserRole.PANEL_MEMBER):
         return True
     if actor.role != UserRole.SUPERVISOR:
         return False
@@ -235,6 +261,25 @@ def deactivate_template(version_id: int, request: Request, actor: User = Depends
     return _template_out(session, version)
 
 
+@router.delete("/templates/{version_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_template(version_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> Response:
+    """Delete an unused uploaded template version and its extracted rule snapshot."""
+    validate_mutating_origin(request)
+    version = session.get(TemplateReferenceVersion, version_id)
+    if version is None:
+        raise _error("template_not_found", "Template version was not found.", 404)
+    if version.is_active:
+        raise _error("template_active", "Deactivate the template before deleting it.", 409)
+    try:
+        session.execute(delete(AcademicRuleVersion).where(AcademicRuleVersion.template_reference_version_id == version_id))
+        session.delete(version)
+        session.commit()
+    except Exception as error:
+        session.rollback()
+        raise _error("template_in_use", "This template is referenced by historical submissions and cannot be deleted.", 409) from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post("/templates/{version_id}/rules")
 def save_template_rules(
     version_id: int,
@@ -303,7 +348,9 @@ async def submit_proposal(
     key = (proposal_key or str(uuid.uuid4())).strip()
     if len(key) > 64:
         raise _error("invalid_proposal_key", "Proposal key is too long.", 422)
-    previous = session.scalar(select(ProposalComplianceSubmission).where(ProposalComplianceSubmission.proposal_key == key, ProposalComplianceSubmission.owner_user_id == actor.id).order_by(desc(ProposalComplianceSubmission.version)).limit(1))
+    team = _student_team(session, actor)
+    ownership_filter = or_(ProposalComplianceSubmission.team_id == team.id, ProposalComplianceSubmission.owner_user_id == actor.id) if team is not None else ProposalComplianceSubmission.owner_user_id == actor.id
+    previous = session.scalar(select(ProposalComplianceSubmission).where(ProposalComplianceSubmission.proposal_key == key, ownership_filter).order_by(desc(ProposalComplianceSubmission.version)).limit(1))
     if proposal_key and previous is None:
         raise _error("proposal_not_found", "The proposal version history could not be found.", 404)
     version_number = (previous.version + 1) if previous else 1
@@ -314,7 +361,6 @@ async def submit_proposal(
     if action not in {"draft", "submit"}:
         raise _error("invalid_submission_action", "Action must be draft or submit.", 422)
     is_draft = action == "draft"
-    team = session.scalar(select(Team).where(Team.shared_user_id == actor.id, Team.status != "dissolved").order_by(Team.id).limit(1))
     row = ProposalComplianceSubmission(proposal_key=key, owner_user_id=actor.id, team_id=team.id if team else None, proposal_type=proposal_type, title=title_value, version=version_number, status="DRAFT" if is_draft else ("RESUBMITTED" if previous else "SUBMITTED"), processing_status="PENDING" if is_draft else "COMPLETED", filename=proposal_file.filename or "proposal", content_type=extracted.content_type, file_size=extracted.file_size, sha256=extracted.sha256, page_count=extracted.page_count, storage_key=str(path.relative_to(settings.document_storage_root)), extracted_text=extracted.extracted_text, extracted_fields=fields, template_reference_version_id=template_version.id)
     session.add(row)
     session.flush()
@@ -356,7 +402,7 @@ def _run_submission(session: Session, row: ProposalComplianceSubmission, templat
 def submit_draft(submission_id: int, request: Request, actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
     validate_mutating_origin(request)
     row = session.get(ProposalComplianceSubmission, submission_id)
-    if row is None or row.owner_user_id != actor.id:
+    if row is None or not _owner_scope(row, actor, _student_team(session, actor)):
         raise _error("submission_not_found", "The proposal draft was not found.", 404)
     if row.status != "DRAFT":
         raise _error("invalid_submission_state", "Only a draft proposal can be submitted.", 409)
@@ -371,7 +417,7 @@ def withdraw_submission(submission_id: int, request: Request, actor: User = Depe
     """Withdraw a student-owned draft/submission without deleting its history."""
     validate_mutating_origin(request)
     row = session.get(ProposalComplianceSubmission, submission_id)
-    if row is None or row.owner_user_id != actor.id:
+    if row is None or not _owner_scope(row, actor, _student_team(session, actor)):
         raise _error("submission_not_found", "The proposal submission was not found.", 404)
     if row.status not in {"DRAFT", "SUBMITTED", "RESUBMITTED", "CHANGES_REQUESTED"}:
         raise _error("invalid_submission_state", "This proposal cannot be withdrawn in its current state.", 409)
@@ -403,7 +449,9 @@ def update_submission_status(submission_id: int, payload: ProposalStatusUpdate, 
 
 @router.get("/submissions/mine")
 def my_submissions(actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
-    rows = session.scalars(select(ProposalComplianceSubmission).where(ProposalComplianceSubmission.owner_user_id == actor.id).order_by(desc(ProposalComplianceSubmission.created_at), desc(ProposalComplianceSubmission.version))).all()
+    team = _student_team(session, actor)
+    ownership_filter = or_(ProposalComplianceSubmission.team_id == team.id, ProposalComplianceSubmission.owner_user_id == actor.id) if team is not None else ProposalComplianceSubmission.owner_user_id == actor.id
+    rows = session.scalars(select(ProposalComplianceSubmission).where(ownership_filter).order_by(desc(ProposalComplianceSubmission.created_at), desc(ProposalComplianceSubmission.version))).all()
     return [_submission_out(session, row) for row in rows]
 
 

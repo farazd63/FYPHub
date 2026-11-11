@@ -16,7 +16,13 @@ router = APIRouter(prefix="/api/v1/module-2", tags=["module-2-collaboration"])
 def team_for_actor(session: Session, actor: User, team_id: int | None = None, *, lock: bool = False) -> Team:
     if actor.role != UserRole.STUDENT:
         raise HTTPException(403, "Student team access is required.")
-    query = select(Team).where(Team.shared_user_id == actor.id)
+    member_match = select(TeamMember.id).where(
+        TeamMember.team_id == Team.id,
+        TeamMember.academic_cycle_id == Team.academic_cycle_id,
+        TeamMember.is_active.is_(True),
+        (TeamMember.registration_number == actor.registration_number) | (TeamMember.university_email == actor.email),
+    ).exists()
+    query = select(Team).where((Team.shared_user_id == actor.id) | member_match, Team.status != "dissolved")
     if team_id is not None:
         query = query.where(Team.id == team_id)
     if lock:

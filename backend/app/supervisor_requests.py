@@ -30,6 +30,7 @@ from .models import (
     SupervisorRequestStatusHistory,
     SupervisorRequestSubmissionNoteVersion,
     Team,
+    TeamMember,
     User,
     UserRole,
 )
@@ -185,7 +186,30 @@ def _ai_out(run: ProposalAIReviewRun) -> dict[str, object]:
 
 
 def _team_for_student(session: Session, actor: User) -> Team | None:
-    return session.execute(select(Team).where(Team.shared_user_id == actor.id).order_by(Team.id)).scalar_one_or_none()
+    """Resolve the existing shared group for either its login or an active member."""
+    member_match = select(TeamMember.id).where(
+        TeamMember.team_id == Team.id,
+        TeamMember.academic_cycle_id == Team.academic_cycle_id,
+        TeamMember.is_active.is_(True),
+        or_(TeamMember.registration_number == actor.registration_number, TeamMember.university_email == actor.email),
+    ).exists() if actor.registration_number else None
+    conditions = [Team.shared_user_id == actor.id]
+    if member_match is not None:
+        conditions.append(member_match)
+    return session.execute(select(Team).where(or_(*conditions), Team.status != "dissolved").order_by(Team.id)).scalars().first()
+
+
+def _actor_has_team_access(session: Session, team: Team, actor: User) -> bool:
+    if team.shared_user_id == actor.id:
+        return True
+    if actor.role != UserRole.STUDENT or not actor.registration_number:
+        return False
+    return session.scalar(select(TeamMember.id).where(
+        TeamMember.team_id == team.id,
+        TeamMember.academic_cycle_id == team.academic_cycle_id,
+        TeamMember.registration_number == actor.registration_number,
+        TeamMember.is_active.is_(True),
+    ).limit(1)) is not None
 
 
 def _cycle_for_request(session: Session, cycle_id: int, *, lock: bool = False) -> AcademicCycle:
@@ -254,14 +278,8 @@ def _owner_request(session: Session, request_id: int, actor: User, *, lock: bool
         raise failure("request_not_found", "Supervisor request was not found.", status.HTTP_404_NOT_FOUND)
     if row.requester_user_id == actor.id:
         return row
-    team_owner = session.scalar(
-        select(Team.id).where(
-            Team.id == row.team_id,
-            Team.academic_cycle_id == row.academic_cycle_id,
-            Team.shared_user_id == actor.id,
-        )
-    ) if row.team_id is not None else None
-    if team_owner is None:
+    team = session.scalar(select(Team).where(Team.id == row.team_id, Team.academic_cycle_id == row.academic_cycle_id)) if row.team_id is not None else None
+    if team is None or not _actor_has_team_access(session, team, actor):
         raise failure("request_forbidden", "This supervisor request is not accessible.", status.HTTP_403_FORBIDDEN)
     return row
 
@@ -397,6 +415,8 @@ def _out(session: Session, row: SupervisorRequest, *, include_history: bool = Tr
     requester = session.get(User, row.requester_user_id)
     supervisor = session.get(User, row.supervisor_id)
     team = session.get(Team, row.team_id) if row.team_id is not None else None
+    shared_user = session.get(User, team.shared_user_id) if team is not None else None
+    members = session.scalars(select(TeamMember).where(TeamMember.team_id == team.id, TeamMember.academic_cycle_id == team.academic_cycle_id, TeamMember.is_active.is_(True)).order_by(TeamMember.id)).all() if team is not None else []
     reviewer = session.get(User, row.reviewer_id) if row.reviewer_id is not None else None
     capacity_used = _capacity_used(session, row.supervisor_id, row.academic_cycle_id, exclude_request_id=row.id if row.status == SupervisorRequestStatus.SUBMITTED.value else None)
     capacity_policy = session.scalar(
@@ -414,6 +434,8 @@ def _out(session: Session, row: SupervisorRequest, *, include_history: bool = Tr
         "requester_name": requester.full_name if requester else None,
         "requester_registration_number": requester.registration_number if requester else None,
         "team_id": team.id if team else None,
+        "group_email": shared_user.email if shared_user else None,
+        "group_members": [{"id": member.id, "name": member.full_name, "registration_number": member.registration_number, "email": member.university_email} for member in members],
         "supervisor_id": row.supervisor_id,
         "proposal_type": row.proposal_type,
         "problem_statement": row.problem_statement,
@@ -500,9 +522,17 @@ def eligible_supervisors(
 @proposal_router.get("/mine")
 def my_requests(actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
     team = _team_for_student(session, actor)
-    statement = select(SupervisorRequest).where(SupervisorRequest.requester_user_id == actor.id)
-    if team is not None:
-        statement = statement.where(or_(SupervisorRequest.team_id == team.id, SupervisorRequest.team_id.is_(None)))
+    team_ids = select(Team.id).where(Team.status != "dissolved")
+    if actor.registration_number:
+        team_ids = team_ids.where(or_(Team.shared_user_id == actor.id, select(TeamMember.id).where(
+            TeamMember.team_id == Team.id,
+            TeamMember.academic_cycle_id == Team.academic_cycle_id,
+            or_(TeamMember.registration_number == actor.registration_number, TeamMember.university_email == actor.email),
+            TeamMember.is_active.is_(True),
+        ).exists()))
+    else:
+        team_ids = team_ids.where(Team.shared_user_id == actor.id)
+    statement = select(SupervisorRequest).where(or_(SupervisorRequest.requester_user_id == actor.id, SupervisorRequest.team_id.in_(team_ids)))
     rows = session.scalars(statement.order_by(SupervisorRequest.updated_at.desc(), SupervisorRequest.id.desc())).all()
     return [_out(session, row) for row in rows]
 
@@ -534,14 +564,9 @@ async def create_request(
             raise failure("cycle_mismatch", "The student team does not belong to the selected cycle.")
         supervisor, policy = _lock_capacity(session, supervisor_id, cycle.id)
         _ensure_capacity(session, supervisor.id, cycle.id, policy)
-        duplicate = session.scalar(
-            select(SupervisorRequest.id).where(
-                SupervisorRequest.academic_cycle_id == cycle.id,
-                SupervisorRequest.requester_user_id == actor.id,
-                SupervisorRequest.supervisor_id == supervisor.id,
-                SupervisorRequest.status.in_(ACTIVE_REQUEST_STATUSES),
-            )
-        )
+        duplicate_filters = [SupervisorRequest.academic_cycle_id == cycle.id, SupervisorRequest.supervisor_id == supervisor.id, SupervisorRequest.status.in_(ACTIVE_REQUEST_STATUSES)]
+        duplicate_filters.append(SupervisorRequest.team_id == team.id if team is not None else SupervisorRequest.requester_user_id == actor.id)
+        duplicate = session.scalar(select(SupervisorRequest.id).where(*duplicate_filters))
         if duplicate is not None:
             raise failure("duplicate_active_request", "An active request already exists for this supervisor and cycle.")
         proposal_type = proposal_type.strip().upper()
@@ -849,13 +874,13 @@ def decide_request(
                 .where(Team.id == row.team_id, Team.academic_cycle_id == cycle.id)
                 .with_for_update()
             ).scalar_one_or_none() if row.team_id is not None else None
-            if team is None or team.shared_user_id != row.requester_user_id:
+            if team is None:
                 raise failure("team_required", "A registered team is required before supervisor assignment.", status.HTTP_422_UNPROCESSABLE_CONTENT)
             supervisor, policy = _lock_capacity(session, row.supervisor_id, cycle.id)
             _ensure_capacity(session, supervisor.id, cycle.id, policy, exclude_request_id=row.id)
             if session.scalar(select(SupervisorAssignment.id).where(SupervisorAssignment.team_id == team.id, SupervisorAssignment.ended_at.is_(None))) is not None:
                 raise failure("team_already_assigned", "This team already has an active supervisor assignment.")
-            assignment = SupervisorAssignment(team_id=team.id, academic_cycle_id=cycle.id, supervisor_id=actor.id, assigned_by_id=actor.id)
+            assignment = SupervisorAssignment(team_id=team.id, academic_cycle_id=cycle.id, supervisor_id=actor.id, assigned_by_id=actor.id, academic_year=cycle.academic_year, session=cycle.session)
             session.add(assignment)
             session.flush()
             ensure_collaboration_channel(session, assignment, team)

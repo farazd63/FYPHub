@@ -96,7 +96,6 @@ export function AdminDeadlines({ api }: { api: string }) {
 
   const selectFilter = async (value: string) => { setFilterCycle(value); try { await loadDeadlines(value); } catch (error) { setMessageIsError(true); setMessage(error instanceof Error ? error.message : "Deadline configurations could not be loaded."); } };
   const startNew = () => { detailRequest.current += 1; setSelected(null); setSelectedVersion(null); setForm({ ...emptyForm(), academic_cycle_id: filterCycle }); setPreview(null); setOffsets([]); setErrors({}); setMessage(""); };
-
   const submit = async (event: React.FormEvent) => {
     event.preventDefault(); if (saving) return;
     const next: Record<string, string> = {};

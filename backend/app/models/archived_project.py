@@ -29,12 +29,13 @@ class ArchivedProject(Base):
         Index("ix_archived_projects_normalized_title", "normalized_title"),
         Index("ix_archived_projects_active_cycle", "is_active", "academic_year"),
         Index("ix_archived_projects_active_scope", "is_active", "project_scope"),
-        Index("uq_archived_project_active_title_year", "normalized_title", "academic_year", unique=True, postgresql_where=text("is_active = true")),
+        Index("uq_archived_project_active_title_year_group", "normalized_title", "academic_year", "normalized_group_name", unique=True, postgresql_where=text("is_active = true")),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     normalized_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    normalized_group_name: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default="")
     abstract_summary: Mapped[str] = mapped_column(Text, nullable=False)
     keywords: Mapped[list[str]] = mapped_column(ARRAY(String(100)), nullable=False, default=list, server_default="{}")
     academic_cycle_id: Mapped[int | None] = mapped_column(ForeignKey("academic_cycles.id", ondelete="RESTRICT"), nullable=True)
@@ -52,6 +53,7 @@ class ArchivedProject(Base):
     # are nullable so existing archive records remain readable and unchanged.
     project_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
     group_leader_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    group_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     group_leader_registration_number: Mapped[str | None] = mapped_column(String(120), nullable=True)
     group_members: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default="[]")
     supervisor_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -69,6 +71,8 @@ class ArchivedProject(Base):
     presentation_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     external_reference: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_batch_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    source_row_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_visible_to_students: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

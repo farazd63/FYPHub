@@ -6,7 +6,7 @@ import { StudentSupervisorSelectionPdf } from "./StudentSupervisorSelectionPdf";
 type Cycle = { id: number; code: string; display_name: string };
 type Supervisor = { id: number; name: string; max_capacity: number; assigned_count: number; remaining_capacity: number; available: boolean };
 type History = { id: number; from_status: string | null; to_status: string; comment: string | null; actor_name: string; created_at: string };
-type RequestRecord = { id: number; academic_cycle_id: number; academic_cycle_name: string; requester_name: string; team_id: number | null; supervisor_id: number; supervisor_name: string; title: string; summary: string; status: string; revision: number; updated_at: string; status_history: History[] };
+type RequestRecord = { id: number; academic_cycle_id: number; academic_cycle_name: string; requester_name: string; team_id: number | null; group_email?: string | null; group_members?: Array<{ name: string; registration_number: string; email: string }>; supervisor_id: number; supervisor_name: string; title: string; summary: string; status: string; revision: number; updated_at: string; status_history: History[] };
 
 const input = "student-request-input";
 const statusClass = (status: string) => status === "ACCEPTED" ? "student-status--implemented" : status === "CHANGES_REQUESTED" ? "student-status--partial" : "student-status--future";
@@ -27,7 +27,6 @@ export function LegacyStudentSupervisorSelection({ api }: { api: string }) {
 
 */
 import { StudentSupervisorSelectionPdf } from "./StudentSupervisorSelectionPdf";
-import { ProposalReferenceSearch } from "./ProposalReferenceSearch";
 export function StudentSupervisorSelection({ api, userId }: { api: string; userId: number }) {
-  return <><ProposalReferenceSearch api={api} /><StudentSupervisorSelectionPdf api={api} userId={userId} /></>;
+  return <StudentSupervisorSelectionPdf api={api} userId={userId} />;
 }

@@ -1,6 +1,5 @@
-import { ArchiveManagementV2 } from "../supervisor-requests/ArchiveManagementV2";
-import { OldProjectArchiveImport } from "./OldProjectArchiveImport";
+import { AdminArchiveProjects } from "./AdminArchiveProjects";
 
 export function ArchiveManagement({ api }: { api: string }) {
-  return <><OldProjectArchiveImport api={api} /><ArchiveManagementV2 api={api} /></>;
+  return <AdminArchiveProjects api={api} />;
 }

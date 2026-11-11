@@ -1,170 +1,205 @@
-/* Shared presentation tokens. Components keep their existing routes,
-   handlers, permissions and status semantics. */
+/* Shared visual language derived from the Project Progress workspace. */
 :root {
-  --app-primary: #4169e1;
-  --app-primary-hover: #3157c8;
-  --app-action: #4169e1;
-  --app-action-hover: #3157c8;
-  --app-action-soft: #eef1ff;
-  --app-action-ink: #315db4;
-  --app-success: #2f9b72;
-  --app-warning: #c8892f;
-  --app-danger: #c45555;
-  --app-page: #f4f7fb;
-  --app-surface: #ffffff;
-  --app-surface-muted: #f7f9fd;
-  --app-border: #dbe4f0;
-  --app-border-strong: #c8d5e7;
-  --app-text: #182b49;
-  --app-muted: #667892;
-  --app-shadow-sm: 0 6px 18px rgb(25 53 102 / 0.06);
-  --app-shadow-md: 0 16px 40px rgb(25 53 102 / 0.09);
-  --app-radius: 14px;
+  --ds-page: #eff8ff;
+  --ds-surface: #ffffff;
+  --ds-ink: #182b4d;
+  --ds-muted: #71809a;
+  --ds-border: #e3e7f0;
+  --ds-purple: #acdfff;
+  --ds-purple-dark: #acdfff;
+  --ds-purple-soft: #eff8ff;
+  --ds-mint: #acdfff;
+  --ds-mint-soft: #eff8ff;
+  --ds-orange: #acdfff;
+  --ds-orange-soft: #eff8ff;
+  --ds-shadow: 0 11px 28px rgb(35 54 94 / 0.07);
 }
 
-body {
-  background: var(--app-page);
-  color: var(--app-text);
+body { background: var(--ds-page); color: var(--ds-ink); }
+button, input, select, textarea { font: inherit; }
+button { transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease; }
+button:not(:disabled):hover { transform: translateY(-1px); }
+
+.student-shell,
+main:has(.admin-sidebar),
+.supervisor-page,
+.coordinator-page { background: var(--ds-page); color: var(--ds-ink); }
+
+.student-content,
+main:has(.admin-sidebar) > header + div > section { background: var(--ds-page); }
+
+.student-header,
+main:has(.admin-sidebar) > header { border-color: var(--ds-border); background: rgb(255 255 255 / 0.92); box-shadow: 0 2px 18px rgb(35 54 94 / 0.06); }
+
+.student-sidebar,
+main:has(.admin-sidebar) .admin-sidebar {
+  background: radial-gradient(circle at 15% 0%, rgb(118 86 219 / 0.34), transparent 32%), linear-gradient(165deg, #151039, #211753 64%, #30236f);
+  border-color: rgb(173 153 255 / 0.28);
 }
 
-button,
-a,
-input,
-select,
-textarea {
-  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, color 160ms ease, transform 160ms ease;
+.student-sidebar__item[aria-current="page"],
+main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"] {
+  background: linear-gradient(105deg, rgb(118 86 219 / 0.82), rgb(91 70 184 / 0.65));
+  box-shadow: inset 0 0 0 1px rgb(194 180 255 / 0.46), 0 6px 18px rgb(23 13 70 / 0.2);
 }
 
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 3px solid rgb(65 105 225 / 0.28);
-  outline-offset: 2px;
+.student-overview__hero,
+.progress-hero {
+  background: linear-gradient(135deg, var(--ds-purple-dark) 0%, #6353cf 55%, #8c73e6 100%);
+  box-shadow: 0 18px 38px rgb(53 39 137 / 0.2);
 }
 
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-select,
-textarea {
-  border-color: var(--app-border-strong);
-  border-radius: 11px;
-  background: var(--app-surface);
-  color: var(--app-text);
+.student-request-card,
+.student-placeholder,
+.supervisor-card,
+.progress-card,
+.progress-board,
+.progress-summary__card,
+main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .rounded-xl.border,
+main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .rounded-2xl.border,
+main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) .rounded-xl.border {
+  border-color: var(--ds-border);
+  border-radius: 20px;
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow);
 }
 
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
-select:focus,
-textarea:focus {
-  border-color: var(--app-primary);
-  box-shadow: 0 0 0 3px rgb(65 105 225 / 0.13);
+.student-request-card:hover,
+.supervisor-card:hover,
+.progress-card:hover,
+main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .rounded-xl.border:hover { border-color: #cfc4f6; }
+
+.student-page-heading h1,
+.supervisor-page-heading h1,
+main:has(.admin-sidebar) .admin-enter h1 { color: var(--ds-ink); letter-spacing: -0.04em; }
+
+.student-page-heading p:last-child,
+.supervisor-page-heading > span,
+main:has(.admin-sidebar) .admin-enter > section > p { color: var(--ds-muted); }
+
+input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+  border-color: #d7ddeb;
+  border-radius: 10px;
+  background: #fbfcff;
+  color: var(--ds-ink);
+}
+input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus {
+  border-color: #836de0;
+  box-shadow: 0 0 0 3px rgb(131 109 224 / 0.14);
   outline: 0;
 }
 
-textarea {
-  min-height: 92px;
-  line-height: 1.5;
-  resize: vertical;
-}
-
-button:disabled { cursor: not-allowed; }
-
-/* Existing cards and table wrappers share a quiet surface hierarchy. */
-.student-request-card,
-.student-phase-card,
-.student-placeholder,
-.student-overview-card,
-.cycle-overview__card,
-.academic-cycles__card,
-.academic-cycle-dashboard__card,
-.admin-card,
-.admin-panel,
-.admin-table-card {
-  border-color: var(--app-border);
-  border-radius: var(--app-radius);
-  background: var(--app-surface);
-  box-shadow: var(--app-shadow-sm);
-}
-
-table {
-  border-color: var(--app-border);
-  border-collapse: separate;
-  border-spacing: 0;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-thead th {
-  background: var(--app-surface-muted);
-  color: #385170;
-  font-size: 0.75rem;
-  font-weight: 750;
-  letter-spacing: 0.035em;
-  text-transform: uppercase;
-}
-
-tbody tr { border-color: var(--app-border); }
-tbody tr:hover { background: #f8faff; }
-[role="alert"],
-[role="status"] { border-radius: 11px; }
-
-/* Legacy primary utility colors are normalized only on actionable buttons.
-   Status text and badges retain their own semantic colors. */
-button[type="submit"],
 button[class*="bg-[#4663ff]"],
-button[class*="bg-[#4663FF]"],
-button[class*="bg-[#3567d6]"],
 button[class*="bg-[#176b66]"],
-button[class*="bg-[#176B66]"] {
-  border-radius: 11px;
-  font-weight: 700;
+button[class*="bg-[#354fe0]"] {
+  background: linear-gradient(135deg, #7656db, #5b46c2);
+  box-shadow: 0 7px 16px rgb(91 70 194 / 0.2);
 }
+button[class*="bg-[#4663ff]"]:hover,
+button[class*="bg-[#176b66]"]:hover { background: linear-gradient(135deg, #6849cb, #4936a9); }
 
-button[class*="bg-[#4663ff]"]:not(:disabled),
-button[class*="bg-[#4663FF]"]:not(:disabled),
-button[class*="bg-[#3567d6]"]:not(:disabled),
-button[class*="bg-[#176b66]"]:not(:disabled),
-button[class*="bg-[#176B66]"]:not(:disabled) { background-color: var(--app-action); }
+.student-status,
+.student-role,
+.admin-role { border-color: #d4cafa; background: var(--ds-purple-soft); color: #5a43aa; }
+.student-status--implemented { border-color: #b7ead5; background: var(--ds-mint-soft); color: #218765; }
+.student-status--partial { border-color: #d4cafa; background: var(--ds-purple-soft); color: #5a43aa; }
 
-button[class*="hover:bg-[#354FE0]"]:hover:not(:disabled),
-button[class*="hover:bg-[#354ee0]"]:hover:not(:disabled),
-button[class*="hover:bg-[#354fe0]"]:hover:not(:disabled),
-button[class*="hover:bg-[#125650]"]:hover:not(:disabled) { background-color: var(--app-action-hover); }
-
-button[type="submit"]:hover:not(:disabled),
-button[class*="bg-[#4663ff]"]:hover:not(:disabled),
-button[class*="bg-[#4663FF]"]:hover:not(:disabled),
-button[class*="bg-[#3567d6]"]:hover:not(:disabled),
-button[class*="bg-[#176b66]"]:hover:not(:disabled),
-button[class*="bg-[#176B66]"]:hover:not(:disabled) { transform: translateY(-1px); }
-
-.auth-photo-background { display: none !important; }
-
-.auth-saas .auth-card {
-  border: 1px solid var(--app-border);
-  border-radius: 18px;
-  background: var(--app-surface);
-  box-shadow: var(--app-shadow-md);
-  backdrop-filter: none;
-}
+.progress-summary__card--purple::before { background: var(--ds-purple); }
+.progress-summary__card--green::before { background: var(--ds-mint); }
+.progress-summary__card--orange::before { background: var(--ds-orange); }
 
 @media (max-width: 767px) {
-  .student-request-layout,
-  .student-overview-grid,
-  .academic-cycle-dashboard__grid { grid-template-columns: minmax(0, 1fr); }
-
-  table {
-    display: block;
-    max-width: 100%;
-    overflow-x: auto;
-  }
+  .student-content { padding: 16px; }
+  main:has(.admin-sidebar) > header + div > section { padding: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 1ms !important;
-    transition-duration: 1ms !important;
-  }
+  button { transition: none; }
+  button:not(:disabled):hover { transform: none; }
+}
+
+/* Blue and white palette across every role and public account screen.
+   Dark blue is reserved for readable text on the light blue surfaces. */
+:root { --app-primary: #acdfff; --app-primary-hover: #90d3fc; --app-selected: #eff8ff; --app-page: #eff8ff; --app-border: #cce7f9; }
+main:has(.admin-sidebar) { --admin-primary: #acdfff; --admin-primary-hover: #90d3fc; --admin-selected: #eff8ff; --admin-border: #cce7f9; }
+.student-shell .student-sidebar,
+main:has(.admin-sidebar) .admin-sidebar { background: #acdfff !important; border-color: #cce7f9 !important; box-shadow: 0 8px 24px rgb(34 117 173 / .08); }
+.student-sidebar button, .student-sidebar span, .student-sidebar svg,
+main:has(.admin-sidebar) .admin-sidebar nav button,
+main:has(.admin-sidebar) .admin-sidebar nav span { color: #183f60 !important; }
+.student-sidebar .student-sidebar__icon,
+main:has(.admin-sidebar) .admin-nav-icon { background: #eff8ff !important; border-color: #fff !important; }
+.student-sidebar .student-sidebar__item[aria-current="page"],
+.student-sidebar .student-sidebar__item:hover,
+main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"],
+main:has(.admin-sidebar) .admin-sidebar nav button:hover { background: #fff !important; color: #183f60 !important; box-shadow: 0 4px 12px rgb(34 117 173 / .1) !important; }
+.student-sidebar button::before, .admin-sidebar button::before { background: #69bff3 !important; }
+.student-sidebar__collapse, .student-sidebar__close { background: #fff !important; border-color: #cce7f9 !important; }
+.progress-hero, .student-overview__hero, .cycle-overview__hero,
+.module3-hero { background: #acdfff !important; border-color: #cce7f9 !important; box-shadow: 0 12px 30px rgb(34 117 173 / .1) !important; }
+.progress-hero *, .student-overview__hero *, .cycle-overview__hero * { color: #183f60 !important; }
+.auth-photo-background { background: #183f60; }
+.auth-card { background: rgb(248 251 253 / .78); border-color: rgb(255 255 255 / .62); box-shadow: 0 18px 45px rgb(8 35 51 / .28); }
+main:has(.auth-card) > .relative > section,
+main:has(.auth-card) > .relative > section * { color: #fff !important; }
+.progress-bar, .progress-card__icon, .progress-legend__swatch,
+.student-avatar, .admin-avatar, .student-role, .admin-role, .student-status,
+[class*="status--"], .progress-hero__badge { background: #acdfff !important; color: #183f60 !important; border-color: #cce7f9 !important; }
+.progress-summary__card::before, .progress-hero__dot { background: #acdfff !important; box-shadow: none; }
+main button[class*="bg-"], main button[type="submit"],
+.student-request-actions button, .supervisor-actions button, .progress-button,
+main label:has(> input[type="file"].sr-only) { background: #acdfff !important; color: #183f60 !important; border-color: #9ed5f5 !important; box-shadow: none !important; }
+main button[class*="bg-"]:hover, .progress-button:hover { background: #d3edff !important; }
+main button:disabled { background: #eff8ff !important; color: #52738d !important; box-shadow: none !important; }
+main button[class*="text-red"], main button[class*="text-[#"], main button[class*="text-green"] { color: #183f60 !important; border-color: #cce7f9; }
+main [role="status"], main [role="alert"], .progress-toast,
+.student-request-alert, .supervisor-alert { background: #eff8ff !important; color: #183f60 !important; border-color: #cce7f9 !important; }
+main input:not([type="checkbox"]):not([type="radio"]), main select, main textarea { background: #fff !important; color: #183f60 !important; border-color: #cce7f9 !important; }
+main input:focus, main select:focus, main textarea:focus { border-color: #69bff3 !important; box-shadow: 0 0 0 3px rgb(172 223 255 / .45) !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: #69bff3; }
+/* Approved brand blue. Keep white text on filled controls for contrast. */
+:root { --brand-blue: #124bc4; --ds-purple: #124bc4; --ds-mint: #124bc4; --ds-orange: #124bc4; --app-primary: #124bc4; }
+.student-shell .student-sidebar, main:has(.admin-sidebar) .admin-sidebar,
+.progress-hero, .student-overview__hero, .cycle-overview__hero,
+main button[class*="bg-"], main button[type="submit"],
+.student-request-actions button, .supervisor-actions button, .progress-button,
+main label:has(> input[type="file"].sr-only) { background: #124bc4 !important; color: #fff !important; }
+.progress-hero *, .student-overview__hero *, .cycle-overview__hero *,
+.student-sidebar button, .student-sidebar span, .student-sidebar svg,
+main:has(.admin-sidebar) .admin-sidebar nav button,
+main:has(.admin-sidebar) .admin-sidebar nav span { color: #fff !important; }
+.student-sidebar .student-sidebar__item[aria-current="page"],
+.student-sidebar .student-sidebar__item[aria-current="page"] *,
+.student-sidebar .student-sidebar__item:hover *,
+.student-sidebar .student-sidebar__icon *,
+main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"],
+main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"] *,
+main:has(.admin-sidebar) .admin-nav-icon * { color: #124bc4 !important; }
+input[type="checkbox"], input[type="radio"] { accent-color: #124bc4; }
+main table thead, .progress-gantt__dates, .cycle-overview { background: #eff8ff !important; }
+.student-phase-card, .cycle-overview__card { background: #fff !important; border-color: #cce7f9 !important; }
+.cycle-overview__card::before { background: #acdfff !important; }
+
+/* Reference royal-blue header and matching interaction states. */
+.student-header, main:has(.admin-sidebar) > header {
+  background: #124bc4 !important;
+  border-color: #0d3c9f !important;
+  color: #fff !important;
+}
+.student-header .student-brand, .student-header .student-brand svg,
+.student-header .student-account__name, .student-header .student-menu,
+main:has(.admin-sidebar) > header strong,
+main:has(.admin-sidebar) .admin-account-name { color: #fff !important; }
+.student-header .student-logout, main:has(.admin-sidebar) .admin-logout {
+  background: #fff !important;
+  color: #124bc4 !important;
+  border-color: #fff !important;
+}
+main button[class*="bg-"]:not(:disabled):hover,
+.progress-button:not(:disabled):hover { background: #0d3c9f !important; color: #fff !important; }
+.progress-summary__card::before, .cycle-overview__card::before,
+.progress-legend__swatch { background: #124bc4 !important; }
+main input:focus, main select:focus, main textarea:focus {
+  border-color: #124bc4 !important;
+  box-shadow: 0 0 0 3px rgb(18 75 196 / .16) !important;
 }

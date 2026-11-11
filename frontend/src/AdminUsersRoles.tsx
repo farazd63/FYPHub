@@ -50,7 +50,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
   const [busy, setBusy] = useState<number | "create" | null>(null);
   const [confirm, setConfirm] = useState<{
     user: User;
-    type: "status";
+    type: "status" | "delete";
     value: string;
   } | null>(null);
   const [form, setForm] = useState({
@@ -150,13 +150,8 @@ export function AdminUsersRoles({ api }: { api: string }) {
     setNotice("");
     try {
       const response = await fetch(
-        `${api}/api/v1/admin/users/${confirm.user.id}/${confirm.type}`,
-        {
-          method: "PATCH",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ is_active: confirm.value === "true" }),
-        },
+        confirm.type === "delete" ? `${api}/api/v1/admin/users/${confirm.user.id}` : `${api}/api/v1/admin/users/${confirm.user.id}/${confirm.type}`,
+        confirm.type === "delete" ? { method: "DELETE", credentials: "include" } : { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: confirm.value === "true" }) },
       );
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -164,7 +159,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
         return;
       }
       setConfirm(null);
-      setNotice("Account updated.");
+      setNotice(confirm.type === "delete" ? "Account permanently deleted." : "Account updated.");
       await load();
     } catch {
       setNotice("The account service is unavailable.");
@@ -334,6 +329,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                         >
                           {user.is_active ? "Deactivate" : "Activate"}
                         </button>
+                        <button type="button" disabled={busy === user.id} onClick={() => setConfirm({ user, type: "delete", value: "delete" })} className="mt-2 w-full rounded-lg border border-[#d38b83] px-2 py-1.5 text-xs font-semibold text-[#a43a33] transition duration-200 hover:bg-[#fff3f0] disabled:opacity-60">Delete</button>
                       </td>
                     </tr>
                   ))}
@@ -462,10 +458,10 @@ export function AdminUsersRoles({ api }: { api: string }) {
         >
           <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
             <h2 id="confirm-heading" className="text-lg font-bold">
-              Confirm account change
+              {confirm.type === "delete" ? "Confirm permanent deletion" : "Confirm account change"}
             </h2>
             <p className="mt-2 text-sm text-[#60716b]">
-              {`${confirm.value === "true" ? "Activate" : "Deactivate"} ${confirm.user.full_name}?`}
+              {confirm.type === "delete" ? `Permanently delete ${confirm.user.full_name}? This works only when no portal records or audit history reference the account.` : `${confirm.value === "true" ? "Activate" : "Deactivate"} ${confirm.user.full_name}?`}
             </p>
             <div className="mt-5 flex justify-end gap-3">
               <button
@@ -482,7 +478,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                 onClick={() => void mutate()}
                 className="rounded-lg bg-[#176b66] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
-                {busy ? "Saving…" : "Confirm"}
+                {busy ? "Saving…" : confirm.type === "delete" ? "Delete permanently" : "Confirm"}
               </button>
             </div>
           </div>

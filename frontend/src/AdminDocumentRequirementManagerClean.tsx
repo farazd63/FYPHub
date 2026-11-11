@@ -1,103 +1,35 @@
-/* eslint-disable react-hooks/set-state-in-effect -- initial list loading is intentionally started on mount. */
 import { useCallback, useEffect, useState } from "react";
 
-type Requirement = { id: number; title: string; due_at: string; allowed_file_types: string[]; status: string };
-type FormatKey = "PDF" | "DOC" | "DOCX" | "TEX" | "TXT" | "MD" | "IMAGE" | "VIDEO" | "AUDIO" | "SPREADSHEET" | "PRESENTATION" | "ARCHIVE" | "ALL";
-type Diagnostic = { origin: string; url: string; method: "GET" | "POST" | "DELETE"; status: number | "none"; errorType: string };
+type Cycle = { id: number; display_name?: string; code?: string; academic_year?: number | null; session?: string | null };
+type Requirement = { id: number; title: string; description?: string | null; academic_cycle_id: number; due_at: string; allowed_file_types: string[]; max_file_size_mb: number; is_required: boolean; status: string; submission_count?: number; created_at: string; updated_at: string };
+type Version = { id: number; version_number: number; original_filename: string; mime_type: string; file_size: number; uploaded_at: string; download_url?: string };
+type AdminSubmission = { id: number; status: string; is_late: boolean; uploaded_at: string; updated_at: string; review_comment?: string | null; student: { id: number; name: string; email?: string | null; registration_number?: string | null }; group_id?: number | null; versions: Version[] };
+const formatOptions = [
+  { value: "pdf", label: "PDF", extensions: ["pdf"] },
+  { value: "doc", label: "DOC", extensions: ["doc"] },
+  { value: "docx", label: "DOCX", extensions: ["docx"] },
+  { value: "txt", label: "Plain text (TXT)", extensions: ["txt"] },
+  { value: "IMAGE", label: "Images", extensions: ["jpg", "jpeg", "png", "gif", "webp", "svg"] },
+  { value: "VIDEO", label: "Video", extensions: ["mp4", "mov", "avi", "mkv", "webm"] },
+  { value: "AUDIO", label: "Audio", extensions: ["mp3", "wav", "m4a", "ogg"] },
+  { value: "SPREADSHEET", label: "Spreadsheet", extensions: ["xls", "xlsx", "csv"] },
+  { value: "PRESENTATION", label: "Presentation", extensions: ["ppt", "pptx"] },
+  { value: "ARCHIVE", label: "Archive", extensions: ["zip", "rar", "7z"] },
+  { value: "ALL", label: "Any supported format", extensions: ["pdf", "doc", "docx", "tex", "txt", "md", "jpg", "jpeg", "png", "gif", "webp", "svg", "mp4", "mov", "avi", "mkv", "webm", "mp3", "wav", "m4a", "ogg", "xls", "xlsx", "csv", "ppt", "pptx", "zip", "rar", "7z"] },
+];
+const formats = formatOptions.map((item) => item.label);
+const errorText = (body: unknown) => typeof body === "object" && body && typeof (body as { detail?: unknown }).detail === "string" ? (body as { detail: string }).detail : "The requirement request could not be completed.";
 
-const FORMAT_MAP: Record<FormatKey, string[]> = {
-  PDF: ["PDF"], DOC: ["DOC"], DOCX: ["DOCX"], TEX: ["TEX"], TXT: ["TXT"], MD: ["MD"],
-  IMAGE: ["JPG", "JPEG", "PNG", "GIF", "WEBP", "SVG"], VIDEO: ["MP4", "MOV", "AVI", "MKV", "WEBM"],
-  AUDIO: ["MP3", "WAV", "M4A", "OGG"], SPREADSHEET: ["XLS", "XLSX", "CSV"],
-  PRESENTATION: ["PPT", "PPTX"], ARCHIVE: ["ZIP", "RAR", "7Z"], ALL: [],
-};
-FORMAT_MAP.ALL = Object.values(FORMAT_MAP).flat();
-
-const errorMessage = (status: number, detail: unknown) => {
-  const detailText = typeof detail === "string" ? detail : detail && typeof detail === "object" && typeof (detail as { detail?: unknown }).detail === "string" ? (detail as { detail: string }).detail : "";
-  return ({ 401: "Your session has expired. Please sign in again.", 403: "Admin or coordinator permission is required.", 404: "Document requirement endpoint was not found.", 422: detailText || "The backend rejected the submitted fields.", 500: detailText || "The backend returned a server error." } as Record<number, string>)[status] ?? (detailText || `The request failed with HTTP ${status}.`);
-};
-
-const responseRows = (body: unknown): Requirement[] => Array.isArray(body) ? body as Requirement[] : body && typeof body === "object" && Array.isArray((body as { requirements?: unknown }).requirements) ? (body as { requirements: Requirement[] }).requirements : [];
+async function downloadVersion(api: string, version: Version) { if (!version.download_url) return; const response = await fetch(`${api}${version.download_url}`, { credentials: "include" }); if (!response.ok) throw new Error("The uploaded file could not be downloaded."); const blob = await response.blob(); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = version.original_filename; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url); }
 
 export function AdminDocumentRequirementManagerClean({ api }: { api: string }) {
-  const base = api.replace(/\/$/, "");
-  const listUrl = `${base}/api/v1/document-requirements`;
-  const [requirements, setRequirements] = useState<Requirement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [title, setTitle] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [format, setFormat] = useState<FormatKey>("PDF");
-  const [fieldError, setFieldError] = useState("");
-  const [requestError, setRequestError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [deleting, setDeleting] = useState<number | null>(null);
-  const [diagnostic, setDiagnostic] = useState<Diagnostic | null>(null);
-
-  const request = useCallback(async (method: "GET" | "POST" | "DELETE", payload?: object, resourceId?: number) => {
-    const url = resourceId === undefined ? listUrl : `${listUrl}/${resourceId}`;
-    try {
-      const response = await fetch(url, {
-        method,
-        credentials: "include",
-        headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
-        body: payload ? JSON.stringify(payload) : undefined,
-      });
-      const body: unknown = await response.json().catch(() => null);
-      const keys = body && typeof body === "object" && !Array.isArray(body) ? Object.keys(body) : [];
-      setDiagnostic({ origin: window.location.origin, url, method, status: response.status, errorType: response.ok ? "none" : `HTTP_${response.status}` });
-      if (import.meta.env.DEV) console.debug("document_requirements_request", { origin: window.location.origin, url, method, status: response.status, responseKeys: keys, errorType: response.ok ? "none" : `HTTP_${response.status}` });
-      if (!response.ok) throw new Error(errorMessage(response.status, body));
-      return body;
-    } catch (error) {
-      if (error instanceof TypeError) {
-        setDiagnostic({ origin: window.location.origin, url, method, status: "none", errorType: error.name });
-        if (import.meta.env.DEV) console.debug("document_requirements_request", { origin: window.location.origin, url, method, status: "none", responseKeys: [], errorType: error.name });
-        throw new Error(`Network error: backend unavailable (${error.message || error.name}).`, { cause: error });
-      }
-      throw error;
-    }
-  }, [listUrl]);
-
-  const load = useCallback(async () => {
-    setLoading(true); setRequestError("");
-    try { setRequirements(responseRows(await request("GET"))); }
-    catch (error) { setRequestError(error instanceof Error ? error.message : "Required documents could not be loaded."); }
-    finally { setLoading(false); }
-  }, [request]);
-  useEffect(() => { void load(); }, [load]);
-
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault(); setFieldError(""); setRequestError(""); setSuccess("");
-    const cleanTitle = title.trim();
-    if (cleanTitle.length < 3) return setFieldError("Document to Upload must contain at least 3 characters.");
-    if (!deadline) return setFieldError("Deadline is required.");
-    const date = new Date(deadline);
-    if (Number.isNaN(date.getTime())) return setFieldError("Deadline must be a valid date and time.");
-    if (date.getTime() <= Date.now()) return setFieldError("Deadline must be in the future.");
-    const allowed = FORMAT_MAP[format];
-    if (!allowed?.length) return setFieldError("File Format is required.");
-    setSaving(true);
-    try {
-      const body = await request("POST", { title: cleanTitle, due_date: date.toISOString(), allowed_file_types: [...allowed] });
-      setSuccess("Requirement created successfully."); setTitle(""); setDeadline(""); setFormat("PDF");
-      setRequirements(responseRows(await request("GET")));
-      void body;
-    } catch (error) { setRequestError(error instanceof Error ? error.message : "Requirement could not be created."); }
-    finally { setSaving(false); }
-  };
-
-  const remove = async (item: Requirement) => {
-    if (deleting !== null || !window.confirm(`Delete the draft requirement “${item.title}”?`)) return;
-    setDeleting(item.id); setRequestError(""); setSuccess("");
-    try {
-      await request("DELETE", undefined, item.id);
-      setSuccess("Requirement deleted.");
-      setRequirements(responseRows(await request("GET")));
-    } catch (error) { setRequestError(error instanceof Error ? error.message : "Requirement could not be deleted."); }
-    finally { setDeleting(null); }
-  };
-
-  return <section className="mx-auto w-full max-w-3xl"><h1 className="text-3xl font-bold">Required Documents</h1><p className="mt-1 text-slate-600">Create and manage document requirements.</p><form onSubmit={submit} className="mt-6 grid gap-4 rounded-2xl border bg-white p-6"><h2 className="text-xl font-semibold">Create document requirement</h2><label className="grid gap-1">Document to Upload<input value={title} onChange={event => setTitle(event.target.value)} className="rounded border p-3" />{fieldError && title.trim().length < 3 && <small className="text-red-600">{fieldError}</small>}</label><label className="grid gap-1">Deadline<input type="datetime-local" value={deadline} onChange={event => setDeadline(event.target.value)} className="rounded border p-3" />{fieldError && !deadline && <small className="text-red-600">{fieldError}</small>}</label><label className="grid gap-1">File Format<select value={format} onChange={event => setFormat(event.target.value as FormatKey)} className="rounded border p-3"><option value="PDF">PDF</option><option value="DOC">DOC</option><option value="DOCX">DOCX</option><option value="TEX">LaTeX (.tex)</option><option value="TXT">Plain text (.txt)</option><option value="MD">Markdown (.md)</option><option value="IMAGE">Image</option><option value="VIDEO">Video</option><option value="AUDIO">Audio</option><option value="SPREADSHEET">Spreadsheet</option><option value="PRESENTATION">Presentation</option><option value="ARCHIVE">Archive</option><option value="ALL">Any supported format / ALL</option></select></label>{fieldError && <p className="text-sm text-red-600">{fieldError}</p>}{requestError && <p role="alert" className="text-sm text-red-600">{requestError}<button type="button" className="ml-2 underline" onClick={() => void load()}>Retry</button></p>}{success && <p role="status" className="text-sm text-green-700">{success}</p>}{import.meta.env.DEV && diagnostic && <pre className="rounded bg-slate-100 p-2 text-xs" data-testid="request-diagnostic" data-origin={diagnostic.origin}>Origin: {diagnostic.origin}{"\n"}URL: {diagnostic.url}{"\n"}Method: {diagnostic.method}{"\n"}Status: {diagnostic.status}{"\n"}Error type: {diagnostic.errorType}</pre>}<button type="submit" disabled={saving} className="rounded bg-[#176b66] p-3 font-semibold text-white">{saving ? "Creating requirement…" : "Create Requirement"}</button></form><section className="mt-6 rounded-2xl border bg-white p-6"><h2 className="text-xl font-semibold">Existing document requirements</h2>{loading ? <p>Loading document requirements…</p> : requirements.length === 0 ? <p>No document requirements created yet.</p> : requirements.map(item => <article key={item.id} className="mt-3 rounded border p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold">{item.title}</h3><p>Format: {item.allowed_file_types.join(", ")} · Deadline: {new Date(item.due_at).toLocaleString()}</p><p>Status: {item.status}</p></div>{item.status === "DRAFT" && <button type="button" disabled={deleting === item.id} onClick={() => void remove(item)} className="rounded border border-red-200 px-3 py-1 text-sm font-semibold text-red-700 disabled:opacity-50">{deleting === item.id ? "Deleting…" : "Delete"}</button>}</div></article>)}</section></section>;
+  const [cycles, setCycles] = useState<Cycle[]>([]), [items, setItems] = useState<Requirement[]>([]), [cycleId, setCycleId] = useState(""), [title, setTitle] = useState(""), [description, setDescription] = useState(""), [deadline, setDeadline] = useState(""), [format, setFormat] = useState("PDF"), [size, setSize] = useState("10"), [required, setRequired] = useState(true), [loading, setLoading] = useState(true), [busy, setBusy] = useState<number | "create" | null>(null), [notice, setNotice] = useState(""), [openRequirement, setOpenRequirement] = useState<number | null>(null), [submissions, setSubmissions] = useState<Record<number, AdminSubmission[]>>({}), [loadingSubmissions, setLoadingSubmissions] = useState<number | null>(null), [downloading, setDownloading] = useState<number | null>(null);
+  const load = useCallback(async () => { setLoading(true); try { const [cycleResponse, requirementResponse] = await Promise.all([fetch(`${api}/api/v1/academic-cycles`, { credentials: "include" }), fetch(`${api}/api/v1/document-requirements`, { credentials: "include" })]); if (!cycleResponse.ok || !requirementResponse.ok) throw new Error("Requirements could not be loaded."); const loadedCycles = await cycleResponse.json() as Cycle[]; setCycles(loadedCycles); if (!cycleId && loadedCycles[0]) setCycleId(String(loadedCycles[0].id)); setItems(await requirementResponse.json() as Requirement[]); } catch (error) { setNotice(error instanceof Error ? error.message : "Requirements could not be loaded."); } finally { setLoading(false); } }, [api, cycleId]);
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [load]);
+  const request = async (url: string, method: string, body?: object) => { const response = await fetch(url, { method, credentials: "include", headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(errorText(data)); return data; };
+  const create = async (publish: boolean) => { setNotice(""); if (!title.trim() || !cycleId || !deadline) { setNotice("Title, academic cycle, and deadline are required."); return; } setBusy("create"); try { const selectedFormat = formatOptions.find((item) => item.label === format) ?? formatOptions[0]; const created = await request(`${api}/api/v1/document-requirements`, "POST", { title: title.trim(), description: description.trim() || null, academic_cycle_id: Number(cycleId), due_at: new Date(deadline).toISOString(), allowed_file_types: selectedFormat.extensions, max_file_size_mb: Number(size), is_required: required }); if (publish) await request(`${api}/api/v1/document-requirements/${(created as Requirement).id}/publish`, "POST"); setTitle(""); setDescription(""); setDeadline(""); setNotice(publish ? "Requirement published." : "Requirement saved as draft."); await load(); } catch (error) { setNotice(error instanceof Error ? error.message : "Requirement could not be created."); } finally { setBusy(null); } };
+  const action = async (item: Requirement, name: "publish" | "unpublish" | "close" | "archive" | "delete") => { if (name === "delete" && !window.confirm(`Delete draft requirement “${item.title}”?`)) return; setBusy(item.id); setNotice(""); try { await request(`${api}/api/v1/document-requirements/${item.id}${name === "delete" ? "" : `/${name}`}`, name === "delete" ? "DELETE" : "POST"); setNotice(name === "delete" ? "Requirement deleted." : `Requirement ${name}d.`); await load(); } catch (error) { setNotice(error instanceof Error ? error.message : "Requirement action failed."); } finally { setBusy(null); } };
+  const showSubmissions = async (item: Requirement) => { if (openRequirement === item.id) { setOpenRequirement(null); return; } setOpenRequirement(item.id); if (submissions[item.id]) return; setLoadingSubmissions(item.id); setNotice(""); try { const response = await fetch(`${api}/api/v1/document-requirements/${item.id}/submissions`, { credentials: "include" }); const body = await response.json().catch(() => []); if (!response.ok) throw new Error(errorText(body)); setSubmissions({ ...submissions, [item.id]: body as AdminSubmission[] }); } catch (error) { setNotice(error instanceof Error ? error.message : "Submissions could not be loaded."); } finally { setLoadingSubmissions(null); } };
+  const download = async (version: Version) => { setDownloading(version.id); setNotice(""); try { await downloadVersion(api, version); } catch (error) { setNotice(error instanceof Error ? error.message : "Download failed."); } finally { setDownloading(null); } };
+  return <section className="mx-auto w-full max-w-5xl"><h1 className="text-3xl font-bold">Required Documents</h1><p className="mt-1 text-slate-600">Create, publish, close, and manage group document requirements.</p>{notice && <p role="status" className="mt-4 rounded-lg bg-[#eef5ff] p-3 text-sm text-[#315db4]">{notice}</p>}<form className="mt-6 grid gap-4 rounded-2xl border bg-white p-6" onSubmit={(event) => { event.preventDefault(); void create(false); }}><h2 className="text-xl font-semibold">Create document requirement</h2><label className="grid gap-1">Document title<input required value={title} onChange={(event) => setTitle(event.target.value)} className="rounded border p-3" /></label><label className="grid gap-1">Academic cycle<select required value={cycleId} onChange={(event) => setCycleId(event.target.value)} className="rounded border p-3"><option value="">Select cycle</option>{cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.display_name || cycle.code || `Cycle ${cycle.id}`}</option>)}</select></label><label className="grid gap-1">Instructions<textarea value={description} onChange={(event) => setDescription(event.target.value)} className="rounded border p-3" rows={3} /></label><label className="grid gap-1">Deadline<input required type="datetime-local" value={deadline} onChange={(event) => setDeadline(event.target.value)} className="rounded border p-3" /></label><div className="grid gap-3 sm:grid-cols-3"><label className="grid gap-1">File format<select value={format} onChange={(event) => setFormat(event.target.value)} className="rounded border p-3">{formats.map((item) => <option key={item} value={item}>{item.toUpperCase()}</option>)}</select></label><label className="grid gap-1">Max size (MB)<input type="number" min="1" max="100" value={size} onChange={(event) => setSize(event.target.value)} className="rounded border p-3" /></label><label className="flex items-center gap-2 pt-7"><input type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} /> Required</label></div><div className="flex flex-wrap gap-2"><button type="submit" disabled={busy !== null} className="rounded bg-slate-700 px-4 py-3 font-semibold text-white">{busy === "create" ? "Saving…" : "Save Draft"}</button><button type="button" disabled={busy !== null} onClick={() => void create(true)} className="rounded bg-[#176b66] px-4 py-3 font-semibold text-white">Publish Requirement</button></div></form><section className="mt-6 rounded-2xl border bg-white p-6"><h2 className="text-xl font-semibold">Existing document requirements</h2>{loading ? <p className="mt-3">Loading requirements…</p> : !items.length ? <p className="mt-3">No document requirements created yet.</p> : <div className="mt-3 grid gap-3">{items.map((item) => <article key={item.id} className="rounded border p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{item.title}</h3><p className="text-sm">Cycle {item.academic_cycle_id} · {item.allowed_file_types.join(", ")} · Due {new Date(item.due_at).toLocaleString()}</p><p className="text-sm">Status: <strong>{item.status}</strong> · Submissions: {item.submission_count ?? 0}</p><p className="text-xs text-slate-500">Created {new Date(item.created_at).toLocaleString()} · Updated {new Date(item.updated_at).toLocaleString()}</p></div><div className="flex flex-wrap gap-2"><button type="button" disabled={loadingSubmissions === item.id} onClick={() => void showSubmissions(item)} className="rounded border border-[#4663ff] px-3 py-1 text-sm font-semibold text-[#354fe0]">{loadingSubmissions === item.id ? "Loading…" : openRequirement === item.id ? "Hide submissions" : "View submissions"}</button>{item.status === "DRAFT" && <><button type="button" disabled={busy === item.id} onClick={() => void action(item, "publish")} className="rounded border px-3 py-1 text-sm">Publish</button><button type="button" disabled={busy === item.id} onClick={() => void action(item, "delete")} className="rounded border border-red-200 px-3 py-1 text-sm text-red-700">Delete</button></>}{item.status === "PUBLISHED" && <><button type="button" disabled={busy === item.id} onClick={() => void action(item, "unpublish")} className="rounded border px-3 py-1 text-sm">Unpublish</button><button type="button" disabled={busy === item.id} onClick={() => void action(item, "close")} className="rounded border px-3 py-1 text-sm">Close</button></>}{item.status === "CLOSED" && <button type="button" disabled={busy === item.id} onClick={() => void action(item, "archive")} className="rounded border px-3 py-1 text-sm">Archive</button>}{item.status === "ARCHIVED" && <span className="rounded bg-slate-100 px-3 py-1 text-sm">View only</span>}</div></div>{openRequirement === item.id && <div className="mt-4 border-t pt-4"><h4 className="font-semibold">Student submissions</h4>{!submissions[item.id]?.length ? <p className="mt-2 text-sm text-slate-500">No files have been submitted for this requirement.</p> : <div className="mt-3 grid gap-3">{submissions[item.id].map((submission) => <div key={submission.id} className="rounded-lg border bg-slate-50 p-3"><div className="flex flex-wrap justify-between gap-2"><div><p className="font-semibold">{submission.student.name}</p><p className="text-xs text-slate-500">{submission.student.email || ""}{submission.student.registration_number ? ` · ${submission.student.registration_number}` : ""}{submission.group_id ? ` · Group ${submission.group_id}` : ""}</p></div><span className="text-sm font-semibold">{submission.status}{submission.is_late ? " · Late" : ""}</span></div><div className="mt-2 grid gap-2">{submission.versions.map((version) => <div key={version.id} className="flex flex-wrap items-center justify-between gap-2 rounded border bg-white px-3 py-2 text-sm"><span>{version.original_filename} <small className="text-slate-500">· Version {version.version_number} · {new Date(version.uploaded_at).toLocaleString()}</small></span><button type="button" disabled={downloading === version.id} onClick={() => void download(version)} className="rounded bg-[#4663ff] px-3 py-1 text-xs font-semibold text-white">{downloading === version.id ? "Downloading…" : "Download PDF"}</button></div>)}</div>{submission.review_comment && <p className="mt-2 text-xs text-slate-600">Review comment: {submission.review_comment}</p>}</div>)}</div>}</div>}</article>)}</div>}</section></section>;
 }

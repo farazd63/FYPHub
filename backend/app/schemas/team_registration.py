@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 from ..models import UserRole
+from ..security import validate_full_name
 from .email import normalize_email
 
 
@@ -94,6 +95,8 @@ class StudentGroupMemberInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     email: EmailStr
     registration_number: str
+    full_name: str
+    designation: str | None = None
 
     @field_validator("email", mode="before")
     @classmethod
@@ -108,10 +111,16 @@ class StudentGroupMemberInput(BaseModel):
             raise ValueError("registration_number must be between 1 and 100 characters.")
         return normalized
 
+    @field_validator("full_name")
+    @classmethod
+    def normalized_name(cls, value: str) -> str:
+        return validate_full_name(value)
+
 
 class StudentGroupRegistrationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     academic_cycle_id: int
+    group_name: str | None = None
     group_email: EmailStr
     password: str
     confirm_password: str
@@ -121,3 +130,13 @@ class StudentGroupRegistrationRequest(BaseModel):
     @classmethod
     def normalized_group_email(cls, value: object) -> object:
         return normalize_email(value)
+
+    @field_validator("group_name")
+    @classmethod
+    def normalized_group_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = " ".join(value.split())
+        if not normalized or len(normalized) > 255:
+            raise ValueError("group_name must be between 1 and 255 characters.")
+        return normalized

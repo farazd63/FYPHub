@@ -112,20 +112,23 @@ def supervisor_channels(actor: User = Depends(require_roles(UserRole.SUPERVISOR)
     return _list_channels(session, actor)
 
 
-@router.get("/{role:student|supervisor}/collaboration/channels/{channel_id}")
+@router.get("/student/collaboration/channels/{channel_id}")
+@router.get("/supervisor/collaboration/channels/{channel_id}")
 def collaboration_channel(channel_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     channel = _active_channel(session, channel_id); _authorize(session, channel, actor)
     return _channel_out(session, channel)
 
 
-@router.get("/{role:student|supervisor}/collaboration/channels/{channel_id}/messages")
+@router.get("/student/collaboration/channels/{channel_id}/messages")
+@router.get("/supervisor/collaboration/channels/{channel_id}/messages")
 def collaboration_messages(channel_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     channel = _active_channel(session, channel_id); _authorize(session, channel, actor)
     rows = session.scalars(select(CollaborationMessage).where(CollaborationMessage.channel_id == channel.id, CollaborationMessage.deleted_at.is_(None)).order_by(CollaborationMessage.created_at, CollaborationMessage.id)).all()
     return [_message_out(session, row) for row in rows]
 
 
-@router.post("/{role:student|supervisor}/collaboration/channels/{channel_id}/messages", status_code=201)
+@router.post("/student/collaboration/channels/{channel_id}/messages", status_code=201)
+@router.post("/supervisor/collaboration/channels/{channel_id}/messages", status_code=201)
 def send_collaboration_message(channel_id: int, payload: MessageWrite, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     validate_mutating_origin(request)
     channel = _active_channel(session, channel_id); _authorize(session, channel, actor, write=True)

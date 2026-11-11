@@ -12,7 +12,7 @@ import { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";
 import { StudentEvaluatorPortal as EvaluatorPortal } from "./portals/student/modules/StudentEvaluatorPortal";
 import signInStudentsImage from "./assets/sign-in-students.webp";
 
-type Member = { id: string; email: string; registration: string };
+type Member = { id: string; full_name: string; email: string; registration: string };
 type Cycle = {
   id: number;
   code: string;
@@ -40,6 +40,18 @@ type SafeUser = {
   is_active: boolean;
   group_id?: number | null;
   group_email?: string | null;
+  principal_type?: "GROUP" | "ACCOUNT";
+  group_name?: string | null;
+  academic_cycle?: string | null;
+  group_status?: string | null;
+  members?: Array<{
+    id: number;
+    full_name: string;
+    registration_number: string;
+    email: string | null;
+    designation?: string;
+    is_active?: boolean;
+  }>;
 };
 type PasswordResetDeliveryStatus = {
   development_mode: boolean;
@@ -52,11 +64,13 @@ type PublicRoute = { page: PublicPage; signupRole: LoginRole | null; step: 1 | 2
 type DashboardPage = "account" | "admin-portal";
 
 const STEPS = ["Academic Cycle", "Group Members", "Group Credentials"];
-const configuredApi = (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8010").replace(/\/$/, "");
-const localBrowserHost = typeof window !== "undefined" ? window.location.hostname : "";
-export const API = /:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(configuredApi) && localBrowserHost
-  ? configuredApi.replace(/:\/\/(localhost|127\.0\.0\.1)/, `://${localBrowserHost}`)
-  : configuredApi;
+const configuredApi = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+// Production is served with an nginx /api proxy. Keeping the API same-origin
+// makes every portal work from localhost, a LAN hostname, or a reverse proxy,
+// while preserving the cookie-backed session.
+const browserOrigin = typeof window !== "undefined" ? window.location.origin : "";
+const isLocalBackendUrl = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(configuredApi);
+export const API = !configuredApi || isLocalBackendUrl ? browserOrigin : configuredApi;
 const INPUT =
   "w-full rounded-lg border border-[#DCE3ED] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#4663FF] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
 const PRIMARY =
@@ -68,6 +82,7 @@ const academicCycleError = (status: number) => ({ 401: "Your session has expired
 
 const newMember = (): Member => ({
   id: crypto.randomUUID(),
+  full_name: "",
   email: "",
   registration: "",
 });
@@ -435,6 +450,9 @@ export default function App() {
       const emails = new Map<string, string>();
       members.forEach((member) => {
         const prefix = `member.${member.id}`;
+        const name = member.full_name.trim();
+        if (!name) next[`${prefix}.full_name`] = "Enter the member's full name.";
+        else if (name.length < 2 || name.length > 100 || /[0-9]/.test(name)) next[`${prefix}.full_name`] = "Name must be 2–100 letters; numbers are not allowed.";
         const reg = registration(member.registration);
         const emailError = emailValidationMessage(member.email);
         if (emailError) next[`${prefix}.name`] = "Enter a valid member email address.";
@@ -557,10 +575,11 @@ export default function App() {
     };
     if (basic[path]) return basic[path];
     const match = path.match(
-      /^members\.(\d+)\.(email|registration_number)$/,
+      /^members\.(\d+)\.(full_name|email|registration_number)$/,
     );
     if (!match || !members[Number(match[1])]) return undefined;
     const field = {
+      full_name: "full_name",
       email: "email",
       registration_number: "registration",
     }[match[2]] as keyof Omit<Member, "id">;
@@ -608,12 +627,13 @@ export default function App() {
       password: login.password,
       confirm_password: login.confirm,
       members: members.map((member) => ({
+        full_name: member.full_name.trim(),
         email: normalizeEmail(member.email),
         registration_number: registration(member.registration),
       })),
     };
     try {
-      const response = await fetch(`${API}/api/v1/student/group-registration`, {
+      const response = await fetch(`${API}/api/v1/auth/group-signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1248,7 +1268,7 @@ export default function App() {
                   <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-[#4f6470]">{teamSize} of {maximum ?? "—"} members added</p><button type="button" disabled={submitting || !maximum || teamSize >= maximum} onClick={() => setMembers((current) => [...current, newMember()])} className="rounded-lg border border-[#176B66] px-3 py-2 text-sm font-semibold text-[#176B66] disabled:cursor-not-allowed disabled:border-[#cbd6d0] disabled:text-[#4f6470]">+ Add member</button></div>
                   {maximum && teamSize >= maximum && <p className="text-sm text-[#4f6470]">Maximum group size reached for this cycle.</p>}
                   {errors["members.configuration"] && <p role="alert" className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{errors["members.configuration"]}</p>}
-                  {members.map((member, index) => <article key={member.id} className="rounded-xl border border-[#dce4de] bg-[#f4f8f5] p-4"><div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-bold">Member {index + 1}</h3><button type="button" disabled={submitting || members.length <= minimum} aria-label={`Remove Member ${index + 1}`} onClick={() => setMembers((current) => current.filter((item) => item.id !== member.id))} className="text-xs font-semibold text-[#176B66] underline disabled:text-[#4f6470]">Remove</button></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Member email" type="email" value={member.email} disabled={submitting} error={errors[memberKey(member.id, "email")]} onChange={(value) => updateMember(member.id, "email", value)} /><Field label="Registration number" value={member.registration} disabled={submitting} error={errors[memberKey(member.id, "registration")]} onChange={(value) => updateMember(member.id, "registration", value)} /></div></article>)}
+                  {members.map((member, index) => <article key={member.id} className="rounded-xl border border-[#dce4de] bg-[#f4f8f5] p-4"><div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-bold">Member {index + 1}</h3><button type="button" disabled={submitting || members.length <= minimum} aria-label={`Remove Member ${index + 1}`} onClick={() => setMembers((current) => current.filter((item) => item.id !== member.id))} className="text-xs font-semibold text-[#176B66] underline disabled:text-[#4f6470]">Remove</button></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Full name" value={member.full_name} disabled={submitting} error={errors[memberKey(member.id, "full_name")]} onChange={(value) => updateMember(member.id, "full_name", value)} /><Field label="Member email" type="email" value={member.email} disabled={submitting} error={errors[memberKey(member.id, "email")]} onChange={(value) => updateMember(member.id, "email", value)} /><Field label="Registration number" value={member.registration} disabled={submitting} error={errors[memberKey(member.id, "registration")]} onChange={(value) => updateMember(member.id, "registration", value)} /></div></article>)}
                 </div>
               )}
               {step === 3 && (

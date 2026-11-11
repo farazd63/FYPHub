@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from ..models import UserRole
 from ..security import validate_full_name, validate_password
@@ -91,5 +91,10 @@ class CurrentUserResponse(BaseModel):
     is_active: bool
     group_id: int | None = None
     group_email: str | None = None
+    principal_type: str = "ACCOUNT"
+    group_name: str | None = None
+    academic_cycle: str | None = None
+    group_status: str | None = None
+    members: list[dict[str, object]] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

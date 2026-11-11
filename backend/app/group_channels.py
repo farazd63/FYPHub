@@ -5,11 +5,11 @@ from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Query, 
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 import re
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 from .auth import get_current_user, validate_mutating_origin
 from .database import get_db
-from .models import GroupMessage, SupervisorAssignment, Team, User, UserRole
+from .models import GroupMessage, SupervisorAssignment, Team, TeamMember, User, UserRole
 from .config import settings
 
 router = APIRouter(prefix="/api/v1/group-channels")
@@ -37,7 +37,8 @@ def permission(session, actor, team_id, channel, write=False):
     team = session.get(Team, team_id)
     if team and actor.role in (UserRole.ADMIN, UserRole.COORDINATOR):
         return actor.role.value
-    if team and actor.role == UserRole.STUDENT and team.shared_user_id == actor.id:
+    student_member = team and actor.role == UserRole.STUDENT and session.scalar(select(TeamMember.id).where(TeamMember.team_id == team.id, TeamMember.academic_cycle_id == team.academic_cycle_id, TeamMember.is_active.is_(True), or_(TeamMember.registration_number == actor.registration_number, TeamMember.university_email == actor.email))) is not None
+    if team and actor.role == UserRole.STUDENT and (team.shared_user_id == actor.id or student_member):
         if write and channel == Channel.announcements_deadlines:
             raise HTTPException(status_code=403, detail="This channel is read-only for students.")
         return "TEAM"
@@ -56,7 +57,8 @@ def _file_path(team_id: int, stored_name: str) -> Path:
 @router.get("/teams")
 def teams(actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     if actor.role == UserRole.STUDENT:
-        found = session.scalars(select(Team).where(Team.shared_user_id == actor.id).order_by(Team.id)).all()
+        member_match = select(TeamMember.id).where(TeamMember.team_id == Team.id, TeamMember.academic_cycle_id == Team.academic_cycle_id, TeamMember.is_active.is_(True), or_(TeamMember.registration_number == actor.registration_number, TeamMember.university_email == actor.email)).exists()
+        found = session.scalars(select(Team).where(Team.status != "dissolved", (Team.shared_user_id == actor.id) | member_match).order_by(Team.id)).all()
     elif actor.role == UserRole.SUPERVISOR:
         found = session.scalars(select(Team).join(SupervisorAssignment, SupervisorAssignment.team_id == Team.id).where(SupervisorAssignment.supervisor_id == actor.id, SupervisorAssignment.ended_at.is_(None)).order_by(Team.id)).all()
     else: found = []
