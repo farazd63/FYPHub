@@ -97,7 +97,7 @@ class SupervisorRequestTests(unittest.TestCase):
 
     @staticmethod
     def proposal_pdf(title: str = "Campus Safety Study", *, missing_title: bool = False, missing_purpose: bool = False, pages: int = 1) -> bytes:
-        page_text = [] if missing_title else ["Proposal Title: Campus Safety Study"]
+        page_text = [] if missing_title else [f"Proposal Title: {title}"]
         page_text += ["Topic: Student safety"]
         if not missing_purpose:
             page_text.append("Purpose: Improve campus safety for students.")
@@ -167,6 +167,97 @@ class SupervisorRequestTests(unittest.TestCase):
 
     def replace_document(self, draft: dict, token: str, data: bytes | None = None):
         return self.multipart_call("POST", f"/api/v1/supervisor-requests/draft/{draft['id']}/document", {"revision": str(draft["revision"])}, token, data=data)
+
+    def test_long_extracted_title_can_be_saved_confirmed_and_submitted(self):
+        from starlette.datastructures import Headers, UploadFile
+        from starlette.requests import Request
+        from app.supervisor_requests import create_request, confirm_extraction, submit_request, my_requests, decide_request, DecisionAction, RevisionAction
+
+        title = "Campus safety and accessible research planning " * 8
+        title = title.strip()
+        request = Request({"type": "http", "method": "POST", "path": "/api/v1/supervisor-requests", "headers": []})
+        with Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint") as session:
+            actor = session.get(User, self.student.id)
+            document = UploadFile(io.BytesIO(self.proposal_pdf(title)), filename="proposal.pdf", headers=Headers({"content-type": "application/pdf"}))
+            draft = asyncio.run(create_request(request=request, academic_cycle_id=self.cycle.id, supervisor_id=self.supervisor.id, proposal_type="SHORT", problem_statement=None, objectives=None, scope=None, methodology=None, submission_note=None, proposal_file=document, actor=actor, session=session))
+            self.assertEqual(draft["title"], title)
+            self.assertEqual(draft["document"]["extracted_fields"]["title"]["value"], title)
+            confirmed = confirm_extraction(draft["id"], RevisionAction(revision=draft["revision"]), request, actor, session)
+            submitted = submit_request(draft["id"], RevisionAction(revision=confirmed["revision"]), request, actor, session)
+            self.assertEqual((submitted["status"], submitted["title"]), ("SUBMITTED", title))
+            mine = my_requests(actor, session)
+            self.assertEqual(next(item for item in mine if item["id"] == draft["id"])["title"], title)
+            from unittest.mock import AsyncMock
+            from app.supervisor_requests import generate_proposal_summary
+            from app.models import SupervisorRequest
+            generated = "This proposal studies campus safety and develops accessible planning recommendations based on interviews and observation."
+            with patch("app.supervisor_requests.run_ai_json", new_callable=AsyncMock) as provider:
+                provider.return_value = {"status": "COMPLETED", "payload": {"summary": generated}, "model": "llama3.1:8b", "provider": "ollama", "timestamp": utc_now().isoformat()}
+                result = asyncio.run(generate_proposal_summary(draft["id"], request, actor, session))
+                self.assertEqual(result["summary"], generated)
+                self.assertEqual(session.get(SupervisorRequestDocument, submitted["document"]["id"]).extracted_fields["title"]["value"], title)
+                original_summary = session.get(SupervisorRequest, draft["id"]).summary
+                self.assertEqual(original_summary, "Improve campus safety for students.")
+                cached = asyncio.run(generate_proposal_summary(draft["id"], request, actor, session))
+                self.assertEqual(cached, result)
+                self.assertEqual(provider.await_count, 1)
+            from fastapi import HTTPException
+            with self.assertRaises(HTTPException) as denied:
+                asyncio.run(generate_proposal_summary(draft["id"], request, session.get(User, self.other_supervisor.id), session))
+            self.assertEqual(denied.exception.status_code, 403)
+            row = session.get(SupervisorRequest, draft["id"])
+            row.ai_summary = None
+            session.commit()
+            with patch("app.supervisor_requests.run_ai_json", new_callable=AsyncMock) as provider:
+                provider.return_value = {"status": "UNAVAILABLE", "model": "llama3.1:8b", "provider": "ollama"}
+                result = asyncio.run(generate_proposal_summary(draft["id"], request, actor, session))
+                self.assertEqual(result["status"], "UNAVAILABLE")
+                self.assertNotIn("summary", result)
+                self.assertEqual(session.get(SupervisorRequest, draft["id"]).status, "SUBMITTED")
+            supervisor = session.get(User, self.supervisor.id)
+            changed = decide_request(draft["id"], DecisionAction(action="request_changes", revision=submitted["revision"]), request, supervisor, session)
+            self.assertEqual(changed["status"], "CHANGES_REQUESTED")
+            rejected = decide_request(draft["id"], DecisionAction(action="reject", comment="   ", revision=changed["revision"]), request, supervisor, session)
+            self.assertEqual(rejected["status"], "REJECTED")
+            self.assertIsNone(rejected["status_history"][-1]["comment"])
+
+    def _verify_workspace_decision(self, action, expected):
+        from starlette.datastructures import Headers, UploadFile
+        from starlette.requests import Request
+        from app.supervisor_requests import create_request, confirm_extraction, submit_request, RevisionAction
+        from app.supervisor_workspace import decision, requests, DecisionInput
+
+        request = Request({"type": "http", "scheme": "http", "server": ("localhost", 80), "method": "POST", "path": f"/api/v1/supervisor/requests/1/{action}", "headers": []})
+        with Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint") as session:
+            actor = session.get(User, self.team_user.id)
+            reviewer = session.get(User, self.supervisor.id)
+            cycle = session.get(AcademicCycle, self.cycle.id)
+            cycle.academic_year = {"accept": 2050, "reject": 2051, "request-changes": 2052}[action]
+            cycle.session = "SPRING"
+            session.flush()
+            upload = UploadFile(io.BytesIO(self.proposal_pdf()), filename="proposal.pdf", headers=Headers({"content-type": "application/pdf"}))
+            draft = asyncio.run(create_request(request=request, academic_cycle_id=self.cycle.id, supervisor_id=self.supervisor.id, proposal_type="SHORT", problem_statement=None, objectives=None, scope=None, methodology=None, submission_note=None, proposal_file=upload, actor=actor, session=session))
+            self.assertNotIn(draft["id"], [row["id"] for row in requests(reviewer, session, True)])
+            confirmed = confirm_extraction(draft["id"], RevisionAction(revision=draft["revision"]), request, actor, session)
+            submitted = submit_request(draft["id"], RevisionAction(revision=confirmed["revision"]), request, actor, session)
+            self.assertIn(submitted["id"], [row["id"] for row in requests(reviewer, session)])
+            result = decision(submitted["id"], DecisionInput(revision=submitted["revision"], comment="Reviewed proposal"), request, reviewer, session)
+            self.assertEqual(result["status"], expected)
+            if action == "accept":
+                assignment = session.query(SupervisorAssignment).filter_by(team_id=self.team.id, supervisor_id=reviewer.id).one()
+                self.assertIsNone(assignment.ended_at)
+            if action != "request-changes":
+                self.assertNotIn(result["id"], [row["id"] for row in requests(reviewer, session)])
+            self.assertIn(result["id"], [row["id"] for row in requests(reviewer, session, True)])
+
+    def test_workspace_accept_submitted_group(self):
+        self._verify_workspace_decision("accept", "ACCEPTED")
+
+    def test_workspace_reject_submitted_group(self):
+        self._verify_workspace_decision("reject", "REJECTED")
+
+    def test_workspace_request_changes_submitted_group(self):
+        self._verify_workspace_decision("request-changes", "CHANGES_REQUESTED")
 
     def test_eligible_supervisor_list_and_role_isolation(self):
         status, body = self.call("GET", f"/api/v1/supervisor-requests/supervisors?academic_cycle_id={self.cycle.id}", token=self.tokens["student"])
@@ -323,8 +414,6 @@ class SupervisorRequestTests(unittest.TestCase):
     def test_reject_changes_resubmit_withdraw_and_history(self):
         _, draft = self.create_draft(self.tokens["student"])
         _, submitted = self.submit(draft, self.tokens["student"])
-        status, body = self.call("POST", f"/api/v1/supervisor-requests/{draft['id']}/decision", {"action": "request_changes", "revision": submitted["revision"]}, self.tokens["supervisor"])
-        self.assertEqual((status, body["detail"]["code"]), (422, "comment_required"))
         _, changed = self.call("POST", f"/api/v1/supervisor-requests/{draft['id']}/decision", {"action": "request_changes", "comment": "Please clarify the methodology.", "revision": submitted["revision"]}, self.tokens["supervisor"])
         self.assertEqual(changed["status"], "CHANGES_REQUESTED")
         _, edited = self.replace_document(changed, self.tokens["student"])

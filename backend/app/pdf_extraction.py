@@ -238,10 +238,10 @@ class ExtractionResult:
 
 _FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     "title": ("proposal title", "project title", "title"),
-    "topic": ("research area", "topic", "area"),
-    "purpose": ("problem statement", "project purpose", "purpose", "problem", "aim"),
+    "topic": ("topic / area", "research area", "topic", "area"),
+    "purpose": ("problem statement / purpose", "problem statement", "project purpose", "purpose", "problem", "aim"),
     "objectives": ("project objectives", "objectives", "objective", "goals", "goal"),
-    "methodology": ("methodology and approach", "methodology", "method", "approach", "methods"),
+    "methodology": ("methodology / approach", "methodology and approach", "methodology", "method", "approach", "methods"),
     "expected_outcomes": ("expected outcomes", "outcomes", "expected outcome", "outcome"),
     "scope": ("scope and limitations", "scope", "project scope", "scope of the project", "limitations"),
     "proposed_solution": ("proposed solution", "solution", "proposed system", "system proposal"),

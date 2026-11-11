@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import json
+import hashlib
 import uuid
 from pathlib import Path
 from typing import Any
@@ -25,6 +27,8 @@ from ...pdf_extraction import PdfExtractionError, extract_proposal_document
 from .compliance_engine import build_change_summary, build_compliance_report
 from .template_extractor import extract_template_rules
 from ...team_lifecycle import lock_team
+from ...ai_provider import run_ai_json
+from .ai_report import ComplianceNarrativePayload, REPORT_VERSION, assemble_report, report_prompt
 
 router = APIRouter(prefix="/api/v1/proposal-compliance", tags=["module-3-proposal-compliance"])
 REVIEW_ROLES = (UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR, UserRole.PANEL_MEMBER)
@@ -479,6 +483,46 @@ def get_report(submission_id: int, actor: User = Depends(get_current_user), sess
     if report is None:
         raise _error("report_pending", "The compliance report is not available yet.", 409)
     return report.report
+
+
+def _report_fingerprint(report: dict) -> str:
+    return hashlib.sha256(json.dumps({key: value for key, value in report.items() if key != "aiSummary"}, sort_keys=True, default=str).encode()).hexdigest()
+
+
+@router.post("/reports/{submission_id}/ai-summary")
+async def generate_compliance_summary(submission_id: int, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or not _can_view(session, actor, row):
+        raise _error("report_not_found", "The compliance report was not found.", 404)
+    report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id))
+    if report is None:
+        raise _error("report_pending", "Run the compliance check before generating its summary.", 409)
+    fingerprint = _report_fingerprint(report.report)
+    cached = report.report.get("aiSummary")
+    if cached and cached.get("status") == "COMPLETED" and cached.get("report_fingerprint") == fingerprint and cached.get("input_scope") == "FULL_DOCUMENT_AND_REPORT_V1" and cached.get("report_format") == REPORT_VERSION:
+        return cached
+    context = {
+        "proposal_text": row.extracted_text,
+        "proposal_fields": row.extracted_fields,
+        "compliance_report": {key: value for key, value in report.report.items() if key != "aiSummary"},
+    }
+    actor_id = actor.id
+    source_sha = row.sha256
+    session.rollback()
+    result = await run_ai_json(report_prompt(context), ComplianceNarrativePayload, model_kind="proposal", rate_key=f"compliance-summary:{actor_id}")
+    saved = {"status": result.get("status", "UNAVAILABLE"), "model": result.get("model"), "provider": result.get("provider"), "generated_at": result.get("timestamp"), "advisory": True, "report_fingerprint": fingerprint, "source_sha256": source_sha, "input_scope": "FULL_DOCUMENT_AND_REPORT_V1", "report_format": REPORT_VERSION}
+    if result.get("status") == "COMPLETED":
+        saved["summary"] = assemble_report(result["payload"], context)
+    else:
+        saved["message"] = result.get("message") or "AI summary is unavailable. The rule-based compliance report remains available. Retry generation when the model is ready."
+    report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == submission_id).with_for_update())
+    if report is None or _report_fingerprint(report.report) != fingerprint:
+        session.rollback()
+        raise _error("report_changed", "The compliance report changed during generation. Retry its summary.", 409)
+    report.report = {**report.report, "aiSummary": saved}
+    session.commit()
+    return saved
 
 
 @router.post("/reports/{submission_id}/run")

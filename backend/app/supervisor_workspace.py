@@ -107,8 +107,9 @@ def group_section(group_id: int, request: Request, actor: User = Depends(supervi
 
 
 @router.get("/requests")
-def requests(actor: User = Depends(supervisor), db: Session = Depends(get_db)):
-    rows = db.scalars(select(SupervisorRequest).where(SupervisorRequest.supervisor_id == actor.id, SupervisorRequest.status.in_(["SUBMITTED", "CHANGES_REQUESTED"])).order_by(SupervisorRequest.updated_at.desc())).all()
+def requests(actor: User = Depends(supervisor), db: Session = Depends(get_db), include_history: bool = False):
+    statuses = ["SUBMITTED", "CHANGES_REQUESTED", "ACCEPTED", "REJECTED", "WITHDRAWN"] if include_history else ["SUBMITTED", "CHANGES_REQUESTED"]
+    rows = db.scalars(select(SupervisorRequest).where(SupervisorRequest.supervisor_id == actor.id, SupervisorRequest.status.in_(statuses)).order_by(SupervisorRequest.updated_at.desc())).all()
     return [request_detail(row.id, actor, db) for row in rows]
 
 

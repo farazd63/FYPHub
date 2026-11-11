@@ -13,8 +13,9 @@ class CollaborationChannelContractTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             MessageWrite(message_text="   ")
 
-    def test_message_text_is_trimmed(self):
-        self.assertEqual(MessageWrite(message_text="  hello  ").message_text, "hello")
+    def test_message_indentation_and_line_breaks_are_preserved(self):
+        value = "  if ready:\n      send()\n"
+        self.assertEqual(MessageWrite(message_text=value).message_text, value)
 
     def test_private_channel_routes_exist(self):
         paths = set(app.openapi()["paths"])

@@ -68,6 +68,8 @@ class CollaborationParticipant(Base):
     participant_role: Mapped[str] = mapped_column(String(24), nullable=False)
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    last_read_message_id: Mapped[int | None] = mapped_column(ForeignKey("collaboration_messages.id", ondelete="SET NULL"), nullable=True)
+    last_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class CollaborationMessage(Base):

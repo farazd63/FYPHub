@@ -27,6 +27,36 @@ class _Client:
 
 
 class OllamaProviderTests(unittest.TestCase):
+    def test_summary_context_expands_to_preserve_full_input(self):
+        from pydantic import BaseModel
+        class Summary(BaseModel):
+            summary: str
+        class SummaryResponse(_Response):
+            def json(self):
+                return {"message": {"content": '{"summary":"A complete generated summary."}'}}
+        class SummaryClient(_Client):
+            async def post(self, url, **kwargs):
+                _Client.last = (url, kwargs)
+                return SummaryResponse()
+        cfg = {"provider":"ollama", "key":"", "base_url":"", "ollama_url":"http://ollama:11434", "proposal_model":"llama3.1:8b", "agent_model":"llama3.1:8b", "timeout":120, "retries":0, "rate_limit":10}
+        prompt = "All document content " * 1000 + "DOCUMENT_END"
+        with patch("app.ai_provider.provider_config", return_value=cfg), patch("app.ai_provider.httpx.AsyncClient", SummaryClient):
+            result = asyncio.run(run_ai_json(prompt, Summary, model_kind="proposal", rate_key="full-summary"))
+        self.assertEqual(result["status"], "COMPLETED")
+        payload = _Client.last[1]["json"]
+        self.assertEqual(payload["messages"][1]["content"], prompt)
+        self.assertGreater(payload["options"]["num_ctx"], len(prompt.encode()))
+
+    def test_oversize_input_fails_explicitly_without_truncation(self):
+        from pydantic import BaseModel
+        class Summary(BaseModel):
+            summary: str
+        cfg = {"provider":"ollama", "key":"", "base_url":"", "ollama_url":"http://ollama:11434", "proposal_model":"llama3.1:8b", "agent_model":"llama3.1:8b", "timeout":120, "retries":0, "rate_limit":10}
+        with patch("app.ai_provider.provider_config", return_value=cfg), patch("app.ai_provider.httpx.AsyncClient") as client:
+            result = asyncio.run(run_ai_json("x" * 140000, Summary, model_kind="proposal", rate_key="oversize-summary"))
+        self.assertEqual(result["fallback_reason"], "model_context_exceeded")
+        client.assert_not_called()
+
     def test_chat_request_is_local_non_streaming_and_schema_validated(self):
         cfg = {"provider":"ollama", "key":"", "base_url":"https://api.groq.com/openai/v1", "ollama_url":"http://127.0.0.1:11434", "proposal_model":"llama3.1:8b", "agent_model":"llama3.1:8b", "timeout":8.0, "retries":0, "rate_limit":10}
         with patch("app.ai_provider.provider_config", return_value=cfg), patch("app.ai_provider.httpx.AsyncClient", _Client):

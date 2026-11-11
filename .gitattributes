@@ -1,0 +1,7 @@
+# Preserve generated documents and image assets byte-for-byte on Windows.
+*.pdf binary
+*.docx binary
+*.png binary
+*.webp binary
+*.jpg binary
+*.jpeg binary

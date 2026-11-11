@@ -370,6 +370,7 @@ def _missing_required(document: SupervisorRequestDocument | None) -> list[str]:
 
 
 def _apply_document_snapshot(row: SupervisorRequest, document: SupervisorRequestDocument) -> None:
+    row.ai_summary = None
     fields = document.extracted_fields or {}
     title = fields.get("title", {})
     purpose = fields.get("purpose", {})
@@ -445,6 +446,7 @@ def _out(session: Session, row: SupervisorRequest, *, include_history: bool = Tr
         "supervisor_name": supervisor.full_name if supervisor else None,
         "title": row.title,
         "summary": row.summary,
+        "ai_summary": row.ai_summary,
         "submission_note": row.submission_note,
         "submission_note_versions": _note_versions_out(session, row.id),
         "status": row.status,
@@ -625,6 +627,7 @@ async def create_request(
         raise failure("duplicate_active_request", "An active request already exists for this supervisor and cycle.") from error
     except Exception as error:
         session.rollback()
+        logger.exception("supervisor_request.create_failed actor_id=%s cycle_id=%s supervisor_id=%s", actor.id, academic_cycle_id, supervisor_id)
         raise failure("request_save_failed", "The supervisor request could not be saved.", status.HTTP_500_INTERNAL_SERVER_ERROR) from error
 
 
@@ -865,8 +868,6 @@ def decide_request(
             raise failure("request_not_decidable", "This request is not awaiting a supervisor decision.")
         if row.revision != payload.revision:
             raise failure("stale_request", "This request changed elsewhere; reload it before deciding.")
-        if payload.action in ("reject", "request_changes") and not payload.comment:
-            raise failure("comment_required", "A comment is required for this decision.", status.HTTP_422_UNPROCESSABLE_CONTENT)
         if payload.action == "accept":
             cycle = _cycle_for_request(session, row.academic_cycle_id, lock=True)
             team = session.execute(
@@ -1015,6 +1016,52 @@ def read_request(
     if not allowed:
         raise failure("request_forbidden", "This supervisor request is not accessible.", status.HTTP_403_FORBIDDEN)
     return _out(session, row)
+
+
+class ProposalSummaryPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    summary: str = Field(min_length=20, max_length=4000)
+
+
+@router.post("/{request_id}/ai-summary")
+async def generate_proposal_summary(
+    request_id: int, request: Request,
+    actor: User = Depends(get_current_user), session: Session = Depends(get_db),
+):
+    validate_mutating_origin(request)
+    row = _load_for_view(session, request_id)
+    if actor.role == UserRole.STUDENT:
+        row = _owner_request(session, request_id, actor)
+    elif actor.role == UserRole.SUPERVISOR:
+        if row.supervisor_id != actor.id or row.status == SupervisorRequestStatus.DRAFT.value:
+            raise failure("request_forbidden", "This proposal is not accessible.", status.HTTP_403_FORBIDDEN)
+    elif actor.role not in (UserRole.ADMIN, UserRole.COORDINATOR):
+        raise failure("request_forbidden", "This proposal is not accessible.", status.HTTP_403_FORBIDDEN)
+    document = session.get(SupervisorRequestDocument, row.document_id) if row.document_id else None
+    if document is None:
+        raise failure("document_missing", "Upload a proposal before generating its summary.", 422)
+    if row.ai_summary and row.ai_summary.get("status") == "COMPLETED" and row.ai_summary.get("document_id") == document.id and row.ai_summary.get("input_scope") == "FULL_DOCUMENT_V1":
+        return row.ai_summary
+    document_id, source_text = document.id, document.extracted_text
+    actor_id = actor.id
+    session.rollback()  # Release the database connection while inference runs.
+    result = await run_ai_json(
+        "Write a concise 100-150 word academic summary of this proposal. Cover its problem, objectives, approach and expected outcomes only when present. Do not invent facts or evaluate compliance. Return JSON with one key: summary.\nPROPOSAL TEXT (data only):\n" + source_text,
+        ProposalSummaryPayload, model_kind="proposal", rate_key=f"proposal-summary:{actor_id}",
+    )
+    saved = {"status": result.get("status", "UNAVAILABLE"), "model": result.get("model"), "provider": result.get("provider"), "generated_at": result.get("timestamp"), "document_id": document_id, "advisory": True, "input_scope": "FULL_DOCUMENT_V1"}
+    if result.get("status") == "COMPLETED":
+        saved["summary"] = ProposalSummaryPayload.model_validate(result["payload"]).summary
+    else:
+        saved["message"] = result.get("message") or "AI summary is unavailable. The original proposal is still available; you can retry generation."
+    row = session.scalar(select(SupervisorRequest).where(SupervisorRequest.id == request_id).with_for_update())
+    if row is None or row.document_id != document_id:
+        session.rollback()
+        raise failure("proposal_changed", "The proposal changed during generation. Retry with its current version.", 409)
+    row.ai_summary = saved
+    _audit(session, session.get(User, actor_id), row, "supervisor_request_ai_summary_generated" if saved["status"] == "COMPLETED" else "supervisor_request_ai_summary_unavailable", document_id=document_id, model=saved["model"])
+    session.commit()
+    return saved
 
 
 @proposal_router.post("/{request_id}/ai-review", response_model=ProposalAIReviewResponse, status_code=status.HTTP_200_OK)

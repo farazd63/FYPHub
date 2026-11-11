@@ -42,6 +42,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
+    cpus: 4
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
     volumes:

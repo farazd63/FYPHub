@@ -1,3 +1,4 @@
+import { ProposalAiSummary } from "../../ProposalAiSummary";
 import { useEffect, useState, type FormEvent } from "react";
 import "./module-3.css";
 
@@ -19,6 +20,7 @@ export function ProposalComplianceWorkspace({ api, reviewerMode = false }: { api
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [report, setReport] = useState<Report | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [summaryRevision, setSummaryRevision] = useState(0);
   const [proposalType, setProposalType] = useState<"SHORT" | "LONG">("SHORT");
   const [title, setTitle] = useState("");
   const [resubmitKey, setResubmitKey] = useState<string | null>(null);
@@ -110,7 +112,7 @@ export function ProposalComplianceWorkspace({ api, reviewerMode = false }: { api
       const response = await fetch(`${api}/api/v1/proposal-compliance/reports/${selectedId}/run`, { method: "POST", credentials: "include" });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof payload.detail === "object" ? payload.detail.message : payload.detail || "Compliance re-run failed.");
-      setReport(payload as Report); setMessage("Compliance report re-run against the current active baseline."); await load();
+      setReport(payload as Report); setSummaryRevision((value) => value + 1); setMessage("Compliance report re-run against the current active baseline."); await load();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Compliance re-run failed."); } finally { setBusy(false); }
   };
 
@@ -123,6 +125,7 @@ export function ProposalComplianceWorkspace({ api, reviewerMode = false }: { api
   return <section className="module3-workspace" aria-labelledby="module3-compliance-heading">
     <div className="module3-page-heading module3-report-heading"><div><p className="module3-eyebrow">Proposal Compliance Review</p><h1 id="module3-compliance-heading">Compliance Report</h1><p>Detailed analysis of your proposal against the active university template.</p></div><div className="module3-report-actions"><button type="button" onClick={newCheck} className="module3-secondary-button">New Check</button>{report && <><button type="button" onClick={() => void rerun()} className="module3-primary-button" disabled={busy}>Re-run Check</button><button type="button" onClick={download} className="module3-secondary-button">Download PDF</button><button type="button" onClick={annotated} className="module3-secondary-button">View Annotated PDF</button><button type="button" onClick={original} className="module3-secondary-button">View Original</button>{reviewerMode && <><button type="button" onClick={() => void reviewStatus("APPROVED")} className="module3-secondary-button" disabled={busy}>Approve</button><button type="button" onClick={() => void reviewStatus("CHANGES_REQUESTED")} className="module3-secondary-button" disabled={busy}>Request changes</button><button type="button" onClick={() => void reviewStatus("REJECTED")} className="module3-secondary-button" disabled={busy}>Reject</button></>}</>}</div></div>
     {message && <p className="module3-alert module3-alert--success" role="status">{message}</p>}{error && <p className="module3-alert module3-alert--error" role="alert">{error}</p>}
+    {report && selectedId && !showUpload && <ProposalAiSummary key={`${selectedId}-${summaryRevision}`} api={api} requestId={selectedId} endpoint={`/api/v1/proposal-compliance/reports/${selectedId}/ai-summary`} />}
     {showUpload || !report ? <form className="module3-panel module3-proposal-upload" onSubmit={(event) => void submit(event)}><div className="module3-panel-heading"><div><span className="module3-kicker">{resubmitKey ? "Resubmit version" : "New check"}</span><h2>{resubmitKey ? "Resubmit Your Proposal" : "Submit Your Proposal"}</h2></div><span className="module3-live-dot">Template-aware</span></div><p className="module3-muted">Upload your existing proposal for compliance checking. The active university baseline is used and every uploaded version is preserved.</p><div className="module3-form-grid"><label>Proposal title<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Enter proposal title" /></label><label>Proposal type<select value={proposalType} onChange={(event) => setProposalType(event.target.value as "SHORT" | "LONG")}><option value="SHORT">Short proposal</option><option value="LONG">Long proposal</option></select></label></div><label className="module3-file-drop">Proposal document<input type="file" accept=".pdf,.docx,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />{file && <strong>{file.name}</strong>}</label><div className="module3-form-actions"><button type="submit" data-action="draft" className="module3-secondary-button" disabled={busy}>Save Draft</button><button type="submit" data-action="submit" className="module3-primary-button" disabled={busy}>{busy ? "Processing proposal..." : "Submit & run compliance check"}</button></div>{submissions.some((item) => item.status === "DRAFT") && <div className="module3-draft-list"><strong>Saved drafts</strong>{submissions.filter((item) => item.status === "DRAFT").map((item) => <div key={item.id}><span>v{item.version} - {item.title}</span><button type="button" className="module3-secondary-button" onClick={() => void submitDraft(item.id)} disabled={busy}>Submit draft</button><button type="button" className="module3-secondary-button" onClick={() => void withdraw(item.id)} disabled={busy}>Withdraw</button></div>)}</div>}</form> : <ReportView report={report} submissions={submissions} onSelect={(id) => void openReport(id)} onDownload={download} onOriginal={original} onAnnotated={annotated} onRerun={() => void rerun()} onResubmit={startResubmit} onWithdraw={withdraw} busy={busy} />}
   </section>;
 }

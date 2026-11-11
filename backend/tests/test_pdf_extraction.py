@@ -7,6 +7,14 @@ from app.pdf_extraction import PdfExtractionError, _extract_fields, _normalize_t
 
 
 class PdfExtractionFieldTests(unittest.TestCase):
+    def test_combined_preview_headings_keep_title_and_purpose_separate(self):
+        fields = _extract_fields("Proposal Title\nFYPHub\nTopic / Area\nAcademic automation\nProblem Statement / Purpose\nCentralize FYP activities.\nObjectives\nTrack proposals.\nMethodology / Approach\nModular software.\nScope\nAcademic workflows.")
+        self.assertEqual(fields["title"]["value"], "FYPHub")
+        self.assertEqual(fields["purpose"]["value"], "Centralize FYP activities.")
+        self.assertEqual(fields["topic"]["value"], "Academic automation")
+        self.assertEqual(fields["methodology"]["value"], "Modular software.")
+        self.assertEqual(fields["missing_required_fields"], [])
+
     def test_demo_headings_extract_all_sections_until_next_heading(self):
         fields = _extract_fields(
             "Title:\nCampus Safety Study\nPurpose: Improve campus safety.\n"
