@@ -28,6 +28,17 @@ class CycleCreate(BaseModel):
 class CycleUpdate(BaseModel):
  model_config=ConfigDict(extra="forbid")
  code:str|None=None; display_name:str|None=None; registration_open:bool|None=None
+ academic_year:int|None=None; session:AcademicSession|None=None
+ @field_validator("academic_year")
+ @classmethod
+ def update_year(cls,value:int|None)->int:
+  if value is None or value<1900 or value>2200: raise ValueError("academic_year must be between 1900 and 2200.")
+  return value
+ @field_validator("session",mode="before")
+ @classmethod
+ def update_session(cls,value:object)->object:
+  if value is None: raise ValueError("session cannot be cleared.")
+  return value.strip().upper() if isinstance(value,str) else value
  @field_validator("code")
  @classmethod
  def update_code(cls,value:str|None)->str|None:

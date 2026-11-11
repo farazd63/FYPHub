@@ -1,0 +1,23 @@
+{
+  "before": {
+    "id": 492,
+    "code": "SPRING",
+    "display_name": "Spring 2025",
+    "academic_year": null,
+    "session": null
+  },
+  "after": {
+    "academic_year": 2025,
+    "session": "SPRING"
+  },
+  "assignments_backfilled": 0,
+  "verification": {
+    "focused_backend_tests_passed": 14,
+    "frontend_build": "passed",
+    "frontend_lint": "passed with 14 existing warnings",
+    "live_workspace_period": "2025 / SPRING",
+    "acceptance_and_channel_creation": "passed inside an outer transaction; rolled back",
+    "original_pending_decision": "preserved",
+    "registration_policy": "Closed registration blocks new submissions, not review of existing pending requests"
+  }
+}

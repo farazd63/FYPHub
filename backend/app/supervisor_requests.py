@@ -212,14 +212,16 @@ def _actor_has_team_access(session: Session, team: Team, actor: User) -> bool:
     ).limit(1)) is not None
 
 
-def _cycle_for_request(session: Session, cycle_id: int, *, lock: bool = False) -> AcademicCycle:
+def _cycle_for_request(session: Session, cycle_id: int, *, lock: bool = False, require_open: bool = True) -> AcademicCycle:
     statement = select(AcademicCycle).where(AcademicCycle.id == cycle_id)
     if lock:
         statement = statement.with_for_update()
     cycle = session.execute(statement).scalar_one_or_none()
     if cycle is None:
         raise failure("academic_cycle_not_found", "Academic cycle was not found.", status.HTTP_404_NOT_FOUND)
-    if not cycle.registration_open:
+    if cycle.academic_year is None or not cycle.session:
+        raise failure("academic_cycle_metadata_missing", "Ask an administrator to configure this academic cycle's year and session before sending a supervisor request.", status.HTTP_422_UNPROCESSABLE_CONTENT)
+    if require_open and not cycle.registration_open:
         raise failure("academic_cycle_closed", "This academic cycle is not accepting supervisor requests.")
     return cycle
 
@@ -869,7 +871,9 @@ def decide_request(
         if row.revision != payload.revision:
             raise failure("stale_request", "This request changed elsewhere; reload it before deciding.")
         if payload.action == "accept":
-            cycle = _cycle_for_request(session, row.academic_cycle_id, lock=True)
+            # Closing registration blocks new submissions, not a supervisor's
+            # decision on an already submitted, owned request.
+            cycle = _cycle_for_request(session, row.academic_cycle_id, lock=True, require_open=False)
             team = session.execute(
                 select(Team)
                 .where(Team.id == row.team_id, Team.academic_cycle_id == cycle.id)

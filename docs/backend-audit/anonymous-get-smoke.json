@@ -1,0 +1,538 @@
+[
+  {
+    "path": "/api/v1/academic-cycles",
+    "status": 200
+  },
+  {
+    "path": "/api/v1/academic-cycles/{cycle_id}/group-policy",
+    "status": 200
+  },
+  {
+    "path": "/api/v1/academic-cycles/{cycle_id}/overview",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/academic-deadlines",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/academic-deadlines/{deadline_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/archive/import-batches",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/archive/import-batches/{batch_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/archive/projects",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/archive/projects/{project_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/audit-events",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/audit-events/{event_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/evaluation-rubrics",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/evaluation-rubrics/{rubric_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/evaluations",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/evaluations/aggregation",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/me",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/registration-mode",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/reminder-rules",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/reminder-rules/{rule_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/results/group/{group_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/results/{student_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/student-groups",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/student-groups/{group_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/supervisor-assignments",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/supervisor-assignments/teams",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/supervisor-capacities",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/supervisor-capacities/{policy_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/template-references",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/template-references/{reference_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/time-zones",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/admin/users",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/agent-supervision/{team_id}/runs",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/archived-projects/admin/detail/{project_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/archived-projects/admin/list",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/archived-projects/admin/{project_id}/documents/history",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/archived-projects/search",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/archived-projects/{project_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/archived-projects/{project_id}/documents/{document_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/auth/dev/password-reset-link",
+    "status": 422
+  },
+  {
+    "path": "/api/v1/auth/me",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/auth/password-reset-status",
+    "status": 200
+  },
+  {
+    "path": "/api/v1/coordinator/audit-history",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/coordinator/evaluation-criteria",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/coordinator/proposal-templates",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/coordinator/supervisor-capacity",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/dashboard/deadlines",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/dashboard/requirements",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/dashboard/summary",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/document-requirements",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/document-requirements/student",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/document-requirements/submissions/{submission_id}/versions/{version_id}/download",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/document-requirements/{requirement_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/document-requirements/{requirement_id}/submission",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/document-requirements/{requirement_id}/submission/versions",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/document-requirements/{requirement_id}/submissions",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/evaluations/assignments",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/evaluations/my",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/evaluations/{evaluation_id}/audit",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/evaluations/{evaluation_id}/report",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/evaluations/{evaluation_id}/report.pdf",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/group-ai/{team_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/group-channels/teams",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/group-channels/{team_id}/files/{stored_name}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/group-channels/{team_id}/{channel}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/module-2/notifications",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/module-2/teams/{team_id}/deadlines",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/module-2/teams/{team_id}/proposal-versions",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/module-2/teams/{team_id}/tasks",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/module-2/teams/{team_id}/unread",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/module-2/workspace",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/notifications",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/panel-evaluations/schedule/{schedule_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/panel-schedules",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/panel-schedules/options",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/panel-schedules/{schedule_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/project-progress/{team_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/project-progress/{team_id}/meetings",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposal-compliance/reports",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposal-compliance/reports/{submission_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposal-compliance/reports/{submission_id}/annotated",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposal-compliance/reports/{submission_id}/original",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposal-compliance/reports/{submission_id}/pdf",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposal-compliance/submissions/mine",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposal-compliance/submissions/{submission_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposal-compliance/templates",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposal-references/search",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposal-references/{reference_id}/document",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposals/admin/monitor",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposals/coordinator/monitor",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposals/cycles",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposals/document/{request_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposals/mine",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposals/supervisors",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposals/{request_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/proposals/{request_id}/ai-review",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/student/collaboration/channels",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/student/collaboration/channels/{channel_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/student/collaboration/channels/{channel_id}/messages",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/student/document-requirements",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/student/group/me",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/student/group/members",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/student/group/requirements",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/student/group/requirements/{requirement_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/student/group/requirements/{requirement_id}/submission",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/student/results",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor-requests/admin/monitor",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor-requests/coordinator/monitor",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor-requests/cycles",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor-requests/detail/{request_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor-requests/document/{request_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor-requests/mine",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor-requests/supervisor/queue",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor-requests/supervisors",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor-requests/{request_id}/conversation",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/assigned-groups",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/capacity",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/collaboration/channels",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/collaboration/channels/{channel_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/collaboration/channels/{channel_id}/messages",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/groups/{group_id}",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/groups/{group_id}/conversation",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/groups/{group_id}/documents",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/groups/{group_id}/members",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/groups/{group_id}/progress",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/groups/{group_id}/project",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/groups/{group_id}/proposal",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/requests",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/supervisor/requests/{request_id}",
+    "status": 401
+  },
+  {
+    "path": "/docs",
+    "status": 200
+  },
+  {
+    "path": "/docs/oauth2-redirect",
+    "status": 200
+  },
+  {
+    "path": "/health",
+    "status": 200
+  },
+  {
+    "path": "/health/ready",
+    "status": 200
+  },
+  {
+    "path": "/openapi.json",
+    "status": 200
+  },
+  {
+    "path": "/redoc",
+    "status": 200
+  }
+]

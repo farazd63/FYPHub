@@ -50,8 +50,8 @@ class ComplianceAiSummaryTests(unittest.TestCase):
         self.report.report["violations"] = [{"title": f"Finding {i}", "severity": "Major", "evidence": "Evidence " * 100, "requirement": "Original requirement", "location": f"Page {i}"} for i in range(20)]
         self.report.report["missingSections"] = [{"issue": f"Section {i}", "details": "Complete detail " * 100} for i in range(20)]
         self.report.report["categories"] = [{"name": "All checks", "checks": list(range(30))}]
-        _, provider = self.run_summary({"status": "UNAVAILABLE"})
-        prompt = provider.await_args.args[0]
+        from app.modules.module_03_proposal.ai_report import report_prompt
+        prompt = report_prompt({"proposal_text": self.row.extracted_text, "proposal_fields": self.row.extracted_fields, "compliance_report": self.report.report})
         proposal = json.loads(prompt.split("<PROPOSAL_DATA>\n", 1)[1].split("\n</PROPOSAL_DATA>", 1)[0])
         report = json.loads(prompt.split("<COMPLIANCE_FINDINGS>\n", 1)[1].split("\n</COMPLIANCE_FINDINGS>", 1)[0])
         self.assertEqual(proposal["proposal_text"], self.row.extracted_text)

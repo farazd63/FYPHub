@@ -777,6 +777,12 @@ def update_cycle(cycle_id: int, payload: CycleUpdate, request: Request, actor: U
     validate_mutating_origin(request)
     cycle, policy = locked_cycle_and_policy(session, cycle_id)
     values = payload.model_dump(exclude_unset=True)
+    if "session" in values:
+        values["session"] = payload.session.value
+    year = values.get("academic_year", cycle.academic_year)
+    term = values.get("session", cycle.session)
+    if (values.get("registration_open") or {"academic_year", "session"}.intersection(values)) and (year is None or not term):
+        raise cycle_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "academic_cycle_metadata_missing", "Set the academic year and session before opening registration.")
     if values.get("registration_open") and policy is None:
         raise cycle_error(status.HTTP_409_CONFLICT, "group_policy_required", "Registration cannot open without a group-size policy.")
     if not values:
@@ -1260,8 +1266,6 @@ def change_admin_user_status(
         raise admin_user_error(status.HTTP_404_NOT_FOUND, "account_not_found", "Account was not found.")
     if user.is_active == payload.is_active:
         return user
-    if not payload.is_active and shared_team_account(session, user.id):
-        raise admin_user_error(status.HTTP_409_CONFLICT, "shared_team_account", "Shared team accounts cannot be deactivated here.")
     lock_and_protect_last_active_admin(
         session, user, will_remain_active_admin=payload.is_active and user.role == UserRole.ADMIN
     )
@@ -1331,7 +1335,7 @@ def delete_admin_user(
     actor: User = Depends(require_roles(UserRole.ADMIN)),
     session: Session = Depends(get_db),
 ) -> Response:
-    """Permanently remove an unused account; linked records stay protected by FK guards."""
+    """Remove portal access without deleting the account or historical records."""
     validate_mutating_origin(request)
     if actor.id == user_id:
         raise admin_user_error(status.HTTP_409_CONFLICT, "cannot_delete_self", "You cannot delete the account used for this admin session.")
@@ -1340,17 +1344,18 @@ def delete_admin_user(
         raise admin_user_error(status.HTTP_404_NOT_FOUND, "account_not_found", "Account was not found.")
     if user.role == UserRole.ADMIN and user.is_active:
         lock_and_protect_last_active_admin(session, user, will_remain_active_admin=False)
-    audit_exists = session.scalar(select(AdminAuditEvent.id).where(or_(AdminAuditEvent.actor_id == user_id, AdminAuditEvent.affected_user_id == user_id)).limit(1))
-    if audit_exists is not None:
-        raise admin_user_error(status.HTTP_409_CONFLICT, "account_has_audit_history", "This account has audit history; deactivate it instead of permanently deleting it.")
-    if shared_team_account(session, user_id):
-        raise admin_user_error(status.HTTP_409_CONFLICT, "account_in_use", "This account is attached to a team; deactivate it instead.")
+    was_active = user.is_active
     try:
-        session.delete(user)
+        user.is_active = False
+        revoke_user_sessions(session, user.id)
+        from .models import PasswordResetToken
+        session.execute(update(PasswordResetToken).where(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None)).values(used_at=utc_now()))
+        if was_active:
+            add_admin_audit_event(session, actor_id=actor.id, affected_user_id=user.id, action="account_access_removed", changed_values={"previous_is_active": True, "is_active": False, "historical_records_preserved": True})
         session.commit()
-    except IntegrityError as error:
+    except SQLAlchemyError:
         session.rollback()
-        raise admin_user_error(status.HTTP_409_CONFLICT, "account_in_use", "This account is referenced by portal data; deactivate it instead of deleting it.") from error
+        raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

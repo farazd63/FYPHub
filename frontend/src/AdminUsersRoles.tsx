@@ -159,7 +159,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
         return;
       }
       setConfirm(null);
-      setNotice(confirm.type === "delete" ? "Account permanently deleted." : "Account updated.");
+      setNotice(confirm.type === "delete" ? "Portal access removed. Previous records are preserved." : "Account updated.");
       await load();
     } catch {
       setNotice("The account service is unavailable.");
@@ -329,7 +329,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                         >
                           {user.is_active ? "Deactivate" : "Activate"}
                         </button>
-                        <button type="button" disabled={busy === user.id} onClick={() => setConfirm({ user, type: "delete", value: "delete" })} className="mt-2 w-full rounded-lg border border-[#d38b83] px-2 py-1.5 text-xs font-semibold text-[#a43a33] transition duration-200 hover:bg-[#fff3f0] disabled:opacity-60">Delete</button>
+                        <button type="button" disabled={busy === user.id || !user.is_active} onClick={() => setConfirm({ user, type: "delete", value: "delete" })} className="mt-2 w-full rounded-lg border border-[#d38b83] px-2 py-1.5 text-xs font-semibold text-[#a43a33] transition duration-200 hover:bg-[#fff3f0] disabled:opacity-60">Remove access</button>
                       </td>
                     </tr>
                   ))}
@@ -458,10 +458,10 @@ export function AdminUsersRoles({ api }: { api: string }) {
         >
           <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
             <h2 id="confirm-heading" className="text-lg font-bold">
-              {confirm.type === "delete" ? "Confirm permanent deletion" : "Confirm account change"}
+              {confirm.type === "delete" ? "Confirm access removal" : "Confirm account change"}
             </h2>
             <p className="mt-2 text-sm text-[#60716b]">
-              {confirm.type === "delete" ? `Permanently delete ${confirm.user.full_name}? This works only when no portal records or audit history reference the account.` : `${confirm.value === "true" ? "Activate" : "Deactivate"} ${confirm.user.full_name}?`}
+              {confirm.type === "delete" ? `Remove portal access for ${confirm.user.full_name}? They will be signed out and unable to sign in. All previous records and audit history will be preserved.` : `${confirm.value === "true" ? "Activate" : "Deactivate"} ${confirm.user.full_name}?`}
             </p>
             <div className="mt-5 flex justify-end gap-3">
               <button
@@ -478,7 +478,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                 onClick={() => void mutate()}
                 className="rounded-lg bg-[#176b66] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
-                {busy ? "Saving…" : confirm.type === "delete" ? "Delete permanently" : "Confirm"}
+                {busy ? "Saving…" : confirm.type === "delete" ? "Remove access" : "Confirm"}
               </button>
             </div>
           </div>

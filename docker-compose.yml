@@ -45,6 +45,12 @@ services:
     cpus: 4
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
+      # Keep full-document contexts within local Docker memory capacity.
+      OLLAMA_FLASH_ATTENTION: "1"
+      OLLAMA_KV_CACHE_TYPE: q4_0
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_KEEP_ALIVE: "30m"
     volumes:
       - fyphub-p1-ollama-models:/root/.ollama
     expose:

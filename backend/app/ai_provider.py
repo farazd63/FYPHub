@@ -82,10 +82,10 @@ async def _run_ai_json_once(prompt: str, schema: type[T], *, model_kind: str, ra
         if getattr(schema, "inference_timeout", None):
             cfg = {**cfg, "timeout": max(cfg["timeout"], schema.inference_timeout), "retries": 0}
         required_context = len((system_prompt + prompt).encode("utf-8")) + 1024 + output_budget
-        if required_context > 131072:
-            return {**base, "status": "UNAVAILABLE", "source": "AI", "fallback_reason": "model_context_exceeded", "error_type": "ContextLengthError", "message": "The full input exceeds this model's context capacity. No proposal or report content was truncated."}
-        context_size = max(4096, ((required_context + 1023) // 1024) * 1024)
-        payload["options"] = {"num_thread": 4, "num_ctx": context_size, "num_predict": output_budget, "temperature": 0}
+        # UTF-8 bytes are an upper bound, not the actual token count. A document
+        # over 128 KiB can still fit easily in Llama's 128K-token context.
+        context_size = min(131072, max(4096, ((required_context + 1023) // 1024) * 1024))
+        payload["options"] = {"num_thread": 4, "num_batch": 512, "num_ctx": context_size, "num_predict": output_budget, "temperature": 0}
     if provider == "groq": headers["Authorization"] = f"Bearer {cfg['key']}"; payload["response_format"]={"type":"json_object"}
     url = cfg["ollama_url"] + "/api/chat" if provider == "ollama" else cfg["base_url"] + "/chat/completions"
     logger.info("ai_request_start provider=%s model=%s request_id=%s timeout=%s", provider, model, request_id, cfg["timeout"])
@@ -101,6 +101,8 @@ async def _run_ai_json_once(prompt: str, schema: type[T], *, model_kind: str, ra
                     return result
                 continue
             response.raise_for_status(); raw=response.json(); content=raw["message"]["content"] if provider == "ollama" else raw["choices"][0]["message"]["content"]
+            if provider == "ollama" and "options" in payload and raw.get("prompt_eval_count", 0) >= payload["options"]["num_ctx"] - 1024:
+                return {**base, "status": "UNAVAILABLE", "source": "AI", "fallback_reason": "model_context_exceeded", "error_type": "ContextLengthError", "message": "The tokenized input reaches the model context limit. A summary of potentially truncated input was not saved."}
             if not isinstance(content, str): raise TypeError("AI content must be a string")
             cleaned=content.strip()
             if cleaned.startswith("```"):

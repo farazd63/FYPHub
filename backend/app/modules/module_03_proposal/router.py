@@ -28,7 +28,7 @@ from .compliance_engine import build_change_summary, build_compliance_report
 from .template_extractor import extract_template_rules
 from ...team_lifecycle import lock_team
 from ...ai_provider import run_ai_json
-from .ai_report import ComplianceNarrativePayload, REPORT_VERSION, assemble_report, report_prompt
+from .ai_report import REPORT_VERSION, assemble_report, generate_full_report
 
 router = APIRouter(prefix="/api/v1/proposal-compliance", tags=["module-3-proposal-compliance"])
 REVIEW_ROLES = (UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR, UserRole.PANEL_MEMBER)
@@ -510,7 +510,7 @@ async def generate_compliance_summary(submission_id: int, request: Request, acto
     actor_id = actor.id
     source_sha = row.sha256
     session.rollback()
-    result = await run_ai_json(report_prompt(context), ComplianceNarrativePayload, model_kind="proposal", rate_key=f"compliance-summary:{actor_id}")
+    result = await generate_full_report(context, run_ai_json, rate_key=f"compliance-summary:{actor_id}")
     saved = {"status": result.get("status", "UNAVAILABLE"), "model": result.get("model"), "provider": result.get("provider"), "generated_at": result.get("timestamp"), "advisory": True, "report_fingerprint": fingerprint, "source_sha256": source_sha, "input_scope": "FULL_DOCUMENT_AND_REPORT_V1", "report_format": REPORT_VERSION}
     if result.get("status") == "COMPLETED":
         saved["summary"] = assemble_report(result["payload"], context)
@@ -582,6 +582,7 @@ def download_report_pdf(submission_id: int, actor: User = Depends(get_current_us
 
 def _render_pdf(report: dict[str, Any]) -> bytes:
     from io import BytesIO
+    from xml.sax.saxutils import escape
 
     stream = BytesIO()
     document = SimpleDocTemplate(stream, pagesize=A4, rightMargin=16 * mm, leftMargin=16 * mm, topMargin=16 * mm, bottomMargin=16 * mm)
@@ -590,6 +591,16 @@ def _render_pdf(report: dict[str, Any]) -> bytes:
     story = [Paragraph("FYPHub Compliance Report", styles["Title"]), Paragraph(f"{report.get('proposal', {}).get('title', 'Proposal')} · Score {summary.get('score', 0)}% · {summary.get('status', 'Review Required')}", styles["Normal"]), Spacer(1, 8)]
     story.append(Table([["Passed", "Failed", "Partial", "Total"], [summary.get("metrics", {}).get("passed", 0), summary.get("metrics", {}).get("failed", 0), summary.get("metrics", {}).get("partial", 0), summary.get("metrics", {}).get("total", 0)]], colWidths=[38 * mm] * 4, style=TableStyle([["BACKGROUND", (0, 0), (-1, 0), "#1E2436"], ["TEXTCOLOR", (0, 0), (-1, 0), "white"], ["GRID", (0, 0), (-1, -1), 0.25, "#D8E0EA"], ["ALIGN", (0, 0), (-1, -1), "CENTER"], ["BACKGROUND", (0, 1), (-1, 1), "#F5F8FC"]])))
     story.append(Spacer(1, 12))
+    story.append(Paragraph("Checks needing attention (including partial and unverifiable)", styles["Heading2"]))
+    for category in report.get("categories", []):
+        for check in category.get("checks", []):
+            if check.get("status") == "PASS":
+                continue
+            story.append(Paragraph(escape(f"{category.get('name')} / {check.get('name')} — {check.get('status')}"), styles["Heading3"]))
+            for label, key in (("Expected", "expected"), ("Detected", "actual"), ("Location", "location"), ("Evidence / reason", "evidence")):
+                value = check.get(key)
+                story.append(Paragraph(escape(f"{label}: {value if value is not None else 'Not available'}"), styles["BodyText"]))
+            story.append(Spacer(1, 6))
     story.append(Paragraph("Detailed Violations", styles["Heading2"]))
     for violation in report.get("violations", []):
         story.extend([Paragraph(f"{violation.get('id')} · {violation.get('severity')} · {violation.get('title')}", styles["Heading3"]), Paragraph(f"Location: {violation.get('location', 'Document')} · Requirement: {violation.get('requirement')} · Detected: {violation.get('detected')}", styles["BodyText"]), Paragraph(str(violation.get("evidence", "")), styles["BodyText"]), Spacer(1, 6)])

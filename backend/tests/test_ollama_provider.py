@@ -47,15 +47,38 @@ class OllamaProviderTests(unittest.TestCase):
         self.assertEqual(payload["messages"][1]["content"], prompt)
         self.assertGreater(payload["options"]["num_ctx"], len(prompt.encode()))
 
-    def test_oversize_input_fails_explicitly_without_truncation(self):
+    def test_large_byte_input_is_sent_complete_with_native_context(self):
         from pydantic import BaseModel
         class Summary(BaseModel):
             summary: str
         cfg = {"provider":"ollama", "key":"", "base_url":"", "ollama_url":"http://ollama:11434", "proposal_model":"llama3.1:8b", "agent_model":"llama3.1:8b", "timeout":120, "retries":0, "rate_limit":10}
-        with patch("app.ai_provider.provider_config", return_value=cfg), patch("app.ai_provider.httpx.AsyncClient") as client:
+        class SummaryClient(_Client):
+            async def post(self, url, **kwargs):
+                _Client.last = (url, kwargs)
+                response = _Response()
+                response.json = lambda: {"prompt_eval_count": 35000, "message": {"content": '{"summary":"Complete summary"}'}}
+                return response
+        with patch("app.ai_provider.provider_config", return_value=cfg), patch("app.ai_provider.httpx.AsyncClient", SummaryClient):
             result = asyncio.run(run_ai_json("x" * 140000, Summary, model_kind="proposal", rate_key="oversize-summary"))
+        self.assertEqual(result["status"], "COMPLETED")
+        payload = _Client.last[1]["json"]
+        self.assertEqual(payload["messages"][1]["content"], "x" * 140000)
+        self.assertEqual(payload["options"]["num_ctx"], 131072)
+
+    def test_context_saturation_does_not_save_potentially_truncated_summary(self):
+        from pydantic import BaseModel
+        class Summary(BaseModel):
+            summary: str
+        class SaturatedClient(_Client):
+            async def post(self, url, **kwargs):
+                response = _Response()
+                response.json = lambda: {"prompt_eval_count": 131071, "message": {"content": '{"summary":"Incomplete summary"}'}}
+                return response
+        cfg = {"provider":"ollama", "key":"", "base_url":"", "ollama_url":"http://ollama:11434", "proposal_model":"llama3.1:8b", "agent_model":"llama3.1:8b", "timeout":120, "retries":0, "rate_limit":10}
+        with patch("app.ai_provider.provider_config", return_value=cfg), patch("app.ai_provider.httpx.AsyncClient", SaturatedClient):
+            result = asyncio.run(run_ai_json("x" * 140000, Summary, model_kind="proposal", rate_key="saturated-summary"))
         self.assertEqual(result["fallback_reason"], "model_context_exceeded")
-        client.assert_not_called()
+        self.assertNotIn("payload", result)
 
     def test_chat_request_is_local_non_streaming_and_schema_validated(self):
         cfg = {"provider":"ollama", "key":"", "base_url":"https://api.groq.com/openai/v1", "ollama_url":"http://127.0.0.1:11434", "proposal_model":"llama3.1:8b", "agent_model":"llama3.1:8b", "timeout":8.0, "retries":0, "rate_limit":10}

@@ -1,0 +1,4 @@
+{
+  "unchanged": true,
+  "normalization": "Sort unordered SQLAlchemy constraints and foreign_keys only."
+}
