@@ -1,7 +1,52 @@
 @import "tailwindcss";
-:root { --app-primary:#4663ff; --app-primary-hover:#354fe0; --app-selected:#eef1ff; --app-text:#243746; --app-muted:#607087; --app-page:#f4f6fb; --app-surface:#fff; --app-border:#dce3ed; font-family: ui-sans-serif, system-ui, sans-serif; color: var(--app-text); background: var(--app-page); }
-* { box-sizing: border-box; } body { margin: 0; min-width: 320px; }
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline: 3px solid rgb(70 99 255 / .28); outline-offset: 2px; }
+
+/* Phase 1 — Tailwind theme tokens (mapped to --fy-* in design-system.css) */
+@theme {
+  --color-fy-page: #0c0e12;
+  --color-fy-surface: #151922;
+  --color-fy-surface-muted: #1c222e;
+  --color-fy-border: #2a3140;
+  --color-fy-text: #f4f6fa;
+  --color-fy-text-secondary: #c4ccd9;
+  --color-fy-brand: #e0a85c;
+  --color-fy-brand-hover: #f0bc74;
+  --color-fy-brand-soft: #2a2116;
+  --color-fy-success: #3dba7a;
+  --color-fy-success-soft: #132a1c;
+  --color-fy-warning: #e0a85c;
+  --color-fy-warning-soft: #2a2116;
+  --color-fy-danger: #f07178;
+  --color-fy-danger-soft: #2a1518;
+  --color-fy-info: #7eb8c9;
+  --color-fy-info-soft: #152228;
+  --font-fy: "IBM Plex Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --radius-fy-control: 0.5rem;
+  --radius-fy-card: 0.75rem;
+  --shadow-fy: 0 1px 0 rgb(255 255 255 / 0.04), 0 18px 40px rgb(0 0 0 / 0.35);
+}
+
+:root {
+  --app-primary: var(--fy-brand, #e0a85c);
+  --app-primary-hover: var(--fy-brand-hover, #f0bc74);
+  --app-selected: var(--fy-brand-soft, #2a2116);
+  --app-text: var(--fy-text, #eceef2);
+  --app-muted: var(--fy-text-secondary, #9aa3b5);
+  --app-page: var(--fy-page, #0c0e12);
+  --app-surface: var(--fy-surface, #151922);
+  --app-border: var(--fy-border, #2a3140);
+  font-family: var(--fy-font, "IBM Plex Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif);
+  color: var(--app-text);
+  background: var(--app-page);
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(224 168 92 / 0.38);
+}
 
 /* Keep dashboard headers focused on the feature itself; role/section eyebrow labels are intentionally omitted. */
 .cycle-overview__eyebrow,
@@ -22,19 +67,24 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .admin-sidebar + button { transition-duration: 250ms; }
 
 /* Scoped Admin polish keeps data-heavy surfaces distinct from public auth. */
-main:has(.admin-sidebar) { background: #f4f7fb; color: #182f46; }
-main:has(.admin-sidebar) > header { border-color: #d9e2ee; background: rgb(255 255 255 / .88); box-shadow: 0 1px 0 rgb(24 47 70 / .04); }
-main:has(.admin-sidebar) .admin-enter { max-width: 72rem; }
+main:has(.admin-sidebar) { background: var(--fy-page, #f4f6f8); color: var(--fy-text, #1a2433); }
+main:has(.admin-sidebar) > header {
+  border-color: var(--fy-border, #d8dee6);
+  background: var(--fy-surface, #ffffff);
+  box-shadow: 0 1px 0 rgb(26 36 51 / 0.04);
+  color: var(--fy-text, #1a2433);
+}
+main:has(.admin-sidebar) .admin-enter { width: 100%; max-width: none; margin-inline: auto; }
 
 main:has(.admin-sidebar) {
-  --admin-primary: #4663ff;
-  --admin-primary-hover: #354fe0;
-  --admin-selected: #eef1ff;
-  --admin-text: #183047;
-  --admin-muted: #607087;
-  --admin-page: #f4f6fb;
-  --admin-surface: #fff;
-  --admin-border: #dce3ed;
+  --admin-primary: var(--fy-brand, #1d4ed8);
+  --admin-primary-hover: var(--fy-brand-hover, #1e40af);
+  --admin-selected: var(--fy-brand-soft, #e8eefc);
+  --admin-text: var(--fy-text, #1a2433);
+  --admin-muted: var(--fy-text-secondary, #5b6b7c);
+  --admin-page: var(--fy-page, #f4f6f8);
+  --admin-surface: var(--fy-surface, #ffffff);
+  --admin-border: var(--fy-border, #d8dee6);
 }
 main:has(.admin-sidebar) .bg-\[\#176b66\], main:has(.admin-sidebar) .bg-\[\#176B66\] { background-color: var(--admin-primary); }
 main:has(.admin-sidebar) .hover\:bg-\[\#125650\]:hover { background-color: var(--admin-primary-hover); }
@@ -42,26 +92,22 @@ main:has(.admin-sidebar) .text-\[\#176b66\], main:has(.admin-sidebar) .text-\[\#
 main:has(.admin-sidebar) .bg-\[\#e4eee7\], main:has(.admin-sidebar) .bg-\[\#eef0ff\] { background-color: var(--admin-selected); }
 main:has(.admin-sidebar) .border-\[\#dce4de\], main:has(.admin-sidebar) .border-\[\#cbd6d0\], main:has(.admin-sidebar) .border-\[\#b8cdc1\] { border-color: var(--admin-border); }
 main:has(.admin-sidebar) .text-\[\#243746\] { color: var(--admin-text); }
-main:has(.admin-sidebar) .text-\[\#60716b\] { color: var(--admin-muted); }
-main:has(.admin-sidebar) input:focus, main:has(.admin-sidebar) select:focus, main:has(.admin-sidebar) textarea:focus { border-color: var(--admin-primary); outline-color: rgb(70 99 255 / .28); }
+main:has(.admin-sidebar) .text-\[\var(--fy-text-secondary)\] { color: var(--admin-muted); }
+main:has(.admin-sidebar) input:focus, main:has(.admin-sidebar) select:focus, main:has(.admin-sidebar) textarea:focus { border-color: var(--admin-primary); box-shadow: var(--fy-focus-ring, 0 0 0 3px rgb(29 78 216 / .28)); }
 main:has(.admin-sidebar) > header > div:last-child { align-items: center; gap: .75rem; }
 main:has(.admin-sidebar) > header > div:last-child > span,
 main:has(.admin-sidebar) > header > div:last-child > button { line-height: 1.25rem; }
 section[aria-labelledby="users-heading"] .admin-create-role { grid-column: 1 / -1; }
 section[aria-labelledby="users-heading"] .admin-create-role select { width: 100%; }
 
-@keyframes auth-photo-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.auth-card { border: 1px solid rgb(255 255 255 / .62); background: rgb(248 251 253 / .78); box-shadow: 0 18px 45px rgb(8 35 51 / .28); backdrop-filter: blur(14px); animation: auth-photo-enter 360ms ease-out both; }
-@supports not (backdrop-filter: blur(1px)) { .auth-card { background: rgb(248 251 253 / .94); } }
+/* Auth card presentation lives in auth.css (dark studio). */
 
 /* Create Account remains one column because its sidebar panel is intentionally narrow. */
 section[aria-labelledby="users-heading"] form.h-fit > div { grid-template-columns: minmax(0, 1fr); }
 section[aria-labelledby="users-heading"] form.h-fit > div > * { min-width: 0; }
-@media (max-width: 1023px) { .auth-photo-background > div { background: linear-gradient(125deg, rgb(10 40 55 / .8), rgb(18 92 98 / .68)); }.auth-card { backdrop-filter: blur(8px); } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 1ms !important; }
   .admin-enter, .admin-enter > section[aria-labelledby="cycles-heading"] { animation: none; }
-  .auth-card { animation: none; }
 }
 
 /* Sign-in only: leave the top reachable and compact the optional guidance. */
@@ -112,54 +158,80 @@ section[aria-labelledby="users-heading"] form.h-fit > div > * { min-width: 0; }
   .auth-sign-in-card details { margin-top: .55rem; }
 }
 
-/* Desktop Admin shell: constrain the page to the viewport and scroll only the work pane. */
+/* Admin / portal shells: document scrolls; header + sidebar stay sticky. */
+html:has(.admin-shell),
+html:has(.student-shell),
+body:has(.admin-shell),
+body:has(.student-shell),
+#root:has(.admin-shell),
+#root:has(.student-shell) {
+  height: auto;
+  min-height: 100%;
+  /* Keep overflow visible so position:sticky sidebar/header keep working. */
+  overflow: visible;
+}
+
+.admin-shell,
+.student-shell,
+main:has(.admin-sidebar) {
+  min-height: 100dvh;
+  height: auto;
+  overflow: visible;
+}
+
+.admin-shell > header,
+.student-shell > .student-header,
+main:has(.admin-sidebar) > header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: 4rem;
+  min-height: 4rem;
+}
+
+.admin-shell > div,
+.admin-shell__body,
+.student-shell .student-body,
+.portal-shell .portal-body,
+main:has(.admin-sidebar) > header + div {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fy-shell-pad, 1.5rem);
+  min-height: 0;
+  height: auto;
+  overflow: visible;
+}
+
+.admin-shell > div > section,
+.admin-shell__content,
+.student-shell .student-content,
+.portal-shell .portal-content,
+main:has(.admin-sidebar) > header + div > section {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: auto;
+  overflow: visible;
+}
+
+/* Prevent collapsed-desktop width from reserving a mobile gutter */
+@media (max-width: 767px) {
+  .admin-shell__body,
+  .student-shell .student-body,
+  .portal-shell .portal-body,
+  .admin-shell > div {
+    gap: 0;
+  }
+
+  .admin-shell__content,
+  .student-shell .student-content,
+  .portal-shell .portal-content {
+    width: 100%;
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+}
+
 @media (min-width: 768px) {
-  html:has(main:has(.admin-sidebar)),
-  body:has(main:has(.admin-sidebar)),
-  #root:has(main:has(.admin-sidebar)) {
-    height: 100%;
-    overflow: hidden;
-  }
-
-  main:has(.admin-sidebar) {
-    height: 100dvh;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  main:has(.admin-sidebar) > header {
-    flex: 0 0 4rem;
-    height: 4rem;
-    min-height: 4rem;
-  }
-
-  main:has(.admin-sidebar) > header + div {
-    flex: 1 1 auto;
-    height: calc(100dvh - 4rem);
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  main:has(.admin-sidebar) > header + div > .admin-sidebar {
-    height: 100%;
-    min-height: 0;
-    margin-top: 0;
-    top: 0;
-    align-self: stretch;
-    overflow-x: hidden;
-    overflow-y: auto;
-    padding-block: 10px;
-  }
-
-  main:has(.admin-sidebar) > header + div > section {
-    min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
   main:has(.admin-sidebar) .admin-sidebar nav,
   main.admin-sidebar-collapsed .admin-sidebar nav {
     gap: 4px;
@@ -183,14 +255,14 @@ section[aria-labelledby="users-heading"] form.h-fit > div > * { min-width: 0; }
   }
 }
 
-/* Shared Admin surface system: presentation only, scoped away from public screens. */
+/* Shared Admin surface system — single dark charcoal/gold theme. */
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] {
-  color: var(--admin-text);
+  color: var(--fy-text);
 }
 
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] > div:first-child h1,
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] > h1 {
-  color: #172b4d;
+  color: var(--fy-text);
   font-size: clamp(1.65rem, 2.2vw, 2.15rem);
   line-height: 1.15;
   letter-spacing: -.03em;
@@ -200,41 +272,44 @@ main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] > div:first-chi
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] > h1 + p {
   max-width: 48rem;
   line-height: 1.55;
-  color: #607087;
+  color: var(--fy-text-secondary);
 }
 
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .rounded-xl.border,
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .rounded-2xl.border,
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .users-table {
-  border-color: #dce5f2;
-  background: #fff;
-  box-shadow: 0 8px 24px rgba(24, 56, 112, .055);
+  border-color: var(--fy-border);
+  background: var(--fy-surface);
+  box-shadow: var(--fy-shadow);
+  color: var(--fy-text);
 }
 
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .rounded-xl.border:hover,
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .rounded-2xl.border:hover {
-  border-color: #c8d8ef;
+  border-color: var(--fy-border-strong);
 }
 
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] input:not([type="checkbox"]):not([type="radio"]),
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] select,
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] textarea {
-  border-color: #cfdbea;
-  background: #fbfdff;
-  color: #183047;
+  border-color: var(--fy-border);
+  background: var(--fy-page);
+  color: var(--fy-text);
 }
 
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] input:not([type="checkbox"]):not([type="radio"]):focus,
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] select:focus,
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] textarea:focus {
-  border-color: #4663ff;
-  background: #fff;
-  box-shadow: 0 0 0 3px rgb(70 99 255 / .12);
+  border-color: var(--fy-brand);
+  background: var(--fy-page);
+  box-shadow: var(--fy-focus-ring);
 }
 
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] [role="alert"] {
-  border: 1px solid #f0d3c9;
-  box-shadow: 0 4px 14px rgb(154 67 55 / .06);
+  border: 1px solid color-mix(in srgb, var(--fy-danger) 45%, var(--fy-border));
+  background: var(--fy-danger-soft);
+  color: var(--fy-danger);
+  box-shadow: none;
 }
 
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] [role="status"] {
@@ -242,13 +317,13 @@ main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] [role="status"]
 }
 
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .border-dashed {
-  border-color: #c8d8ea;
-  background: linear-gradient(135deg, #fff, #f7faff);
+  border-color: var(--fy-border-strong);
+  background: var(--fy-surface-muted);
 }
 
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] table thead {
-  background: #f5f8fd;
-  color: #526b93;
+  background: var(--fy-surface-muted);
+  color: var(--fy-text-secondary);
 }
 
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] table tbody tr {
@@ -256,7 +331,7 @@ main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] table tbody tr 
 }
 
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] table tbody tr:hover {
-  background: #f8fbff;
+  background: var(--fy-surface-muted);
 }
 
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] button:disabled {
@@ -283,11 +358,11 @@ main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] button:disabled
 /* The roster screen has a deliberately compact markup structure; give it the
    same shared surface treatment without changing its import workflow. */
 main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) {
-  color: var(--admin-text);
+  color: var(--fy-text);
 }
 
 main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) > h1 {
-  color: #172b4d;
+  color: var(--fy-text);
   font-size: clamp(1.65rem, 2.2vw, 2.15rem);
   line-height: 1.15;
   letter-spacing: -.03em;
@@ -296,41 +371,46 @@ main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) > h1 {
 main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) > h1 + p {
   max-width: 48rem;
   line-height: 1.55;
-  color: #607087;
+  color: var(--fy-text-secondary);
 }
 
 main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) .rounded-xl.border {
-  border-color: #dce5f2;
-  box-shadow: 0 8px 24px rgba(24, 56, 112, .055);
+  border-color: var(--fy-border);
+  background: var(--fy-surface);
+  box-shadow: var(--fy-shadow);
 }
 
 main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) input:not([type="checkbox"]):not([type="radio"]),
 main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) select {
-  border-color: #cfdbea;
-  background: #fbfdff;
+  border-color: var(--fy-border);
+  background: var(--fy-page);
+  color: var(--fy-text);
 }
 
 main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) table thead {
-  background: #f5f8fd;
-  color: #526b93;
+  background: var(--fy-surface-muted);
+  color: var(--fy-text-secondary);
 }
-/* Approved Admin surface fallback: these selectors target the shared portal
-   content directly so every Admin page keeps the same visual language even
-   when the surrounding :has() scope is unavailable or reordered. */
+
 .student-page-heading .student-overview__eyebrow,
-.admin-enter .student-overview__eyebrow { color: #315db4; }
+.admin-enter .student-overview__eyebrow { color: var(--fy-brand); }
 
 .student-page-heading [class*="status"] { opacity: 1; }
 .student-supervisor-option:disabled,
 .student-request-actions button:disabled,
-.student-request-list article > button:disabled { opacity: 1; color: #526b93; background: #e8edf5; border-color: #c7d5e8; }
+.student-request-list article > button:disabled {
+  opacity: 1;
+  color: var(--fy-text-secondary);
+  background: var(--fy-surface-muted);
+  border-color: var(--fy-border);
+}
 
 .admin-enter > section[aria-labelledby],
-.admin-enter > section:not([aria-labelledby]) { color: #183047; }
+.admin-enter > section:not([aria-labelledby]) { color: var(--fy-text); }
 .admin-enter > section[aria-labelledby] > div:first-child h1,
 .admin-enter > section[aria-labelledby] > h1,
 .admin-enter > section:not([aria-labelledby]) > h1 {
-  color: #172b4d;
+  color: var(--fy-text);
   font-size: clamp(1.65rem, 2.2vw, 2.15rem);
   line-height: 1.15;
   letter-spacing: -.03em;
@@ -339,16 +419,17 @@ main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) table the
 .admin-enter > section[aria-labelledby] .rounded-2xl.border,
 .admin-enter > section[aria-labelledby] .users-table,
 .admin-enter > section:not([aria-labelledby]) .rounded-xl.border {
-  border-color: #dce5f2;
-  background: #fff;
-  box-shadow: 0 8px 24px rgba(24, 56, 112, .055);
+  border-color: var(--fy-border);
+  background: var(--fy-surface);
+  box-shadow: var(--fy-shadow);
+  color: var(--fy-text);
 }
 .admin-enter > section[aria-labelledby] input:not([type="checkbox"]):not([type="radio"]),
 .admin-enter > section[aria-labelledby] select,
 .admin-enter > section[aria-labelledby] textarea,
 .admin-enter > section:not([aria-labelledby]) input:not([type="checkbox"]):not([type="radio"]),
 .admin-enter > section:not([aria-labelledby]) select {
-  border-color: #cfdbea;
-  background: #fbfdff;
-  color: #183047;
+  border-color: var(--fy-border);
+  background: var(--fy-page);
+  color: var(--fy-text);
 }

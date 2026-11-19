@@ -48,7 +48,7 @@ export function OldProjectArchiveImport({ api, onImported }: { api: string; onIm
     <label className="mt-4 grid gap-1 text-sm font-semibold">Excel file
       <input type="file" accept=".xls,.xlsx" disabled={!cycleId || busy} className="rounded-lg border border-[#dce4de] px-3 py-2" onChange={(event) => { setFile(event.target.files?.[0] ?? null); }} />
     </label>
-    <button type="button" disabled={!file || !cycleId || busy} onClick={() => { if (file) void upload(file); }} className="mt-4 rounded-lg bg-[#4663ff] px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Uploading..." : "Upload Excel file"}</button>
+    <button type="button" disabled={!file || !cycleId || busy} onClick={() => { if (file) void upload(file); }} className="fy-btn fy-btn--primary mt-4 disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Uploading..." : "Upload Excel file"}</button>
     {message && <p role="status" className="mt-3 rounded-lg bg-[#eef5ff] px-3 py-2 text-sm text-[#315db4]">{message}</p>}
   </section>;
 }

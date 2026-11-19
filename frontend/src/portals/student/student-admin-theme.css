@@ -1,13 +1,13 @@
 /* Student portal uses the same visual language as the Admin workspace. */
 .student-shell {
-  --student-primary: #4663ff;
-  --student-primary-hover: #354fe0;
-  --student-selected: #eef1ff;
-  --student-text: #183047;
-  --student-muted: #607087;
-  --student-page: #f4f6fb;
-  --student-surface: #ffffff;
-  --student-border: #dce3ed;
+  --student-primary: var(--fy-brand, #1d4ed8);
+  --student-primary-hover: var(--fy-brand-hover, #1e40af);
+  --student-selected: var(--fy-brand-soft, #e8eefc);
+  --student-text: var(--fy-text, #1a2433);
+  --student-muted: var(--fy-text-secondary, #5b6b7c);
+  --student-page: var(--fy-page, #f4f6f8);
+  --student-surface: var(--fy-surface, #ffffff);
+  --student-border: var(--fy-border, #d8dee6);
   background: var(--student-page);
   color: var(--student-text);
 }
@@ -39,8 +39,13 @@
 .student-shell .student-logout:hover { background: #f3f7ff; border-color: #7897d2; }
 
 .student-shell .student-overview__hero {
-  background: linear-gradient(115deg, #4663ff, #354fe0 62%, #2e4fc0);
-  box-shadow: 0 16px 32px rgb(24 56 112 / 0.16);
+  background: linear-gradient(135deg, var(--fy-brand, #1d4ed8) 0%, var(--fy-brand-hover, #1e40af) 100%);
+  box-shadow: var(--fy-shadow, 0 16px 32px rgb(24 56 112 / 0.16));
+  color: #fff;
+}
+.student-shell .student-overview__hero h1,
+.student-shell .student-overview__hero p {
+  color: #fff;
 }
 .student-shell .student-overview__summary,
 .student-shell .student-phase-card,

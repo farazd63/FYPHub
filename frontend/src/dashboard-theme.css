@@ -1,0 +1,218 @@
+/* Dashboard presentation tokens. This file is deliberately page-focused;
+   navigation geometry lives in dashboard-nav.css and auth in auth.css. */
+:root {
+  --dash-canvas: var(--fy-page, #f4f6f8);
+  --dash-surface: var(--fy-surface, #ffffff);
+  --dash-surface-soft: var(--fy-surface-muted, #eef1f4);
+  --dash-ink: var(--fy-text, #1a2433);
+  --dash-muted: var(--fy-text-secondary, #5b6b7c);
+  --dash-line: var(--fy-border, #d8dee6);
+  --dash-blue: var(--fy-brand, #1d4ed8);
+  --dash-blue-dark: var(--fy-brand-hover, #1e40af);
+  --dash-navy: var(--fy-text, #1a2433);
+  --dash-navy-soft: var(--fy-text-secondary, #5b6b7c);
+  --dash-shadow: var(--fy-shadow, 0 18px 44px rgb(25 38 66 / 0.12));
+  --dash-radius: var(--fy-radius-card, 0.75rem);
+}
+
+body:has(.student-shell),
+body:has(.admin-sidebar) { background: var(--dash-canvas); }
+
+.student-shell,
+main:has(.admin-sidebar) {
+  min-height: 100dvh;
+  background: var(--dash-canvas);
+  color: var(--dash-ink);
+}
+
+.student-header,
+main:has(.admin-sidebar) > header {
+  height: 64px;
+  border-bottom: 1px solid var(--dash-line);
+  background: color-mix(in srgb, var(--dash-surface) 92%, transparent);
+  box-shadow: var(--dash-shadow);
+  backdrop-filter: blur(14px);
+}
+
+.student-header__left,
+main:has(.admin-sidebar) > header > div:first-child { gap: 16px; }
+
+.admin-menu {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--dash-blue);
+}
+
+.admin-menu svg { width: 22px; height: 22px; }
+.admin-menu:hover { background: #eef2ff; }
+
+.student-brand,
+main:has(.admin-sidebar) .admin-brand {
+  color: var(--dash-ink);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.student-brand svg,
+main:has(.admin-sidebar) .admin-brand svg {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+}
+
+.student-role,
+main:has(.admin-sidebar) .admin-role {
+  border-color: #d9def0;
+  background: #f1f3ff;
+  color: #4350c9;
+  font-size: 11px;
+  line-height: 1.1;
+  padding: 4px 8px;
+}
+
+.student-avatar,
+main:has(.admin-sidebar) .admin-avatar {
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+  border: 2px solid var(--fy-border, var(--dash-line));
+  background: var(--fy-brand-soft, var(--dash-surface-soft));
+  box-shadow: none;
+  color: var(--fy-brand, var(--dash-blue));
+}
+
+.student-logout,
+main:has(.admin-sidebar) .admin-logout {
+  border-color: var(--dash-line);
+  border-radius: 10px;
+  background: var(--dash-surface);
+  color: var(--fy-brand, var(--dash-blue));
+}
+
+.student-logout:hover,
+main:has(.admin-sidebar) .admin-logout:hover {
+  border-color: var(--fy-border-strong, var(--dash-line));
+  background: var(--fy-brand-soft, var(--dash-surface-soft));
+}
+
+.student-content,
+main:has(.admin-sidebar) > div > section {
+  padding: var(--fy-shell-pad, 1.5rem);
+}
+
+.student-content__inner,
+main:has(.admin-sidebar) .admin-enter {
+  width: 100%;
+  max-width: none;
+  margin-inline: auto;
+}
+
+.academic-cycle-dashboard__heading,
+.academic-cycle-dashboard__detail-heading {
+  margin-bottom: 22px;
+}
+
+.academic-cycle-dashboard h1,
+main:has(.admin-sidebar) h1 {
+  color: var(--dash-ink);
+  letter-spacing: -0.035em;
+}
+
+/* The overview hero is intentionally dark; keep its copy readable even if a
+   utility or global heading rule is loaded after the page chunk. */
+main:has(.cycle-overview) .cycle-overview__hero h1 { color: #fff; }
+main:has(.cycle-overview) .cycle-overview__hero .cycle-overview__eyebrow { color: #dbe6ff; }
+main:has(.cycle-overview) .cycle-overview__hero .cycle-overview__subtitle { color: #eef3ff; }
+
+.academic-cycle-dashboard__heading p,
+main:has(.admin-sidebar) .admin-enter p { color: var(--dash-muted); }
+
+.academic-cycle-dashboard__card,
+.academic-cycle-dashboard__table-wrap,
+main:has(.admin-sidebar) .admin-enter .rounded-xl.border,
+main:has(.admin-sidebar) .admin-enter .rounded-2xl.border,
+main:has(.admin-sidebar) .admin-enter .rounded-3xl.border {
+  border-color: var(--dash-line);
+  border-radius: var(--dash-radius);
+  background: var(--dash-surface);
+  box-shadow: 0 8px 26px rgb(31 45 76 / 0.07);
+}
+
+.academic-cycle-dashboard__card { border-radius: 22px; }
+
+.admin-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.admin-shell select,
+.admin-shell textarea,
+.student-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.student-shell select,
+.student-shell textarea {
+  min-height: 42px;
+  border: 1px solid var(--dash-line);
+  border-radius: 10px;
+  background: var(--fy-page, var(--dash-canvas));
+  color: var(--dash-ink);
+}
+
+.admin-shell input:focus,
+.admin-shell select:focus,
+.admin-shell textarea:focus,
+.student-shell input:focus,
+.student-shell select:focus,
+.student-shell textarea:focus {
+  border-color: var(--dash-blue);
+  box-shadow: var(--fy-focus-ring, 0 0 0 3px rgb(224 168 92 / 0.28));
+  outline: 0;
+}
+
+.admin-shell table,
+.student-shell table {
+  width: 100%;
+  border: 1px solid var(--dash-line);
+  border-radius: 14px;
+  background: var(--dash-surface);
+  box-shadow: var(--dash-shadow);
+}
+
+.admin-shell thead th,
+.student-shell thead th {
+  background: var(--fy-surface-muted, var(--dash-surface-soft));
+  color: var(--dash-muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-shell button[type="submit"],
+.admin-shell button[class*="bg-[#4663ff]"],
+.admin-shell button[class*="bg-[#176b66]"],
+.admin-shell button[class*="bg-[#176B66]"],
+.student-shell button[type="submit"] {
+  border-radius: 10px;
+  background: var(--fy-brand, var(--dash-blue));
+  color: var(--fy-text-on-brand, #1a1208);
+  box-shadow: var(--fy-shadow, none);
+}
+
+.admin-shell button[type="submit"]:hover:not(:disabled),
+.admin-shell button[class*="bg-[#4663ff]"]:hover:not(:disabled),
+.admin-shell button[class*="bg-[#176b66]"]:hover:not(:disabled),
+.admin-shell button[class*="bg-[#176B66]"]:hover:not(:disabled),
+.student-shell button[type="submit"]:hover:not(:disabled) {
+  background: var(--fy-brand-hover, var(--dash-blue-dark));
+  color: var(--fy-text-on-brand, #1a1208);
+}
+
+@media (max-width: 767px) {
+  .student-content,
+  main:has(.admin-sidebar) > div > section { padding: 20px 14px 30px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .student-shell .student-sidebar__item,
+  main:has(.admin-sidebar) .admin-sidebar nav button { transition: none; }
+}

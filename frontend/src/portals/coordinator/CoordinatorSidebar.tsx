@@ -2,6 +2,7 @@ import { RoleSidebar, SidebarIcon, type RoleSidebarItem } from "../shared/RoleSi
 
 export const coordinatorNav: readonly RoleSidebarItem[] = [
   { id: "requests", label: "Supervisor Requests", icon: <SidebarIcon name="requests" />, section: "People & Access" },
+  { id: "scheduling", label: "Panel Scheduling", icon: <SidebarIcon name="schedule" />, section: "People & Access" },
 ];
 
 export function CoordinatorSidebar({ active, collapsed, mobileOpen, onSelect, onToggle, onClose }: { active: string; collapsed: boolean; mobileOpen: boolean; onSelect: (id: string) => void; onToggle: () => void; onClose: () => void }) {

@@ -54,5 +54,14 @@ class VersionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int; version_number: int; original_filename: str; mime_type: str; file_size: int; storage_reference: str; uploaded_at: datetime; uploaded_by_id: int | None = None; download_url: str | None = None; preview_url: str | None = None
 
+class ReviewEventOut(BaseModel):
+    id: int
+    status: str
+    version_id: int | None = None
+    reviewer_id: int
+    reviewer_name: str | None = None
+    comment: str | None = None
+    created_at: datetime
+
 class SubmissionOut(BaseModel):
-    id: int; requirement_id: int; academic_cycle_id: int | None = None; group_id: int | None = None; project_id: int | None = None; requirement_section_id: int | None = None; student_id: int | None = None; uploader_id: int | None = None; status: str; is_late: bool; review_comment: str | None; reviewed_by_id: int | None = None; reviewed_at: datetime | None = None; uploaded_at: datetime; updated_at: datetime; versions: list[VersionOut] = []
+    id: int; requirement_id: int; academic_cycle_id: int | None = None; group_id: int | None = None; project_id: int | None = None; requirement_section_id: int | None = None; student_id: int | None = None; uploader_id: int | None = None; status: str; is_late: bool; review_comment: str | None; reviewed_by_id: int | None = None; reviewed_at: datetime | None = None; uploaded_at: datetime; updated_at: datetime; versions: list[VersionOut] = []; review_history: list[ReviewEventOut] = []

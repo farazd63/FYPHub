@@ -1,58 +1,171 @@
-/* Shared visual language derived from the Project Progress workspace. */
+/* FYPHub design tokens — dark academic studio
+   Charcoal surfaces + warm gold accent. Presentation only. */
+
 :root {
-  --ds-page: #eff8ff;
-  --ds-surface: #ffffff;
-  --ds-ink: #182b4d;
-  --ds-muted: #71809a;
-  --ds-border: #e3e7f0;
-  --ds-purple: #acdfff;
-  --ds-purple-dark: #acdfff;
-  --ds-purple-soft: #eff8ff;
-  --ds-mint: #acdfff;
-  --ds-mint-soft: #eff8ff;
-  --ds-orange: #acdfff;
-  --ds-orange-soft: #eff8ff;
-  --ds-shadow: 0 11px 28px rgb(35 54 94 / 0.07);
+  /* Surfaces */
+  --fy-page: #0c0e12;
+  --fy-surface: #151922;
+  --fy-surface-muted: #1c222e;
+  --fy-border: #2a3140;
+  --fy-border-strong: #3a4254;
+
+  /* Text (WCAG AA on dark surfaces) */
+  --fy-text: #f4f6fa;
+  /* ≥4.5:1 on --fy-page / --fy-surface (raised from #c4ccd9 / leftover #6b7c96) */
+  --fy-text-secondary: #d5dce8;
+  --fy-text-inverse: #0c0e12;
+  --fy-text-on-brand: #1a1208;
+
+  /* Brand — warm gold, used for primary actions and active nav */
+  --fy-brand: #e0a85c;
+  --fy-brand-hover: #f0bc74;
+  --fy-brand-soft: #2a2116;
+  --fy-brand-ring: rgb(224 168 92 / 0.38);
+
+  /* Semantic */
+  /* Success ink chosen for ≥4.5:1 on --fy-success-soft (pill labels) */
+  --fy-success: #7ddea0;
+  --fy-success-soft: #132a1c;
+  --fy-warning: #e0a85c;
+  --fy-warning-soft: #2a2116;
+  --fy-danger: #f07178;
+  --fy-danger-soft: #2a1518;
+  --fy-info: #7eb8c9;
+  --fy-info-soft: #152228;
+
+  /* Type scale */
+  --fy-font: "IBM Plex Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --fy-text-page: 1.75rem; /* 28px page title */
+  --fy-text-section: 1.25rem; /* 20px section title */
+  --fy-text-body: 0.9375rem; /* 15px body */
+  --fy-text-small: 0.8125rem; /* 13px small */
+  --fy-text-label: 0.75rem; /* 12px label */
+  --fy-leading-tight: 1.25;
+  --fy-leading-body: 1.5;
+  --fy-weight-regular: 400;
+  --fy-weight-semibold: 600;
+
+  /* Spacing (4px base) */
+  --fy-space-1: 0.25rem;
+  --fy-space-2: 0.5rem;
+  --fy-space-3: 0.75rem;
+  --fy-space-4: 1rem;
+  --fy-space-5: 1.25rem;
+  --fy-space-6: 1.5rem;
+  --fy-space-8: 2rem;
+  --fy-space-10: 2.5rem;
+  --fy-space-12: 3rem;
+
+  /* Shape */
+  --fy-radius-control: 0.5rem; /* inputs / buttons */
+  --fy-radius-card: 0.75rem; /* cards / panels */
+  --fy-shadow: 0 1px 0 rgb(255 255 255 / 0.04), 0 18px 40px rgb(0 0 0 / 0.35);
+  --fy-focus-ring: 0 0 0 3px var(--fy-brand-ring);
+
+  /* Legacy aliases used across the app */
+  --ds-page: var(--fy-page);
+  --ds-surface: var(--fy-surface);
+  --ds-ink: var(--fy-text);
+  --ds-muted: var(--fy-text-secondary);
+  --ds-border: var(--fy-border);
+  --ds-purple: var(--fy-brand);
+  --ds-purple-dark: var(--fy-brand-hover);
+  --ds-purple-soft: var(--fy-brand-soft);
+  --ds-mint: var(--fy-success);
+  --ds-mint-soft: var(--fy-success-soft);
+  --ds-orange: var(--fy-warning);
+  --ds-orange-soft: var(--fy-warning-soft);
+  --ds-shadow: var(--fy-shadow);
+  --brand-blue: var(--fy-brand);
+  --app-primary: var(--fy-brand);
+  --app-primary-hover: var(--fy-brand-hover);
+  --app-selected: var(--fy-brand-soft);
+  --app-text: var(--fy-text);
+  --app-muted: var(--fy-text-secondary);
+  --app-page: var(--fy-page);
+  --app-surface: var(--fy-surface);
+  --app-border: var(--fy-border);
 }
 
-body { background: var(--ds-page); color: var(--ds-ink); }
-button, input, select, textarea { font: inherit; }
-button { transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease; }
-button:not(:disabled):hover { transform: translateY(-1px); }
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: var(--fy-font);
+  font-size: var(--fy-text-body);
+  line-height: var(--fy-leading-body);
+  font-weight: var(--fy-weight-regular);
+  color: var(--fy-text);
+  background: var(--fy-page);
+}
 
-/* One shared wordmark and mark are used by every authenticated dashboard. */
-.fyp-hub-brand { display: flex; align-items: center; gap: 10px; color: var(--ds-ink); font-size: 17px; font-weight: 750; letter-spacing: -0.02em; white-space: nowrap; }
-.fyp-hub-brand svg { width: 30px; height: 30px; flex: 0 0 30px; }
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+/* Type utilities */
+.fy-title {
+  font-size: var(--fy-text-page);
+  line-height: var(--fy-leading-tight);
+  font-weight: var(--fy-weight-semibold);
+  letter-spacing: -0.02em;
+  color: var(--fy-text);
+}
+.fy-section {
+  font-size: var(--fy-text-section);
+  line-height: var(--fy-leading-tight);
+  font-weight: var(--fy-weight-semibold);
+  letter-spacing: -0.015em;
+  color: var(--fy-text);
+}
+.fy-body {
+  font-size: var(--fy-text-body);
+  line-height: var(--fy-leading-body);
+  color: var(--fy-text);
+}
+.fy-small {
+  font-size: var(--fy-text-small);
+  line-height: 1.4;
+  color: var(--fy-text-secondary);
+}
+.fy-label {
+  font-size: var(--fy-text-label);
+  line-height: 1.35;
+  font-weight: var(--fy-weight-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fy-text-secondary);
+}
+
+/* Focus — every interactive control */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+[role="menuitem"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: none;
+  box-shadow: var(--fy-focus-ring);
+}
 
 .student-shell,
 main:has(.admin-sidebar),
 .supervisor-page,
-.coordinator-page { background: var(--ds-page); color: var(--ds-ink); }
+.coordinator-page {
+  background: var(--fy-page);
+  color: var(--fy-text);
+}
 
 .student-content,
-main:has(.admin-sidebar) > header + div > section { background: var(--ds-page); }
-
-.student-header,
-main:has(.admin-sidebar) > header { border-color: var(--ds-border); background: rgb(255 255 255 / 0.92); box-shadow: 0 2px 18px rgb(35 54 94 / 0.06); }
-
-.student-sidebar,
-main:has(.admin-sidebar) .admin-sidebar {
-  background: radial-gradient(circle at 15% 0%, rgb(118 86 219 / 0.34), transparent 32%), linear-gradient(165deg, #151039, #211753 64%, #30236f);
-  border-color: rgb(173 153 255 / 0.28);
+main:has(.admin-sidebar) > header + div > section {
+  background: var(--fy-page);
 }
 
-.student-sidebar__item[aria-current="page"],
-main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"] {
-  background: linear-gradient(105deg, rgb(118 86 219 / 0.82), rgb(91 70 184 / 0.65));
-  box-shadow: inset 0 0 0 1px rgb(194 180 255 / 0.46), 0 6px 18px rgb(23 13 70 / 0.2);
-}
-
-.student-overview__hero,
-.progress-hero {
-  background: linear-gradient(135deg, var(--ds-purple-dark) 0%, #6353cf 55%, #8c73e6 100%);
-  box-shadow: 0 18px 38px rgb(53 39 137 / 0.2);
-}
-
+/* Cards / surfaces */
 .student-request-card,
 .student-placeholder,
 .supervisor-card,
@@ -62,149 +175,505 @@ main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"] {
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .rounded-xl.border,
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .rounded-2xl.border,
 main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) .rounded-xl.border {
-  border-color: var(--ds-border);
-  border-radius: 20px;
-  background: var(--ds-surface);
-  box-shadow: var(--ds-shadow);
+  border-color: var(--fy-border);
+  border-radius: var(--fy-radius-card);
+  background: var(--fy-surface);
+  box-shadow: var(--fy-shadow);
 }
 
 .student-request-card:hover,
 .supervisor-card:hover,
 .progress-card:hover,
-main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .rounded-xl.border:hover { border-color: #cfc4f6; }
+main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .rounded-xl.border:hover {
+  border-color: var(--fy-border-strong);
+}
 
 .student-page-heading h1,
 .supervisor-page-heading h1,
-main:has(.admin-sidebar) .admin-enter h1 { color: var(--ds-ink); letter-spacing: -0.04em; }
+main:has(.admin-sidebar) .admin-enter > section > h1,
+main:has(.admin-sidebar) .admin-enter .student-page-heading h1,
+main:has(.admin-sidebar) .admin-enter .cycle-overview__list-heading h2 {
+  color: var(--fy-text);
+  letter-spacing: -0.02em;
+  font-weight: var(--fy-weight-semibold);
+}
 
 .student-page-heading p:last-child,
 .supervisor-page-heading > span,
-main:has(.admin-sidebar) .admin-enter > section > p { color: var(--ds-muted); }
-
-input:not([type="checkbox"]):not([type="radio"]), select, textarea {
-  border-color: #d7ddeb;
-  border-radius: 10px;
-  background: #fbfcff;
-  color: var(--ds-ink);
+main:has(.admin-sidebar) .admin-enter > section > p {
+  color: var(--fy-text-secondary);
 }
-input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus {
-  border-color: #836de0;
-  box-shadow: 0 0 0 3px rgb(131 109 224 / 0.14);
+
+/* Form controls */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border-color: var(--fy-border);
+  border-radius: var(--fy-radius-control);
+  background: var(--fy-surface);
+  color: var(--fy-text);
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--fy-brand);
+  box-shadow: var(--fy-focus-ring);
   outline: 0;
 }
 
+/* Primary filled actions — brand only */
 button[class*="bg-[#4663ff]"],
 button[class*="bg-[#176b66]"],
-button[class*="bg-[#354fe0]"] {
-  background: linear-gradient(135deg, #7656db, #5b46c2);
-  box-shadow: 0 7px 16px rgb(91 70 194 / 0.2);
+button[class*="bg-[#354fe0]"],
+button[class*="bg-[#124bc4]"],
+button[class*="bg-fy-brand"] {
+  background: var(--fy-brand);
+  color: var(--fy-text-on-brand, #1a1208);
+  border-radius: var(--fy-radius-control);
+  box-shadow: none;
 }
 button[class*="bg-[#4663ff]"]:hover,
-button[class*="bg-[#176b66]"]:hover { background: linear-gradient(135deg, #6849cb, #4936a9); }
+button[class*="bg-[#176b66]"]:hover,
+button[class*="bg-[#124bc4]"]:hover {
+  background: var(--fy-brand-hover);
+}
 
+/* Semantic status — colour carries meaning */
 .student-status,
 .student-role,
-.admin-role { border-color: #d4cafa; background: var(--ds-purple-soft); color: #5a43aa; }
-.student-status--implemented { border-color: #b7ead5; background: var(--ds-mint-soft); color: #218765; }
-.student-status--partial { border-color: #d4cafa; background: var(--ds-purple-soft); color: #5a43aa; }
+.admin-role {
+  border-color: color-mix(in srgb, var(--fy-brand) 22%, white);
+  background: var(--fy-brand-soft);
+  color: var(--fy-brand);
+}
+.student-status--implemented,
+.student-status--accepted,
+[data-status="ACCEPTED"],
+[data-status="SUBMITTED"].is-success {
+  border-color: color-mix(in srgb, var(--fy-success) 28%, white);
+  background: var(--fy-success-soft);
+  color: var(--fy-success);
+}
+.student-status--partial,
+[data-status="CHANGES_REQUESTED"],
+[data-status="PARTIAL"] {
+  border-color: color-mix(in srgb, var(--fy-warning) 28%, white);
+  background: var(--fy-warning-soft);
+  color: var(--fy-warning);
+}
+.student-status--rejected,
+[data-status="REJECTED"],
+[data-status="FAILED"] {
+  border-color: color-mix(in srgb, var(--fy-danger) 28%, white);
+  background: var(--fy-danger-soft);
+  color: var(--fy-danger);
+}
+.student-status--withdrawn,
+.student-status--idle,
+[data-status="WITHDRAWN"],
+[data-status="NOT_SUBMITTED"] {
+  border-color: var(--fy-border);
+  background: var(--fy-surface-muted);
+  color: var(--fy-text-secondary);
+}
 
-.progress-summary__card--purple::before { background: var(--ds-purple); }
-.progress-summary__card--green::before { background: var(--ds-mint); }
-.progress-summary__card--orange::before { background: var(--ds-orange); }
+.progress-summary__card--purple::before { background: var(--fy-brand); }
+.progress-summary__card--green::before { background: var(--fy-success); }
+.progress-summary__card--orange::before { background: var(--fy-warning); }
+
+/* Admin portal token bridge (structure unchanged until Phase 2) */
+main:has(.admin-sidebar) {
+  --admin-primary: var(--fy-brand);
+  --admin-primary-hover: var(--fy-brand-hover);
+  --admin-selected: var(--fy-brand-soft);
+  --admin-text: var(--fy-text);
+  --admin-muted: var(--fy-text-secondary);
+  --admin-page: var(--fy-page);
+  --admin-surface: var(--fy-surface);
+  --admin-border: var(--fy-border);
+  background: var(--fy-page);
+  color: var(--fy-text);
+}
+
+/* App shell: dark top bar + gold accents. */
+.student-header,
+.portal-header,
+.admin-shell > header,
+main:has(.admin-sidebar) > header {
+  background: var(--fy-surface) !important;
+  border-bottom: 1px solid var(--fy-border);
+  color: var(--fy-text);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.03);
+}
+.student-header .student-brand,
+.student-header .student-account__name,
+.student-header .student-menu,
+.portal-brand,
+.portal-account__name,
+.admin-shell > header strong,
+main:has(.admin-sidebar) > header strong,
+main:has(.admin-sidebar) .admin-account-name {
+  color: var(--fy-text) !important;
+}
+.student-header .student-brand svg,
+.portal-brand svg,
+.admin-brand svg {
+  color: var(--fy-brand) !important;
+}
+.student-role,
+.portal-role,
+.admin-role {
+  border: 1px solid color-mix(in srgb, var(--fy-brand) 22%, white);
+  background: var(--fy-brand-soft);
+  color: var(--fy-brand);
+}
+.student-header .student-logout,
+.portal-logout,
+main:has(.admin-sidebar) .admin-logout,
+.admin-shell .admin-logout {
+  background: var(--fy-surface);
+  color: var(--fy-brand);
+  border: 1px solid var(--fy-border);
+  border-radius: var(--fy-radius-control);
+}
+.student-header .student-logout:hover,
+.portal-logout:hover,
+.admin-logout:hover {
+  background: var(--fy-brand-soft);
+  border-color: color-mix(in srgb, var(--fy-brand) 28%, white);
+}
+
+/* Content column: fill the pane after the sidebar (no right-side dead band) */
+.student-content__inner,
+.portal-content__inner,
+.admin-shell .admin-enter,
+main:has(.admin-sidebar) .admin-enter {
+  width: 100%;
+  max-width: none;
+  margin-inline: auto;
+}
+
+/* Shared portal buttons */
+.fy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.5rem;
+  padding: 0.55rem 1rem;
+  border-radius: var(--fy-radius-control, 0.5rem);
+  border: 1px solid transparent;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.fy-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.fy-btn--primary {
+  background: var(--fy-brand);
+  border-color: transparent;
+  color: var(--fy-text-on-brand);
+}
+.fy-btn--primary:hover:not(:disabled) {
+  background: var(--fy-brand-hover);
+}
+.fy-btn--secondary {
+  background: var(--fy-surface-muted);
+  border-color: var(--fy-border);
+  color: var(--fy-text);
+}
+.fy-btn--secondary:hover:not(:disabled) {
+  border-color: var(--fy-border-strong);
+}
+
+/* Heroes: deep charcoal with gold edge — light copy for contrast. */
+.progress-hero,
+.student-overview__hero,
+.cycle-overview__hero,
+.module3-hero {
+  background:
+    linear-gradient(135deg, rgb(224 168 92 / 0.18), transparent 42%),
+    linear-gradient(160deg, #1a1f2a 0%, #10141c 55%, #0c0e12 100%) !important;
+  border: 1px solid var(--fy-border);
+  box-shadow: var(--fy-shadow);
+  border-radius: var(--fy-radius-card);
+  color: #fff !important;
+}
+.progress-hero *,
+.student-overview__hero *,
+.cycle-overview__hero *,
+.module3-hero * {
+  color: #fff !important;
+}
+.progress-hero h1,
+.student-overview__hero h1,
+.cycle-overview__hero h1,
+.module3-hero h1,
+main:has(.admin-sidebar) .admin-enter .cycle-overview__hero h1,
+main:has(.cycle-overview) .cycle-overview__hero h1,
+.student-shell .student-overview__hero h1,
+.student-shell .progress-hero h1 {
+  color: #fff !important;
+}
+.cycle-overview__subtitle,
+.student-overview__hero p,
+.progress-hero p,
+.module3-hero p {
+  color: rgb(236 238 242 / 0.82) !important;
+}
+
+/* Alerts / toasts — semantic, not brand-flooded */
+main [role="status"],
+.progress-toast {
+  background: var(--fy-info-soft);
+  color: var(--fy-text);
+  border-color: color-mix(in srgb, var(--fy-info) 24%, white);
+  border-radius: var(--fy-radius-card);
+}
+main [role="alert"],
+.student-request-alert,
+.supervisor-alert {
+  background: var(--fy-danger-soft);
+  color: var(--fy-danger);
+  border-color: color-mix(in srgb, var(--fy-danger) 24%, white);
+  border-radius: var(--fy-radius-card);
+}
+
+main input:not([type="checkbox"]):not([type="radio"]),
+main select,
+main textarea {
+  background: var(--fy-surface);
+  color: var(--fy-text);
+  border-color: var(--fy-border);
+}
+main input:focus,
+main select:focus,
+main textarea:focus {
+  border-color: var(--fy-brand);
+  box-shadow: var(--fy-focus-ring);
+}
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--fy-brand);
+}
+
+main table thead,
+.progress-gantt__dates,
+.cycle-overview {
+  background: var(--fy-surface-muted);
+}
+.student-phase-card,
+.cycle-overview__card {
+  background: var(--fy-surface);
+  border-color: var(--fy-border);
+  border-radius: var(--fy-radius-card);
+  box-shadow: var(--fy-shadow);
+}
+.cycle-overview__card::before,
+.progress-summary__card::before,
+.progress-legend__swatch,
+.progress-hero__dot {
+  background: var(--fy-brand);
+}
+
+/* Shell geometry — one pad so sidebar aligns with content on every page */
+:root {
+  --fy-shell-header: 4rem;
+  --fy-shell-pad: 1.5rem;
+  --fy-shell-sidebar-top: calc(var(--fy-shell-header) + var(--fy-shell-pad));
+}
+
+.admin-shell__body,
+.student-shell .student-body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fy-shell-pad);
+  overflow: visible;
+}
+
+.admin-shell__content,
+.student-shell .student-content,
+.portal-shell .portal-content,
+main:has(.admin-sidebar) > div > section,
+main:has(.admin-sidebar) > header + div > section {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: var(--fy-shell-pad) !important;
+  overflow: visible !important;
+}
+
+.student-shell .student-content__inner,
+.admin-shell .admin-enter,
+main:has(.admin-sidebar) .admin-enter {
+  width: 100%;
+  max-width: none;
+  margin-inline: auto;
+}
 
 @media (max-width: 767px) {
-  .student-content { padding: 16px; }
-  main:has(.admin-sidebar) > header + div > section { padding: 16px; }
+  :root { --fy-shell-pad: 1rem; }
+  .admin-shell__content,
+  .student-shell .student-content { padding: var(--fy-shell-pad); }
+}
+
+/* Phase 2 authority — desktop sticky sidebar; mobile drawer takes no flow width */
+@media (min-width: 768px) {
+  .student-shell .student-sidebar.role-sidebar,
+  .admin-shell .student-sidebar.role-sidebar,
+  main:has(.admin-sidebar) .student-sidebar.role-sidebar {
+    position: sticky !important;
+    top: var(--fy-shell-sidebar-top) !important;
+    align-self: flex-start;
+    height: calc(100dvh - var(--fy-shell-sidebar-top) - var(--fy-shell-pad)) !important;
+    max-height: calc(100dvh - var(--fy-shell-sidebar-top) - var(--fy-shell-pad)) !important;
+    margin: var(--fy-shell-pad) 0 var(--fy-shell-pad) var(--fy-shell-pad) !important;
+    border-color: var(--fy-border) !important;
+    background: var(--fy-surface) !important;
+    color: var(--fy-text) !important;
+    box-shadow: var(--fy-shadow) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .student-shell .student-sidebar.role-sidebar,
+  .admin-shell .student-sidebar.role-sidebar,
+  main:has(.admin-sidebar) .student-sidebar.role-sidebar,
+  .student-shell .student-sidebar.role-sidebar.student-sidebar--collapsed,
+  .admin-shell .student-sidebar.role-sidebar.student-sidebar--collapsed,
+  .admin-shell.admin-sidebar-collapsed .student-sidebar.role-sidebar {
+    position: fixed !important;
+    inset: calc(var(--fy-shell-header) + 0.75rem) 0.85rem 0.85rem 0.85rem !important;
+    top: calc(var(--fy-shell-header) + 0.75rem) !important;
+    z-index: 40;
+    flex: 0 0 0 !important;
+    width: min(84vw, 304px) !important;
+    min-width: 0 !important;
+    max-width: min(84vw, 304px) !important;
+    height: auto !important;
+    max-height: calc(100dvh - var(--fy-shell-header) - 1.5rem) !important;
+    margin: 0 !important;
+    /* Collapse the flex item box so content uses full width */
+    padding-inline: 12px;
+    transform: translateX(calc(-100% - 24px));
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    border-color: var(--fy-border) !important;
+    background: var(--fy-surface) !important;
+    color: var(--fy-text) !important;
+    box-shadow: var(--fy-shadow) !important;
+  }
+
+  .student-shell .student-sidebar.role-sidebar.student-sidebar--open,
+  .admin-shell .student-sidebar.role-sidebar.student-sidebar--open,
+  main:has(.admin-sidebar) .student-sidebar.role-sidebar.student-sidebar--open {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .student-shell .student-body,
+  .admin-shell__body,
+  .admin-shell > div {
+    gap: 0 !important;
+  }
+
+  .admin-shell__content,
+  .student-shell .student-content {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+.student-shell .student-sidebar.role-sidebar .student-sidebar__item,
+.admin-shell .student-sidebar.role-sidebar .student-sidebar__item {
+  color: var(--fy-text) !important;
+  background: transparent !important;
+}
+
+.student-shell .student-sidebar.role-sidebar .student-sidebar__item:hover:not(:disabled):not([aria-current="page"]),
+.admin-shell .student-sidebar.role-sidebar .student-sidebar__item:hover:not(:disabled):not([aria-current="page"]) {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text) !important;
+}
+
+.student-shell .student-sidebar.role-sidebar .student-sidebar__item[aria-current="page"],
+.student-shell .student-sidebar.role-sidebar .student-sidebar__item[aria-current="page"]:hover,
+.student-shell .student-sidebar.role-sidebar .student-sidebar__item[aria-current="page"]:focus-visible,
+.admin-shell .student-sidebar.role-sidebar .student-sidebar__item[aria-current="page"],
+.admin-shell .student-sidebar.role-sidebar .student-sidebar__item[aria-current="page"]:hover,
+.admin-shell .student-sidebar.role-sidebar .student-sidebar__item[aria-current="page"]:focus-visible {
+  background: var(--fy-brand-soft) !important;
+  color: var(--fy-brand) !important;
+  border-color: color-mix(in srgb, var(--fy-brand) 28%, white) !important;
+  box-shadow: none !important;
+}
+
+.student-shell .student-sidebar.role-sidebar .student-sidebar__item[aria-current="page"] *,
+.student-shell .student-sidebar.role-sidebar .student-sidebar__item[aria-current="page"]:hover *,
+.admin-shell .student-sidebar.role-sidebar .student-sidebar__item[aria-current="page"] *,
+.admin-shell .student-sidebar.role-sidebar .student-sidebar__item[aria-current="page"]:hover * {
+  color: var(--fy-brand) !important;
+}
+
+.student-shell .student-sidebar.role-sidebar .student-sidebar__icon,
+.admin-shell .student-sidebar.role-sidebar .student-sidebar__icon {
+  background: var(--fy-surface-muted) !important;
+  border-color: var(--fy-border) !important;
+  color: var(--fy-text-secondary) !important;
+}
+
+.student-shell .student-sidebar.role-sidebar .student-sidebar__item[aria-current="page"] .student-sidebar__icon,
+.admin-shell .student-sidebar.role-sidebar .student-sidebar__item[aria-current="page"] .student-sidebar__icon {
+  background: var(--fy-surface) !important;
+  border-color: color-mix(in srgb, var(--fy-brand) 30%, white) !important;
+  color: var(--fy-brand) !important;
+}
+
+.student-shell .student-sidebar.role-sidebar .student-sidebar__collapse,
+.admin-shell .student-sidebar.role-sidebar .student-sidebar__collapse {
+  background: var(--fy-surface) !important;
+  border: 1px solid var(--fy-border) !important;
+  color: var(--fy-brand) !important;
+}
+
+.student-shell .student-sidebar.role-sidebar .student-sidebar__collapse svg,
+.admin-shell .student-sidebar.role-sidebar .student-sidebar__collapse svg {
+  color: var(--fy-brand) !important;
+  stroke: currentColor !important;
+}
+
+.student-shell .student-sidebar.role-sidebar .role-sidebar__section-heading,
+.admin-shell .student-sidebar.role-sidebar .role-sidebar__section-heading {
+  background: transparent !important;
+  color: var(--fy-text-secondary) !important;
+}
+
+.student-shell .student-sidebar.role-sidebar .role-sidebar__section-heading:hover,
+.admin-shell .student-sidebar.role-sidebar .role-sidebar__section-heading:hover {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text) !important;
+}
+
+.student-shell .student-sidebar.role-sidebar .role-sidebar__section-title,
+.admin-shell .student-sidebar.role-sidebar .role-sidebar__section-title {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+}
+
+.student-content__inner {
+  width: 100%;
+  max-width: none;
+  margin-inline: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
   button { transition: none; }
   button:not(:disabled):hover { transform: none; }
-}
-
-/* Blue and white palette across every role and public account screen.
-   Dark blue is reserved for readable text on the light blue surfaces. */
-:root { --app-primary: #acdfff; --app-primary-hover: #90d3fc; --app-selected: #eff8ff; --app-page: #eff8ff; --app-border: #cce7f9; }
-main:has(.admin-sidebar) { --admin-primary: #acdfff; --admin-primary-hover: #90d3fc; --admin-selected: #eff8ff; --admin-border: #cce7f9; }
-.student-shell .student-sidebar,
-main:has(.admin-sidebar) .admin-sidebar { background: #acdfff !important; border-color: #cce7f9 !important; box-shadow: 0 8px 24px rgb(34 117 173 / .08); }
-.student-sidebar button, .student-sidebar span, .student-sidebar svg,
-main:has(.admin-sidebar) .admin-sidebar nav button,
-main:has(.admin-sidebar) .admin-sidebar nav span { color: #183f60 !important; }
-.student-sidebar .student-sidebar__icon,
-main:has(.admin-sidebar) .admin-nav-icon { background: #eff8ff !important; border-color: #fff !important; }
-.student-sidebar .student-sidebar__item[aria-current="page"],
-.student-sidebar .student-sidebar__item:hover,
-main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"],
-main:has(.admin-sidebar) .admin-sidebar nav button:hover { background: #fff !important; color: #183f60 !important; box-shadow: 0 4px 12px rgb(34 117 173 / .1) !important; }
-.student-sidebar button::before, .admin-sidebar button::before { background: #69bff3 !important; }
-.student-sidebar__collapse, .student-sidebar__close { background: #fff !important; border-color: #cce7f9 !important; }
-.progress-hero, .student-overview__hero, .cycle-overview__hero,
-.module3-hero { background: #acdfff !important; border-color: #cce7f9 !important; box-shadow: 0 12px 30px rgb(34 117 173 / .1) !important; }
-.progress-hero *, .student-overview__hero *, .cycle-overview__hero * { color: #183f60 !important; }
-.auth-photo-background { background: #183f60; }
-.auth-card { background: rgb(248 251 253 / .78); border-color: rgb(255 255 255 / .62); box-shadow: 0 18px 45px rgb(8 35 51 / .28); }
-main:has(.auth-card) > .relative > section,
-main:has(.auth-card) > .relative > section * { color: #fff !important; }
-.progress-bar, .progress-card__icon, .progress-legend__swatch,
-.student-avatar, .admin-avatar, .student-role, .admin-role, .student-status,
-[class*="status--"], .progress-hero__badge { background: #acdfff !important; color: #183f60 !important; border-color: #cce7f9 !important; }
-.progress-summary__card::before, .progress-hero__dot { background: #acdfff !important; box-shadow: none; }
-main button[class*="bg-"], main button[type="submit"],
-.student-request-actions button, .supervisor-actions button, .progress-button,
-main label:has(> input[type="file"].sr-only) { background: #acdfff !important; color: #183f60 !important; border-color: #9ed5f5 !important; box-shadow: none !important; }
-main button[class*="bg-"]:hover, .progress-button:hover { background: #d3edff !important; }
-main button:disabled { background: #eff8ff !important; color: #52738d !important; box-shadow: none !important; }
-main button[class*="text-red"], main button[class*="text-[#"], main button[class*="text-green"] { color: #183f60 !important; border-color: #cce7f9; }
-main [role="status"], main [role="alert"], .progress-toast,
-.student-request-alert, .supervisor-alert { background: #eff8ff !important; color: #183f60 !important; border-color: #cce7f9 !important; }
-main input:not([type="checkbox"]):not([type="radio"]), main select, main textarea { background: #fff !important; color: #183f60 !important; border-color: #cce7f9 !important; }
-main input:focus, main select:focus, main textarea:focus { border-color: #69bff3 !important; box-shadow: 0 0 0 3px rgb(172 223 255 / .45) !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: #69bff3; }
-/* Approved brand blue. Keep white text on filled controls for contrast. */
-:root { --brand-blue: #124bc4; --ds-purple: #124bc4; --ds-mint: #124bc4; --ds-orange: #124bc4; --app-primary: #124bc4; }
-.student-shell .student-sidebar, main:has(.admin-sidebar) .admin-sidebar,
-.progress-hero, .student-overview__hero, .cycle-overview__hero,
-main button[class*="bg-"], main button[type="submit"],
-.student-request-actions button, .supervisor-actions button, .progress-button,
-main label:has(> input[type="file"].sr-only) { background: #124bc4 !important; color: #fff !important; }
-.progress-hero *, .student-overview__hero *, .cycle-overview__hero *,
-.student-sidebar button, .student-sidebar span, .student-sidebar svg,
-main:has(.admin-sidebar) .admin-sidebar nav button,
-main:has(.admin-sidebar) .admin-sidebar nav span { color: #fff !important; }
-.student-sidebar .student-sidebar__item[aria-current="page"],
-.student-sidebar .student-sidebar__item[aria-current="page"] *,
-.student-sidebar .student-sidebar__item:hover *,
-.student-sidebar .student-sidebar__icon *,
-main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"],
-main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"] *,
-main:has(.admin-sidebar) .admin-nav-icon * { color: #124bc4 !important; }
-input[type="checkbox"], input[type="radio"] { accent-color: #124bc4; }
-main table thead, .progress-gantt__dates, .cycle-overview { background: #eff8ff !important; }
-.student-phase-card, .cycle-overview__card { background: #fff !important; border-color: #cce7f9 !important; }
-.cycle-overview__card::before { background: #acdfff !important; }
-
-/* Reference royal-blue header and matching interaction states. */
-.student-header, main:has(.admin-sidebar) > header {
-  background: #124bc4 !important;
-  border-color: #0d3c9f !important;
-  color: #fff !important;
-}
-.student-header .student-brand, .student-header .student-brand svg,
-.student-header .fyp-hub-brand, .student-header .fyp-hub-brand svg,
-.student-header .student-account__name, .student-header .student-menu,
-main:has(.admin-sidebar) > header .admin-brand, main:has(.admin-sidebar) > header .admin-brand svg,
-main:has(.admin-sidebar) .admin-account-name { color: #fff !important; }
-.student-header .student-logout, main:has(.admin-sidebar) .admin-logout {
-  background: #fff !important;
-  color: #124bc4 !important;
-  border-color: #fff !important;
-}
-main button[class*="bg-"]:not(:disabled):hover,
-.progress-button:not(:disabled):hover { background: #0d3c9f !important; color: #fff !important; }
-.progress-summary__card::before, .cycle-overview__card::before,
-.progress-legend__swatch { background: #124bc4 !important; }
-main input:focus, main select:focus, main textarea:focus {
-  border-color: #124bc4 !important;
-  box-shadow: 0 0 0 3px rgb(18 75 196 / .16) !important;
 }

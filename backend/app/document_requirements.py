@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from .auth import get_current_user, require_roles, validate_mutating_origin
 from .database import get_db
 from .models import AcademicCycle, DocumentArchiveReviewQueue, DocumentRequirementSection, DocumentSubmission, DocumentSubmissionReviewEvent, DocumentSubmissionVersion, DocumentUploadRequirement, SupervisorAssignment, SupervisorRequest, Team, TeamMember, User, UserRole
-from .schemas.document_requirements import RequirementWrite, RequirementPatch, RequirementOut, SubmissionOut, VersionOut
+from .schemas.document_requirements import RequirementWrite, RequirementPatch, RequirementOut, ReviewEventOut, SubmissionOut, VersionOut
 from .config import settings
 from .document_preview import DocumentPreviewError, render_document_preview
 
@@ -265,7 +265,17 @@ def _validate(req, upload, data):
 
 def _submission_out(row, db):
     versions = db.scalars(select(DocumentSubmissionVersion).where(DocumentSubmissionVersion.submission_id == row.id).order_by(DocumentSubmissionVersion.version_number)).all()
-    return SubmissionOut(id=row.id, requirement_id=row.requirement_id, academic_cycle_id=row.academic_cycle_id, group_id=row.group_id, project_id=row.project_id, requirement_section_id=row.requirement_section_id, student_id=row.student_id, uploader_id=row.uploaded_by_id, status=row.status, is_late=row.is_late, review_comment=row.review_comment, reviewed_by_id=row.reviewed_by_id, reviewed_at=row.reviewed_at, uploaded_at=row.uploaded_at, updated_at=row.updated_at, versions=[VersionOut.model_validate(v).model_copy(update={"uploaded_by_id": v.uploaded_by_id, "download_url": f"/api/v1/document-requirements/submissions/{row.id}/versions/{v.id}/download", "preview_url": f"/api/v1/document-requirements/submissions/{row.id}/versions/{v.id}/preview"}) for v in versions])
+    events = db.scalars(select(DocumentSubmissionReviewEvent).where(DocumentSubmissionReviewEvent.submission_id == row.id).order_by(DocumentSubmissionReviewEvent.created_at, DocumentSubmissionReviewEvent.id)).all()
+    reviewer_ids = {event.reviewer_id for event in events}
+    reviewers = {user.id: user for user in db.scalars(select(User).where(User.id.in_(reviewer_ids))).all()} if reviewer_ids else {}
+    return SubmissionOut(
+        id=row.id, requirement_id=row.requirement_id, academic_cycle_id=row.academic_cycle_id, group_id=row.group_id, project_id=row.project_id,
+        requirement_section_id=row.requirement_section_id, student_id=row.student_id, uploader_id=row.uploaded_by_id, status=row.status,
+        is_late=row.is_late, review_comment=row.review_comment, reviewed_by_id=row.reviewed_by_id, reviewed_at=row.reviewed_at,
+        uploaded_at=row.uploaded_at, updated_at=row.updated_at,
+        versions=[VersionOut.model_validate(v).model_copy(update={"uploaded_by_id": v.uploaded_by_id, "download_url": f"/api/v1/document-requirements/submissions/{row.id}/versions/{v.id}/download", "preview_url": f"/api/v1/document-requirements/submissions/{row.id}/versions/{v.id}/preview"}) for v in versions],
+        review_history=[ReviewEventOut(id=event.id, status=event.status, version_id=event.version_id, reviewer_id=event.reviewer_id, reviewer_name=reviewers.get(event.reviewer_id).full_name if reviewers.get(event.reviewer_id) else None, comment=event.comment, created_at=event.created_at) for event in events],
+    )
 
 @router.get("/student", response_model=list[RequirementOut])
 @student_router.get("/api/v1/student/document-requirements", response_model=list[RequirementOut])
@@ -398,4 +408,5 @@ def under_review(requirement_id:int, submission_id:int, _: object=Depends(valida
 @router.post("/{requirement_id}/submissions/{submission_id}/reject", response_model=SubmissionOut)
 def reject(requirement_id:int, submission_id:int, comment:str|None=None, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "REJECTED", comment, actor, db)
 @router.post("/{requirement_id}/submissions/{submission_id}/request-replacement", response_model=SubmissionOut)
+@router.post("/{requirement_id}/submissions/{submission_id}/request-changes", response_model=SubmissionOut)
 def replacement(requirement_id:int, submission_id:int, comment:str|None=None, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "RESUBMISSION_REQUIRED", comment, actor, db)

@@ -1,5 +1,4 @@
-"""Merge the active migration branches into one application head."""
-
+"""Preserve the legacy merge revision used by existing deployments."""
 
 from alembic import op
 
@@ -15,6 +14,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # This revision was already applied by earlier deployments.
     pass
 
 

@@ -11,6 +11,7 @@ depends_on = None
 
 
 def upgrade():
+    existing = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("archived_projects")}
     columns = [
         ("project_code", sa.String(length=120)), ("group_leader_name", sa.String(length=255)),
         ("group_leader_registration_number", sa.String(length=120)), ("group_members", postgresql.JSONB(), sa.text("'[]'::jsonb")),
@@ -22,15 +23,21 @@ def upgrade():
         ("external_reference", sa.String(length=1000)), ("notes", sa.Text()),
     ]
     for item in columns:
+        name = item[0]
+        if name in existing:
+            continue
         if len(item) == 3:
-            name, type_, default = item
+            _, type_, default = item
             op.add_column("archived_projects", sa.Column(name, type_, nullable=False, server_default=default))
             op.alter_column("archived_projects", name, server_default=None)
         else:
-            name, type_ = item
+            _, type_ = item
             op.add_column("archived_projects", sa.Column(name, type_, nullable=True))
-    op.add_column("archived_projects", sa.Column("is_visible_to_students", sa.Boolean(), nullable=False, server_default=sa.true()))
-    op.create_index("ix_archived_projects_cycle_code", "archived_projects", ["academic_cycle_id", "project_code"], unique=False)
+    if "is_visible_to_students" not in existing:
+        op.add_column("archived_projects", sa.Column("is_visible_to_students", sa.Boolean(), nullable=False, server_default=sa.true()))
+    indexes = {index["name"] for index in sa.inspect(op.get_bind()).get_indexes("archived_projects")}
+    if "ix_archived_projects_cycle_code" not in indexes:
+        op.create_index("ix_archived_projects_cycle_code", "archived_projects", ["academic_cycle_id", "project_code"], unique=False)
 
 
 def downgrade():

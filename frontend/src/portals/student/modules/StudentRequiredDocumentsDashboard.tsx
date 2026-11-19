@@ -15,7 +15,8 @@ type Requirement = {
   status?: string;
 };
 type Version = { id: number; version_number: number; original_filename: string; uploaded_at: string; download_url?: string; preview_url?: string };
-type Submission = { status?: string; is_late?: boolean; review_comment?: string | null; uploaded_at?: string; versions: Version[] };
+type ReviewEvent = { id: number; status: string; reviewer_name?: string | null; comment?: string | null; created_at: string };
+type Submission = { status?: string; is_late?: boolean; review_comment?: string | null; reviewed_at?: string | null; uploaded_at?: string; versions: Version[]; review_history?: ReviewEvent[] };
 type GroupContext = { group_name?: string | null; academic_cycle?: string | null; project?: { title?: string | null } | null };
 type PreviewState = { url: string; title: string; page: number; pages: number; zoom: number; loading: boolean; error?: string };
 
@@ -37,6 +38,8 @@ async function downloadVersion(api: string, version: Version) {
 }
 
 const statusLabel = (value?: string) => ({
+  DRAFT: "Draft",
+  UNDER_REVIEW: "Under review",
   UPLOADED: "Submitted · awaiting review",
   ACCEPTED: "Approved",
   REJECTED: "Rejected",
@@ -170,5 +173,6 @@ export function StudentRequiredDocumentsDashboard({ api }: { api: string }) {
     })}</div></section>)}</div>}
 
     {preview && <div role="dialog" aria-modal="true" aria-label={`Preview ${preview.title}`} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"><div className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">{preview.title}</h2><p className="text-xs text-slate-500">Inline preview · use Download only when a local copy is needed</p></div><div className="flex flex-wrap items-center gap-2 text-sm"><button type="button" disabled={preview.page <= 1} onClick={() => setPreview((current) => current && ({ ...current, page: current.page - 1 }))} className="rounded border px-2 py-1">Previous</button><span>Page {preview.page} / {preview.pages}</span><button type="button" disabled={preview.page >= preview.pages} onClick={() => setPreview((current) => current && ({ ...current, page: current.page + 1 }))} className="rounded border px-2 py-1">Next</button><button type="button" onClick={() => setPreview((current) => current && ({ ...current, zoom: Math.max(50, current.zoom - 10) }))} className="rounded border px-2 py-1">−</button><span>{preview.zoom}%</span><button type="button" onClick={() => setPreview((current) => current && ({ ...current, zoom: Math.min(200, current.zoom + 10) }))} className="rounded border px-2 py-1">+</button><button type="button" onClick={closePreview} className="rounded bg-slate-800 px-3 py-1 text-white">Close</button></div></div><div className="min-h-0 flex-1 bg-slate-100 p-3">{preview.loading ? <p className="p-6 text-sm">Generating preview…</p> : preview.error ? <p role="alert" className="p-6 text-sm text-red-700">{preview.error}</p> : <iframe title={`Preview of ${preview.title}`} src={`${preview.url}#page=${preview.page}&zoom=${preview.zoom}`} className="h-full w-full rounded border bg-white" />}</div></div></div>}
+    {Object.entries(submissions).some(([, submission]) => Boolean(submission.review_history?.length)) && <section className="mt-6 rounded-xl border border-[#dce4de] bg-white p-5"><h3 className="text-lg font-semibold">Review history</h3><div className="mt-3 grid gap-3">{requirements.map((item) => { const history = submissions[item.id]?.review_history || []; return history.length ? <article key={item.id} className="rounded-lg border bg-slate-50 p-3"><strong>{item.title}</strong><div className="mt-2 grid gap-2 text-sm">{history.map((event) => <div key={event.id}><strong>{statusLabel(event.status)}</strong> · {event.reviewer_name || "Reviewer"} · {new Date(event.created_at).toLocaleString()}{event.comment && <p className="text-slate-600">{event.comment}</p>}</div>)}</div></article> : null; })}</div></section>}
   </section>;
 }

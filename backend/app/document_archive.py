@@ -147,6 +147,8 @@ def _archive_rows(db: Session, cycle: AcademicCycle, group: Team, requirements: 
     reviewers = {user.id: user for user in db.scalars(select(User).where(User.id.in_(reviewer_ids))).all()} if reviewer_ids else {}
     reviewers.update({user.id: user for user in db.scalars(select(User).where(User.id.in_([row.reviewed_by_id for row in submissions if row.reviewed_by_id]))).all()} if submissions else {})
     project = _project(db, group)
+    project_ids = {submission.project_id for submission in submissions if submission.project_id is not None}
+    projects = {item.id: item for item in db.scalars(select(SupervisorRequest).where(SupervisorRequest.id.in_(project_ids))).all()} if project_ids else {}
     rows = []
     for requirement in requirements:
         submission = submission_by_requirement.get(requirement.id)
@@ -155,6 +157,7 @@ def _archive_rows(db: Session, cycle: AcademicCycle, group: Team, requirements: 
         student = students.get(submission.student_id) if submission else None
         uploader = students.get(submission.uploaded_by_id) if submission and submission.uploaded_by_id else None
         reviewer = reviewers.get(submission.reviewed_by_id) if submission and submission.reviewed_by_id else None
+        row_project = projects.get(submission.project_id) if submission and submission.project_id is not None else project
         history = [{"id": event.id, "status": _status(requirement, type("ReviewState", (), {"status": event.status})()), "reviewer": _user(reviewers.get(event.reviewer_id)), "reviewed_at": event.created_at, "comment": event.comment, "version_id": event.version_id} for event in events_by_submission.get(submission.id, [])] if submission else []
         rows.append({
             "id": requirement.id,
@@ -163,7 +166,7 @@ def _archive_rows(db: Session, cycle: AcademicCycle, group: Team, requirements: 
             "group_id": group.id,
             "group_code": _group_code(cycle, group),
             "project_id": submission.project_id if submission else (project.id if project else None),
-            "project_title": project.title if project else None,
+            "project_title": row_project.title if row_project else None,
             "requirement_section_id": requirement.section_id,
             "requirement_section": _section(db, requirement)["name"],
             "requirement_id": requirement.id,
