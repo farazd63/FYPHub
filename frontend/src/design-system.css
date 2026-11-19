@@ -20,6 +20,10 @@ button, input, select, textarea { font: inherit; }
 button { transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease; }
 button:not(:disabled):hover { transform: translateY(-1px); }
 
+/* One shared wordmark and mark are used by every authenticated dashboard. */
+.fyp-hub-brand { display: flex; align-items: center; gap: 10px; color: var(--ds-ink); font-size: 17px; font-weight: 750; letter-spacing: -0.02em; white-space: nowrap; }
+.fyp-hub-brand svg { width: 30px; height: 30px; flex: 0 0 30px; }
+
 .student-shell,
 main:has(.admin-sidebar),
 .supervisor-page,
@@ -187,8 +191,9 @@ main table thead, .progress-gantt__dates, .cycle-overview { background: #eff8ff 
   color: #fff !important;
 }
 .student-header .student-brand, .student-header .student-brand svg,
+.student-header .fyp-hub-brand, .student-header .fyp-hub-brand svg,
 .student-header .student-account__name, .student-header .student-menu,
-main:has(.admin-sidebar) > header strong,
+main:has(.admin-sidebar) > header .admin-brand, main:has(.admin-sidebar) > header .admin-brand svg,
 main:has(.admin-sidebar) .admin-account-name { color: #fff !important; }
 .student-header .student-logout, main:has(.admin-sidebar) .admin-logout {
   background: #fff !important;

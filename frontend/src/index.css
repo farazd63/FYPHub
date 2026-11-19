@@ -5,7 +5,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* Keep dashboard headers focused on the feature itself; role/section eyebrow labels are intentionally omitted. */
 .cycle-overview__eyebrow,
-.academic-cycle-dashboard__eyebrow,
 .student-overview__eyebrow,
 .module3-eyebrow,
 .module3-kicker,

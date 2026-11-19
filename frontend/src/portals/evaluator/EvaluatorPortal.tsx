@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { EvaluatorOverview } from "./EvaluatorOverview";
 import { EvaluatorSidebar } from "./EvaluatorSidebar";
+import { FypHubBrand } from "../shared/FypHubBrand";
 import "../student/student.css";
 import "./evaluator.css";
 
@@ -32,7 +33,7 @@ export function EvaluatorPortal({ user, onLogout }: Props) {
       <header className="student-header">
         <div className="student-header__left">
           <button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>☰</button>
-          <div className="student-brand"><svg aria-hidden="true" viewBox="0 0 56 40" fill="none"><path d="m4 14 24-10 24 10-24 10L4 14Z" fill="currentColor"/><path d="M15 20v8c5 5 21 5 26 0v-8M49 16v11" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg><span>FYPHub</span></div>
+          <FypHubBrand className="student-brand" />
           <span className="student-role">Evaluator</span>
         </div>
         <div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name">{user.full_name}</span><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div>

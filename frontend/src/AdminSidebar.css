@@ -23,9 +23,9 @@ main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"]::before 
 
 /* Header and navigation presentation, scoped to the Admin portal. */
 main:has(.admin-sidebar) > header { box-shadow: 0 2px 14px rgba(28, 56, 111, .08), inset 0 -1px rgba(91, 123, 196, .16); }
-main:has(.admin-sidebar) .admin-brand { padding: 5px 8px; margin-left: -8px; border-radius: 10px; color: #1e3965; transition: background .2s ease, box-shadow .2s ease; }
+main:has(.admin-sidebar) .admin-brand { display: flex; align-items: center; gap: 10px; padding: 5px 8px; margin-left: -8px; border-radius: 10px; color: #1e3965; transition: background .2s ease, box-shadow .2s ease; }
 main:has(.admin-sidebar) .admin-brand:hover { background: #f2f6ff; box-shadow: 0 0 20px rgba(75, 118, 214, .12); }
-main:has(.admin-sidebar) .admin-brand svg { color: #365fc0; filter: drop-shadow(0 2px 5px rgba(68, 112, 213, .2)); }
+main:has(.admin-sidebar) .admin-brand svg { width: 30px; height: 30px; flex: 0 0 30px; color: #365fc0; filter: drop-shadow(0 2px 5px rgba(68, 112, 213, .2)); }
 main:has(.admin-sidebar) .admin-role { align-items: center; gap: 5px; padding: 5px 10px; border: 1px solid #c7d5f5; border-radius: 999px; background: linear-gradient(110deg, #eef5ff, #eeedff); color: #344f9b; font-size: .72rem; font-weight: 700; }
 .admin-role svg { width: 15px; height: 15px; flex: none; }
 main:has(.admin-sidebar) .admin-account { align-items: center; gap: 10px; }
@@ -96,8 +96,8 @@ main:has(.admin-sidebar) .admin-sidebar .admin-nav-icon { color: #dce8ff; backgr
 main:has(.admin-sidebar) .admin-sidebar nav > span[aria-disabled="true"] .admin-nav-icon { color: #91a6c8; background: #182f59; border-color: #385887; opacity: .85; }
 .admin-sidebar-toggle { background: #214b9b; border-color: #78a4ff; color: #fff; box-shadow: 0 3px 12px rgba(3, 16, 45, .35); }
 .admin-sidebar-toggle:hover { background: #3567d6; }
-.admin-brand { color: #1e3965; }
-.admin-brand svg { color: #365fc0; }
+.admin-brand { display: flex; align-items: center; gap: 10px; color: #1e3965; }
+.admin-brand svg { width: 30px; height: 30px; flex: 0 0 30px; color: #365fc0; }
 .admin-role { align-items: center; gap: 5px; padding: 5px 10px; border: 1px solid #c7d5f5; border-radius: 999px; background: linear-gradient(110deg, #eef5ff, #eeedff); color: #344f9b; font-size: .72rem; font-weight: 700; }
 .admin-account { align-items: center; gap: 10px; }
 .admin-account-name { color: #263d61; }

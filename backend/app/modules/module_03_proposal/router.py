@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
@@ -23,12 +23,13 @@ from ...auth import get_current_user, require_roles, utc_now, validate_mutating_
 from ...config import settings
 from ...database import get_db
 from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, SupervisorAssignment, Team, TeamMember, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
-from ...pdf_extraction import PdfExtractionError, extract_proposal_document
-from .compliance_engine import build_change_summary, build_compliance_report
-from .template_extractor import extract_template_rules
+from ...pdf_extraction import PdfExtractionError, extract_pdf_text_for_summary, extract_proposal_document
+from ...document_preview import DocumentPreviewError, render_document_preview
+from .compliance_engine import build_change_summary, build_compliance_report, build_document_difference_issues
+from .template_extractor import extract_template_rules, normalize_template_rules
 from ...team_lifecycle import lock_team
 from ...ai_provider import run_ai_json
-from .ai_report import REPORT_VERSION, assemble_report, generate_full_report
+from .ai_report import REPORT_VERSION, generate_full_report
 
 router = APIRouter(prefix="/api/v1/proposal-compliance", tags=["module-3-proposal-compliance"])
 REVIEW_ROLES = (UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR, UserRole.PANEL_MEMBER)
@@ -82,9 +83,57 @@ def _storage_path(kind: str, identifier: str, filename: str) -> Path:
     return root / _safe_filename(filename)
 
 
+def _safe_stored_path(storage_key: str | None) -> Path | None:
+    if not storage_key:
+        return None
+    root = settings.document_storage_root.resolve()
+    candidate = (root / storage_key).resolve()
+    return candidate if candidate.is_relative_to(root) else None
+
+
+def _summary_source_text(row: ProposalComplianceSubmission) -> str:
+    """Use the stored report as the source, refreshing PDF text with PyMuPDF."""
+    path = _safe_stored_path(getattr(row, "storage_key", None))
+    if path is not None and path.is_file():
+        try:
+            if getattr(row, "content_type", "") == "application/pdf":
+                readable_text = extract_pdf_text_for_summary(path.read_bytes())
+                if len(readable_text) >= 20:
+                    return readable_text
+            extracted = extract_proposal_document(path.read_bytes(), row.content_type, row.filename)
+            if len(extracted.extracted_text) >= 20:
+                return extracted.extracted_text
+        except (OSError, PdfExtractionError):
+            pass
+    return row.extracted_text or ""
+
+
+def _inline_headers(filename: str, page_count: int) -> dict[str, str]:
+    safe_name = _safe_filename(filename)
+    return {"Content-Disposition": f'inline; filename="{safe_name}"', "X-Preview-Page-Count": str(max(1, page_count)), "Cache-Control": "private, max-age=300"}
+
+
+def _preview_response(path: Path, content_type: str | None, filename: str | None) -> Response:
+    try:
+        preview = render_document_preview(path, content_type, filename, settings.document_storage_root)
+    except DocumentPreviewError as error:
+        raise _error(error.code, error.message, 422 if error.code != "document_missing" else 404) from error
+    return Response(content=preview.content, media_type=preview.media_type, headers=_inline_headers(preview.filename, preview.page_count))
+
+
+def _template_source_path(session: Session, version_id: int) -> tuple[Path, str] | None:
+    rule = session.scalar(select(AcademicRuleVersion).where(AcademicRuleVersion.template_reference_version_id == version_id).order_by(desc(AcademicRuleVersion.version_number)).limit(1))
+    source = (rule.rules or {}).get("source") if rule else None
+    storage_key = source.get("storage_key") if isinstance(source, dict) else None
+    path = _safe_stored_path(storage_key if isinstance(storage_key, str) else None)
+    if path is None:
+        return None
+    return path, path.name
+
+
 def _template_rules(session: Session, version_id: int) -> dict[str, Any]:
     rule = session.scalar(select(AcademicRuleVersion).where(AcademicRuleVersion.template_reference_version_id == version_id).order_by(desc(AcademicRuleVersion.version_number)).limit(1))
-    return dict(rule.rules) if rule else {}
+    return normalize_template_rules(dict(rule.rules)) if rule else {}
 
 
 def _template_out(session: Session, version: TemplateReferenceVersion) -> dict[str, Any]:
@@ -239,7 +288,7 @@ def activate_template(version_id: int, request: Request, actor: User = Depends(r
     if version is None:
         raise _error("template_not_found", "Template version was not found.", 404)
     rules = _template_rules(session, version.id)
-    if not rules.get("required_sections") and not any(key in rules for key in ("page_size", "font_family", "font_size_pt", "margin_mm", "line_spacing")):
+    if not rules.get("required_sections") and not any(key in rules for key in ("page_size", "top_margin_mm", "bottom_margin_mm", "left_margin_mm", "right_margin_mm", "font_family", "font_size_pt", "line_spacing", "alignment", "heading_style", "page_numbering", "required_references", "required_captions", "required_tables", "required_figures", "required_appendices")):
         raise _error("template_incomplete", "The template has no confirmed extractable rules and cannot be activated.", 409)
     session.execute(update(TemplateReferenceVersion).where(TemplateReferenceVersion.template_reference_id == version.template_reference_id).values(is_active=False, activated_at=None, activated_by_id=None))
     version.is_active = True
@@ -267,20 +316,36 @@ def deactivate_template(version_id: int, request: Request, actor: User = Depends
 
 @router.delete("/templates/{version_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_template(version_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> Response:
-    """Delete an unused uploaded template version and its extracted rule snapshot."""
+    """Delete an inactive template while preserving historical compliance results."""
     validate_mutating_origin(request)
     version = session.get(TemplateReferenceVersion, version_id)
     if version is None:
         raise _error("template_not_found", "Template version was not found.", 404)
     if version.is_active:
         raise _error("template_active", "Deactivate the template before deleting it.", 409)
+    source = _template_source_path(session, version_id)
     try:
+        # Historical submissions keep their measured report snapshot, so they
+        # no longer need a live FK to a template that an administrator removes.
+        # Detach the reference before deleting the immutable template row.
+        session.execute(
+            update(ProposalComplianceSubmission)
+            .where(ProposalComplianceSubmission.template_reference_version_id == version_id)
+            .values(template_reference_version_id=None)
+        )
         session.execute(delete(AcademicRuleVersion).where(AcademicRuleVersion.template_reference_version_id == version_id))
         session.delete(version)
         session.commit()
     except Exception as error:
         session.rollback()
-        raise _error("template_in_use", "This template is referenced by historical submissions and cannot be deleted.", 409) from error
+        raise _error("template_delete_failed", "The template could not be deleted. No historical submission was changed.", 409) from error
+    if source is not None:
+        try:
+            source[0].unlink(missing_ok=True)
+        except OSError:
+            # Database deletion is already complete; an orphaned source file
+            # should not turn a successful admin delete into a 500 response.
+            pass
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -297,13 +362,16 @@ def save_template_rules(
     version = session.get(TemplateReferenceVersion, version_id)
     if version is None:
         raise _error("template_not_found", "Template version was not found.", 404)
-    allowed = {"page_size", "margin_mm", "right_margin_mm", "top_margin_mm", "bottom_margin_mm", "font_family", "font_size_pt", "line_spacing", "alignment", "heading_style", "page_numbering", "table_count", "figure_count", "caption_count", "reference_count", "appendix_count", "required_sections", "required_references", "required_appendices", "required_captions", "source"}
-    cleaned: dict[str, Any] = {key: value for key, value in rules.items() if key in allowed}
-    for key in ("margin_mm", "right_margin_mm", "top_margin_mm", "bottom_margin_mm", "font_size_pt", "line_spacing", "table_count", "figure_count", "caption_count", "reference_count", "appendix_count", "required_references", "required_appendices", "required_captions"):
+    allowed = {"page_size", "top_margin_mm", "bottom_margin_mm", "left_margin_mm", "right_margin_mm", "font_family", "font_size_pt", "line_spacing", "alignment", "heading_style", "page_numbering", "required_sections", "required_references", "required_captions", "required_tables", "required_figures", "required_appendices"}
+    cleaned: dict[str, Any] = normalize_template_rules({key: value for key, value in rules.items() if key in allowed})
+    existing_rules = _template_rules(session, version.id)
+    if isinstance(existing_rules.get("source"), dict):
+        cleaned["source"] = existing_rules["source"]
+    for key in ("top_margin_mm", "bottom_margin_mm", "left_margin_mm", "right_margin_mm", "font_size_pt", "line_spacing", "required_references", "required_appendices", "required_captions", "required_tables", "required_figures"):
         if key in cleaned and cleaned[key] not in (None, ""):
             try:
                 number = float(cleaned[key])
-                cleaned[key] = int(number) if number.is_integer() and key in {"table_count", "figure_count"} else number
+                cleaned[key] = int(number) if number.is_integer() and key.startswith("required_") else number
             except (TypeError, ValueError) as error:
                 raise _error("invalid_rule_value", f"{key} must be numeric.", 422) from error
     if "page_numbering" in cleaned and isinstance(cleaned["page_numbering"], str):
@@ -372,7 +440,7 @@ async def submit_proposal(
         session.commit()
         return {"submission": _submission_out(session, row), "report": None}
     history = _version_history(session, row)
-    report = build_compliance_report(submission=row, rules=rules, previous_versions=history)
+    report = build_compliance_report(submission=row, rules=rules, previous_versions=history, template_name=template_version.title)
     session.add(ProposalComplianceReport(submission_id=row.id, status=report["reportSummary"]["status"], score=report["reportSummary"]["score"], total_checks=report["finalResults"]["totalChecks"], report=report))
     session.commit()
     if team is not None and not is_draft:
@@ -387,7 +455,7 @@ def _run_submission(session: Session, row: ProposalComplianceSubmission, templat
     row.status = "SUBMITTED" if row.status == "DRAFT" else row.status
     row.processing_status = "COMPLETED"
     row.error_message = None
-    report_data = build_compliance_report(submission=row, rules=rules, previous_versions=history)
+    report_data = build_compliance_report(submission=row, rules=rules, previous_versions=history, template_name=template_version.title)
     saved = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
     if saved is None:
         saved = ProposalComplianceReport(submission_id=row.id, status=report_data["reportSummary"]["status"], score=report_data["reportSummary"]["score"], total_checks=report_data["finalResults"]["totalChecks"], report=report_data)
@@ -489,6 +557,10 @@ def _report_fingerprint(report: dict) -> str:
     return hashlib.sha256(json.dumps({key: value for key, value in report.items() if key != "aiSummary"}, sort_keys=True, default=str).encode()).hexdigest()
 
 
+def _summary_source_fingerprint(text: str | None) -> str:
+    return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
+
+
 @router.post("/reports/{submission_id}/ai-summary")
 async def generate_compliance_summary(submission_id: int, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     validate_mutating_origin(request)
@@ -498,28 +570,32 @@ async def generate_compliance_summary(submission_id: int, request: Request, acto
     report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id))
     if report is None:
         raise _error("report_pending", "Run the compliance check before generating its summary.", 409)
-    fingerprint = _report_fingerprint(report.report)
+    source_text = _summary_source_text(row)
+    source_fingerprint = _summary_source_fingerprint(source_text)
     cached = report.report.get("aiSummary")
-    if cached and cached.get("status") == "COMPLETED" and cached.get("report_fingerprint") == fingerprint and cached.get("input_scope") == "FULL_DOCUMENT_AND_REPORT_V1" and cached.get("report_format") == REPORT_VERSION:
+    if cached and cached.get("status") == "COMPLETED" and cached.get("source_fingerprint") == source_fingerprint and cached.get("input_scope") == "STUDENT_REPORT_TEXT_V2" and cached.get("report_format") == REPORT_VERSION:
         return cached
-    context = {
-        "proposal_text": row.extracted_text,
-        "proposal_fields": row.extracted_fields,
-        "compliance_report": {key: value for key, value in report.report.items() if key != "aiSummary"},
-    }
+    context = {"student_report_text": source_text}
     actor_id = actor.id
     source_sha = row.sha256
     session.rollback()
     result = await generate_full_report(context, run_ai_json, rate_key=f"compliance-summary:{actor_id}")
-    saved = {"status": result.get("status", "UNAVAILABLE"), "model": result.get("model"), "provider": result.get("provider"), "generated_at": result.get("timestamp"), "advisory": True, "report_fingerprint": fingerprint, "source_sha256": source_sha, "input_scope": "FULL_DOCUMENT_AND_REPORT_V1", "report_format": REPORT_VERSION}
+    saved = {"status": result.get("status", "UNAVAILABLE"), "source": result.get("source"), "generation_mode": result.get("generation_mode"), "fallback_reason": result.get("fallback_reason"), "model": result.get("model"), "provider": result.get("provider"), "generated_at": result.get("timestamp"), "advisory": True, "source_fingerprint": source_fingerprint, "source_sha256": source_sha, "input_scope": "STUDENT_REPORT_TEXT_V2", "report_format": REPORT_VERSION, "summary_word_count": result.get("summary_word_count")}
     if result.get("status") == "COMPLETED":
-        saved["summary"] = assemble_report(result["payload"], context)
+        payload = result.get("payload") or {}
+        summary = payload.get("summary") if isinstance(payload, dict) else None
+        if isinstance(summary, str):
+            saved["summary"] = summary
+        else:
+            saved["status"] = "UNAVAILABLE"
+            saved["message"] = "AI summary is unavailable because the model returned no final summary. Retry generation when the model is ready."
     else:
         saved["message"] = result.get("message") or "AI summary is unavailable. The rule-based compliance report remains available. Retry generation when the model is ready."
+    current_row = session.get(ProposalComplianceSubmission, submission_id)
     report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == submission_id).with_for_update())
-    if report is None or _report_fingerprint(report.report) != fingerprint:
+    if current_row is None or _summary_source_fingerprint(_summary_source_text(current_row)) != source_fingerprint or report is None:
         session.rollback()
-        raise _error("report_changed", "The compliance report changed during generation. Retry its summary.", 409)
+        raise _error("report_changed", "The uploaded report changed during generation. Retry its summary.", 409)
     report.report = {**report.report, "aiSummary": saved}
     session.commit()
     return saved
@@ -543,10 +619,23 @@ def get_original(submission_id: int, actor: User = Depends(get_current_user), se
     row = session.get(ProposalComplianceSubmission, submission_id)
     if row is None or not _can_view(session, actor, row):
         raise _error("document_not_found", "The original proposal was not found.", 404)
-    path = settings.document_storage_root / row.storage_key
-    if not path.is_file():
+    path = _safe_stored_path(row.storage_key)
+    if path is None:
         raise _error("document_missing", "The original proposal file is no longer available.", 404)
-    return FileResponse(path, media_type=row.content_type, filename=row.filename)
+    return _preview_response(path, row.content_type, row.filename)
+
+
+@router.get("/reports/{submission_id}/template")
+def get_original_template(submission_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    """Preview the exact university template attached to this compliance report."""
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or not _can_view(session, actor, row):
+        raise _error("template_not_found", "The university template was not found.", 404)
+    source = _template_source_path(session, row.template_reference_version_id or 0)
+    if source is None:
+        raise _error("template_preview_unavailable", "The original university template file is not available for preview.", 404)
+    path, filename = source
+    return _preview_response(path, None, filename)
 
 
 @router.get("/reports/{submission_id}/annotated")
@@ -558,14 +647,25 @@ def get_annotated_document(submission_id: int, actor: User = Depends(get_current
     saved = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
     if saved is None:
         raise _error("report_pending", "The compliance report is not available yet.", 409)
-    path = settings.document_storage_root / row.storage_key
-    if not path.is_file():
+    path = _safe_stored_path(row.storage_key)
+    if path is None:
         raise _error("document_missing", "The original proposal file is no longer available.", 404)
     try:
-        data = _render_annotated_document(path.read_bytes(), row.content_type, row.filename, saved.report)
-    except PdfExtractionError as error:
+        preview = render_document_preview(path, row.content_type, row.filename, settings.document_storage_root)
+        data = _render_annotated_document(preview.content, "application/pdf", preview.filename, saved.report)
+    except (PdfExtractionError, DocumentPreviewError) as error:
         raise _error(error.code, error.message, 422) from error
-    return Response(content=data, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="annotated-{_safe_filename(row.filename.rsplit(".", 1)[0])}.pdf"'})
+    try:
+        import fitz
+
+        annotated_pdf = fitz.open(stream=data, filetype="pdf")
+        try:
+            page_count = annotated_pdf.page_count
+        finally:
+            annotated_pdf.close()
+    except Exception:
+        page_count = 1
+    return Response(content=data, media_type="application/pdf", headers=_inline_headers(f'annotated-{_safe_filename(row.filename.rsplit(".", 1)[0])}.pdf', page_count))
 
 
 @router.get("/reports/{submission_id}/pdf")
@@ -577,10 +677,10 @@ def download_report_pdf(submission_id: int, actor: User = Depends(get_current_us
     if saved is None:
         raise _error("report_pending", "The compliance report is not available yet.", 409)
     data = _render_pdf(saved.report)
-    return Response(content=data, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="compliance-report-{submission_id}.pdf"'})
+    return Response(content=data, media_type="application/pdf", headers=_inline_headers(f"compliance-report-{submission_id}.pdf", 1))
 
 
-def _render_pdf(report: dict[str, Any]) -> bytes:
+def _render_pdf_legacy(report: dict[str, Any]) -> bytes:
     from io import BytesIO
     from xml.sax.saxutils import escape
 
@@ -608,7 +708,94 @@ def _render_pdf(report: dict[str, Any]) -> bytes:
     return stream.getvalue()
 
 
-def _render_annotated_document(data: bytes, content_type: str, filename: str, report: dict[str, Any]) -> bytes:
+def _page_label(pages: list[int] | None, page_count: int) -> str:
+    normalized = sorted({int(page) for page in (pages or []) if int(page) > 0})
+    if not normalized:
+        normalized = list(range(1, max(1, int(page_count)) + 1))
+    if len(normalized) == 1:
+        return f"Page {normalized[0]}"
+    if normalized == list(range(normalized[0], normalized[-1] + 1)):
+        return f"Pages {normalized[0]}-{normalized[-1]}"
+    return "Pages " + ", ".join(str(page) for page in normalized)
+
+
+def _report_issues(report: dict[str, Any]) -> list[dict[str, Any]]:
+    issues = report.get("documentDifferenceIssues")
+    if isinstance(issues, list) and issues:
+        return issues
+    checks: list[dict[str, Any]] = []
+    for category in report.get("categories", []):
+        for check in category.get("checks", []):
+            checks.append({**check, "category": check.get("category") or category.get("name") or "Template Compliance"})
+    page_count = int(report.get("document", {}).get("pageCount") or 1)
+    return build_document_difference_issues(checks, page_count)
+
+
+def _render_pdf(report: dict[str, Any]) -> bytes:
+    from io import BytesIO
+    from xml.sax.saxutils import escape
+
+    stream = BytesIO()
+    document = SimpleDocTemplate(stream, pagesize=A4, rightMargin=16 * mm, leftMargin=16 * mm, topMargin=16 * mm, bottomMargin=16 * mm)
+    styles = getSampleStyleSheet()
+    styles["Title"].textColor = "#19304F"
+    styles["Title"].fontSize = 20
+    styles["Heading2"].textColor = "#19304F"
+    summary = report.get("reportSummary", {})
+    metadata = report.get("reportMetadata", {})
+    proposal = report.get("proposal", {})
+    template = report.get("template", {})
+    issues = _report_issues(report)
+    critical = [item for item in issues if item.get("severity") == "critical" and item.get("status") != "passed"]
+    warnings = [item for item in issues if item.get("severity") == "warning" and item.get("status") != "passed"]
+    status = "Rejected" if any(item.get("status") == "failed" for item in critical) else "Needs Correction" if critical or warnings else "Compliant"
+    page_count = int(report.get("document", {}).get("pageCount") or 1)
+    template_name = metadata.get("templateName") or template.get("title") or "Active University Template"
+    analysis_date = str(metadata.get("analysisDate") or "").split("T", 1)[0] or "Current analysis"
+    report_version = metadata.get("reportVersion") or "2.0"
+    story = [
+        Paragraph("Template Compliance and Document Difference Report", styles["Title"]),
+        Paragraph("Strict comparison between university template and student document", styles["Normal"]),
+        Spacer(1, 8),
+    ]
+    details = [
+        ["Student / Project", proposal.get("title") or "Student document"],
+        ["Template", template_name],
+        ["Analysis date", analysis_date],
+        ["Report version", report_version],
+    ]
+    story.append(Table([[Paragraph(f"<b>{escape(str(label))}</b>", styles["BodyText"]), Paragraph(escape(str(value)), styles["BodyText"])] for label, value in details], colWidths=[42 * mm, 128 * mm], style=TableStyle([["BACKGROUND", (0, 0), (0, -1), "#F3F6FB"], ["GRID", (0, 0), (-1, -1), 0.25, "#D8E0EA"], ["VALIGN", (0, 0), (-1, -1), "TOP"], ["LEFTPADDING", (0, 0), (-1, -1), 7], ["RIGHTPADDING", (0, 0), (-1, -1), 7], ["TOPPADDING", (0, 0), (-1, -1), 6], ["BOTTOMPADDING", (0, 0), (-1, -1), 6]])))
+    story.append(Spacer(1, 12))
+    summary_table = Table([
+        ["Total Issues", "Critical Issues", "Warnings", "Submission Status"],
+        [len([item for item in issues if item.get("status") != "passed"]), len(critical), len(warnings), status],
+    ], colWidths=[42.5 * mm] * 4, style=TableStyle([["BACKGROUND", (0, 0), (-1, 0), "#1E2436"], ["TEXTCOLOR", (0, 0), (-1, 0), "white"], ["GRID", (0, 0), (-1, -1), 0.25, "#D8E0EA"], ["ALIGN", (0, 0), (-1, -1), "CENTER"], ["BACKGROUND", (0, 1), (-1, 1), "#F5F8FC"], ["FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"], ["TOPPADDING", (0, 0), (-1, -1), 8], ["BOTTOMPADDING", (0, 0), (-1, -1), 8]]))
+    story.append(summary_table)
+    story.append(Spacer(1, 14))
+    for heading, group in (("Critical Violations", critical), ("Warnings", warnings), ("Passed Checks", [item for item in issues if item.get("status") == "passed"])):
+        story.append(Paragraph(heading, styles["Heading2"]))
+        if not group:
+            story.append(Paragraph("No checks in this group.", styles["BodyText"]))
+            story.append(Spacer(1, 6))
+            continue
+        for item in group:
+            rows = [
+                ("Issue", item.get("issue") or "Compliance requirement"),
+                ("Original / University Template", item.get("originalTemplate") or "Template rule not configured"),
+                ("Student Document", item.get("studentDocument") or "Measurement not detected"),
+                ("Difference", item.get("difference") or "Matches the approved university template."),
+                ("Strict Page Number", _page_label(item.get("affectedPages"), page_count)),
+                ("Required Action", item.get("requiredAction") or "Follow the active university template requirement."),
+            ]
+            story.append(Table([[Paragraph(f"<b>{escape(str(label))}</b>", styles["BodyText"]), Paragraph(escape(str(value)), styles["BodyText"])] for label, value in rows], colWidths=[48 * mm, 122 * mm], style=TableStyle([["BACKGROUND", (0, 0), (0, -1), "#F8FAFD"], ["GRID", (0, 0), (-1, -1), 0.25, "#D8E0EA"], ["VALIGN", (0, 0), (-1, -1), "TOP"], ["LEFTPADDING", (0, 0), (-1, -1), 7], ["RIGHTPADDING", (0, 0), (-1, -1), 7], ["TOPPADDING", (0, 0), (-1, -1), 6], ["BOTTOMPADDING", (0, 0), (-1, -1), 6]])))
+            story.append(Spacer(1, 8))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph("Strict Rule: Page count, page numbering, page size, and approved template structure are mandatory. Every violation must show the exact affected page.", styles["BodyText"]))
+    document.build(story)
+    return stream.getvalue()
+
+
+def _render_annotated_document_legacy(data: bytes, content_type: str, filename: str, report: dict[str, Any]) -> bytes:
     """Annotate each affected page with red issue callouts and append full evidence."""
     from io import BytesIO
     try:
@@ -657,3 +844,55 @@ def display_value(value: Any) -> str:
     if isinstance(value, list):
         return ", ".join(str(item) for item in value)
     return "Not available" if value is None or value == "" else str(value)
+
+
+def _render_annotated_document(data: bytes, content_type: str, filename: str, report: dict[str, Any]) -> bytes:
+    """Annotate affected pages using the clean comparison issue contract."""
+    from io import BytesIO
+    try:
+        import fitz
+    except ImportError as error:
+        raise PdfExtractionError("pdf_annotation_unavailable", "PDF annotation is unavailable on this server.") from error
+    if not filename.casefold().endswith(".pdf") or not content_type.casefold().endswith("pdf"):
+        raise PdfExtractionError("pdf_annotation_unavailable", "Annotated preview is currently available for PDF proposals only.")
+    try:
+        document = fitz.open(stream=data, filetype="pdf")
+    except Exception as error:
+        raise PdfExtractionError("invalid_pdf", "The proposal PDF could not be opened for annotation.") from error
+    issues = [item for item in _report_issues(report) if item.get("status") != "passed"]
+    by_page: dict[int, list[dict[str, Any]]] = {}
+    for issue in issues:
+        for page_number in issue.get("affectedPages") or [1]:
+            by_page.setdefault(max(1, int(page_number)), []).append(issue)
+    for page_number, page_issues in by_page.items():
+        if page_number > document.page_count:
+            continue
+        page = document[page_number - 1]
+        for index, issue in enumerate(page_issues[:6]):
+            top = 24 + index * 43
+            rect = fitz.Rect(24, top, page.rect.width - 24, top + 35)
+            page.draw_rect(rect, color=(0.88, 0.08, 0.14), fill=(1, 0.93, 0.94), width=1.6, overlay=True)
+            label = f"{issue.get('issue', 'Compliance issue')} | {issue.get('difference', '')} | {_page_label(issue.get('affectedPages'), document.page_count)}"
+            page.insert_textbox(rect + (5, 4, -5, -4), label[:300], fontsize=8, color=(0.55, 0.05, 0.08), overlay=True)
+    appendix = document.new_page()
+    appendix.insert_text((36, 45), "FYPHub - Annotated Compliance Findings", fontsize=16, color=(0.1, 0.18, 0.3))
+    y = 75
+    for issue in issues:
+        text = "\n".join([
+            f"Issue: {issue.get('issue', 'Compliance requirement')}",
+            f"Original / University Template: {issue.get('originalTemplate', 'Template rule not configured')}",
+            f"Student Document: {issue.get('studentDocument', 'Measurement not detected')}",
+            f"Difference: {issue.get('difference', '')}",
+            f"Strict Page Number: {_page_label(issue.get('affectedPages'), document.page_count)}",
+            f"Required Action: {issue.get('requiredAction', '')}",
+        ])
+        box = fitz.Rect(36, y, appendix.rect.width - 36, y + 92)
+        appendix.draw_rect(box, color=(0.88, 0.08, 0.14), fill=(1, 0.95, 0.95), width=1.2, overlay=True)
+        appendix.insert_textbox(box + (8, 7, -8, -7), text[:900], fontsize=8, color=(0.18, 0.2, 0.25), overlay=True)
+        y += 104
+        if y > appendix.rect.height - 110:
+            appendix = document.new_page(); y = 45
+    output = BytesIO()
+    document.save(output, garbage=4, deflate=True)
+    document.close()
+    return output.getvalue()

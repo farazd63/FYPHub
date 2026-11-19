@@ -80,7 +80,11 @@ async def _run_ai_json_once(prompt: str, schema: type[T], *, model_kind: str, ra
         # Ollama to silently truncate the complete document/report prompt.
         output_budget = getattr(schema, "output_token_budget", 256)
         if getattr(schema, "inference_timeout", None):
-            cfg = {**cfg, "timeout": max(cfg["timeout"], schema.inference_timeout), "retries": 0}
+            # Summary requests must fail over before the browser or reverse
+            # proxy turns the response into an HTML timeout page. A schema may
+            # raise the limit for a genuinely slow task, but never beyond its
+            # explicit maximum.
+            cfg = {**cfg, "timeout": min(cfg["timeout"], schema.inference_timeout), "retries": 0}
         required_context = len((system_prompt + prompt).encode("utf-8")) + 1024 + output_budget
         # UTF-8 bytes are an upper bound, not the actual token count. A document
         # over 128 KiB can still fit easily in Llama's 128K-token context.

@@ -18,7 +18,7 @@ from .database import engine, get_db
 from .config import settings
 from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
 from .models import AcademicCycle, AcademicGroupPolicy, SupervisorCapacityPolicy, SupervisorAssignment, SupervisorRequest, SupervisorRequestStatus
-from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType
+from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType, ProposalComplianceSubmission
 from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
 from .models import EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion
 from .models import AcademicDeadline, AcademicDeadlineVersion
@@ -562,13 +562,20 @@ def delete_template_reference_version(version_id: int, request: Request, actor: 
     if version.is_active:
         raise HTTPException(status_code=409, detail={"code": "template_active", "message": "Deactivate the active template before deleting it."})
     try:
+        # Keep historical compliance reports intact while removing the live
+        # template FK that otherwise blocks deletion with RESTRICT.
+        session.execute(
+            update(ProposalComplianceSubmission)
+            .where(ProposalComplianceSubmission.template_reference_version_id == version_id)
+            .values(template_reference_version_id=None)
+        )
         session.execute(delete(AcademicRuleVersion).where(AcademicRuleVersion.template_reference_version_id == version_id))
         session.delete(version)
         add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="TEMPLATE_REFERENCE", target_id=version_id, action="template_reference_version_deleted", changed_values={})
         session.commit()
     except IntegrityError as error:
         session.rollback()
-        raise HTTPException(status_code=409, detail={"code": "template_in_use", "message": "This template version is referenced by historical submissions and cannot be deleted."}) from error
+        raise HTTPException(status_code=409, detail={"code": "template_delete_failed", "message": "The template could not be deleted. No historical submission was changed."}) from error
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -1754,7 +1761,8 @@ def register_team(
         session.add(user)
         session.flush()
 
-        team = Team(academic_cycle_id=cycle.id, shared_user_id=user.id)
+        next_group_number = (session.scalar(select(func.max(Team.group_number)).where(Team.academic_cycle_id == cycle.id)) or 0) + 1
+        team = Team(academic_cycle_id=cycle.id, group_number=next_group_number, shared_user_id=user.id)
         session.add(team)
         session.flush()
 
@@ -1854,23 +1862,38 @@ def register_student_group(
     return register_team(legacy, session, request=request)
 
 
+def cycle_group_number(session: Session, team: Team) -> int | None:
+    """Return the stable visible number, with a legacy-row fallback."""
+    if team.group_number is not None:
+        return team.group_number
+    if team.created_at is None:
+        return None
+    return session.scalar(select(func.count(Team.id)).where(
+        Team.academic_cycle_id == team.academic_cycle_id,
+        or_(Team.created_at < team.created_at, (Team.created_at == team.created_at) & (Team.id <= team.id)),
+    )) or None
+
+
 def student_group_detail(session: Session, team: Team) -> dict[str, object]:
     """Serialize the shared student principal without exposing credentials."""
     account = session.get(User, team.shared_user_id)
     cycle = session.get(AcademicCycle, team.academic_cycle_id)
     members = session.execute(
         select(TeamMember)
-        .where(TeamMember.team_id == team.id)
+        .where(TeamMember.team_id == team.id, TeamMember.academic_cycle_id == team.academic_cycle_id)
         .order_by(TeamMember.is_creator.desc(), TeamMember.id)
     ).scalars().all()
-    assignment = session.scalar(select(SupervisorAssignment).where(SupervisorAssignment.team_id == team.id, SupervisorAssignment.ended_at.is_(None)).order_by(SupervisorAssignment.id.desc()).limit(1))
+    assignment = session.scalar(select(SupervisorAssignment).where(SupervisorAssignment.team_id == team.id, SupervisorAssignment.academic_cycle_id == team.academic_cycle_id, SupervisorAssignment.ended_at.is_(None)).order_by(SupervisorAssignment.id.desc()).limit(1))
     supervisor = session.get(User, assignment.supervisor_id) if assignment else None
-    latest_request = session.scalar(select(SupervisorRequest).where(SupervisorRequest.team_id == team.id).order_by(SupervisorRequest.updated_at.desc(), SupervisorRequest.id.desc()).limit(1))
+    latest_request = session.scalar(select(SupervisorRequest).where(SupervisorRequest.team_id == team.id, SupervisorRequest.academic_cycle_id == team.academic_cycle_id, SupervisorRequest.status.not_in(["WITHDRAWN", "REJECTED"])).order_by(SupervisorRequest.updated_at.desc(), SupervisorRequest.id.desc()).limit(1))
     leader = next((member for member in members if member.is_creator), members[0] if members else None)
+    visible_group_number = cycle_group_number(session, team)
     return {
         "id": team.id,
         "group_id": team.id,
-        "group_name": f"{leader.full_name}'s Group" if leader else f"Group {team.id}",
+        "group_number": visible_group_number,
+        "group_code": f"{cycle.code}-{visible_group_number}" if cycle and visible_group_number is not None else None,
+        "group_name": f"{leader.full_name}'s Group" if leader else f"Group {visible_group_number or '—'}",
         "group_email": account.email if account else None,
         "academic_cycle_id": team.academic_cycle_id,
         "academic_cycle": cycle.display_name if cycle else None,
@@ -1932,12 +1955,20 @@ def student_group_members(
 
 @app.get("/api/v1/admin/student-groups")
 def list_student_groups(
+    cycle_id: int = Query(..., gt=0),
     search: str | None = Query(default=None, max_length=320),
     is_active: bool | None = None,
     _: User = Depends(require_roles(UserRole.ADMIN)),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
-    statement = select(Team).join(User, User.id == Team.shared_user_id).where(User.role == UserRole.STUDENT, Team.status != "dissolved")
+    cycle = session.get(AcademicCycle, cycle_id)
+    if cycle is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "cycle_not_found", "Academic cycle was not found.")
+    statement = select(Team).join(User, User.id == Team.shared_user_id).where(
+        User.role == UserRole.STUDENT,
+        Team.academic_cycle_id == cycle.id,
+        Team.status != "dissolved",
+    )
     if search and search.strip():
         needle = f"%{search.strip()}%"
         statement = statement.where(or_(User.email.ilike(needle), User.full_name.ilike(needle)))
@@ -1950,12 +1981,16 @@ def list_student_groups(
 @app.get("/api/v1/admin/student-groups/{group_id}")
 def get_student_group(
     group_id: int,
+    cycle_id: int = Query(..., gt=0),
     _: User = Depends(require_roles(UserRole.ADMIN)),
     session: Session = Depends(get_db),
 ) -> dict[str, object]:
-    group = session.get(Team, group_id)
-    if group is None or group.status == "dissolved":
-        raise admin_user_error(status.HTTP_404_NOT_FOUND, "group_not_found", "Student group was not found.")
+    cycle = session.get(AcademicCycle, cycle_id)
+    if cycle is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "cycle_not_found", "Academic cycle was not found.")
+    group = session.scalar(select(Team).where(Team.id == group_id, Team.academic_cycle_id == cycle.id))
+    if group is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "group_not_found", "Student group was not found in the selected academic cycle.")
     return student_group_detail(session, group)
 
 
@@ -1990,25 +2025,148 @@ def deactivate_student_group(group_id: int, request: Request, actor: User = Depe
     return set_student_group_status(group_id, False, request, actor, session)
 
 
+def _delete_student_group_records(session: Session, group_id: int, account_id: int, replacement_user_id: int) -> None:
+    """Remove every record owned by a group before deleting its team/account rows.
+
+    Most group-related tables intentionally use RESTRICT so normal workflows
+    cannot accidentally erase academic records. An explicit admin permanent
+    delete is different: delete the dependent records in FK order inside the
+    same transaction, then remove the group itself.
+    """
+    params = {"group_id": group_id, "account_id": account_id}
+
+    # Documents and review rows must go before their project/request parents.
+    session.execute(text("""
+        DELETE FROM document_submissions
+        WHERE group_id = :group_id
+           OR student_id = :account_id
+           OR uploaded_by_id = :account_id
+           OR project_id IN (
+                SELECT id FROM supervisor_requests
+                WHERE team_id = :group_id OR requester_user_id = :account_id
+           )
+    """), params)
+
+    # Agent runs and request children reference requests with RESTRICT.
+    session.execute(text("""
+        DELETE FROM supervision_agent_runs
+        WHERE team_id = :group_id
+           OR created_by_id = :account_id
+           OR proposal_request_id IN (
+                SELECT id FROM supervisor_requests
+                WHERE team_id = :group_id OR requester_user_id = :account_id
+           )
+    """), params)
+    session.execute(text("""
+        UPDATE supervisor_requests
+        SET document_id = NULL
+        WHERE team_id = :group_id OR requester_user_id = :account_id
+    """), params)
+    session.execute(text("""
+        DELETE FROM supervisor_request_documents
+        WHERE request_id IN (
+            SELECT id FROM supervisor_requests
+            WHERE team_id = :group_id OR requester_user_id = :account_id
+        )
+    """), params)
+    session.execute(text("""
+        DELETE FROM supervisor_request_messages
+        WHERE request_id IN (
+            SELECT id FROM supervisor_requests
+            WHERE team_id = :group_id OR requester_user_id = :account_id
+        )
+    """), params)
+    session.execute(text("""
+        DELETE FROM supervisor_request_submission_note_versions
+        WHERE request_id IN (
+            SELECT id FROM supervisor_requests
+            WHERE team_id = :group_id OR requester_user_id = :account_id
+        )
+    """), params)
+    session.execute(text("""
+        DELETE FROM supervisor_requests
+        WHERE team_id = :group_id OR requester_user_id = :account_id
+    """), params)
+
+    # Collaboration messages must be removed before their channels; channel
+    # participants/read rows are then removed by cascade or explicitly below.
+    session.execute(text("""
+        DELETE FROM collaboration_messages
+        WHERE channel_id IN (SELECT id FROM collaboration_channels WHERE team_id = :group_id)
+           OR sender_user_id = :account_id
+    """), params)
+    session.execute(text("""
+        DELETE FROM collaboration_channels
+        WHERE team_id = :group_id
+    """), params)
+    session.execute(text("DELETE FROM group_messages WHERE team_id = :group_id OR author_id = :account_id"), params)
+    session.execute(text("DELETE FROM module2_channel_reads WHERE team_id = :group_id OR user_id = :account_id"), params)
+    session.execute(text("DELETE FROM module2_chatbot_sessions WHERE team_id = :group_id OR user_id = :account_id"), params)
+
+    # Assignments, projects, schedules, and proposals have their own child
+    # rows and therefore must be cleared in dependency order.
+    session.execute(text("DELETE FROM supervisor_assignments WHERE team_id = :group_id"), params)
+    session.execute(text("DELETE FROM project_tasks WHERE team_id = :group_id"), params)
+    session.execute(text("DELETE FROM project_milestones WHERE team_id = :group_id"), params)
+    session.execute(text("DELETE FROM supervision_meetings WHERE team_id = :group_id"), params)
+    session.execute(text("""
+        DELETE FROM panel_evaluations
+        WHERE schedule_id IN (SELECT id FROM defense_schedules WHERE team_id = :group_id)
+    """), params)
+    session.execute(text("DELETE FROM defense_schedules WHERE team_id = :group_id"), params)
+    session.execute(text("""
+        DELETE FROM proposal_versions
+        WHERE proposal_id IN (SELECT id FROM proposals WHERE team_id = :group_id)
+    """), params)
+    session.execute(text("DELETE FROM proposals WHERE team_id = :group_id"), params)
+
+    # Evaluation corrections restrict deletion of the evaluation record.
+    session.execute(text("""
+        DELETE FROM evaluation_corrections
+        WHERE evaluation_id IN (
+            SELECT id FROM evaluation_records
+            WHERE group_id = :group_id OR student_id = :account_id
+        )
+    """), params)
+    session.execute(text("""
+        DELETE FROM evaluation_records
+        WHERE group_id = :group_id OR student_id = :account_id
+    """), params)
+
+    session.execute(text("DELETE FROM proposal_compliance_submissions WHERE team_id = :group_id OR owner_user_id = :account_id"), params)
+    session.execute(text("DELETE FROM dashboard_requirements WHERE assigned_group_id = :group_id OR assigned_user_id = :account_id"), params)
+    session.execute(text("DELETE FROM document_upload_requirements WHERE assigned_group_id = :group_id"), params)
+
+    # Remove the group membership and account-owned global rows that still
+    # hold non-null references to the shared student account.
+    session.execute(text("DELETE FROM team_members WHERE team_id = :group_id"), params)
+    session.execute(text("DELETE FROM auth_sessions WHERE user_id = :account_id"), params)
+    session.execute(text("DELETE FROM admin_audit_events WHERE actor_id = :account_id OR affected_user_id = :account_id"), params)
+    session.execute(text("UPDATE document_submissions SET reviewed_by_id = NULL WHERE reviewed_by_id = :account_id"), params)
+    session.execute(text("UPDATE document_upload_requirements SET assigned_user_id = NULL, created_by_id = :replacement_user_id WHERE assigned_user_id = :account_id OR created_by_id = :account_id"), {**params, "replacement_user_id": replacement_user_id})
+    session.execute(text("UPDATE dashboard_requirements SET assigned_user_id = NULL, created_by_id = :replacement_user_id WHERE assigned_user_id = :account_id OR created_by_id = :account_id"), {**params, "replacement_user_id": replacement_user_id})
+    session.execute(text("UPDATE template_reference_versions SET activated_by_id = NULL, created_by_id = :replacement_user_id WHERE activated_by_id = :account_id OR created_by_id = :account_id"), {**params, "replacement_user_id": replacement_user_id})
+    session.execute(text("UPDATE academic_rule_versions SET created_by_id = :replacement_user_id WHERE created_by_id = :account_id"), {**params, "replacement_user_id": replacement_user_id})
+    session.execute(text("UPDATE document_archive_review_queue SET resolved_by_id = NULL WHERE resolved_by_id = :account_id"), params)
+
+
 @app.delete("/api/v1/admin/student-groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_student_group(group_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> Response:
     validate_mutating_origin(request)
     group = session.execute(select(Team).where(Team.id == group_id).with_for_update()).scalar_one_or_none()
-    if group is None or group.status == "dissolved":
+    if group is None:
         raise admin_user_error(status.HTTP_404_NOT_FOUND, "group_not_found", "Student group was not found.")
     account = session.get(User, group.shared_user_id)
     if account is None:
         raise admin_user_error(status.HTTP_404_NOT_FOUND, "group_account_not_found", "The shared group account was not found.")
     try:
-        session.execute(delete(AuthSession).where(AuthSession.user_id == account.id))
-        session.execute(delete(AdminAuditEvent).where(or_(AdminAuditEvent.actor_id == account.id, AdminAuditEvent.affected_user_id == account.id)))
-        session.execute(delete(TeamMember).where(TeamMember.team_id == group.id))
+        _delete_student_group_records(session, group.id, account.id, actor.id)
         session.delete(group)
         session.delete(account)
         session.commit()
     except IntegrityError as error:
         session.rollback()
-        raise admin_user_error(status.HTTP_409_CONFLICT, "group_in_use", "This group is referenced by portal records and cannot be permanently deleted.") from error
+        raise admin_user_error(status.HTTP_409_CONFLICT, "group_delete_failed", "The group could not be deleted. No group data was changed.") from error
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -2191,3 +2349,5 @@ app.include_router(project_workflow_router)
 app.include_router(evaluations_router)
 from .supervisor_workspace import router as supervisor_workspace_router
 app.include_router(supervisor_workspace_router)
+from .document_archive import router as document_archive_router
+app.include_router(document_archive_router)

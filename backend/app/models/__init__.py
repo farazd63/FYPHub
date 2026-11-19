@@ -11,9 +11,9 @@ from .evaluation_rubric import EvaluationRubric, EvaluationRubricVersion, Evalua
 from .evaluation import EvaluationRecord, EvaluationAuditEvent, EvaluationCorrection, EvaluationAggregationConfig
 from .dashboard_requirement import DashboardRequirement
 from .academic_deadline import AcademicDeadline, AcademicDeadlineVersion
-from .document_requirement import DocumentUploadRequirement, DocumentSubmission, DocumentSubmissionVersion
+from .document_requirement import DocumentArchiveReviewQueue, DocumentRequirementSection, DocumentSubmission, DocumentSubmissionReviewEvent, DocumentSubmissionVersion, DocumentUploadRequirement
 
-__all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "PasswordResetToken", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion", "EvaluationRecord", "EvaluationAuditEvent", "EvaluationCorrection", "EvaluationAggregationConfig", "AcademicDeadline", "AcademicDeadlineVersion", "DashboardRequirement", "DocumentUploadRequirement", "DocumentSubmission", "DocumentSubmissionVersion", "ArchivedProject", "ArchivedProjectDocument", "ArchivedProjectDocumentType", "ArchiveImportBatch"]
+__all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "PasswordResetToken", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion", "EvaluationRecord", "EvaluationAuditEvent", "EvaluationCorrection", "EvaluationAggregationConfig", "AcademicDeadline", "AcademicDeadlineVersion", "DashboardRequirement", "DocumentUploadRequirement", "DocumentSubmission", "DocumentSubmissionVersion", "DocumentRequirementSection", "DocumentSubmissionReviewEvent", "DocumentArchiveReviewQueue", "ArchivedProject", "ArchivedProjectDocument", "ArchivedProjectDocumentType", "ArchiveImportBatch"]
 
 from .reminder_rule import ReminderRule, ReminderRuleVersion
 

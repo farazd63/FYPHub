@@ -1,1 +1,0 @@
-export { ArchivedProjectDetail } from "../ArchivedProjectDetail";
