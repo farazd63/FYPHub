@@ -1,0 +1,1642 @@
+/* Single dark charcoal/gold theme for every authenticated portal.
+   Loaded after legacy light styles; forces dark surfaces and readable text. */
+
+:root {
+  /* Projector-safe body text (≥7:1 on charcoal page/surface) */
+  --fy-text: #f4f6fa;
+  --fy-text-secondary: #c4ccd9;
+}
+
+.admin-shell,
+.student-shell,
+.portal-shell,
+.module3-workspace,
+.module3-admin-page {
+  color: var(--fy-text);
+  background: var(--fy-page);
+}
+
+.admin-shell .admin-avatar,
+.student-shell .student-avatar,
+.portal-shell .portal-avatar {
+  background: var(--fy-brand-soft) !important;
+  border-color: var(--fy-border) !important;
+  color: var(--fy-brand) !important;
+}
+
+.admin-shell .admin-role,
+.student-shell .student-role,
+.portal-shell .portal-role {
+  background: var(--fy-surface-muted) !important;
+  border-color: var(--fy-border) !important;
+  color: var(--fy-text-secondary) !important;
+}
+
+.admin-shell .admin-logout,
+.student-shell .student-logout,
+.portal-shell .portal-logout {
+  background: var(--fy-surface) !important;
+  border-color: var(--fy-border) !important;
+  color: var(--fy-brand) !important;
+}
+
+/* Gold / brand fills must use dark on-brand ink (white-on-gold fails AA) */
+.admin-shell .bg-fy-brand,
+.admin-shell button.bg-fy-brand,
+.admin-shell [class*="bg-[#e0a"],
+.admin-shell [class*="bg-[#176"],
+.admin-shell [class*="bg-[#466"],
+.admin-shell button[type="submit"],
+.student-shell button[type="submit"],
+.module3-workspace .module3-primary-button,
+.admin-shell .bg-slate-700,
+.admin-shell .bg-slate-800,
+.admin-shell .bg-slate-900 {
+  background: var(--fy-brand) !important;
+  color: var(--fy-text-on-brand) !important;
+  border-color: transparent !important;
+}
+
+.admin-shell button.bg-fy-brand,
+.admin-shell button[type="submit"],
+.admin-shell button.bg-slate-700,
+.admin-shell button.bg-slate-800,
+.admin-shell button.bg-slate-900,
+.admin-shell button[class*="bg-[#176"],
+.admin-shell button[class*="bg-[#466"] {
+  color: var(--fy-text-on-brand) !important;
+}
+
+/* Kill leftover white / light cards inside shells */
+.admin-shell .bg-white,
+.student-shell .bg-white,
+.portal-shell .bg-white,
+.admin-shell .users-table,
+.admin-shell [class*="bg-white"],
+.student-shell [class*="bg-white"],
+.admin-enter .rounded-xl.border,
+.admin-enter .rounded-2xl.border,
+.admin-enter > section [class*="rounded-xl"],
+.admin-enter > section [class*="rounded-2xl"],
+.student-shell .student-content .rounded-xl,
+.student-shell .student-content .rounded-2xl,
+.student-shell .student-phase-card,
+.student-shell .student-placeholder,
+.student-shell .student-request-card,
+.student-shell .progress-card,
+.student-shell .progress-board,
+.student-shell .progress-summary__card {
+  background: var(--fy-surface) !important;
+  background-color: var(--fy-surface) !important;
+  border-color: var(--fy-border) !important;
+  color: var(--fy-text) !important;
+  box-shadow: var(--fy-shadow) !important;
+}
+
+/* Hard-coded light Tailwind text utilities → theme text */
+.admin-shell [class*="text-[#"],
+.student-shell [class*="text-[#"],
+.portal-shell [class*="text-[#"],
+.module3-workspace [class*="text-[#"],
+.admin-shell .text-slate-500,
+.admin-shell .text-slate-600,
+.admin-shell .text-slate-700,
+.student-shell .text-slate-500,
+.student-shell .text-slate-600,
+.student-shell .text-slate-700 {
+  color: var(--fy-text-secondary) !important;
+}
+
+.admin-shell .font-semibold[class*="text-[#"],
+.admin-shell .font-bold[class*="text-[#"],
+.student-shell .font-semibold[class*="text-[#"],
+.student-shell .font-bold[class*="text-[#"],
+.admin-shell h1,
+.admin-shell h2,
+.admin-shell h3,
+.student-shell h1,
+.student-shell h2,
+.student-shell h3,
+.module3-workspace h1,
+.module3-workspace h2,
+.module3-workspace h3 {
+  color: var(--fy-text) !important;
+}
+
+/* Soft pastel badge/chip backgrounds → muted surface + readable ink */
+.admin-shell [class*="bg-[#ee"],
+.admin-shell [class*="bg-[#e4"],
+.admin-shell [class*="bg-[#e8"],
+.admin-shell [class*="bg-[#e9"],
+.admin-shell [class*="bg-[#ea"],
+.admin-shell [class*="bg-[#eb"],
+.admin-shell [class*="bg-[#ec"],
+.admin-shell [class*="bg-[#ed"],
+.admin-shell [class*="bg-[#ef"],
+.admin-shell [class*="bg-[#f0"],
+.admin-shell [class*="bg-[#f1"],
+.admin-shell [class*="bg-[#f2"],
+.admin-shell [class*="bg-[#f3"],
+.admin-shell [class*="bg-[#f4"],
+.admin-shell [class*="bg-[#f5"],
+.admin-shell [class*="bg-[#f6"],
+.admin-shell [class*="bg-[#f7"],
+.admin-shell [class*="bg-[#f8"],
+.admin-shell [class*="bg-[#f9"],
+.admin-shell [class*="bg-[#fa"],
+.admin-shell [class*="bg-[#fb"],
+.admin-shell [class*="bg-[#fc"],
+.admin-shell [class*="bg-[#fd"],
+.admin-shell [class*="bg-[#fe"],
+.admin-shell [class*="bg-[#ff"],
+.student-shell [class*="bg-[#ee"],
+.student-shell [class*="bg-[#e4"],
+.student-shell [class*="bg-[#f0"],
+.student-shell [class*="bg-[#f4"],
+.student-shell [class*="bg-[#f8"],
+.student-shell [class*="bg-[#fb"],
+.student-shell [class*="bg-[#ff"] {
+  background-color: var(--fy-surface-muted) !important;
+}
+
+.admin-shell [class*="bg-[#17"],
+.admin-shell [class*="bg-[#12"],
+.admin-shell [class*="bg-[#46"],
+.admin-shell [class*="bg-[#26"] {
+  background-color: var(--fy-brand) !important;
+  color: var(--fy-text-on-brand) !important;
+}
+
+/* Forms */
+.admin-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.admin-shell select,
+.admin-shell textarea,
+.admin-shell input[type="file"],
+.student-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.student-shell select,
+.student-shell textarea,
+.student-shell input[type="file"],
+.portal-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.portal-shell select,
+.portal-shell textarea,
+.portal-shell input[type="file"],
+.module3-workspace input:not([type="checkbox"]):not([type="radio"]),
+.module3-workspace select,
+.module3-workspace textarea,
+.module3-admin-page input:not([type="checkbox"]):not([type="radio"]),
+.module3-admin-page select,
+.module3-admin-page textarea {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-page) !important;
+  background-color: var(--fy-page) !important;
+  color: var(--fy-text) !important;
+  color-scheme: dark;
+}
+
+.admin-shell input::placeholder,
+.student-shell input::placeholder,
+.module3-workspace input::placeholder {
+  color: var(--fy-text-secondary) !important;
+  opacity: 0.85;
+}
+
+.admin-shell input[type="checkbox"],
+.admin-shell input[type="radio"],
+.student-shell input[type="checkbox"],
+.student-shell input[type="radio"],
+.portal-shell input[type="checkbox"],
+.portal-shell input[type="radio"],
+.module3-workspace input[type="checkbox"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--fy-brand);
+  color-scheme: dark;
+  border: 1px solid var(--fy-border-strong);
+  background: var(--fy-page);
+}
+
+/* Tables: dark cells, readable ink, horizontal scroll stays inside the card */
+.admin-shell table,
+.student-shell table,
+.module3-workspace table {
+  background: transparent !important;
+  color: var(--fy-text) !important;
+}
+
+.admin-shell thead,
+.student-shell thead,
+.module3-workspace thead,
+.admin-shell thead th,
+.student-shell thead th {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text-secondary) !important;
+}
+
+.admin-shell td,
+.admin-shell th,
+.student-shell td,
+.student-shell th,
+.module3-workspace td,
+.module3-workspace th {
+  color: var(--fy-text) !important;
+  border-color: var(--fy-border) !important;
+  background: transparent !important;
+}
+
+.admin-shell tbody tr:hover,
+.student-shell tbody tr:hover {
+  background: var(--fy-surface-muted) !important;
+}
+
+.admin-shell .overflow-x-auto,
+.admin-shell .users-table,
+.student-shell .overflow-x-auto,
+.portal-shell .overflow-x-auto,
+.admin-shell [class*="overflow-x"],
+.student-shell [class*="overflow-x"],
+.portal-shell [class*="overflow-x"] {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto !important;
+}
+
+/* Cards must not grow with wide tables */
+.admin-shell .admin-enter article,
+.admin-shell .admin-enter .rounded-xl.border,
+.admin-shell .admin-enter .rounded-2xl.border,
+.admin-shell .users-table,
+.student-shell .student-content article,
+.student-shell .student-content .rounded-xl.border,
+.student-shell .student-content .rounded-2xl.border,
+.portal-shell .portal-content article,
+.portal-shell .portal-content .rounded-xl.border,
+.portal-shell .portal-content .rounded-2xl.border {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* Phone: layout fits 390px; tables scroll inside the card only */
+@media (max-width: 480px) {
+  html:has(.admin-shell),
+  html:has(.student-shell),
+  html:has(.portal-shell),
+  body:has(.admin-shell),
+  body:has(.student-shell),
+  body:has(.portal-shell) {
+    overflow-x: hidden !important;
+    max-width: 100vw;
+  }
+
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .admin-shell__content,
+  .student-shell .student-content,
+  .portal-shell .portal-content,
+  .admin-shell .admin-enter,
+  .student-shell .student-content__inner {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .admin-shell table,
+  .student-shell table,
+  .portal-shell table {
+    min-width: 28rem;
+  }
+
+  .admin-shell .users-table,
+  .admin-shell .overflow-x-auto,
+  .student-shell .overflow-x-auto,
+  .portal-shell .overflow-x-auto {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+  }
+}
+
+/* —— Admin overview (was light blue) —— */
+.cycle-overview {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+}
+.cycle-overview::before { opacity: 0.35; background: radial-gradient(circle at 90% 26%, rgb(224 168 92 / 0.12), transparent 30%) !important; }
+.cycle-overview__hero {
+  background: linear-gradient(115deg, #1a1208, #2a2116 58%, #151922) !important;
+  box-shadow: var(--fy-shadow) !important;
+  color: var(--fy-text) !important;
+}
+.cycle-overview__hero h1,
+.cycle-overview__subtitle { color: var(--fy-text) !important; }
+.cycle-overview__eyebrow { color: var(--fy-brand) !important; }
+.cycle-overview__summary,
+.cycle-overview__card,
+.cycle-overview__card--open,
+.cycle-overview__card--closed,
+.cycle-overview__message,
+.cycle-overview__error,
+.cycle-overview__empty {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-page) !important;
+  color: var(--fy-text) !important;
+  box-shadow: none !important;
+}
+.cycle-overview__summary > div + div { border-left-color: var(--fy-border) !important; }
+.cycle-overview__summary span,
+.cycle-overview__list-heading p,
+.cycle-overview__card-title p,
+.cycle-overview__card-title > span,
+.cycle-overview__policy span,
+.cycle-overview__empty p { color: var(--fy-text-secondary) !important; }
+.cycle-overview__summary strong,
+.cycle-overview__list-heading h2,
+.cycle-overview__card-title h3,
+.cycle-overview__policy strong,
+.cycle-overview__empty h3 { color: var(--fy-text) !important; }
+.cycle-overview__calendar,
+.cycle-overview__summary svg {
+  background: var(--fy-brand-soft) !important;
+  color: var(--fy-brand) !important;
+}
+.cycle-overview__status--open {
+  color: var(--fy-success) !important;
+  background: var(--fy-success-soft) !important;
+}
+.cycle-overview__status--closed {
+  color: var(--fy-text-secondary) !important;
+  background: var(--fy-surface-muted) !important;
+}
+.cycle-overview__policy { border-top-color: var(--fy-border) !important; }
+.cycle-overview__summary > div:hover { background: var(--fy-surface-muted) !important; }
+
+/* —— Module 3 / compliance (was light) —— */
+.module3-workspace,
+.module3-admin-page {
+  --m3-navy: var(--fy-text);
+  --m3-ink: var(--fy-text);
+  --m3-muted: var(--fy-text-secondary);
+  --m3-border: var(--fy-border);
+  --m3-bg: var(--fy-page);
+  color: var(--fy-text) !important;
+}
+.module3-panel,
+.module3-workspace .module3-panel {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+  box-shadow: var(--fy-shadow) !important;
+  color: var(--fy-text) !important;
+}
+.module3-page-heading h1,
+.module3-panel h2,
+.module3-panel h3,
+.module3-template-row h3,
+.module3-admin-page label,
+.module3-workspace label,
+.module3-template-row strong,
+.module3-template-row p,
+.module3-rule-grid > label span,
+.module3-section-review h3 { color: var(--fy-text) !important; }
+.module3-page-heading p,
+.module3-muted,
+.module3-empty,
+.module3-template-row p,
+.module3-draft-list,
+.module3-section-header,
+.module3-paper-toolbar,
+.module3-paper-file,
+.module3-metric span,
+.module3-metric small,
+.module3-final-results span,
+.module3-panel p,
+.module3-workspace p,
+.module3-admin-page p { color: var(--fy-text-secondary) !important; }
+.module3-workspace,
+.module3-admin-page,
+.module3-panel,
+.module3-metric,
+.module3-final-results {
+  --m3-muted: var(--fy-text-secondary);
+  --m3-ink: var(--fy-text);
+}
+.module3-eyebrow,
+.module3-kicker { color: var(--fy-brand) !important; }
+
+/* Module 3 leftover light surfaces (template rows, rule chips, file drop, paper) */
+.module3-template-row,
+.module3-template-row--active,
+.module3-rule-grid > label,
+.module3-file-drop,
+.module3-paper-page,
+.module3-empty,
+.module3-admin-page .module3-panel,
+.module3-workspace .module3-panel {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+}
+.module3-rule-grid > label,
+.module3-file-drop {
+  background: var(--fy-page) !important;
+}
+.module3-row-actions button,
+.module3-close-button,
+.module3-history-row > button {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text) !important;
+}
+.module3-template-upload label,
+.module3-admin-page form label {
+  color: var(--fy-text) !important;
+}
+.module3-live-dot,
+.module3-count,
+.module3-category-icon {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-brand) !important;
+}
+.module3-category-row,
+.module3-section-row,
+.module3-section-header,
+.module3-violation-head,
+.module3-final-results strong,
+.module3-metric strong {
+  color: var(--fy-text) !important;
+  border-color: var(--fy-border) !important;
+}
+.module3-success-text {
+  color: var(--fy-success) !important;
+}
+.module3-final-results span,
+.module3-metric > span,
+.module3-final-metrics span,
+.module3-final-panel span {
+  color: var(--fy-text-secondary) !important;
+}
+.module3-final-metrics strong,
+.module3-final-panel strong {
+  color: var(--fy-text) !important;
+}
+.module3-category-row small,
+.module3-section-header span,
+.module3-paper-text,
+.module3-paper-file {
+  color: var(--fy-text-secondary) !important;
+}
+.module3-alert--success {
+  border-color: color-mix(in srgb, var(--fy-success) 40%, var(--fy-border)) !important;
+  background: var(--fy-success-soft) !important;
+  color: var(--fy-success) !important;
+}
+.module3-alert--error {
+  border-color: color-mix(in srgb, var(--fy-danger) 40%, var(--fy-border)) !important;
+  background: var(--fy-danger-soft) !important;
+  color: var(--fy-danger) !important;
+}
+.module3-score-ring {
+  background: conic-gradient(var(--fy-brand) var(--score, 0%), var(--fy-surface-muted) 0) !important;
+}
+.module3-score-ring > div {
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+}
+.module3-primary-button,
+.module3-secondary-button {
+  border-color: var(--fy-border) !important;
+}
+.module3-primary-button {
+  background: var(--fy-brand) !important;
+  color: var(--fy-text-on-brand) !important;
+}
+.module3-secondary-button {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text) !important;
+}
+
+.module3-status-pill--pass,
+.module3-status-pill--compliant,
+.module3-metric-icon--pass {
+  background: var(--fy-success-soft) !important;
+  border-color: color-mix(in srgb, var(--fy-success) 35%, var(--fy-border)) !important;
+  color: var(--fy-success) !important;
+}
+.module3-status-pill--fail,
+.module3-status-pill--not-compliant,
+.module3-metric-icon--fail {
+  background: var(--fy-danger-soft) !important;
+  border-color: color-mix(in srgb, var(--fy-danger) 35%, var(--fy-border)) !important;
+  color: var(--fy-danger) !important;
+}
+.module3-status-pill--partial,
+.module3-status-pill--review-required,
+.module3-metric-icon--partial {
+  background: var(--fy-warning-soft) !important;
+  border-color: color-mix(in srgb, var(--fy-warning) 35%, var(--fy-border)) !important;
+  color: var(--fy-warning) !important;
+}
+.module3-status-pill--muted,
+.module3-status-pill--unverifiable,
+.module3-status-pill--review,
+.module3-metric-icon--total {
+  background: var(--fy-surface-muted) !important;
+  border-color: var(--fy-border) !important;
+  color: var(--fy-text-secondary) !important;
+}
+.module3-metric,
+.module3-metric strong {
+  color: var(--fy-text) !important;
+}
+.module3-metrics {
+  border-color: var(--fy-border) !important;
+}
+
+/* Academic cycle dashboard / capacity leftovers */
+.academic-cycle-dashboard,
+.academic-cycle-dashboard h1,
+.supervisor-capacity-card__top h2 {
+  color: var(--fy-text) !important;
+}
+.academic-cycle-dashboard__heading p,
+.supervisor-capacity-stats span,
+.supervisor-capacity-stats small {
+  color: var(--fy-text-secondary) !important;
+}
+
+/* Student header/content light remnants */
+.student-shell .student-header {
+  background: var(--fy-surface) !important;
+  border-bottom-color: var(--fy-border) !important;
+  color: var(--fy-text) !important;
+}
+.student-shell .student-brand,
+.student-shell .student-account__name,
+.student-shell .student-page-heading h1 {
+  color: var(--fy-text) !important;
+}
+.student-shell .student-role,
+.student-shell .student-status {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell .student-page-heading p:last-child,
+.student-shell .student-placeholder p {
+  color: var(--fy-text-secondary) !important;
+}
+
+/* Student overview / progress / request cards — kill navy-on-charcoal */
+.student-shell {
+  --student-ink: var(--fy-text);
+  --student-muted: var(--fy-text-secondary);
+  --student-line: var(--fy-border);
+  --student-surface: var(--fy-surface);
+}
+.student-shell .student-overview,
+.student-shell .student-overview__hero,
+.student-shell .student-overview__summary,
+.student-shell .student-overview__summary div,
+.student-shell .student-phase-card,
+.student-shell .student-request-card,
+.student-shell .student-placeholder,
+.student-shell .progress-card,
+.student-shell .progress-board,
+.student-shell .progress-summary__card {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+}
+.student-shell .student-overview__hero h1,
+.student-shell .student-overview__heading h2,
+.student-shell .student-overview__summary strong,
+.student-shell .student-phase-card h2,
+.student-shell .student-request-card h2,
+.student-shell .student-content h1,
+.student-shell .student-content h2,
+.student-shell .student-content h3,
+.student-shell .student-content strong {
+  color: var(--fy-text) !important;
+}
+.student-shell .student-overview__hero p,
+.student-shell .student-overview__summary span,
+.student-shell .student-overview__heading p,
+.student-shell .student-overview__eyebrow,
+.student-shell .progress-muted,
+.student-shell .student-collab__members span,
+.student-shell .student-phase-card p,
+.student-shell .student-phase-card span,
+.student-shell .student-placeholder p,
+.student-shell .student-placeholder span,
+.student-shell .student-content p,
+.student-shell .student-content small,
+.student-shell .student-phase-page p,
+.student-shell .student-phase-page span:not([class*="status"]):not([class*="pill"]) {
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell .student-phase-card,
+.student-shell .student-phase-page .rounded-xl,
+.student-shell .student-phase-page .rounded-2xl,
+.student-shell .student-phase-page [class*="bg-white"] {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+}
+/* Catch leftover navy/slate hex ink inside student content */
+.student-shell .student-content [class*="text-[#1"],
+.student-shell .student-content [class*="text-[#2"],
+.student-shell .student-content [class*="text-[#3"],
+.student-shell .student-content [class*="text-[#4"],
+.student-shell .student-content [class*="text-[#5"],
+.student-shell .student-content [class*="text-[#6"] {
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell .student-content .font-bold[class*="text-[#"],
+.student-shell .student-content .font-semibold[class*="text-[#"],
+.student-shell .student-phase-card h2,
+.student-shell .student-phase-card strong {
+  color: var(--fy-text) !important;
+}
+.student-shell .student-overview__summary div + div {
+  border-color: var(--fy-border) !important;
+}
+
+/* Supervisor / Coordinator / Evaluator portal shell leftovers */
+.portal-shell {
+  --portal-navy: var(--fy-text);
+  --portal-ink: var(--fy-text);
+  --portal-muted: var(--fy-text-secondary);
+  --portal-line: var(--fy-border);
+  color: var(--fy-text) !important;
+  background: var(--fy-page) !important;
+}
+.portal-shell .portal-header,
+.portal-shell .portal-content .rounded-xl,
+.portal-shell .portal-content .rounded-2xl,
+.portal-shell .portal-content .supervisor-card,
+.portal-shell .portal-content .student-phase-card,
+.portal-shell .portal-content .student-placeholder,
+.portal-shell .portal-content .student-request-card {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+}
+.portal-shell .portal-brand,
+.portal-shell .portal-content h1,
+.portal-shell .portal-content h2,
+.portal-shell .portal-content h3,
+.portal-shell .portal-content strong {
+  color: var(--fy-text) !important;
+}
+.portal-shell .portal-role,
+.portal-shell .portal-content p,
+.portal-shell .portal-content .text-slate-500,
+.portal-shell .portal-content .text-slate-600 {
+  color: var(--fy-text-secondary) !important;
+}
+
+/* Supervisor / coordinator request cards & stats (loaded inside student-shell) */
+.student-shell .supervisor-page {
+  color: var(--fy-text) !important;
+}
+.student-shell .supervisor-page span:not([class]),
+.student-shell .supervisor-page p:not([class]) {
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell .supervisor-page,
+.student-shell .supervisor-card,
+.student-shell .supervisor-overview-list button,
+.student-shell .supervisor-latest-request,
+.student-shell .supervisor-capacity-stats article,
+.student-shell .student-request-card,
+.student-shell .student-supervisor-option {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+}
+.student-shell .supervisor-page-heading h1,
+.student-shell .supervisor-card h2,
+.student-shell .supervisor-stat-value,
+.student-shell .supervisor-capacity-stats strong,
+.student-shell .supervisor-capacity-card__top h2,
+.student-shell .supervisor-overview-list strong,
+.student-shell .supervisor-latest-request strong {
+  color: var(--fy-text) !important;
+}
+.student-shell .supervisor-stat-label,
+.student-shell .supervisor-page-heading span,
+.student-shell .supervisor-empty,
+.student-shell .supervisor-capacity-stats span,
+.student-shell .supervisor-capacity-stats small,
+.student-shell .supervisor-capacity-card__top span,
+.student-shell .supervisor-overview-list small,
+.student-shell .supervisor-latest-request span,
+.student-shell .supervisor-latest-request small {
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell .supervisor-page-heading p,
+.student-shell .supervisor-capacity-kicker {
+  color: var(--fy-brand) !important;
+}
+.student-shell .supervisor-alert {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text) !important;
+}
+.student-shell .supervisor-monitor-summary,
+.student-shell .supervisor-monitor-summary > span,
+.student-shell .supervisor-monitor-table,
+.student-shell .supervisor-filter,
+.student-shell .supervisor-detail,
+.student-shell .supervisor-submission-note,
+.student-shell .supervisor-extracted-grid > div {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+}
+.student-shell .supervisor-monitor-summary > span,
+.student-shell .supervisor-monitor-summary strong {
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+}
+.student-shell .supervisor-monitor-summary > span {
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell .supervisor-monitor-summary strong {
+  color: var(--fy-text) !important;
+}
+.student-shell .supervisor-monitor-table th {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text-secondary) !important;
+  border-color: var(--fy-border) !important;
+}
+.student-shell .supervisor-monitor-table td {
+  color: var(--fy-text) !important;
+  border-color: var(--fy-border) !important;
+  background: transparent !important;
+}
+.student-shell .supervisor-monitor-table td span,
+.student-shell .supervisor-detail-top > span,
+.student-shell .supervisor-overview-list em,
+.student-shell .supervisor-history-list span,
+.student-shell .supervisor-queue-item--selected {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-brand) !important;
+  border-color: var(--fy-border) !important;
+}
+.student-shell .supervisor-document-link,
+.student-shell .coordinator-document-button,
+.student-shell .supervisor-filter-clear {
+  color: var(--fy-text) !important;
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface-muted) !important;
+}
+.student-shell .supervisor-filter,
+.student-shell .supervisor-filter select,
+.student-shell .supervisor-filter input {
+  color: var(--fy-text) !important;
+  border-color: var(--fy-border) !important;
+  background: var(--fy-page) !important;
+}
+
+/* Student collaboration channel (was light blue/white) */
+.student-shell .student-collab,
+.student-shell .student-collab__history,
+.student-shell .student-collab__message,
+.student-shell .student-collab__message--own,
+.student-shell .student-collab__notice,
+.student-shell .student-collab__error,
+.student-shell .student-collab__members li {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+}
+.student-shell .student-collab__history,
+.student-shell .student-collab__notice,
+.student-shell .student-collab__error {
+  background: var(--fy-page) !important;
+}
+.student-shell .student-collab h2,
+.student-shell .student-collab dd,
+.student-shell .student-collab__composer label {
+  color: var(--fy-text) !important;
+}
+.student-shell .student-collab__heading p,
+.student-shell .student-collab small,
+.student-shell .student-collab dt,
+.student-shell .student-collab__message header span,
+.student-shell .student-collab__message time,
+.student-shell .student-collab__members li span {
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell .student-collab button {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text) !important;
+}
+.student-shell .student-collab__composer button {
+  background: var(--fy-brand) !important;
+  border-color: transparent !important;
+  color: var(--fy-text-on-brand) !important;
+}
+.student-shell .student-collab__composer textarea {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-page) !important;
+  color: var(--fy-text) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Visual polish — charcoal/gold only (screens from screenshots)
+   ═══════════════════════════════════════════════════════════ */
+
+/* —— Progress dashboard: kill purple/light palette —— */
+.student-shell .progress-page { color: var(--fy-text) !important; }
+.student-shell .progress-hero {
+  background: linear-gradient(125deg, #1a1208 0%, #2a2116 48%, #151922 100%) !important;
+  box-shadow: var(--fy-shadow) !important;
+  color: var(--fy-text) !important;
+  border: 1px solid var(--fy-border) !important;
+}
+.student-shell .progress-hero h1,
+.student-shell .progress-hero p:last-child,
+.student-shell .progress-hero__badge { color: var(--fy-text) !important; }
+.student-shell .progress-kicker { color: var(--fy-brand) !important; }
+.student-shell .progress-hero__badge {
+  border-color: color-mix(in srgb, var(--fy-brand) 35%, var(--fy-border)) !important;
+  background: var(--fy-brand-soft) !important;
+}
+.student-shell .progress-hero__dot {
+  background: var(--fy-brand) !important;
+  box-shadow: 0 0 0 4px rgb(224 168 92 / 0.18) !important;
+}
+
+.student-shell .progress-summary__card,
+.student-shell .progress-board,
+.student-shell .progress-card {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+  box-shadow: var(--fy-shadow) !important;
+  color: var(--fy-text) !important;
+}
+.student-shell .progress-summary__card::before { width: 3px !important; }
+.student-shell .progress-summary__card--purple::before,
+.student-shell .progress-summary__card--green::before,
+.student-shell .progress-summary__card--orange::before {
+  background: var(--fy-brand) !important;
+}
+.student-shell .progress-summary__label,
+.student-shell .progress-summary small,
+.student-shell .progress-board__heading span,
+.student-shell .progress-legend,
+.student-shell .progress-muted,
+.student-shell .progress-card__heading p,
+.student-shell .progress-record span,
+.student-shell .progress-meeting span,
+.student-shell .progress-meeting small {
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell .progress-summary strong,
+.student-shell .progress-board__heading h2,
+.student-shell .progress-card__heading h2,
+.student-shell .progress-record strong,
+.student-shell .progress-meeting strong {
+  color: var(--fy-text) !important;
+}
+.student-shell .progress-board__heading,
+.student-shell .progress-gantt__labels,
+.student-shell .progress-gantt__label,
+.student-shell .progress-gantt__dates,
+.student-shell .progress-gantt__track,
+.student-shell .progress-record,
+.student-shell .progress-meeting {
+  border-color: var(--fy-border) !important;
+}
+.student-shell .progress-gantt__timeline {
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(7.142857% - 1px),
+    var(--fy-border) calc(7.142857% - 1px),
+    var(--fy-border) 7.142857%
+  ) !important;
+}
+.student-shell .progress-gantt__dates {
+  background: var(--fy-surface-muted) !important;
+}
+.student-shell .progress-gantt__dates span,
+.student-shell .progress-gantt__dates b,
+.student-shell .progress-gantt__labels-heading,
+.student-shell .progress-gantt__labels-heading span,
+.student-shell .progress-gantt__label b,
+.student-shell .progress-gantt__label strong,
+.student-shell .progress-gantt__empty {
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell .progress-gantt__label span { color: var(--fy-text) !important; }
+
+/* Gantt bars: dark ink on brand soft (readable) — no pastel purple */
+.student-shell .progress-bar,
+.student-shell .progress-bar--violet,
+.student-shell .progress-bar--mint,
+.student-shell .progress-bar--orange,
+.student-shell .progress-bar--pink,
+.student-shell .progress-bar--blue {
+  background: var(--fy-brand) !important;
+  color: var(--fy-text-on-brand) !important;
+  box-shadow: none !important;
+}
+.student-shell .progress-bar b,
+.student-shell .progress-bar small {
+  color: var(--fy-text-on-brand) !important;
+}
+.student-shell .progress-legend__swatch--violet,
+.student-shell .progress-legend__swatch--mint {
+  background: var(--fy-brand) !important;
+}
+
+/* Progress icons + primary actions → gold */
+.student-shell .progress-card__icon,
+.student-shell .progress-card__icon--violet,
+.student-shell .progress-card__icon--mint,
+.student-shell .progress-card__icon--orange {
+  background: var(--fy-brand-soft) !important;
+  color: var(--fy-brand) !important;
+}
+.student-shell .progress-button,
+.student-shell .progress-button--violet,
+.student-shell .progress-button--mint,
+.student-shell .progress-button--orange {
+  background: var(--fy-brand) !important;
+  color: var(--fy-text-on-brand) !important;
+}
+.student-shell .progress-button:hover:not(:disabled) {
+  background: var(--fy-brand-hover) !important;
+}
+.student-shell .progress-input,
+.student-shell .progress-record__update input {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-page) !important;
+  color: var(--fy-text) !important;
+}
+.student-shell .progress-input:focus {
+  border-color: var(--fy-brand) !important;
+  box-shadow: var(--fy-focus-ring) !important;
+}
+.student-shell .progress-record__update button {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text) !important;
+  border: 1px solid var(--fy-border) !important;
+}
+.student-shell .progress-record__update button:hover {
+  border-color: var(--fy-brand) !important;
+  color: var(--fy-brand) !important;
+}
+
+/* —— Required documents cards —— */
+.student-shell section[aria-label="Required Documents & Uploads"] {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+  box-shadow: var(--fy-shadow) !important;
+}
+.student-shell section[aria-label="Required Documents & Uploads"] article,
+.student-shell [aria-labelledby*="document"] article {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-page) !important;
+  color: var(--fy-text) !important;
+}
+.student-shell [aria-label="Required Documents & Uploads"] h2 {
+  color: var(--fy-text) !important;
+  letter-spacing: -0.02em;
+}
+.student-shell [aria-label="Required Documents & Uploads"] p,
+.student-shell [aria-label="Required Documents & Uploads"] .text-slate-600,
+.student-shell [aria-label="Required Documents & Uploads"] .text-sm {
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell [aria-label="Required Documents & Uploads"] button:disabled,
+.student-shell button:disabled:not(.progress-button):not(.module3-primary-button):not(.auth-primary):not(.fy-btn):not(.fy-btn--primary):not(.fy-btn--secondary) {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text-secondary) !important;
+  opacity: 1 !important;
+}
+.student-shell .progress-button:disabled,
+.student-shell .fy-btn--primary:disabled,
+.student-shell button.fy-btn.fy-btn--primary:disabled {
+  background: var(--fy-brand) !important;
+  color: var(--fy-text-on-brand) !important;
+  border-color: transparent !important;
+  opacity: 0.55 !important;
+}
+.student-shell .fy-btn--secondary:disabled,
+.student-shell button.fy-btn.fy-btn--secondary:disabled {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text) !important;
+  border-color: var(--fy-border) !important;
+  opacity: 0.55 !important;
+}
+.student-shell [aria-label="Required Documents & Uploads"] article {
+  background: var(--fy-page) !important;
+  border-color: var(--fy-border) !important;
+}
+.student-shell [aria-label="Required Documents & Uploads"] article h3,
+.student-shell [aria-label="Required Documents & Uploads"] article strong {
+  color: var(--fy-text) !important;
+}
+.student-shell [aria-label="Required Documents & Uploads"] label.bg-slate-300,
+.student-shell [aria-label="Required Documents & Uploads"] label[class*="bg-slate-300"],
+.student-shell [aria-label="Required Documents & Uploads"] label.cursor-not-allowed {
+  border: 1px solid var(--fy-border) !important;
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell [aria-label="Required Documents & Uploads"] label[class*="bg-[#466"],
+.student-shell [aria-label="Required Documents & Uploads"] label.cursor-pointer:not(.cursor-not-allowed) {
+  background: var(--fy-brand) !important;
+  color: var(--fy-text-on-brand) !important;
+  border: 0 !important;
+}
+.student-shell [aria-label="Required Documents & Uploads"] .bg-slate-50,
+.student-shell [aria-label="Required Documents & Uploads"] [class*="bg-slate-50"] {
+  background: var(--fy-surface-muted) !important;
+  border-color: var(--fy-border) !important;
+}
+
+/* —— Supervisor capacity: white metric chips —— */
+.student-shell .supervisor-capacity-metrics div,
+.admin-shell .supervisor-capacity-metrics div {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-page) !important;
+  color: var(--fy-text) !important;
+}
+.student-shell .supervisor-capacity-metrics span,
+.admin-shell .supervisor-capacity-metrics span {
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell .supervisor-capacity-metrics strong,
+.admin-shell .supervisor-capacity-metrics strong {
+  color: var(--fy-text) !important;
+}
+.student-shell .supervisor-capacity-status--available,
+.admin-shell .supervisor-capacity-status--available {
+  background: var(--fy-success-soft) !important;
+  color: var(--fy-success) !important;
+  border: 1px solid color-mix(in srgb, var(--fy-success) 45%, var(--fy-border)) !important;
+}
+.student-shell .supervisor-capacity-status--full,
+.admin-shell .supervisor-capacity-status--full {
+  background: var(--fy-danger-soft) !important;
+  color: var(--fy-danger) !important;
+}
+.student-shell .supervisor-capacity-status--warning,
+.admin-shell .supervisor-capacity-status--warning {
+  background: var(--fy-warning-soft) !important;
+  color: var(--fy-warning) !important;
+}
+.student-shell .supervisor-capacity-table,
+.student-shell .supervisor-capacity-table__row,
+.student-shell .supervisor-capacity-card__section {
+  border-color: var(--fy-border) !important;
+}
+.student-shell .supervisor-capacity-table__head {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell .supervisor-capacity-table__row,
+.student-shell .supervisor-capacity-table__row time,
+.student-shell .supervisor-capacity-card__section > p {
+  color: var(--fy-text-secondary) !important;
+}
+.student-shell .supervisor-capacity-table__row strong,
+.student-shell .supervisor-capacity-card__section h3 {
+  color: var(--fy-text) !important;
+}
+
+/* —— Module 3 loading (was hard white card) —— */
+.module3-loading {
+  border: 1px solid var(--fy-border) !important;
+  border-radius: var(--fy-radius-card, 16px) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-text-secondary) !important;
+  padding: 1.25rem 1.5rem !important;
+  box-shadow: var(--fy-shadow) !important;
+}
+
+/* —— Admin Student Groups polish —— */
+.admin-shell .admin-enter article.rounded-xl,
+.admin-shell .admin-enter .rounded-xl.border {
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.admin-shell .admin-enter article.rounded-xl:hover,
+.admin-shell .admin-enter .rounded-xl.border:hover {
+  border-color: var(--fy-border-strong) !important;
+}
+.admin-shell table thead th {
+  letter-spacing: 0.06em;
+  font-size: 0.7rem !important;
+  color: var(--fy-text-secondary) !important;
+}
+.admin-shell tbody tr {
+  border-bottom: 1px solid var(--fy-border) !important;
+}
+.admin-shell tbody tr:last-child { border-bottom: 0 !important; }
+.admin-shell button.underline,
+.admin-shell article button:not([class*="bg-"]):not([type="submit"]) {
+  border: 1px solid var(--fy-border) !important;
+  border-radius: var(--fy-radius-control, 0.5rem) !important;
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text) !important;
+  padding: 0.4rem 0.75rem !important;
+  text-decoration: none !important;
+}
+.admin-shell article button[class*="text-[#a4"],
+.admin-shell article button[class*="border-[#e6"] {
+  border-color: color-mix(in srgb, var(--fy-danger) 45%, var(--fy-border)) !important;
+  color: var(--fy-danger) !important;
+  background: var(--fy-danger-soft) !important;
+}
+
+/* —— Coordinator monitor polish —— */
+.student-shell .supervisor-monitor-summary > span {
+  transition: border-color 160ms ease;
+}
+.student-shell .supervisor-monitor-summary > span:hover {
+  border-color: var(--fy-border-strong) !important;
+}
+.student-shell .supervisor-monitor-summary strong {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+.student-shell .supervisor-monitor-table td span {
+  letter-spacing: 0.04em;
+}
+.student-shell .supervisor-filter-clear:hover,
+.student-shell .coordinator-document-button:hover {
+  border-color: var(--fy-brand) !important;
+  color: var(--fy-brand) !important;
+}
+
+/* —— Sign-in: slightly richer form card (already dark) —— */
+.auth-shell .auth-card,
+.auth-layout .auth-card {
+  border-color: var(--fy-border) !important;
+  box-shadow: var(--fy-shadow) !important;
+}
+
+/* Root: form labels must never keep leftover navy label ink */
+.student-shell label,
+.admin-shell label,
+.portal-shell label,
+.module3-workspace label,
+.module3-admin-page label,
+.student-shell .student-request-card label,
+.student-shell .student-upload-label,
+.student-shell .supervisor-detail label,
+.student-shell legend {
+  color: var(--fy-text) !important;
+}
+
+/* Bare / unstyled action buttons → secondary treatment */
+.student-shell .student-request-card > button:not([class]),
+.student-shell .student-request-card button.mt-2:not([class*="fy-btn"]),
+.student-shell article > div > button:not([class]),
+.student-shell .supervisor-actions > button:not([class*="fy-btn"]),
+.student-shell .progress-form > button:not([class*="fy-btn"]):not([class*="progress-button"]),
+.admin-shell form button[type="submit"]:not([class*="fy-btn"]),
+.admin-shell section button:not([class]):not([aria-label]),
+.admin-shell .admin-enter button:not([class]):not([aria-label]) {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.4rem !important;
+  min-height: 2.5rem !important;
+  padding: 0.55rem 1rem !important;
+  border-radius: var(--fy-radius-control, 0.5rem) !important;
+  border: 1px solid var(--fy-border) !important;
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text) !important;
+  font-size: 0.8125rem !important;
+  font-weight: 700 !important;
+}
+
+.student-shell .supervisor-actions > button.fy-btn--primary:last-child,
+.student-shell .supervisor-actions > button:last-child:not([class*="fy-btn--secondary"]) {
+  background: var(--fy-brand) !important;
+  color: var(--fy-text-on-brand) !important;
+  border-color: transparent !important;
+}
+
+/* Primary submit / brand fills always use on-brand ink (never white-on-gold) */
+.admin-shell .fy-btn--primary,
+.student-shell .fy-btn--primary,
+.admin-shell button.fy-btn.fy-btn--primary,
+.student-shell button.fy-btn.fy-btn--primary,
+.admin-shell button.bg-fy-brand,
+.admin-shell button[class*="bg-[#176"],
+.admin-shell button[class*="bg-[#466"],
+.student-shell button[class*="bg-[#466"],
+.student-shell .student-request-actions button:not(:first-child) {
+  background: var(--fy-brand) !important;
+  color: var(--fy-text-on-brand) !important;
+  border-color: transparent !important;
+}
+
+.admin-shell .fy-btn--secondary,
+.student-shell .fy-btn--secondary,
+.admin-shell button.fy-btn.fy-btn--secondary,
+.student-shell button.fy-btn.fy-btn--secondary {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text) !important;
+  border: 1px solid var(--fy-border) !important;
+}
+
+/* History / muted secondary that was stuck at #6b7c96 (4.14:1) */
+.student-shell .supervisor-history-list small,
+.student-shell .supervisor-history-list time,
+.student-shell .supervisor-page-heading span,
+.student-shell .supervisor-queue-item small,
+.student-shell .supervisor-overview-list small {
+  color: var(--fy-text-secondary) !important;
+}
+
+/* Available / status pills — force readable semantic colours */
+.admin-shell .supervisor-capacity-status--available,
+.student-shell .supervisor-capacity-status--available,
+.admin-shell span.supervisor-capacity-status--available {
+  background: var(--fy-success-soft) !important;
+  color: var(--fy-success) !important;
+}
+
+/* —— Module 3 Compliance Report polish (Evaluator Proposal Review) —— */
+.student-shell .module3-workspace,
+.admin-shell .module3-workspace,
+.module3-workspace {
+  width: 100%;
+  max-width: none !important;
+  margin: 0 !important;
+  gap: 1.15rem !important;
+  animation: m3-report-enter 480ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+@keyframes m3-report-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.student-shell .module3-page-heading,
+.module3-workspace .module3-page-heading,
+.module3-workspace .module3-report-heading {
+  align-items: flex-start !important;
+  gap: 1rem !important;
+  margin-bottom: 0.25rem;
+}
+
+.student-shell .module3-page-heading h1,
+.module3-workspace .module3-page-heading h1 {
+  font-size: clamp(1.7rem, 2.4vw, 2.15rem) !important;
+  letter-spacing: -0.035em !important;
+  color: var(--fy-text) !important;
+}
+
+.student-shell .module3-report-actions,
+.module3-workspace .module3-report-actions {
+  gap: 0.45rem !important;
+}
+
+.student-shell .module3-primary-button,
+.student-shell .module3-secondary-button,
+.module3-workspace .module3-primary-button,
+.module3-workspace .module3-secondary-button {
+  min-height: 2.35rem;
+  padding: 0.5rem 0.9rem !important;
+  border-radius: 0.55rem !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease, border-color 160ms ease !important;
+}
+
+.student-shell .module3-primary-button:hover:not(:disabled),
+.module3-workspace .module3-primary-button:hover:not(:disabled) {
+  background: var(--fy-brand-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgb(224 168 92 / 0.28);
+}
+
+.student-shell .module3-secondary-button:hover:not(:disabled),
+.module3-workspace .module3-secondary-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--fy-brand) 35%, var(--fy-border)) !important;
+  color: var(--fy-text) !important;
+  transform: translateY(-1px);
+}
+
+.student-shell .module3-report-hero,
+.module3-workspace .module3-report-hero {
+  position: relative;
+  overflow: hidden;
+  gap: 1.5rem !important;
+  padding: 1.35rem 1.45rem !important;
+  border: 1px solid color-mix(in srgb, var(--fy-brand) 22%, var(--fy-border)) !important;
+  background:
+    radial-gradient(ellipse 55% 80% at 0% 0%, rgb(224 168 92 / 0.12), transparent 55%),
+    linear-gradient(145deg, #1a1208 0%, var(--fy-surface) 48%, #151922 100%) !important;
+  box-shadow: var(--fy-shadow) !important;
+}
+
+.student-shell .module3-report-hero::before,
+.module3-workspace .module3-report-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--fy-brand), transparent);
+}
+
+.student-shell .module3-score-ring,
+.module3-workspace .module3-score-ring {
+  width: 152px !important;
+  height: 152px !important;
+  padding: 11px !important;
+  box-shadow: 0 0 0 1px rgb(224 168 92 / 0.18), 0 16px 36px rgb(0 0 0 / 0.35);
+}
+
+.student-shell .module3-score-ring > div,
+.module3-workspace .module3-score-ring > div {
+  background: var(--fy-page) !important;
+  box-shadow: inset 0 0 0 1px var(--fy-border);
+}
+
+.student-shell .module3-score-ring strong,
+.module3-workspace .module3-score-ring strong {
+  color: var(--fy-text) !important;
+  font-size: 2rem !important;
+  letter-spacing: -0.04em;
+}
+
+.student-shell .module3-score-ring span,
+.module3-workspace .module3-score-ring span {
+  color: var(--fy-text-secondary) !important;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.student-shell .module3-metrics,
+.module3-workspace .module3-metrics {
+  border-left-color: var(--fy-border) !important;
+  gap: 0.35rem;
+}
+
+.student-shell .module3-metric,
+.module3-workspace .module3-metric {
+  border-right-color: var(--fy-border) !important;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.65rem;
+  transition: background-color 160ms ease;
+}
+
+.student-shell .module3-metric:hover,
+.module3-workspace .module3-metric:hover {
+  background: rgb(255 255 255 / 0.03);
+}
+
+.student-shell .module3-metric strong,
+.module3-workspace .module3-metric strong {
+  font-size: 1.55rem !important;
+  letter-spacing: -0.03em;
+}
+
+.student-shell .module3-alert,
+.module3-workspace .module3-alert {
+  border-radius: 0.75rem !important;
+  padding: 0.85rem 1rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em;
+}
+
+.student-shell .module3-alert--error,
+.module3-workspace .module3-alert--error {
+  border: 1px solid color-mix(in srgb, var(--fy-warning) 35%, var(--fy-border)) !important;
+  background: color-mix(in srgb, var(--fy-warning-soft) 80%, var(--fy-surface)) !important;
+  color: var(--fy-text) !important;
+}
+
+.student-shell .module3-alert a,
+.student-shell .module3-alert button,
+.module3-workspace .module3-alert a,
+.module3-workspace .module3-alert button {
+  color: var(--fy-brand) !important;
+  font-weight: 700;
+}
+
+.student-shell .module3-panel,
+.module3-workspace .module3-panel {
+  border-radius: 1rem !important;
+  padding: 1.15rem 1.25rem !important;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.student-shell .module3-panel:hover,
+.module3-workspace .module3-panel:hover {
+  border-color: color-mix(in srgb, var(--fy-brand) 22%, var(--fy-border)) !important;
+  box-shadow: 0 14px 36px rgb(0 0 0 / 0.28) !important;
+}
+
+.student-shell .module3-section-title,
+.module3-workspace .module3-section-title {
+  margin: 0 0 0.85rem !important;
+  color: var(--fy-text) !important;
+  font-size: 1rem !important;
+  letter-spacing: -0.02em;
+}
+
+.student-shell .module3-section-title--danger,
+.module3-workspace .module3-section-title--danger {
+  color: var(--fy-danger) !important;
+}
+
+.student-shell .module3-category-row,
+.module3-workspace .module3-category-row {
+  gap: 0.75rem !important;
+  margin: 0 -0.35rem;
+  padding: 0.8rem 0.55rem !important;
+  border-bottom-color: var(--fy-border) !important;
+  border-radius: 0.55rem;
+  transition: background-color 160ms ease;
+}
+
+.student-shell .module3-category-row:hover,
+.module3-workspace .module3-category-row:hover {
+  background: var(--fy-surface-muted) !important;
+}
+
+.student-shell .module3-category-icon,
+.module3-workspace .module3-category-icon {
+  width: 1.65rem !important;
+  height: 1.65rem !important;
+  border-radius: 0.45rem !important;
+  border: 1px solid color-mix(in srgb, var(--fy-brand) 28%, var(--fy-border));
+  background: var(--fy-brand-soft) !important;
+  color: var(--fy-brand) !important;
+  font-weight: 800;
+}
+
+.student-shell .module3-category-row strong,
+.module3-workspace .module3-category-row strong {
+  color: var(--fy-text) !important;
+  font-size: 0.84rem !important;
+}
+
+.student-shell .module3-category-row small,
+.module3-workspace .module3-category-row small {
+  color: var(--fy-text-secondary) !important;
+  font-size: 0.75rem !important;
+}
+
+.student-shell .module3-status-pill,
+.module3-workspace .module3-status-pill {
+  padding: 0.35rem 0.65rem !important;
+  font-size: 0.68rem !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.student-shell .module3-section-header,
+.module3-workspace .module3-section-header {
+  margin-bottom: 0.35rem;
+  padding-bottom: 0.65rem !important;
+  border-bottom-color: var(--fy-border) !important;
+  color: var(--fy-text-secondary) !important;
+}
+
+.student-shell .module3-section-row,
+.module3-workspace .module3-section-row {
+  gap: 0.65rem !important;
+  padding: 0.7rem 0.25rem !important;
+  border-bottom-color: var(--fy-border) !important;
+  transition: background-color 160ms ease;
+}
+
+.student-shell .module3-section-row:hover,
+.module3-workspace .module3-section-row:hover {
+  background: rgb(255 255 255 / 0.02);
+}
+
+.student-shell .module3-section-row strong,
+.module3-workspace .module3-section-row strong {
+  color: var(--fy-text) !important;
+  font-size: 0.82rem !important;
+}
+
+.student-shell .module3-final-metrics,
+.module3-workspace .module3-final-metrics {
+  gap: 0.65rem !important;
+  margin-bottom: 1.1rem !important;
+}
+
+.student-shell .module3-final-metrics > span,
+.module3-workspace .module3-final-metrics > span {
+  border: 1px solid var(--fy-border);
+  border-radius: 0.7rem;
+  background: var(--fy-page);
+  padding: 0.7rem 0.75rem;
+}
+
+.student-shell .module3-final-metrics strong,
+.module3-workspace .module3-final-metrics strong {
+  font-size: 1.2rem !important;
+  letter-spacing: -0.03em;
+}
+
+.student-shell .module3-final-metrics span:nth-child(2) strong,
+.module3-workspace .module3-final-metrics span:nth-child(2) strong {
+  color: var(--fy-success) !important;
+}
+
+.student-shell .module3-final-metrics span:nth-child(3) strong,
+.module3-workspace .module3-final-metrics span:nth-child(3) strong {
+  color: var(--fy-danger) !important;
+}
+
+.student-shell .module3-final-metrics span:nth-child(4) strong,
+.module3-workspace .module3-final-metrics span:nth-child(4) strong {
+  color: var(--fy-warning) !important;
+}
+
+.student-shell .module3-final-metrics small,
+.module3-workspace .module3-final-metrics small {
+  color: var(--fy-text-secondary) !important;
+}
+
+.student-shell .module3-history-list,
+.module3-workspace .module3-history-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.student-shell .module3-history-row,
+.module3-workspace .module3-history-row {
+  gap: 0.75rem !important;
+  border: 1px solid var(--fy-border);
+  border-radius: 0.75rem;
+  background: var(--fy-page);
+  padding: 0.7rem 0.85rem;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.student-shell .module3-history-row:hover,
+.module3-workspace .module3-history-row:hover {
+  border-color: color-mix(in srgb, var(--fy-brand) 30%, var(--fy-border));
+  background: var(--fy-surface-muted);
+}
+
+.student-shell .module3-history-row > button:first-child,
+.module3-workspace .module3-history-row > button:first-child {
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--fy-text) !important;
+  text-align: left;
+  font-weight: 650;
+}
+
+.student-shell .module3-history-row strong,
+.module3-workspace .module3-history-row strong {
+  color: var(--fy-brand) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.student-shell .module3-success-text,
+.module3-workspace .module3-success-text {
+  color: var(--fy-success) !important;
+  font-weight: 650;
+}
+
+.student-shell .module3-live-dot,
+.module3-workspace .module3-live-dot {
+  background: var(--fy-brand-soft) !important;
+  color: var(--fy-brand) !important;
+  border: 1px solid color-mix(in srgb, var(--fy-brand) 30%, var(--fy-border));
+}
+
+.student-shell .module3-report-grid,
+.module3-workspace .module3-report-grid {
+  gap: 1rem !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .module3-workspace,
+  .student-shell .module3-primary-button,
+  .student-shell .module3-secondary-button {
+    animation: none !important;
+    transition: none !important;
+  }
+  .student-shell .module3-primary-button:hover:not(:disabled),
+  .student-shell .module3-secondary-button:hover:not(:disabled) {
+    transform: none;
+  }
+}

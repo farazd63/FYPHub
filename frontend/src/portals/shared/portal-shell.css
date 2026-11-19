@@ -1,13 +1,13 @@
 /* Supervisor portal shell. The shared RoleSidebar owns the rail; this file
    owns only the header, content pane and the shell-specific responsive layout. */
 :root {
-  --portal-canvas: #f3f6fb;
-  --portal-navy: #111b2d;
-  --portal-blue: #4654eb;
-  --portal-ink: #14345b;
-  --portal-muted: #647896;
-  --portal-line: #d9e3f2;
-  --portal-radius: 22px;
+  --portal-canvas: var(--fy-page, #f4f6f8);
+  --portal-navy: var(--fy-text, #1a2433);
+  --portal-blue: var(--fy-brand, #1d4ed8);
+  --portal-ink: var(--fy-text, #1a2433);
+  --portal-muted: var(--fy-text-secondary, #5b6b7c);
+  --portal-line: var(--fy-border, #d8dee6);
+  --portal-radius: var(--fy-radius-card, 0.75rem);
 }
 
 .portal-shell {
@@ -57,7 +57,7 @@
   color: var(--portal-blue);
 }
 
-.portal-header__menu:hover { background: #eef2ff; }
+.portal-header__menu:hover { background: var(--fy-brand-soft, #e8eefc); }
 .portal-header__menu svg { width: 22px; height: 22px; }
 
 .portal-brand {
@@ -75,10 +75,10 @@
 .portal-role {
   display: inline-flex;
   align-items: center;
-  border: 1px solid #c8d5f1;
+  border: 1px solid color-mix(in srgb, var(--portal-blue) 22%, white);
   border-radius: 999px;
-  background: #eef3ff;
-  color: #315db4;
+  background: var(--fy-brand-soft, #e8eefc);
+  color: var(--portal-blue);
   padding: 4px 8px;
   font-size: 11px;
   font-weight: 800;
@@ -101,25 +101,25 @@
   height: 30px;
   flex: 0 0 30px;
   place-items: center;
-  border: 1px solid #c8d5f1;
+  border: 1px solid var(--portal-line);
   border-radius: 50%;
-  background: linear-gradient(135deg, #e4efff, #e9e8ff);
-  color: #315db4;
+  background: var(--fy-brand-soft, #e8eefc);
+  color: var(--portal-blue);
   font-size: 10px;
   font-weight: 800;
 }
 
 .portal-logout {
   border: 1px solid var(--portal-line);
-  border-radius: 9px;
+  border-radius: var(--fy-radius-control, 0.5rem);
   background: #fff;
-  color: #315db4;
+  color: var(--portal-blue);
   padding: 7px 11px;
   font-size: 12px;
   font-weight: 750;
 }
 
-.portal-logout:hover { border-color: #9fb8e6; background: #f4f7ff; }
+.portal-logout:hover { border-color: color-mix(in srgb, var(--portal-blue) 28%, white); background: var(--fy-brand-soft, #e8eefc); }
 
 .portal-body {
   display: flex;
@@ -132,11 +132,11 @@
 .portal-content {
   min-width: 0;
   flex: 1 1 auto;
-  overflow: auto;
-  padding: 28px clamp(16px, 3vw, 40px) 42px;
+  overflow: visible;
+  padding: var(--fy-shell-pad, 1.5rem);
 }
 
-.portal-content__inner { width: 100%; max-width: 1240px; margin: 0 auto; }
+.portal-content__inner { width: 100%; max-width: none; margin-inline: auto; }
 
 .portal-content button {
   min-height: 38px;
@@ -162,7 +162,7 @@
 .portal-content select:focus,
 .portal-content textarea:focus {
   border-color: var(--portal-blue);
-  box-shadow: 0 0 0 3px rgb(70 84 235 / 0.14);
+  box-shadow: var(--fy-focus-ring, 0 0 0 3px rgb(29 78 216 / 0.28));
   outline: none;
 }
 
@@ -181,8 +181,8 @@
 .portal-shell input:focus-visible,
 .portal-shell select:focus-visible,
 .portal-shell textarea:focus-visible {
-  outline: 3px solid rgb(70 84 235 / 0.3);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--fy-focus-ring, 0 0 0 3px rgb(29 78 216 / 0.28));
 }
 
 @media (max-width: 767px) {

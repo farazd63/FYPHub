@@ -4,8 +4,8 @@
 :root {
   --dashboard-navy: #111b2d;
   --dashboard-navy-deep: #0e1728;
-  --dashboard-blue: #4654eb;
-  --dashboard-blue-dark: #3543d7;
+  --dashboard-blue: var(--fy-brand, #1d4ed8);
+  --dashboard-blue-dark: var(--fy-brand-hover, #1e40af);
   --dashboard-blue-line: #c0c7ff;
   --dashboard-border: rgb(139 160 217 / 0.28);
   --dashboard-shadow: 0 22px 42px rgb(20 31 53 / 0.2);
@@ -339,11 +339,17 @@ main:has(.admin-sidebar) button:focus-visible {
   .admin-shell .admin-sidebar-overlay.opacity-100,
   main:has(.admin-sidebar) .student-sidebar__overlay.student-sidebar__overlay--open { opacity: 1; pointer-events: auto; }
 
+  .student-shell .student-sidebar,
   .student-shell .student-sidebar--collapsed,
   .admin-shell.admin-sidebar-collapsed .admin-sidebar,
-  main:has(.admin-sidebar).admin-sidebar-collapsed .admin-sidebar {
-    width: min(84vw, 304px);
-    flex-basis: auto;
+  .admin-shell .admin-sidebar,
+  main:has(.admin-sidebar).admin-sidebar-collapsed .admin-sidebar,
+  main:has(.admin-sidebar) .admin-sidebar {
+    flex: 0 0 0 !important;
+    width: min(84vw, 304px) !important;
+    min-width: 0 !important;
+    max-width: min(84vw, 304px) !important;
+    margin: 0 !important;
   }
 
   .student-shell .student-sidebar--collapsed .student-sidebar__label,

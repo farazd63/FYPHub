@@ -1,18 +1,18 @@
 /* Dashboard presentation tokens. This file is deliberately page-focused;
    navigation geometry lives in dashboard-nav.css and auth in auth.css. */
 :root {
-  --dash-canvas: #e9ebf0;
-  --dash-surface: #ffffff;
-  --dash-surface-soft: #f7f8fb;
-  --dash-ink: #15233a;
-  --dash-muted: #6f7b90;
-  --dash-line: #e2e6ee;
-  --dash-blue: #4654eb;
-  --dash-blue-dark: #3543d7;
-  --dash-navy: #111a2b;
-  --dash-navy-soft: #1b263b;
-  --dash-shadow: 0 18px 44px rgb(25 38 66 / 0.12);
-  --dash-radius: 18px;
+  --dash-canvas: var(--fy-page, #f4f6f8);
+  --dash-surface: var(--fy-surface, #ffffff);
+  --dash-surface-soft: var(--fy-surface-muted, #eef1f4);
+  --dash-ink: var(--fy-text, #1a2433);
+  --dash-muted: var(--fy-text-secondary, #5b6b7c);
+  --dash-line: var(--fy-border, #d8dee6);
+  --dash-blue: var(--fy-brand, #1d4ed8);
+  --dash-blue-dark: var(--fy-brand-hover, #1e40af);
+  --dash-navy: var(--fy-text, #1a2433);
+  --dash-navy-soft: var(--fy-text-secondary, #5b6b7c);
+  --dash-shadow: var(--fy-shadow, 0 18px 44px rgb(25 38 66 / 0.12));
+  --dash-radius: var(--fy-radius-card, 0.75rem);
 }
 
 body:has(.student-shell),
@@ -29,8 +29,8 @@ main:has(.admin-sidebar) {
 main:has(.admin-sidebar) > header {
   height: 64px;
   border-bottom: 1px solid var(--dash-line);
-  background: rgb(255 255 255 / 0.92);
-  box-shadow: 0 1px 0 rgb(27 40 65 / 0.08), 0 8px 24px rgb(25 38 66 / 0.05);
+  background: color-mix(in srgb, var(--dash-surface) 92%, transparent);
+  box-shadow: var(--dash-shadow);
   backdrop-filter: blur(14px);
 }
 
@@ -80,10 +80,10 @@ main:has(.admin-sidebar) .admin-avatar {
   width: 30px;
   height: 30px;
   flex-basis: 30px;
-  border: 2px solid #fff;
-  background: linear-gradient(135deg, #ffd7c5, #c2d7ff);
-  box-shadow: 0 3px 10px rgb(52 67 104 / 0.14);
-  color: #314269;
+  border: 2px solid var(--fy-border, var(--dash-line));
+  background: var(--fy-brand-soft, var(--dash-surface-soft));
+  box-shadow: none;
+  color: var(--fy-brand, var(--dash-blue));
 }
 
 .student-logout,
@@ -91,24 +91,24 @@ main:has(.admin-sidebar) .admin-logout {
   border-color: var(--dash-line);
   border-radius: 10px;
   background: var(--dash-surface);
-  color: #53627b;
+  color: var(--fy-brand, var(--dash-blue));
 }
 
 .student-logout:hover,
 main:has(.admin-sidebar) .admin-logout:hover {
-  border-color: #9fb0dd;
-  background: #f4f7ff;
+  border-color: var(--fy-border-strong, var(--dash-line));
+  background: var(--fy-brand-soft, var(--dash-surface-soft));
 }
 
 .student-content,
 main:has(.admin-sidebar) > div > section {
-  padding: 28px clamp(18px, 3vw, 42px) 42px;
+  padding: var(--fy-shell-pad, 1.5rem);
 }
 
 .student-content__inner,
 main:has(.admin-sidebar) .admin-enter {
   width: 100%;
-  max-width: 1240px;
+  max-width: none;
   margin-inline: auto;
 }
 
@@ -145,53 +145,67 @@ main:has(.admin-sidebar) .admin-enter .rounded-3xl.border {
 
 .academic-cycle-dashboard__card { border-radius: 22px; }
 
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-select,
-textarea {
+.admin-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.admin-shell select,
+.admin-shell textarea,
+.student-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.student-shell select,
+.student-shell textarea {
   min-height: 42px;
-  border: 1px solid #d8deea;
+  border: 1px solid var(--dash-line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--fy-page, var(--dash-canvas));
   color: var(--dash-ink);
 }
 
-input:focus,
-select:focus,
-textarea:focus {
+.admin-shell input:focus,
+.admin-shell select:focus,
+.admin-shell textarea:focus,
+.student-shell input:focus,
+.student-shell select:focus,
+.student-shell textarea:focus {
   border-color: var(--dash-blue);
-  box-shadow: 0 0 0 3px rgb(70 84 235 / 0.14);
+  box-shadow: var(--fy-focus-ring, 0 0 0 3px rgb(224 168 92 / 0.28));
   outline: 0;
 }
 
-table {
+.admin-shell table,
+.student-shell table {
   width: 100%;
   border: 1px solid var(--dash-line);
   border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 8px 26px rgb(31 45 76 / 0.06);
+  background: var(--dash-surface);
+  box-shadow: var(--dash-shadow);
 }
 
-thead th {
-  background: #f7f8fb;
-  color: #5d6b83;
+.admin-shell thead th,
+.student-shell thead th {
+  background: var(--fy-surface-muted, var(--dash-surface-soft));
+  color: var(--dash-muted);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-button[type="submit"],
-button[class*="bg-[#4663ff]"],
-button[class*="bg-[#176b66]"],
-button[class*="bg-[#176B66]"] {
+.admin-shell button[type="submit"],
+.admin-shell button[class*="bg-[#4663ff]"],
+.admin-shell button[class*="bg-[#176b66]"],
+.admin-shell button[class*="bg-[#176B66]"],
+.student-shell button[type="submit"] {
   border-radius: 10px;
-  background: var(--dash-blue);
-  box-shadow: 0 7px 16px rgb(70 84 235 / 0.18);
+  background: var(--fy-brand, var(--dash-blue));
+  color: var(--fy-text-on-brand, #1a1208);
+  box-shadow: var(--fy-shadow, none);
 }
 
-button[type="submit"]:hover:not(:disabled),
-button[class*="bg-[#4663ff]"]:hover:not(:disabled),
-button[class*="bg-[#176b66]"]:hover:not(:disabled),
-button[class*="bg-[#176B66]"]:hover:not(:disabled) { background: var(--dash-blue-dark); }
+.admin-shell button[type="submit"]:hover:not(:disabled),
+.admin-shell button[class*="bg-[#4663ff]"]:hover:not(:disabled),
+.admin-shell button[class*="bg-[#176b66]"]:hover:not(:disabled),
+.admin-shell button[class*="bg-[#176B66]"]:hover:not(:disabled),
+.student-shell button[type="submit"]:hover:not(:disabled) {
+  background: var(--fy-brand-hover, var(--dash-blue-dark));
+  color: var(--fy-text-on-brand, #1a1208);
+}
 
 @media (max-width: 767px) {
   .student-content,
