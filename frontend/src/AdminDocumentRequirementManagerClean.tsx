@@ -41,7 +41,10 @@ export function AdminDocumentRequirementManagerClean({ api }: { api: string }) {
     }
   }, [api]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const initialLoad = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(initialLoad);
+  }, [load]);
 
   const request = async (method: string, url: string, body?: object) => {
     const response = await fetch(url, { method, credentials: "include", headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });

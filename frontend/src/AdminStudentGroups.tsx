@@ -81,8 +81,10 @@ export function AdminStudentGroups({ api }: { api: string }) {
 
   useEffect(() => {
     if (selectedCycleId === null) {
-      setGroups([]); setSelectedGroupId(null); setArchive(null); setGroupState("idle"); setDetailState("idle");
-      return;
+      const reset = window.setTimeout(() => {
+        setGroups([]); setSelectedGroupId(null); setArchive(null); setGroupState("idle"); setDetailState("idle");
+      }, 0);
+      return () => window.clearTimeout(reset);
     }
     const controller = new AbortController();
     const loadGroups = async () => {
@@ -109,8 +111,11 @@ export function AdminStudentGroups({ api }: { api: string }) {
   useEffect(() => {
     if (selectedCycleId === null || groupState !== "ready") return;
     const requestedGroupId = readPositiveId("group_id");
-    if (requestedGroupId !== null && groups.some((group) => group.id === requestedGroupId)) setSelectedGroupId(requestedGroupId);
-    else if (requestedGroupId !== null) writeSelection(selectedCycleId);
+    if (requestedGroupId !== null && groups.some((group) => group.id === requestedGroupId)) {
+      const select = window.setTimeout(() => setSelectedGroupId(requestedGroupId), 0);
+      return () => window.clearTimeout(select);
+    }
+    if (requestedGroupId !== null) writeSelection(selectedCycleId);
   }, [groupState, groups, selectedCycleId]);
 
   useEffect(() => {

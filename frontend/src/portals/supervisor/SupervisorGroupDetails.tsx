@@ -42,7 +42,10 @@ function SupervisorDocuments({ api, data }: { api: string; data: GroupWorkspace 
   const [reviewing, setReviewing] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [preview, setPreview] = useState<DocumentPreview | null>(null);
-  useEffect(() => setDocuments(data.documents), [data.documents]);
+  useEffect(() => {
+    const syncDocuments = window.setTimeout(() => setDocuments(data.documents), 0);
+    return () => window.clearTimeout(syncDocuments);
+  }, [data.documents]);
   useEffect(() => () => { if (preview?.url) URL.revokeObjectURL(preview.url); }, [preview?.url]);
 
   const review = async (documentId: number, submission: DocumentSubmission, action: "under-review" | "approve" | "request-replacement" | "reject") => {

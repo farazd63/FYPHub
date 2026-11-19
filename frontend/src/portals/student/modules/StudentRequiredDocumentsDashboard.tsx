@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/set-state-in-effect, react-hooks/purity */
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Requirement = {
