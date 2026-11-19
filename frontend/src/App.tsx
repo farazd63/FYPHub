@@ -10,7 +10,8 @@ import { StudentPortal } from "./portals/student/StudentPortal";
 import { SupervisorPortal } from "./portals/supervisor/SupervisorPortal";
 import { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";
 import { StudentEvaluatorPortal as EvaluatorPortal } from "./portals/student/modules/StudentEvaluatorPortal";
-import signInStudentsImage from "./assets/sign-in-students.webp";
+import authHeroImage from "./assets/fyphub-auth-hero.jpg";
+import "./auth.css";
 
 type Member = { id: string; full_name: string; email: string; registration: string };
 type Cycle = {
@@ -72,11 +73,11 @@ const browserOrigin = typeof window !== "undefined" ? window.location.origin : "
 const isLocalBackendUrl = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(configuredApi);
 export const API = !configuredApi || isLocalBackendUrl ? browserOrigin : configuredApi;
 const INPUT =
-  "w-full rounded-lg border border-[#DCE3ED] bg-white px-3.5 py-3 text-base text-[#243746] transition-colors focus:border-[#4663FF] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
+  "w-full rounded-lg border border-fy-border bg-fy-page px-3.5 py-3 text-base text-fy-text transition-colors focus:border-fy-brand disabled:cursor-not-allowed disabled:bg-fy-surface-muted disabled:opacity-70";
 const PRIMARY =
-  "rounded-lg bg-[#4663FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#354FE0] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";
+  "rounded-lg bg-fy-brand px-5 py-2.5 text-sm font-semibold text-[#1a1208] transition-colors hover:bg-fy-brand-hover disabled:cursor-not-allowed disabled:bg-[#2a3140] disabled:text-[#9aa3b5]";
 const AUTH_PRIMARY =
-  "rounded-xl bg-[#4663FF] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#354ee0] disabled:cursor-not-allowed disabled:bg-[#cddfd3] disabled:text-[#4f6470]";
+  "auth-primary rounded-xl bg-fy-brand px-5 py-2.5 text-sm font-semibold text-[#1a1208] transition-colors hover:bg-fy-brand-hover disabled:cursor-not-allowed disabled:bg-[#2a3140] disabled:text-[#9aa3b5]";
 const DEVELOPMENT_UNKNOWN_ACCOUNT_MESSAGE = "No account was found with this email address.";
 const academicCycleError = (status: number) => ({ 401: "Your session has expired. Please sign in again.", 403: "You are not authorized to load academic cycles.", 404: "The academic-cycles endpoint was not found.", 500: "The backend could not load academic cycles." }[status] ?? "Academic cycles could not be loaded.");
 
@@ -107,47 +108,55 @@ const readPublicRoute = (value: unknown): PublicRoute | null => {
 
 function Logo({ compact = false, auth = false, authMobile = false }: { compact?: boolean; auth?: boolean; authMobile?: boolean }) {
   const classes = compact
-    ? { wrapper: "flex items-center gap-2", icon: "h-9 w-10 text-[#176B66]", wordmark: "text-xl font-bold tracking-tight" }
+    ? { wrapper: "fy-logo fy-logo--compact", icon: "fy-logo__icon", wordmark: "fy-logo__wordmark" }
     : auth
-      ? { wrapper: "flex items-center gap-3.5 sm:gap-4", icon: "h-auto w-[72px] text-[#c8f3df] lg:w-[100px]", wordmark: "text-[46px] font-bold tracking-tight text-white lg:text-[62px]" }
+      ? { wrapper: "fy-logo fy-logo--auth", icon: "fy-logo__icon", wordmark: "fy-logo__wordmark" }
       : authMobile
-        ? { wrapper: "flex items-center gap-3.5 sm:gap-4", icon: "h-auto w-[56px] text-[#176B66] sm:w-[72px]", wordmark: "text-[34px] font-bold tracking-tight sm:text-[46px]" }
-        : { wrapper: "flex items-center gap-2.5", icon: "h-12 w-auto text-[#176B66]", wordmark: "text-[28px] font-bold tracking-tight sm:text-[32px]" };
+        ? { wrapper: "fy-logo fy-logo--auth-mobile", icon: "fy-logo__icon", wordmark: "fy-logo__wordmark" }
+        : { wrapper: "fy-logo", icon: "fy-logo__icon", wordmark: "fy-logo__wordmark" };
   return (
     <div className={classes.wrapper}>
-      <svg
-        aria-hidden="true"
-        className={classes.icon}
-        viewBox="0 0 56 40"
-        fill="none"
-      >
+      <svg aria-hidden="true" className={classes.icon} viewBox="0 0 56 40" fill="none">
         <path d="m4 14 24-10 24 10-24 10L4 14Z" fill="currentColor" />
-        <path
-          d="M15 20v8c5 5 21 5 26 0v-8M49 16v11"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        <circle
-          cx="49"
-          cy="30"
-          r="3"
-          fill="#E4EEE7"
-          stroke="currentColor"
-          strokeWidth="2"
-        />
+        <path d="M15 20v8c5 5 21 5 26 0v-8M49 16v11" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="49" cy="30" r="3" fill="currentColor" stroke="currentColor" strokeWidth="2" />
       </svg>
       <span className={classes.wordmark}>FYPHub</span>
     </div>
   );
 }
 
-function AuthPhotoBackground() {
-  return <div aria-hidden="true" className="auth-photo-background pointer-events-none absolute inset-0 overflow-hidden"><img src={signInStudentsImage} alt="" width="1200" height="800" className="h-full w-full object-cover object-[58%_center]" /><div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(10,40,55,.82),rgba(11,70,78,.6)_55%,rgba(10,35,50,.5))]" /></div>;
-}
-
 function AuthLayout({ children, actions, compact = false }: { children: ReactNode; actions?: ReactNode; compact?: boolean }) {
-  return <main className="relative min-h-screen overflow-x-hidden px-4 py-7 text-[#243746] sm:px-6 sm:py-10 lg:py-5"><AuthPhotoBackground /><div className="relative mx-auto grid max-w-[1280px] gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(460px,500px)] lg:items-center lg:gap-16"><section className="hidden max-w-lg self-center text-white lg:block"><Logo auth /><h1 className="mt-14 text-4xl font-bold leading-[1.15] tracking-tight">From Your First Idea to Your Final Defense.</h1><p className="mt-5 max-w-[48ch] text-[17px] leading-[1.6] text-white/90">Bring your team, proposals, feedback, and progress together in one FYP workspace.</p><p className="mt-6 text-[15px] font-medium tracking-wide text-[#b9ddcf]">Stay focused. Build together.</p></section><div className={`auth-card mx-auto w-full max-w-[500px] rounded-3xl p-5 ${compact ? "sm:p-6" : "sm:p-7"}`}><header className={`mb-6 flex gap-4 ${actions ? "flex-col items-start sm:flex-row sm:items-center sm:justify-between" : "items-center justify-between lg:hidden"}`}><div className="lg:hidden"><Logo authMobile /></div>{actions && <div className="sm:ml-auto">{actions}</div>}</header>{children}</div></div></main>;
+  return (
+    <main className={`auth-stage ${compact ? "auth-stage--compact" : ""}`}>
+      <div className="auth-stage__glow auth-stage__glow--a" aria-hidden="true" />
+      <div className="auth-stage__glow auth-stage__glow--b" aria-hidden="true" />
+      <div className="auth-stage__noise" aria-hidden="true" />
+      <div className="auth-stage__panel">
+        <div className="auth-stage__media" aria-hidden="true">
+          <img src={authHeroImage} alt="" width="1600" height="900" />
+        </div>
+        <div className="auth-stage__veil" aria-hidden="true" />
+        <div className="auth-stage__grid">
+          <section className="auth-stage__brand">
+            <div className="auth-stage__brand-copy">
+              <div className="auth-stage__reveal auth-stage__reveal--1"><Logo auth /></div>
+              <p className="auth-stage__eyebrow auth-stage__reveal auth-stage__reveal--2">Final year project workspace</p>
+              <h1 className="auth-stage__reveal auth-stage__reveal--3">From your first idea to your final defense.</h1>
+            </div>
+          </section>
+          <section className={`auth-card ${compact ? "auth-card--compact" : ""}`}>
+            <div className="auth-card__shine" aria-hidden="true" />
+            <header className={`auth-card__header ${actions ? "auth-card__header--actions" : ""}`}>
+              <div className="auth-card__mobile-brand"><Logo authMobile /></div>
+              {actions && <div className="auth-card__actions">{actions}</div>}
+            </header>
+            <div className="auth-card__body">{children}</div>
+          </section>
+        </div>
+      </div>
+    </main>
+  );
 }
 
 function Field({
@@ -276,6 +285,24 @@ export default function App() {
   const [recoveryView, setRecoveryView] = useState<"forgot" | "reset">(
     () => window.location.pathname === "/reset-password" ? "reset" : "forgot",
   );
+  useEffect(() => {
+    const titles: Record<string, string> = {
+      in: "FYPHub | Sign In",
+      up: "FYPHub | Create Team Account",
+      recover: recoveryView === "reset" ? "FYPHub | Reset Password" : "FYPHub | Forgot Password",
+      "admin-portal": "FYPHub | Administrator",
+      account: authUser?.role === "STUDENT"
+        ? "FYPHub | Student"
+        : authUser?.role === "SUPERVISOR"
+          ? "FYPHub | Supervisor"
+          : authUser?.role === "COORDINATOR"
+            ? "FYPHub | Coordinator"
+            : authUser?.role === "PANEL_MEMBER"
+              ? "FYPHub | Evaluator"
+              : "FYPHub",
+    };
+    document.title = titles[page] ?? "FYPHub";
+  }, [page, recoveryView, authUser?.role]);
   const [resetToken, setResetToken] = useState(
     () => new URLSearchParams(window.location.search).get("token") ?? "",
   );
@@ -388,6 +415,10 @@ export default function App() {
           }
           setAuthUser(user);
           setPage(destination);
+          const homePath = destination === "admin-portal" ? "/admin" : "/";
+          if (window.location.pathname === "/login" || window.location.pathname === "/signup") {
+            window.history.replaceState({ fyphubNavigation: { page: destination } }, "", homePath);
+          }
         }
       } catch {
         /* A local API may not be running while the public signup form is used. */
@@ -515,8 +546,9 @@ export default function App() {
     setNotice(Object.keys(nextErrors).length ? "Please correct the highlighted fields." : "");
     const current = readPublicRoute(window.history.state);
     const changed = !current || current.page !== next.page || current.signupRole !== next.signupRole || current.step !== next.step || current.studentMode !== next.studentMode;
-    if (mode === "push" && changed) window.history.pushState({ fyphubNavigation: next }, "", window.location.href);
-    if ((mode === "replace" || (mode === "pop" && changed)) && changed) window.history.replaceState({ fyphubNavigation: next }, "", window.location.href);
+    const publicPath = next.page === "up" ? "/signup" : next.page === "recover" ? "/recover" : "/login";
+    if (mode === "push" && changed) window.history.pushState({ fyphubNavigation: next }, "", publicPath);
+    if ((mode === "replace" || (mode === "pop" && changed)) && changed) window.history.replaceState({ fyphubNavigation: next }, "", publicPath);
   }
   useEffect(() => {
     publicNavigationRef.current = navigatePublic;
@@ -716,8 +748,9 @@ export default function App() {
         return;
       }
       setAuthUser(confirmedUser);
-      setSignIn((current) => ({ ...current, password: "" }));
-      window.history.pushState({ fyphubNavigation: { page: destination } }, "", window.location.href);
+      setSignIn({ email: "", password: "" });
+      const homePath = destination === "admin-portal" ? "/admin" : "/";
+      window.history.pushState({ fyphubNavigation: { page: destination } }, "", homePath);
       setPage(destination);
     } catch {
       setAuthError(
@@ -854,6 +887,9 @@ export default function App() {
       });
     } finally {
       setAuthUser(null);
+      setSignIn({ email: "", password: "" });
+      setAuthError("");
+      window.history.replaceState({ fyphubNavigation: publicRoute("in") }, "", "/login");
       navigatePublic(publicRoute("in"), "replace");
     }
   }
@@ -1066,9 +1102,9 @@ export default function App() {
     return (
       <AuthLayout compact>
           <div>
-            <h1 className="text-[26px] font-bold sm:text-[28px]">Sign In</h1>
-            <p className="mt-1.5 mb-4 text-sm text-[#4f6470]">
-              Sign in to your FYP workspace.
+            <h1 className="auth-card__title">Welcome back</h1>
+            <p className="auth-card__hint mt-1.5 mb-4 text-sm">
+              Sign in gently — your team workspace is waiting.
             </p>
             <form
               className="mt-5 space-y-3"
@@ -1092,7 +1128,6 @@ export default function App() {
               <PasswordField
                 label="Password"
                 autoComplete="current-password"
-                guidance
                 value={signIn.password}
                 disabled={authSubmitting}
                 onChange={(value) => {
@@ -1104,7 +1139,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => { setRecoveryView("forgot"); setResetToken(""); setResetSuccess(false); setRecoveryIdentifier(""); setRecoveryMessage(""); setRecoveryError(""); setResetLink(""); setDevelopmentLinkState("idle"); setResetLinkError(""); navigatePublic(publicRoute("recover")); }}
-                  className="font-semibold text-[#176B66] underline"
+                  className="auth-card__link font-semibold underline"
                 >
                   Forgot Password?
                 </button>
@@ -1112,7 +1147,7 @@ export default function App() {
               {authError && (
                 <p
                   role="alert"
-                  className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]"
+                  className="rounded-lg px-3 py-2 text-sm"
                 >
                   {authError}
                 </p>
@@ -1130,12 +1165,12 @@ export default function App() {
               >
                 {authSubmitting ? "Signing in..." : "Login"}
               </button>
-              <p className="text-center text-sm text-[#4f6470]">
+              <p className="auth-card__hint text-center text-sm">
                 Don&apos;t have an account?{" "}
                 <button
                   type="button"
                   onClick={() => navigatePublic(publicRoute("up"))}
-                  className="font-semibold text-[#176B66] underline"
+                  className="auth-card__link font-semibold underline"
                 >
                   Create Account
                 </button>
@@ -1145,7 +1180,7 @@ export default function App() {
       </AuthLayout>
     );
   return (
-    <AuthLayout actions={<nav aria-label="Account navigation" className="flex gap-1"><button type="button" aria-current={page === "in" ? "page" : undefined} disabled={submitting} onClick={() => changePage("in")} className={page === "in" ? "rounded-lg bg-[#E4EEE7] px-3 py-2 text-sm font-semibold text-[#176B66]" : "rounded-lg px-3 py-2 text-sm font-semibold text-[#4f6470] hover:text-[#176B66]"}>Sign In</button><button type="button" aria-current={page === "up" ? "page" : undefined} disabled={submitting} onClick={() => changePage("up")} className={page === "up" ? "rounded-lg bg-[#E4EEE7] px-3 py-2 text-sm font-semibold text-[#176B66]" : "rounded-lg px-3 py-2 text-sm font-semibold text-[#4f6470] hover:text-[#176B66]"}>Sign Up</button></nav>}>
+    <AuthLayout actions={<nav aria-label="Account navigation" className="flex gap-1"><button type="button" aria-current={page === "in" ? "page" : undefined} disabled={submitting} onClick={() => changePage("in")} className={page === "in" ? "rounded-lg bg-fy-brand-soft px-3 py-2 text-sm font-semibold text-fy-brand" : "rounded-lg px-3 py-2 text-sm font-semibold text-fy-text-secondary hover:text-fy-brand"}>Sign In</button><button type="button" aria-current={page === "up" ? "page" : undefined} disabled={submitting} onClick={() => changePage("up")} className={page === "up" ? "rounded-lg bg-fy-brand-soft px-3 py-2 text-sm font-semibold text-fy-brand" : "rounded-lg px-3 py-2 text-sm font-semibold text-fy-text-secondary hover:text-fy-brand"}>Sign Up</button></nav>}>
           {page === "in" ? (
             <>
               <h1 className="mb-7 text-center text-2xl font-bold">Sign In</h1>

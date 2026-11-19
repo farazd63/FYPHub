@@ -11,8 +11,18 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("m03_reference_templates", sa.Column("activation_mode", sa.String(16), nullable=True))
+    tables = set(sa.inspect(op.get_bind()).get_table_names())
+    if "m03_reference_templates" not in tables:
+        return
+    columns = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("m03_reference_templates")}
+    if "activation_mode" not in columns:
+        op.add_column("m03_reference_templates", sa.Column("activation_mode", sa.String(16), nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column("m03_reference_templates", "activation_mode")
+    tables = set(sa.inspect(op.get_bind()).get_table_names())
+    if "m03_reference_templates" not in tables:
+        return
+    columns = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("m03_reference_templates")}
+    if "activation_mode" in columns:
+        op.drop_column("m03_reference_templates", "activation_mode")

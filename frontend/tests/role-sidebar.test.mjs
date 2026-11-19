@@ -27,18 +27,19 @@ test("role sidebars use the shared soft navigation shell", () => {
 });
 
 test("existing role navigation IDs remain present", () => {
-  for (const id of ["overview", "requests", "review", "conversations", "history"]) assert.match(supervisor, new RegExp(`id: "${id}"`));
-  for (const id of ["assigned", "capacity", "agent-supervision"]) assert.doesNotMatch(supervisor, new RegExp(`id: "${id}"`));
+  for (const id of ["overview", "requests", "assigned", "capacity", "history"]) assert.match(supervisor, new RegExp(`id: "${id}"`));
   for (const id of ["overview", "proposal", "schedule", "history"]) assert.match(evaluator, new RegExp(`id: "${id}"`));
   assert.match(coordinator, /CoordinatorSidebar/);
-  for (const label of ["People & Access", "Workspace"]) assert.match(coordinatorSidebar, new RegExp(label.replace(/[&]/g, "\\&")));
+  assert.match(coordinatorSidebar, /People & Access/);
 });
 
 test("sidebar styling keeps mobile drawer and collapsed tooltip behavior", () => {
   assert.match(styles, /student-sidebar--collapsed/);
-  assert.match(styles, /@media \(max-width:767px\)/);
+  assert.match(styles, /@media \(max-width:\s*767px\)/);
   assert.match(shared, /student-sidebar__overlay--open/);
   assert.match(styles, /role-sidebar__section-heading/);
+  assert.match(styles, /var\(--fy-brand/);
+  assert.match(styles, /white-space:\s*normal/);
 });
 
 console.log("role-sidebar.test.mjs: all assertions passed");

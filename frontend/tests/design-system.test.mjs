@@ -4,27 +4,45 @@ import test from "node:test";
 
 const read = (file) => fs.readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8");
 
-test("shared Soft SaaS design system is loaded after the base styles", () => {
+test("shared design system is loaded after the base styles", () => {
   const main = read("main.tsx");
   assert.match(main, /import "\.\/index\.css";/);
-  assert.match(main, /import "\.\/auth\.css";/);
   assert.match(main, /import "\.\/design-system\.css";/);
+  assert.match(main, /@fontsource\/ibm-plex-sans\/400\.css/);
+  assert.match(main, /@fontsource\/ibm-plex-sans\/600\.css/);
+  assert.doesNotMatch(fs.readFileSync(new URL("../index.html", import.meta.url), "utf8"), /fonts\.googleapis\.com/);
   assert.ok(main.indexOf('import "./index.css";') < main.indexOf('import "./design-system.css";'));
 });
 
-test("shared design system defines the floating-shell tokens and accessible surfaces", () => {
+test("design tokens define dark academic surfaces and gold brand", () => {
   const css = read("design-system.css");
-  assert.match(css, /--app-primary:\s*#4169e1/);
-  assert.match(css, /--app-page:\s*#f4f7fb/);
-  assert.match(css, /border-radius:\s*18px/);
+  assert.match(css, /--fy-page:\s*#0c0e12/);
+  assert.match(css, /--fy-surface:\s*#151922/);
+  assert.match(css, /--fy-brand:\s*#e0a85c/);
+  assert.match(css, /--fy-success:\s*#3dba7a/);
+  assert.match(css, /--fy-warning:\s*#e0a85c/);
+  assert.match(css, /--fy-danger:\s*#f07178/);
+  assert.match(css, /--fy-radius-card:\s*0\.75rem/);
+  assert.match(css, /--fy-radius-control:\s*0\.5rem/);
   assert.match(css, /button:focus-visible/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
-test("authentication uses the light centered card shell without the photo asset", () => {
+test("Tailwind theme exposes fy colour tokens for shared components", () => {
+  const index = read("index.css");
+  assert.match(index, /@theme\s*\{/);
+  assert.match(index, /--color-fy-brand:\s*#e0a85c/);
+  assert.match(index, /--color-fy-page:\s*#0c0e12/);
+  assert.match(index, /--radius-fy-card:\s*0\.75rem/);
+});
+
+test("auth stage uses dark studio layout without frosted glass card", () => {
   const app = read("App.tsx");
-  assert.match(app, /className=\{`auth-saas/);
-  assert.match(app, /auth-saas__card auth-card/);
-  assert.doesNotMatch(app, /signInStudentsImage/);
-  assert.match(app, /function AuthPhotoBackground\(\) \{\s+return null;/);
+  const auth = read("auth.css");
+  assert.match(app, /auth-stage/);
+  assert.match(app, /import "\.\/auth\.css"/);
+  assert.match(auth, /\.auth-stage/);
+  assert.match(auth, /--fy-brand/);
+  assert.doesNotMatch(auth, /backdrop-filter:\s*blur/);
+  assert.match(app, /bg-fy-brand/);
 });

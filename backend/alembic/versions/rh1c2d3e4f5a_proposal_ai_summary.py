@@ -9,7 +9,11 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
-    op.add_column("supervisor_requests", sa.Column("ai_summary", JSONB(), nullable=True))
+    columns = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("supervisor_requests")}
+    if "ai_summary" not in columns:
+        op.add_column("supervisor_requests", sa.Column("ai_summary", JSONB(), nullable=True))
 
 def downgrade():
-    op.drop_column("supervisor_requests", "ai_summary")
+    columns = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("supervisor_requests")}
+    if "ai_summary" in columns:
+        op.drop_column("supervisor_requests", "ai_summary")

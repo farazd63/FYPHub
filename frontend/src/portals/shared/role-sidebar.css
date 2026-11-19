@@ -1,28 +1,25 @@
-/* Canonical sidebar used by every authenticated role portal. */
+/* Phase 2 — Neutral academic sidebar for every authenticated role portal. */
 .student-sidebar.role-sidebar {
-  position: relative;
+  position: sticky;
+  top: var(--fy-shell-sidebar-top, calc(4rem + 1.5rem));
   display: flex;
-  width: 236px;
-  height: calc(100dvh - 96px);
+  width: 248px;
+  height: calc(100dvh - var(--fy-shell-sidebar-top, 5.5rem) - var(--fy-shell-pad, 1.5rem));
   min-height: 0;
-  max-height: calc(100dvh - 96px);
-  flex: 0 0 236px;
+  max-height: calc(100dvh - var(--fy-shell-sidebar-top, 5.5rem) - var(--fy-shell-pad, 1.5rem));
+  flex: 0 0 248px;
   flex-direction: column;
   align-self: flex-start;
   gap: 8px;
-  margin: 16px 0 16px 16px;
+  margin: var(--fy-shell-pad, 1.5rem) 0 var(--fy-shell-pad, 1.5rem) var(--fy-shell-pad, 1.5rem);
   padding: 12px;
   overflow: hidden;
-  border: 1px solid #283a63;
-  border-radius: 22px;
-  background: linear-gradient(180deg, #111b2d 0%, #0e1728 100%);
-  box-shadow: 0 22px 42px rgb(20 31 53 / 0.2), inset 0 1px rgb(255 255 255 / 0.07);
-  color: #dce8ff;
-  transition: width 220ms ease, flex-basis 220ms ease, box-shadow 220ms ease, transform 220ms ease;
-}
-
-.student-sidebar.role-sidebar:hover {
-  box-shadow: 0 26px 48px rgb(20 31 53 / 0.25), inset 0 1px rgb(255 255 255 / 0.1);
+  border: 1px solid var(--fy-border, #d8dee6);
+  border-radius: var(--fy-radius-card, 0.75rem);
+  background: var(--fy-surface, #ffffff);
+  box-shadow: var(--fy-shadow, 0 1px 2px rgb(26 36 51 / 0.04), 0 8px 24px rgb(26 36 51 / 0.06));
+  color: var(--fy-text, #1a2433);
+  transition: width 220ms ease, flex-basis 220ms ease, box-shadow 220ms ease;
 }
 
 .role-sidebar .student-sidebar__nav {
@@ -35,12 +32,15 @@
   padding: 42px 0 4px;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-color: rgb(147 184 247 / 0.48) transparent;
+  scrollbar-color: color-mix(in srgb, var(--fy-brand, #1d4ed8) 28%, transparent) transparent;
   scrollbar-width: thin;
 }
 
 .role-sidebar .student-sidebar__nav::-webkit-scrollbar { width: 5px; }
-.role-sidebar .student-sidebar__nav::-webkit-scrollbar-thumb { border-radius: 999px; background: rgb(147 184 247 / 0.48); }
+.role-sidebar .student-sidebar__nav::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fy-brand, #1d4ed8) 28%, transparent);
+}
 
 .role-sidebar .role-sidebar__section {
   display: flex;
@@ -50,40 +50,54 @@
   gap: 5px;
 }
 
-.role-sidebar .role-sidebar__section + .role-sidebar__section { margin-top: 8px; }
+.role-sidebar .role-sidebar__section + .role-sidebar__section { margin-top: 10px; }
 
 .role-sidebar .role-sidebar__section-heading {
   display: flex;
   width: 100%;
   min-height: 28px;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
   padding: 6px 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--fy-radius-control, 0.5rem);
   background: transparent;
-  color: #8fa2c5;
+  color: var(--fy-text-secondary, #5b6b7c);
   text-align: left;
 }
 
-.role-sidebar .role-sidebar__section-heading:hover { background: rgb(92 110 172 / 0.2); color: #dce8ff; }
+.role-sidebar .role-sidebar__section-heading:hover,
+.role-sidebar .role-sidebar__section-heading:focus-visible {
+  background: var(--fy-surface-muted, #eef1f4);
+  color: var(--fy-text, #1a2433);
+}
+
+.role-sidebar .role-sidebar__section-heading[aria-expanded="false"] {
+  background: transparent;
+  color: var(--fy-text-secondary, #5b6b7c);
+}
 
 .role-sidebar .role-sidebar__section-title {
   min-width: 0;
-  margin: 0 8px 2px;
-  overflow: hidden;
+  margin: 0;
+  overflow: visible;
   color: inherit;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  line-height: 1.3;
-  text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
   text-transform: uppercase;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-.role-sidebar .role-sidebar__section-chevron { color: #b7c6e1; font-size: 16px; line-height: 1; }
+.role-sidebar .role-sidebar__section-chevron {
+  flex: 0 0 auto;
+  color: var(--fy-text-secondary, #5b6b7c);
+  font-size: 16px;
+  line-height: 1;
+}
 
 .role-sidebar .student-sidebar__item {
   position: relative;
@@ -95,35 +109,55 @@
   gap: 9px;
   padding: 5px 6px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--fy-radius-control, 0.5rem);
   background: transparent;
-  color: #d7deea;
+  color: var(--fy-text, #1a2433);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.3;
   text-align: left;
-  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
-.role-sidebar .student-sidebar__item:hover:not(:disabled) { transform: translateX(2px); border-color: rgb(139 160 217 / 0.28); background: rgb(92 110 172 / 0.2); color: #fff; }
+.role-sidebar .student-sidebar__item:hover:not(:disabled):not([aria-current="page"]) {
+  border-color: var(--fy-border, #d8dee6);
+  background: var(--fy-surface-muted, #eef1f4);
+  color: var(--fy-text, #1a2433);
+}
 
-.role-sidebar .student-sidebar__item[aria-current="page"] {
-  border-color: rgb(151 163 255 / 0.5);
-  background: linear-gradient(110deg, #4654eb, #3543d7);
-  box-shadow: 0 8px 18px rgb(58 72 216 / 0.28), inset 0 1px rgb(255 255 255 / 0.18);
-  color: #fff;
+.role-sidebar .student-sidebar__item:focus-visible {
+  outline: none;
+  box-shadow: var(--fy-focus-ring, 0 0 0 3px rgb(29 78 216 / 0.28));
+}
+
+/* Active item — readable in default, hover, and focus */
+.role-sidebar .student-sidebar__item[aria-current="page"],
+.role-sidebar .student-sidebar__item[aria-current="page"]:hover,
+.role-sidebar .student-sidebar__item[aria-current="page"]:focus-visible {
+  border-color: color-mix(in srgb, var(--fy-brand, #1d4ed8) 28%, white);
+  background: var(--fy-brand-soft, #e8eefc);
+  box-shadow: none;
+  color: var(--fy-brand, #1d4ed8);
 }
 
 .role-sidebar .student-sidebar__item[aria-current="page"]::before {
   position: absolute;
-  top: 20%;
-  bottom: 20%;
+  top: 18%;
+  bottom: 18%;
   left: 0;
   width: 3px;
   border-radius: 4px;
-  background: #c0c7ff;
-  box-shadow: 0 0 10px #aab4ff;
+  background: var(--fy-brand, #1d4ed8);
   content: "";
+}
+
+.role-sidebar .student-sidebar__item[aria-current="page"] .student-sidebar__label,
+.role-sidebar .student-sidebar__item[aria-current="page"] .student-sidebar__icon,
+.role-sidebar .student-sidebar__item[aria-current="page"] .student-sidebar__icon svg,
+.role-sidebar .student-sidebar__item[aria-current="page"]:hover .student-sidebar__label,
+.role-sidebar .student-sidebar__item[aria-current="page"]:hover .student-sidebar__icon,
+.role-sidebar .student-sidebar__item[aria-current="page"]:hover .student-sidebar__icon svg {
+  color: var(--fy-brand, #1d4ed8);
 }
 
 .role-sidebar .student-sidebar__icon {
@@ -132,16 +166,25 @@
   height: 32px;
   flex: 0 0 32px;
   place-items: center;
-  border: 1px solid rgb(167 181 224 / 0.34);
-  border-radius: 8px;
-  background: rgb(95 119 188 / 0.18);
-  color: #dceaff;
+  border: 1px solid var(--fy-border, #d8dee6);
+  border-radius: var(--fy-radius-control, 0.5rem);
+  background: var(--fy-surface-muted, #eef1f4);
+  color: var(--fy-text-secondary, #5b6b7c);
 }
 
 .role-sidebar .student-sidebar__icon svg { width: 17px; height: 17px; }
-.role-sidebar .student-sidebar__item[aria-current="page"] .student-sidebar__icon { border-color: rgb(222 226 255 / 0.65); background: rgb(25 39 119 / 0.5); }
+.role-sidebar .student-sidebar__item[aria-current="page"] .student-sidebar__icon {
+  border-color: color-mix(in srgb, var(--fy-brand, #1d4ed8) 30%, white);
+  background: var(--fy-surface, #ffffff);
+  color: var(--fy-brand, #1d4ed8);
+}
 
-.role-sidebar .student-sidebar__label { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; line-height: 1.25; }
+.role-sidebar .student-sidebar__label {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
 
 .role-sidebar .student-sidebar__collapse {
   position: absolute;
@@ -153,19 +196,30 @@
   height: 32px;
   place-items: center;
   padding: 0;
-  border: 1px solid rgb(164 202 255 / 0.5);
-  border-radius: 9px;
-  background: rgb(73 89 153 / 0.7);
-  color: #fff;
-  box-shadow: 0 8px 18px rgb(5 20 55 / 0.24);
+  border: 1px solid var(--fy-border, #d8dee6);
+  border-radius: var(--fy-radius-control, 0.5rem);
+  background: var(--fy-surface, #ffffff);
+  color: var(--fy-brand, #1d4ed8);
+  box-shadow: none;
 }
 
-.role-sidebar .student-sidebar__collapse:hover { background: #4654eb; }
-.role-sidebar .student-sidebar__collapse svg { display: block; width: 18px; height: 18px; }
+.role-sidebar .student-sidebar__collapse:hover {
+  background: var(--fy-brand-soft, #e8eefc);
+  border-color: color-mix(in srgb, var(--fy-brand, #1d4ed8) 28%, white);
+}
+
+.role-sidebar .student-sidebar__collapse svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  color: inherit;
+  stroke: currentColor;
+}
+
 .role-sidebar .student-sidebar__mobile-head { display: none; }
 .role-sidebar .student-sidebar__overlay { display: none; }
 
-.student-sidebar.role-sidebar.student-sidebar--collapsed { width: 70px; flex-basis: 70px; padding-inline: 9px; }
+.student-sidebar.role-sidebar.student-sidebar--collapsed { width: 72px; flex-basis: 72px; padding-inline: 9px; }
 .student-sidebar.role-sidebar.student-sidebar--collapsed .student-sidebar__label,
 .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__section-title { display: none; }
 .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__section-heading { justify-content: center; padding-inline: 6px; }
@@ -174,36 +228,93 @@
 .student-sidebar.role-sidebar.student-sidebar--collapsed .student-sidebar__collapse { right: 50%; transform: translateX(50%); }
 
 @media (max-width: 1024px) and (min-width: 768px) {
-  .student-sidebar.role-sidebar { width: 224px; flex-basis: 224px; }
+  .student-sidebar.role-sidebar { width: 228px; flex-basis: 228px; }
 }
 
-@media (max-width:767px) {
-  .student-sidebar.role-sidebar {
+@media (max-width: 767px) {
+  .student-sidebar.role-sidebar,
+  .student-sidebar.role-sidebar.student-sidebar--collapsed {
     position: fixed;
-    inset: 76px 14px 14px 14px;
+    inset: calc(var(--fy-shell-header, 4rem) + 0.75rem) 0.85rem 0.85rem 0.85rem;
     z-index: 40;
     display: flex;
-    width: min(84vw, 304px);
+    flex: 0 0 0 !important;
+    width: min(84vw, 304px) !important;
+    min-width: 0 !important;
+    max-width: min(84vw, 304px) !important;
     height: auto;
-    max-height: calc(100dvh - 90px);
-    margin: 0;
+    max-height: calc(100dvh - var(--fy-shell-header, 4rem) - 1.5rem);
+    margin: 0 !important;
     padding: 12px;
-    transform: translateX(calc(-100% - 20px));
-    border-radius: 24px;
+    transform: translateX(calc(-100% - 24px));
+    border-radius: var(--fy-radius-card, 0.75rem);
     opacity: 0;
     pointer-events: none;
-    box-shadow: 0 22px 46px rgb(9 24 52 / 0.3);
+    box-shadow: 0 22px 46px rgb(26 36 51 / 0.18);
   }
 
-  .student-sidebar.role-sidebar.student-sidebar--open { transform: translateX(0); opacity: 1; pointer-events: auto; }
-  .role-sidebar .student-sidebar__mobile-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 4px 12px; border-bottom: 1px solid rgb(194 215 250 / 0.2); }
-  .role-sidebar .student-sidebar__section-label { color: #aebbd0; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
-  .role-sidebar .student-sidebar__close { display: grid; width: 36px; height: 36px; place-items: center; padding: 0; border: 1px solid #78a4ff; border-radius: 9px; background: #214b9b; color: #fff; font-size: 24px; line-height: 1; }
+  .student-sidebar.role-sidebar.student-sidebar--open {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .role-sidebar .student-sidebar__mobile-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 4px 12px;
+    border-bottom: 1px solid var(--fy-border, #d8dee6);
+  }
+
+  .role-sidebar .student-sidebar__section-label {
+    color: var(--fy-text-secondary, #5b6b7c);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .role-sidebar .student-sidebar__close {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--fy-border, #d8dee6);
+    border-radius: var(--fy-radius-control, 0.5rem);
+    background: var(--fy-surface, #ffffff);
+    color: var(--fy-brand, #1d4ed8);
+    font-size: 24px;
+    line-height: 1;
+  }
+
   .role-sidebar .student-sidebar__collapse { display: none; }
   .role-sidebar .student-sidebar__nav { padding-top: 12px; }
-  .role-sidebar .student-sidebar__overlay { position: fixed; inset: 64px 0 0; z-index: 35; display: block; border: 0; background: rgb(16 36 74 / 0.28); opacity: 0; pointer-events: none; transition: opacity 180ms ease; }
-  .role-sidebar .student-sidebar__overlay.student-sidebar__overlay--open { opacity: 1; pointer-events: auto; }
-  .student-sidebar.role-sidebar.student-sidebar--collapsed { width: min(84vw, 304px); flex-basis: auto; }
+
+  .role-sidebar .student-sidebar__overlay {
+    position: fixed;
+    inset: 64px 0 0;
+    z-index: 35;
+    display: block;
+    border: 0;
+    background: rgb(26 36 51 / 0.28);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+  }
+
+  .role-sidebar .student-sidebar__overlay.student-sidebar__overlay--open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed {
+    width: min(84vw, 304px) !important;
+    flex: 0 0 0 !important;
+    flex-basis: 0 !important;
+  }
   .student-sidebar.role-sidebar.student-sidebar--collapsed .student-sidebar__label,
   .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__section-title { display: inline; }
   .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__section-heading { justify-content: space-between; }

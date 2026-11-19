@@ -1,0 +1,22 @@
+[
+  {
+    "role": "SUPERVISOR",
+    "screen": "supervisor-capacity.png",
+    "overflowX": 0
+  },
+  {
+    "role": "STUDENT",
+    "screen": "student-project-progress.png",
+    "overflowX": 0
+  },
+  {
+    "role": "EVALUATOR",
+    "screen": "evaluator-scoring-feedback.png",
+    "overflowX": 0
+  },
+  {
+    "role": "COORDINATOR",
+    "screen": "coordinator-panel-scheduling.png",
+    "overflowX": 0
+  }
+]

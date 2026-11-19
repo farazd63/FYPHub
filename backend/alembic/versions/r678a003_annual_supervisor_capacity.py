@@ -60,14 +60,20 @@ def upgrade() -> None:
     op.execute("ALTER TABLE supervisor_capacity_policies DROP COLUMN IF EXISTS session")
     op.execute(
         """
-        ALTER TABLE supervisor_capacity_policies
-        ADD CONSTRAINT uq_supervisor_capacity_policies_supervisor_year
-        UNIQUE (supervisor_id, academic_year)
+        DO $$ BEGIN
+            ALTER TABLE supervisor_capacity_policies
+            ADD CONSTRAINT uq_supervisor_capacity_policies_supervisor_year
+            UNIQUE (supervisor_id, academic_year);
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
         """
     )
 
-    op.add_column("supervisor_assignments", sa.Column("academic_year", sa.Integer(), nullable=True))
-    op.add_column("supervisor_assignments", sa.Column("session", sa.String(length=16), nullable=True))
+    assignment_columns = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("supervisor_assignments")}
+    if "academic_year" not in assignment_columns:
+        op.add_column("supervisor_assignments", sa.Column("academic_year", sa.Integer(), nullable=True))
+    if "session" not in assignment_columns:
+        op.add_column("supervisor_assignments", sa.Column("session", sa.String(length=16), nullable=True))
     op.execute(
         """
         UPDATE supervisor_assignments AS assignment
@@ -77,17 +83,32 @@ def upgrade() -> None:
         WHERE assignment.academic_cycle_id = cycle.id
         """
     )
-    op.create_check_constraint(
-        "ck_supervisor_assignments_year_valid",
-        "supervisor_assignments",
-        "academic_year IS NULL OR academic_year BETWEEN 1900 AND 2200",
-    )
-    op.create_check_constraint(
-        "ck_supervisor_assignments_session_valid",
-        "supervisor_assignments",
-        "session IS NULL OR session IN ('FALL','SPRING')",
-    )
-    op.create_index("ix_supervisor_assignments_supervisor_year_session", "supervisor_assignments", ["supervisor_id", "academic_year", "session"])
+    assignment_checks = {
+        item["name"]
+        for item in sa.inspect(op.get_bind()).get_check_constraints("supervisor_assignments")
+        if item.get("name")
+    }
+    if "ck_supervisor_assignments_year_valid" not in assignment_checks:
+        op.create_check_constraint(
+            "ck_supervisor_assignments_year_valid",
+            "supervisor_assignments",
+            "academic_year IS NULL OR academic_year BETWEEN 1900 AND 2200",
+        )
+    if "ck_supervisor_assignments_session_valid" not in assignment_checks:
+        op.create_check_constraint(
+            "ck_supervisor_assignments_session_valid",
+            "supervisor_assignments",
+            "session IS NULL OR session IN ('FALL','SPRING')",
+        )
+    assignment_indexes = {
+        index["name"] for index in sa.inspect(op.get_bind()).get_indexes("supervisor_assignments")
+    }
+    if "ix_supervisor_assignments_supervisor_year_session" not in assignment_indexes:
+        op.create_index(
+            "ix_supervisor_assignments_supervisor_year_session",
+            "supervisor_assignments",
+            ["supervisor_id", "academic_year", "session"],
+        )
 
 
 def downgrade() -> None:
