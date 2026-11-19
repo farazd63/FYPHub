@@ -16,6 +16,9 @@ def _jsonb(name, default="{}"):
 
 
 def upgrade():
+    existing_tables = set(sa.inspect(op.get_bind()).get_table_names())
+    if "m03_reference_templates" in existing_tables:
+        return
     op.create_table("m03_reference_templates",
         sa.Column("id", sa.Integer(), primary_key=True), sa.Column("template_type", sa.String(16), nullable=False),
         sa.Column("filename", sa.String(255), nullable=False), sa.Column("storage_key", sa.String(512), nullable=False),

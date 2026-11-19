@@ -34,3 +34,12 @@ uploads/
 runtime/uploads/
 backend/storage/
 frontend/.audit-working/
+
+# Local database dumps (may contain personal data / password hashes)
+*.sql
+!database/init/*.sql
+!frontend/fyphub_backup.sql
+
+# Local binary DB dumps and OS junk
+*.dump
+.DS_Store
