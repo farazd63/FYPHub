@@ -19,6 +19,7 @@ from .models import (
     DocumentSubmissionVersion,
     DocumentUploadRequirement,
     SupervisorAssignment,
+    SupervisorRequest,
     Team,
     TeamMember,
     User,
