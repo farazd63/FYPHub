@@ -230,6 +230,14 @@ main:has(.admin-sidebar) > header {
   box-shadow: var(--fy-shadow-nav) !important;
   backdrop-filter: blur(12px);
 }
+
+/* The student report scrolls with the document. Keep its sticky header flush
+   with the viewport so content cannot appear in the inset gap above it. */
+.student-shell > .student-header {
+  top: 0 !important;
+  margin-top: 0 !important;
+}
+
 .student-header .student-brand,
 .student-header .student-account__name--clamp {
   max-width: min(42vw, 16rem);
