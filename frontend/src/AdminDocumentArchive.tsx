@@ -27,10 +27,47 @@ type Preview = { url: string; title: string; pageCount: number; error?: string }
 const emptyFilters: Filters = { search: "", section: "", status: "", student: "", requirement: "", date_from: "", date_to: "" };
 const statuses = ["NOT_SUBMITTED", "DRAFT", "SUBMITTED", "UNDER_REVIEW", "CHANGES_REQUESTED", "ACCEPTED", "REJECTED", "CLOSED"];
 
+const FIELD_MESSAGES: Record<string, Record<string, string>> = {
+  max_file_size_mb: {
+    greater_than_equal: "Max size must be at least 1 MB.",
+    less_than_equal: "Max size must be at most 100 MB.",
+    int_parsing: "Max size must be a whole number of megabytes.",
+    missing: "Max size is required.",
+  },
+  title: { missing: "Requirement name is required.", string_too_short: "Requirement name is required." },
+  due_at: { missing: "Deadline is required.", datetime_parsing: "Deadline must be a valid date and time." },
+  academic_cycle_id: { missing: "Academic cycle is required." },
+};
+
 const errorText = (body: unknown, fallback: string) => {
   if (!body || typeof body !== "object") return fallback;
   const detail = (body as { detail?: unknown }).detail;
-  return typeof detail === "string" ? detail : fallback;
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    const payload = detail as { message?: unknown; fields?: Array<{ path?: string; code?: string }> };
+    if (Array.isArray(payload.fields) && payload.fields.length) {
+      const parts = payload.fields.map((field) => {
+        const path = (field.path || "").split(".").pop() || "";
+        const mapped = FIELD_MESSAGES[path]?.[field.code || ""];
+        if (mapped) return mapped;
+        if (path && field.code) return `${path}: ${field.code.replaceAll("_", " ")}`;
+        return "";
+      }).filter(Boolean);
+      if (parts.length) return parts.join(" ");
+    }
+    if (typeof payload.message === "string" && payload.message.trim()) return payload.message;
+  }
+  if (Array.isArray(detail)) {
+    const parts = detail.map((item) => {
+      if (!item || typeof item !== "object") return "";
+      const entry = item as { loc?: unknown[]; msg?: unknown };
+      const field = Array.isArray(entry.loc) ? entry.loc.filter((part) => part !== "body").join(".") : "";
+      const msg = typeof entry.msg === "string" ? entry.msg : "";
+      return field && msg ? `${field}: ${msg}` : msg;
+    }).filter(Boolean);
+    if (parts.length) return parts.join(" ");
+  }
+  return fallback;
 };
 
 const dateText = (value?: string | null) => value ? new Date(value).toLocaleString() : "Not submitted";

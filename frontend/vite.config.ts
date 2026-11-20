@@ -1,6 +1,25 @@
-import { defineConfig } from "vite";
+import { defineConfig, type ProxyOptions } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+
+const apiProxy: ProxyOptions = {
+  target: "http://127.0.0.1:8010",
+  changeOrigin: true,
+  timeout: 15000,
+  proxyTimeout: 15000,
+  configure(proxy) {
+    // First requests after a backend restart can race the listener; retry once.
+    proxy.on("error", (error, _req, res) => {
+      const socket = res as { writeHead?: (code: number, headers?: Record<string, string>) => void; end?: (body?: string) => void };
+      if (typeof socket.writeHead === "function" && !("headersSent" in socket && (socket as { headersSent?: boolean }).headersSent)) {
+        socket.writeHead?.(503, { "Content-Type": "application/json" });
+        socket.end?.(JSON.stringify({ detail: { code: "upstream_unavailable", message: "API temporarily unavailable. Retrying…" } }));
+      }
+      console.warn("[vite-proxy]", error.message);
+    });
+  },
+};
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
@@ -8,8 +27,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      "/api": "http://127.0.0.1:8010",
-      "/health": "http://127.0.0.1:8010",
+      "/api": apiProxy,
+      "/health": apiProxy,
     },
   },
 });

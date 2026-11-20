@@ -796,6 +796,13 @@ def update_cycle(cycle_id: int, payload: CycleUpdate, request: Request, actor: U
         return cycle
     before = {key: getattr(cycle, key) for key in values}
     for key, value in values.items(): setattr(cycle, key, value)
+    if year is not None and term:
+        cycle.code = f"{year}-{term}"
+        cycle.display_name = f"{str(term).title().replace('_', ' ')} {year}"
+        if term == "FALL":
+            cycle.display_name = f"Fall {year}"
+        elif term == "SPRING":
+            cycle.display_name = f"Spring {year}"
     try:
         add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_CYCLE", target_id=cycle.id, action="academic_cycle_updated", changed_values={"before": before, "after": values})
         session.commit(); session.refresh(cycle)

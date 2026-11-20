@@ -3,13 +3,35 @@ import { useCallback, useEffect, useState } from "react";
 type Cycle = { id: number; code: string; display_name: string };
 type Requirement = { id: number; title: string; description?: string | null; academic_cycle_id: number; due_at: string; allowed_file_types: string[]; max_file_size_mb: number; is_required: boolean; status: string; submission_count?: number; created_at: string; updated_at: string };
 
+const FIELD_MESSAGES: Record<string, Record<string, string>> = {
+  max_file_size_mb: {
+    greater_than_equal: "Max size must be at least 1 MB.",
+    less_than_equal: "Max size must be at most 100 MB.",
+    int_parsing: "Max size must be a whole number of megabytes.",
+    missing: "Max size is required.",
+  },
+  title: { missing: "Requirement name is required.", string_too_short: "Requirement name is required." },
+  due_at: { missing: "Deadline is required.", datetime_parsing: "Deadline must be a valid date and time." },
+  academic_cycle_id: { missing: "Academic cycle is required." },
+};
+
 const errorText = (body: unknown, fallback: string) => {
   if (!body || typeof body !== "object") return fallback;
   const detail = (body as { detail?: unknown }).detail;
   if (typeof detail === "string") return detail;
   if (detail && typeof detail === "object" && !Array.isArray(detail)) {
-    const message = (detail as { message?: unknown }).message;
-    if (typeof message === "string" && message.trim()) return message;
+    const payload = detail as { message?: unknown; fields?: Array<{ path?: string; code?: string }> };
+    if (Array.isArray(payload.fields) && payload.fields.length) {
+      const parts = payload.fields.map((field) => {
+        const path = (field.path || "").split(".").pop() || "";
+        const mapped = FIELD_MESSAGES[path]?.[field.code || ""];
+        if (mapped) return mapped;
+        if (path && field.code) return `${path}: ${field.code.replaceAll("_", " ")}`;
+        return "";
+      }).filter(Boolean);
+      if (parts.length) return parts.join(" ");
+    }
+    if (typeof payload.message === "string" && payload.message.trim()) return payload.message;
   }
   if (Array.isArray(detail)) {
     const parts = detail

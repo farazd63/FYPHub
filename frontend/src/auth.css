@@ -910,6 +910,18 @@ html[data-theme="light"] .fy-logo--auth .fy-logo__wordmark {
 
 .auth-signup-stepper {
   margin-bottom: var(--fy-space-5);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: var(--fy-space-3);
+}
+
+.auth-signup-stepper .fy-stepper__item {
+  flex: 1 0 auto;
+  white-space: nowrap;
+}
+
+.auth-signup-stepper .fy-stepper__label {
+  font-size: var(--fy-text-small);
 }
 
 .auth-signup-step-title {

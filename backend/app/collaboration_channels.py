@@ -55,9 +55,9 @@ def _authorize(session: Session, channel: CollaborationChannel, actor: User, *, 
         SupervisorAssignment.supervisor_id == channel.supervisor_id,
         SupervisorAssignment.ended_at.is_(None),
     ))
-    accepted = _accepted_request(session, channel.team_id, channel.supervisor_id, team.academic_cycle_id) if team else None
-    if channel.status != "ACTIVE" or team is None or team.status == "dissolved" or assignment is None or accepted is None:
-        raise HTTPException(403, "Collaboration channel will be available after a supervisor accepts your request.")
+    # Active assignment (admin-assigned or request-accepted) is enough to open the channel.
+    if channel.status != "ACTIVE" or team is None or team.status == "dissolved" or assignment is None:
+        raise HTTPException(403, "Collaboration channel will be available after a supervisor is assigned.")
     if actor.role == UserRole.STUDENT:
         if team.shared_user_id != actor.id and _student_member(session, actor, team.id) is None:
             raise HTTPException(403, "This collaboration channel is not available to your group.")
@@ -80,13 +80,15 @@ def ensure_collaboration_channel(session: Session, assignment: SupervisorAssignm
     if existing is not None:
         return existing
     cycle = session.get(AcademicCycle, assignment.academic_cycle_id)
-    if cycle is None or cycle.academic_year is None or not cycle.session:
+    year = assignment.academic_year or (cycle.academic_year if cycle else None)
+    term = assignment.session or (cycle.session if cycle else None)
+    if cycle is None or year is None or not term:
         raise HTTPException(422, "The assigned academic cycle must have a year and session.")
     # A changed assignment archives the previous conversation but never merges it.
     previous = session.scalars(select(CollaborationChannel).where(CollaborationChannel.team_id == team.id, CollaborationChannel.status == "ACTIVE")).all()
     for channel in previous:
         channel.status = "ARCHIVED"
-    channel = CollaborationChannel(team_id=team.id, supervisor_id=assignment.supervisor_id, academic_year=assignment.academic_year or cycle.academic_year, session=assignment.session or cycle.session, assignment_id=assignment.id, status="ACTIVE")
+    channel = CollaborationChannel(team_id=team.id, supervisor_id=assignment.supervisor_id, academic_year=year, session=term, assignment_id=assignment.id, status="ACTIVE")
     session.add(channel); session.flush()
     members = session.scalars(select(TeamMember).where(TeamMember.team_id == team.id, TeamMember.is_active.is_(True)).order_by(TeamMember.id)).all()
     for member in members:
@@ -94,6 +96,34 @@ def ensure_collaboration_channel(session: Session, assignment: SupervisorAssignm
         session.add(CollaborationParticipant(channel_id=channel.id, user_id=user.id if user else None, team_member_id=member.id, participant_role="STUDENT", is_active=True))
     session.add(CollaborationParticipant(channel_id=channel.id, user_id=assignment.supervisor_id, participant_role="SUPERVISOR", is_active=True))
     return channel
+
+
+def ensure_channels_for_actor(session: Session, actor: User) -> None:
+    """Create missing channels for active assignments (admin-assigned counts as accepted)."""
+    if actor.role == UserRole.STUDENT:
+        membership = select(TeamMember.id).where(TeamMember.team_id == Team.id, TeamMember.is_active.is_(True), or_(TeamMember.registration_number == actor.registration_number, TeamMember.university_email == actor.email)).exists()
+        teams = session.scalars(select(Team).where(Team.status != "dissolved", or_(Team.shared_user_id == actor.id, membership))).all()
+        for team in teams:
+            assignment = session.scalar(select(SupervisorAssignment).where(SupervisorAssignment.team_id == team.id, SupervisorAssignment.ended_at.is_(None)).order_by(SupervisorAssignment.id.desc()))
+            if assignment is None:
+                continue
+            try:
+                ensure_collaboration_channel(session, assignment, team)
+            except HTTPException:
+                continue
+        session.commit()
+        return
+    if actor.role == UserRole.SUPERVISOR:
+        rows = session.scalars(select(SupervisorAssignment).where(SupervisorAssignment.supervisor_id == actor.id, SupervisorAssignment.ended_at.is_(None))).all()
+        for assignment in rows:
+            team = session.get(Team, assignment.team_id)
+            if team is None or team.status == "dissolved":
+                continue
+            try:
+                ensure_collaboration_channel(session, assignment, team)
+            except HTTPException:
+                continue
+        session.commit()
 
 
 def _channel_out(session: Session, channel: CollaborationChannel, actor: User) -> dict:
@@ -134,11 +164,13 @@ def _list_channels(session: Session, actor: User) -> list[dict]:
 
 @router.get("/student/collaboration/channels")
 def student_channels(actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
+    ensure_channels_for_actor(session, actor)
     return _list_channels(session, actor)
 
 
 @router.get("/supervisor/collaboration/channels")
 def supervisor_channels(actor: User = Depends(require_roles(UserRole.SUPERVISOR)), session: Session = Depends(get_db)):
+    ensure_channels_for_actor(session, actor)
     return _list_channels(session, actor)
 
 

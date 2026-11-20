@@ -61,6 +61,12 @@ def assign(payload: AssignmentWrite, request: Request, actor: User = Depends(req
             year = cycle.academic_year or payload.academic_year or "this year"
             raise failure("capacity_full", f"This supervisor has no remaining annual capacity for {year}. Fall and Spring assignments share the same yearly limit.")
         assignment = SupervisorAssignment(team_id=payload.team_id, academic_cycle_id=payload.academic_cycle_id, supervisor_id=payload.supervisor_id, academic_year=cycle.academic_year or payload.academic_year, session=cycle.session or payload.session, assigned_by_id=actor.id); session.add(assignment); session.flush(); lock_team(session, team.id, "supervisor_assigned")
+        from .collaboration_channels import ensure_collaboration_channel
+        try:
+            ensure_collaboration_channel(session, assignment, team)
+        except Exception:
+            # Channel opens once the cycle has year/session; assignment still succeeds.
+            pass
         add_admin_audit_event(session, actor_id=actor.id, affected_user_id=payload.supervisor_id, target_type="SUPERVISOR_ASSIGNMENT", target_id=assignment.id, action="supervisor_assignment_created", changed_values=payload.model_dump())
         session.commit(); session.refresh(assignment); return out(assignment)
     except HTTPException:

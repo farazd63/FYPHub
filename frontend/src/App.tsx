@@ -320,10 +320,18 @@ export default function App() {
     const controller = new AbortController();
     void (async () => {
       try {
-        const response = await fetch(`${API}/api/v1/academic-cycles`, {
+        let response = await fetch(`${API}/api/v1/academic-cycles`, {
           credentials: "include",
           signal: controller.signal,
         });
+        // First hit after a cold API/proxy start can return 503; retry once.
+        if (response.status === 503) {
+          await new Promise((resolve) => window.setTimeout(resolve, 250));
+          response = await fetch(`${API}/api/v1/academic-cycles`, {
+            credentials: "include",
+            signal: controller.signal,
+          });
+        }
         if (!response.ok) throw new Error(academicCycleError(response.status));
         const data: Cycle[] = await response.json();
         if (!controller.signal.aborted) {
@@ -1271,7 +1279,7 @@ export default function App() {
                 currentStepId={SIGNUP_STEP_IDS[step - 1]}
                 completedStepIds={SIGNUP_STEP_IDS.filter((_, index) => index < step - 1)}
               />
-              <h2 className="auth-signup-step-title">{STEPS[step - 1]}</h2>
+              <h2 className="auth-signup-step-title fy-sr-only">{STEPS[step - 1]}</h2>
               {step === 1 && (
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="sm:col-span-2 grid gap-2">

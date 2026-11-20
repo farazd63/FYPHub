@@ -33,6 +33,7 @@ export function ProposalComplianceWorkspace({ api, reviewerMode = false }: { api
   const [message, setMessage] = useState("");
   const [reviewComment, setReviewComment] = useState("");
   const [pendingReview, setPendingReview] = useState<"APPROVED" | "CHANGES_REQUESTED" | "REJECTED" | null>(null);
+  const [confirmReview, setConfirmReview] = useState<"APPROVED" | "CHANGES_REQUESTED" | "REJECTED" | null>(null);
 
   const openReport = async (id: number) => {
     setSelectedId(id); setError("");
@@ -97,8 +98,15 @@ export function ProposalComplianceWorkspace({ api, reviewerMode = false }: { api
     if (!selectedId) return;
     const comment = reviewComment.trim();
     if (!comment) { setError("A review comment is required before Approve, Reject, or Request changes."); return; }
-    if (!window.confirm(`Confirm ${status.toLowerCase().replaceAll("_", " ")} for this proposal?`)) return;
-    setBusy(true); setError(""); setMessage(""); setPendingReview(status);
+    setConfirmReview(status);
+  };
+
+  const confirmReviewStatus = async () => {
+    if (!selectedId || !confirmReview) return;
+    const status = confirmReview;
+    const comment = reviewComment.trim();
+    if (!comment) { setError("A review comment is required before Approve, Reject, or Request changes."); setConfirmReview(null); return; }
+    setBusy(true); setError(""); setMessage(""); setPendingReview(status); setConfirmReview(null);
     try {
       const response = await fetch(`${api}/api/v1/proposal-compliance/submissions/${selectedId}/status`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, comment }) });
       const payload = await response.json().catch(() => ({}));
@@ -133,6 +141,7 @@ export function ProposalComplianceWorkspace({ api, reviewerMode = false }: { api
     {message && <p className="module3-alert module3-alert--success" role="status">{message}</p>}{error && <p className="module3-alert module3-alert--error" role="alert">{error}</p>}
     {report && selectedId && !showUpload && <ProposalAiSummary key={`${selectedId}-${summaryRevision}`} api={api} requestId={selectedId} revision={summaryRevision} endpoint={`/api/v1/proposal-compliance/reports/${selectedId}/ai-summary`} />}
     {!reviewerMode && (showUpload || !report) ? <form className="module3-panel module3-proposal-upload" onSubmit={(event) => void submit(event)}><div className="module3-panel-heading"><div><span className="module3-kicker">{resubmitKey ? "Resubmit version" : "New check"}</span><h2>{resubmitKey ? "Resubmit Your Proposal" : "Submit Your Proposal"}</h2></div><span className="module3-live-dot">Template-aware</span></div><p className="module3-muted">Upload your existing proposal for compliance checking. The active university baseline is used and every uploaded version is preserved.</p><div className="module3-form-grid"><label>Proposal title<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Enter proposal title" /></label><label>Proposal type<select value={proposalType} onChange={(event) => setProposalType(event.target.value as "SHORT" | "LONG")}><option value="SHORT">Short proposal</option><option value="LONG">Long proposal</option></select></label></div><label className="module3-file-drop">Proposal document<input type="file" accept=".pdf,.docx,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />{file && <strong>{file.name}</strong>}</label><div className="module3-form-actions"><button type="submit" data-action="draft" className="module3-secondary-button" disabled={busy}>Save Draft</button><button type="submit" data-action="submit" className="module3-primary-button" disabled={busy}>{busy ? "Processing proposal..." : "Submit & run compliance check"}</button></div>{submissions.some((item) => item.status === "DRAFT") && <div className="module3-draft-list"><strong>Saved drafts</strong>{submissions.filter((item) => item.status === "DRAFT").map((item) => <div key={item.id}><span>v{item.version} - {item.title}</span><button type="button" className="module3-secondary-button" onClick={() => void submitDraft(item.id)} disabled={busy}>Submit draft</button><button type="button" className="module3-secondary-button" onClick={() => void withdraw(item.id)} disabled={busy}>Withdraw</button></div>)}</div>}</form> : report ? <ReportView report={report} submissions={submissions} onSelect={(id) => void openReport(id)} onDownload={download} onOriginal={original} onAnnotated={annotated} onRerun={reviewerMode ? undefined : () => void rerun()} onResubmit={reviewerMode ? undefined : startResubmit} onWithdraw={reviewerMode ? undefined : withdraw} busy={busy} reviewerMode={reviewerMode} /> : <div className="module3-panel"><p className="module3-muted">Select a proposal report from the evaluator queue to begin review.</p></div>}
+    {confirmReview && <div role="dialog" aria-modal="true" aria-labelledby="review-confirm-heading" className="fixed inset-0 z-50 grid place-items-center bg-[#243746]/35 p-4"><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl"><h2 id="review-confirm-heading" className="text-lg font-bold">Confirm proposal decision</h2><p className="mt-2 text-sm text-[#60716b]">Confirm {confirmReview.toLowerCase().replaceAll("_", " ")} for this proposal?</p><div className="mt-5 flex justify-end gap-3"><button type="button" disabled={busy} onClick={() => setConfirmReview(null)} className="rounded-lg border px-3 py-2 text-sm font-semibold">Cancel</button><button type="button" disabled={busy} onClick={() => void confirmReviewStatus()} className={`rounded-lg px-3 py-2 text-sm font-semibold text-white ${confirmReview === "REJECTED" ? "bg-red-700" : "bg-[#176b66]"}`}>{busy ? "Saving…" : "Confirm"}</button></div></div></div>}
   </section>;
 }
 

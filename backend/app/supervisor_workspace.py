@@ -78,7 +78,27 @@ def workspace(db, actor, group, assignment=None, request_row=None):
     proposal = None
     if request_row:
         proposal = {"id": request_row.id, "title": request_row.title or value("title"), "abstract": request_row.summary or value("abstract", "purpose"), "problem_statement": request_row.problem_statement or value("problem_statement", "problem"), "objectives": request_row.objectives or value("objectives"), "scope": request_row.scope or value("scope"), "features": value("features", "proposed_features", "proposed_solution"), "domain": value("domain", "topic"), "technologies": value("technologies", "technologies_used"), "status": request_row.status, "submitted_at": request_row.submitted_at, "updated_at": request_row.updated_at, "version": document.get("version") if document else request_row.revision, "document": document, "comments": request_data.get("status_history", [])}
-    project = {"title": proposal["title"], "description": proposal["abstract"], "domain": proposal["domain"], "technologies": proposal["technologies"], "status": "COMPLETED" if completion == 100 else "IN_PROGRESS", "phase": milestones[-1].title if milestones else None, "completion_percentage": completion, "completion_basis": "Average task completion" if tasks else "Average milestone completion", "last_progress_update": max([m.updated_at for m in [*milestones, *tasks]], default=None), "risks": [t["title"] for t in progress["tasks"] if t["overdue"]]} if proposal and (assignment or completion_items) else None
+    project = None
+    if assignment and (proposal or completion_items):
+        project = {
+            "title": (proposal["title"] if proposal else None) or (f"{leader.full_name}'s project" if leader else f"Group {group.id} project"),
+            "description": (proposal["abstract"] if proposal else None) or "Progress is tracked from milestones and tasks.",
+            "domain": proposal["domain"] if proposal else None,
+            "technologies": proposal["technologies"] if proposal else None,
+            "status": "COMPLETED" if completion == 100 else ("IN_PROGRESS" if completion_items else "NOT_STARTED"),
+            "phase": milestones[-1].title if milestones else None,
+            "completion_percentage": completion,
+            "completion_basis": "Average task completion" if tasks else ("Average milestone completion" if milestones else "No progress recorded"),
+            "last_progress_update": max([m.updated_at for m in [*milestones, *tasks]], default=None),
+            "risks": [t["title"] for t in progress["tasks"] if t["overdue"]],
+        }
+    if assignment:
+        from .collaboration_channels import ensure_collaboration_channel
+        try:
+            ensure_collaboration_channel(db, assignment, group)
+            db.commit()
+        except Exception:
+            db.rollback()
     channel = db.scalar(select(CollaborationChannel).where(CollaborationChannel.assignment_id == assignment.id, CollaborationChannel.supervisor_id == actor.id, CollaborationChannel.status == "ACTIVE")) if assignment else None
     if channel:
         activity.append(channel.updated_at)

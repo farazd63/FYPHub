@@ -170,33 +170,36 @@ export function WelcomeLanding({ onLogin, onSignup }: WelcomeLandingProps) {
       <main>
         <Container>
           <section id="overview" className="welcome-landing__hero">
-            <p className="welcome-landing__eyebrow">Final Year Project Workspace</p>
-            <h1>Manage Your Final Year Project with Intelligence</h1>
-            <p className="welcome-landing__tagline">
-              One guided workspace from group signup through final defence.
-            </p>
-            <p className="welcome-landing__lede">
-              FYPHub keeps students, supervisors, coordinators, panel members, and administrators aligned on the same academic cycle, documents, and review steps — without scattered spreadsheets.
-            </p>
-            <div className="welcome-landing__cta-row">
-              <Button size="lg" onClick={onSignup}>
-                Get Started
-              </Button>
-              <Button variant="secondary" size="lg" onClick={onLogin}>
-                Sign in
-              </Button>
+            <div className="welcome-landing__hero-copy">
+              <p className="welcome-landing__eyebrow">Final Year Project Workspace</p>
+              <h1>Manage Your Final Year Project with Intelligence</h1>
+              <p className="welcome-landing__tagline">
+                One guided workspace from group signup through final defence.
+              </p>
+              <p className="welcome-landing__lede">
+                FYPHub keeps students, supervisors, coordinators, panel members, and administrators aligned on the same academic cycle, documents, and review steps — without scattered spreadsheets.
+              </p>
+              <div className="welcome-landing__cta-row">
+                <Button size="lg" onClick={onSignup}>
+                  Get Started
+                </Button>
+                <Button variant="secondary" size="lg" onClick={onLogin}>
+                  Sign in
+                </Button>
+              </div>
+              <div className="welcome-landing__chips">
+                <FeatureChip icon={Users} active>
+                  Group workspace & collaboration
+                </FeatureChip>
+                <FeatureChip icon={ShieldCheck}>
+                  Proposal compliance workspace
+                </FeatureChip>
+                <FeatureChip icon={BookOpen}>
+                  FYP archive & knowledge search
+                </FeatureChip>
+              </div>
             </div>
-            <div className="welcome-landing__chips">
-              <FeatureChip icon={Users} active>
-                Group workspace & collaboration
-              </FeatureChip>
-              <FeatureChip icon={ShieldCheck}>
-                Proposal compliance workspace
-              </FeatureChip>
-              <FeatureChip icon={BookOpen}>
-                FYP archive & knowledge search
-              </FeatureChip>
-            </div>
+            <div className="welcome-landing__hero-visual" aria-hidden="true" />
           </section>
 
           <Section
