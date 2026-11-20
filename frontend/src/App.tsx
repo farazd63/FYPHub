@@ -12,6 +12,10 @@ import { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";
 import { StudentEvaluatorPortal as EvaluatorPortal } from "./portals/student/modules/StudentEvaluatorPortal";
 import authHeroImage from "./assets/fyphub-auth-hero.jpg";
 import { ThemeToggle } from "./ui/ThemeToggle";
+import { Stepper } from "./ui/Stepper";
+import { Button } from "./ui/Button";
+import { Card } from "./ui/Card";
+import { WelcomeLanding } from "./pages/WelcomeLanding";
 import "./auth.css";
 
 type Member = { id: string; full_name: string; email: string; registration: string };
@@ -60,12 +64,24 @@ type PasswordResetDeliveryStatus = {
   smtp_configured: boolean;
 };
 type DevelopmentResetLinkState = "idle" | "loading" | "ready" | "missing" | "error";
-type PublicPage = "in" | "up" | "recover";
+type PublicPage = "welcome" | "in" | "up" | "recover";
 type StudentSignupMode = "group";
 type PublicRoute = { page: PublicPage; signupRole: LoginRole | null; step: 1 | 2 | 3; studentMode: StudentSignupMode | null };
 type DashboardPage = "account" | "admin-portal";
 
 const STEPS = ["Academic Cycle", "Group Members", "Group Credentials"];
+const SIGNUP_STEP_IDS = ["cycle", "members", "credentials"] as const;
+const isLandingPath = (pathname: string) => pathname === "/" || pathname === "/welcome";
+const welcomePublicPath = () => (window.location.pathname === "/welcome" ? "/welcome" : "/");
+const formatCycleLabel = (cycle: Cycle) => {
+  const status = cycle.registration_open ? "Open" : "Closed";
+  const named = cycle.display_name?.trim();
+  if (named) return `${named} · ${status}`;
+  const session = cycle.session?.trim();
+  if (session) return `${session} · ${status}`;
+  if (cycle.academic_year) return `${cycle.academic_year} · ${status}`;
+  return `Cycle · ${status}`;
+};
 const configuredApi = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 // Production is served with an nginx /api proxy. Keeping the API same-origin
 // makes every portal work from localhost, a LAN hostname, or a reverse proxy,
@@ -103,7 +119,11 @@ const publicRoute = (page: PublicPage, signupRole: LoginRole | null = null, step
 };
 const readPublicRoute = (value: unknown): PublicRoute | null => {
   const route = (value as { fyphubNavigation?: unknown } | null)?.fyphubNavigation as Partial<PublicRoute> | undefined;
-  if (!route || (route.page !== "in" && route.page !== "up" && route.page !== "recover") || (route.step !== 1 && route.step !== 2 && route.step !== 3)) return null;
+  if (
+    !route
+    || (route.page !== "welcome" && route.page !== "in" && route.page !== "up" && route.page !== "recover")
+    || (route.step !== 1 && route.step !== 2 && route.step !== 3)
+  ) return null;
   return publicRoute(route.page, "STUDENT", route.step, "group");
 };
 
@@ -140,6 +160,22 @@ function AuthLayout({ children, actions, compact = false }: { children: ReactNod
         <div className="auth-stage__veil" aria-hidden="true" />
         <div className="auth-stage__grid">
           <section className="auth-stage__brand">
+            <svg className="auth-stage__line-art" viewBox="0 0 420 320" aria-hidden="true">
+              <path
+                d="M36 248c48-78 132-118 212-98 54 14 96 58 118 110M52 184c36-44 96-66 154-58M300 56c28 36 42 82 34 128"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M88 96h48l24 40H112l24 72H76l16-48H52"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+            </svg>
             <div className="auth-stage__brand-copy">
               <div className="auth-stage__reveal auth-stage__reveal--1"><Logo auth /></div>
               <p className="auth-stage__eyebrow auth-stage__reveal auth-stage__reveal--2">Final year project workspace</p>
@@ -207,72 +243,6 @@ function Field({
   );
 }
 
-function StepProgress({ step }: { step: number }) {
-  return (
-    <div className="mb-7">
-      <div className="relative mx-auto max-w-[280px]">
-        <div
-          aria-hidden="true"
-          className="absolute left-[16.666%] right-[16.666%] top-4 h-[2px] overflow-hidden bg-[#d8e2dc]"
-        >
-          <div
-            className="h-full bg-[#176B66] transition-[width] duration-300 ease-in-out motion-reduce:transition-none"
-            style={{ width: `${((step - 1) / 2) * 100}%` }}
-          />
-        </div>
-        <ol
-          aria-label="Registration progress"
-          className="relative grid grid-cols-3"
-        >
-          {STEPS.map((label, index) => {
-            const number = index + 1;
-            const current = number === step;
-            const completed = number < step;
-            return (
-              <li
-                key={label}
-                aria-current={current ? "step" : undefined}
-                className="flex justify-center"
-              >
-                <span
-                  aria-hidden="true"
-                  className={[
-                    "flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition-colors duration-300 motion-reduce:transition-none",
-                    current
-                      ? "border-[#176B66] bg-[#176B66] text-white"
-                      : completed
-                        ? "border-[#176B66] bg-[#E4EEE7] text-[#176B66]"
-                        : "border-[#c5d1ca] bg-white text-[#64766d]",
-                  ].join(" ")}
-                >
-                  {completed ? (
-                    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-                      <path
-                        d="m5 12 4 4 10-10"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  ) : (
-                    number
-                  )}
-                </span>
-                <span className="sr-only">
-                  Step {number}: {label}
-                  {completed ? ", completed" : ""}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-      <h2 className="mt-5 text-center text-xl font-bold">{STEPS[step - 1]}</h2>
-    </div>
-  );
-}
-
 export default function App() {
   const [page, setPage] = useState<string>("in");
   const [authUser, setAuthUser] = useState<SafeUser | null>(null);
@@ -291,6 +261,7 @@ export default function App() {
   );
   useEffect(() => {
     const titles: Record<string, string> = {
+      welcome: "FYPHub | Welcome",
       in: "FYPHub | Sign In",
       up: "FYPHub | Create Team Account",
       recover: recoveryView === "reset" ? "FYPHub | Reset Password" : "FYPHub | Forgot Password",
@@ -550,7 +521,14 @@ export default function App() {
     setNotice(Object.keys(nextErrors).length ? "Please correct the highlighted fields." : "");
     const current = readPublicRoute(window.history.state);
     const changed = !current || current.page !== next.page || current.signupRole !== next.signupRole || current.step !== next.step || current.studentMode !== next.studentMode;
-    const publicPath = next.page === "up" ? "/signup" : next.page === "recover" ? "/recover" : "/login";
+    const publicPath =
+      next.page === "welcome"
+        ? welcomePublicPath()
+        : next.page === "up"
+          ? "/signup"
+          : next.page === "recover"
+            ? "/recover"
+            : "/login";
     if (mode === "push" && changed) window.history.pushState({ fyphubNavigation: next }, "", publicPath);
     if ((mode === "replace" || (mode === "pop" && changed)) && changed) window.history.replaceState({ fyphubNavigation: next }, "", publicPath);
   }
@@ -558,7 +536,12 @@ export default function App() {
     publicNavigationRef.current = navigatePublic;
   });
   useEffect(() => {
-    const initial = readPublicRoute(window.history.state) ?? publicRoute("in");
+    const pathname = window.location.pathname;
+  const stored = readPublicRoute(window.history.state);
+    let initial = stored ?? (isLandingPath(pathname) ? publicRoute("welcome") : publicRoute("in"));
+    if (isLandingPath(pathname) && stored?.page === "in") {
+      initial = publicRoute("welcome");
+    }
     if (window.location.pathname === "/reset-password") {
       queueMicrotask(() => {
         setRecoveryView("reset");
@@ -586,7 +569,10 @@ export default function App() {
         setPage(permitted);
         return;
       }
-      publicNavigationRef.current(readPublicRoute(event.state) ?? publicRoute("in"), "pop");
+      publicNavigationRef.current(
+        readPublicRoute(event.state) ?? (isLandingPath(window.location.pathname) ? publicRoute("welcome") : publicRoute("in")),
+        "pop",
+      );
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -901,6 +887,14 @@ export default function App() {
   const changePage = (value: "in" | "up") => {
     navigatePublic(publicRoute(value));
   };
+  if (page === "welcome" && !authUser) {
+    return (
+      <WelcomeLanding
+        onLogin={() => navigatePublic(publicRoute("in"))}
+        onSignup={() => navigatePublic(publicRoute("up"))}
+      />
+    );
+  }
   if (page === "account" && authUser?.role === "STUDENT")
     return (
       <StudentPortal api={API} user={authUser} onLogout={() => void signOut()} />
@@ -1246,7 +1240,13 @@ export default function App() {
               <p className="mt-2 mb-6 text-center text-sm text-[#4f6470]">
                 Your team will use one email and password.
               </p>
-              <StepProgress step={step} />
+              <Stepper
+                className="auth-signup-stepper"
+                steps={STEPS.map((label, index) => ({ id: SIGNUP_STEP_IDS[index], label }))}
+                currentStepId={SIGNUP_STEP_IDS[step - 1]}
+                completedStepIds={SIGNUP_STEP_IDS.filter((_, index) => index < step - 1)}
+              />
+              <h2 className="auth-signup-step-title">{STEPS[step - 1]}</h2>
               {step === 1 && (
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="sm:col-span-2 grid gap-2">
@@ -1274,8 +1274,7 @@ export default function App() {
                       </option>
                       {cycles.map((cycle) => (
                         <option key={cycle.id} value={cycle.id}>
-                          {cycle.display_name} ({cycle.academic_year ?? "Year"} {cycle.session ?? ""})
-                          {cycle.registration_open ? " — open" : " — closed"}
+                          {formatCycleLabel(cycle)}
                         </option>
                       ))}
                     </select>
@@ -1307,7 +1306,27 @@ export default function App() {
                   <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-[#4f6470]">{teamSize} of {maximum ?? "—"} members added</p><button type="button" disabled={submitting || !maximum || teamSize >= maximum} onClick={() => setMembers((current) => [...current, newMember()])} className="rounded-lg border border-[#176B66] px-3 py-2 text-sm font-semibold text-[#176B66] disabled:cursor-not-allowed disabled:border-[#cbd6d0] disabled:text-[#4f6470]">+ Add member</button></div>
                   {maximum && teamSize >= maximum && <p className="text-sm text-[#4f6470]">Maximum group size reached for this cycle.</p>}
                   {errors["members.configuration"] && <p role="alert" className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{errors["members.configuration"]}</p>}
-                  {members.map((member, index) => <article key={member.id} className="rounded-xl border border-[#dce4de] bg-[#f4f8f5] p-4"><div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-bold">Member {index + 1}</h3><button type="button" disabled={submitting || members.length <= minimum} aria-label={`Remove Member ${index + 1}`} onClick={() => setMembers((current) => current.filter((item) => item.id !== member.id))} className="text-xs font-semibold text-[#176B66] underline disabled:text-[#4f6470]">Remove</button></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Full name" value={member.full_name} disabled={submitting} error={errors[memberKey(member.id, "full_name")]} onChange={(value) => updateMember(member.id, "full_name", value)} /><Field label="Member email" type="email" value={member.email} disabled={submitting} error={errors[memberKey(member.id, "email")]} onChange={(value) => updateMember(member.id, "email", value)} /><Field label="Registration number" value={member.registration} disabled={submitting} error={errors[memberKey(member.id, "registration")]} onChange={(value) => updateMember(member.id, "registration", value)} /></div></article>)}
+                  {members.map((member, index) => (
+                    <Card key={member.id} padding="md" className="auth-member-card">
+                      <div className="auth-member-card__head">
+                        <h3 className="auth-member-card__title">Member {index + 1}</h3>
+                        <button
+                          type="button"
+                          disabled={submitting || members.length <= minimum}
+                          aria-label={`Remove Member ${index + 1}`}
+                          onClick={() => setMembers((current) => current.filter((item) => item.id !== member.id))}
+                          className="auth-member-card__remove"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="auth-member-card__grid">
+                        <Field label="Full name" value={member.full_name} disabled={submitting} error={errors[memberKey(member.id, "full_name")]} onChange={(value) => updateMember(member.id, "full_name", value)} />
+                        <Field label="Member email" type="email" value={member.email} disabled={submitting} error={errors[memberKey(member.id, "email")]} onChange={(value) => updateMember(member.id, "email", value)} />
+                        <Field label="Registration number" value={member.registration} disabled={submitting} error={errors[memberKey(member.id, "registration")]} onChange={(value) => updateMember(member.id, "registration", value)} />
+                      </div>
+                    </Card>
+                  ))}
                 </div>
               )}
               {step === 3 && (
@@ -1325,35 +1344,20 @@ export default function App() {
                   {notice}
                 </p>
               )}
-              <div className="mt-7 flex items-center justify-between gap-3 border-t border-[#e8ede9] pt-5">
+              <div className="auth-signup-actions">
                 {step > 1 && (
-                  <button
-                    type="button"
-                    disabled={submitting}
-                    onClick={() => window.history.back()}
-                    className="rounded-lg border border-[#cbd6d0] px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed"
-                  >
+                  <Button variant="secondary" disabled={submitting} onClick={() => window.history.back()}>
                     Back
-                  </button>
+                  </Button>
                 )}
                 {step < 3 ? (
-                  <button
-                    type="button"
-                    disabled={submitting}
-                    onClick={nextStep}
-                    className={`${AUTH_PRIMARY} ml-auto`}
-                  >
-                    Next →
-                  </button>
+                  <Button className="auth-signup-actions__primary" disabled={submitting} onClick={nextStep}>
+                    Next
+                  </Button>
                 ) : (
-                  <button
-                    type="button"
-                    disabled={submitting || !canSubmit}
-                    onClick={() => void submit()}
-                    className={`${AUTH_PRIMARY} ml-auto`}
-                  >
+                  <Button className="auth-signup-actions__primary" disabled={submitting || !canSubmit} onClick={() => void submit()}>
                     {submitting ? "Creating..." : "Create Student Group Account"}
-                  </button>
+                  </Button>
                 )}
               </div>
             </>

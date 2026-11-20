@@ -66,3 +66,12 @@ test("portal-dark remaps are scoped to dark theme only", () => {
   const css = read("portals/shared/portal-dark.css");
   assert.match(css, /html\[data-theme="dark"\]/);
 });
+
+test("public welcome landing is wired for logged-out home routes", () => {
+  const app = read("App.tsx");
+  assert.ok(fs.existsSync(new URL("../src/pages/WelcomeLanding.tsx", import.meta.url)));
+  assert.match(app, /WelcomeLanding/);
+  assert.match(app, /page === "welcome"/);
+  assert.match(app, /\/welcome|"welcome"/);
+  assert.match(app, /isLandingPath|pathname === "\/"/);
+});
