@@ -24,7 +24,7 @@ export function SupervisorAssignedTeams({ api }: { api: string }) {
         <button type="button" className="fy-btn fy-btn--secondary fy-btn--sm mt-3" onClick={() => void load()}>Retry</button>
       </Alert>
     )}
-    {loading ? <div className="supervisor-card">Loading assigned groups…</div> : !groups.length ? <div className="supervisor-card">No active assignments. Accepted groups will appear here.</div> : <div className="grid gap-4">{groups.map(data => <article key={data.group.id} className="supervisor-card">
+    {loading ? <div className="supervisor-card">Loading assigned groups…</div> : error ? null : !groups.length ? <div className="supervisor-card">No active assignments. Accepted groups will appear here.</div> : <div className="grid gap-4">{groups.map(data => <article key={data.group.id} className="supervisor-card">
       <h2>{data.group.name}</h2><p>{data.group.email}</p><p>{data.group.academic_cycle.name} · {data.group.academic_cycle.year} · {data.group.academic_cycle.session}</p>
       <dl className="my-4 grid gap-3 sm:grid-cols-3">{[
         ["Group status", data.group.status], ["Assignment", data.assignment?.status], ["Assigned", date(data.assignment?.assigned_at)],

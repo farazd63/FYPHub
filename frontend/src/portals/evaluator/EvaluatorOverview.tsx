@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   CalendarDays,
   ClipboardList,
@@ -10,32 +11,62 @@ import type { LucideIcon } from "lucide-react";
 import { FeatureChip, PageHeader } from "../../ui";
 
 type FeatureKey = "queue" | "proposal" | "schedule" | "criteria" | "scoring" | "history";
-type EvaluatorOverviewProps = { onSelect: (key: FeatureKey) => void };
+type EvaluatorOverviewProps = { api: string; onSelect: (key: FeatureKey) => void };
+type Schedule = { id: number; status: string };
+type Evaluation = { id: number; status: string };
 
 const cards: Array<{ key: FeatureKey; title: string; summary: string; status: string; icon: LucideIcon }> = [
-  { key: "queue", title: "Evaluation Queue", summary: "Assigned evaluation work will appear here when the evaluator assignment service is available.", status: "Unavailable", icon: ClipboardList },
-  { key: "proposal", title: "Proposal Review", summary: "Authorized proposal documents will be shown here only after a review assignment exists.", status: "Unavailable", icon: FileSearch },
-  { key: "schedule", title: "Defense Schedule", summary: "No defense schedule is exposed until the scheduling workflow is implemented.", status: "Unavailable", icon: CalendarDays },
-  { key: "criteria", title: "Evaluation Criteria", summary: "Evaluation criteria remain managed by Administrator configuration and are not fabricated here.", status: "Unavailable", icon: ListChecks },
-  { key: "scoring", title: "Scoring & Feedback", summary: "Scoring and feedback submission is unavailable until its authorized API is implemented.", status: "Unavailable", icon: MessageSquareText },
-  { key: "history", title: "Decision History", summary: "Submitted evaluations and decisions will appear here when persisted evaluator records exist.", status: "Unavailable", icon: History },
+  { key: "queue", title: "Evaluation Queue", summary: "Assigned defenses that still need scoring or a decision.", status: "Available", icon: ClipboardList },
+  { key: "proposal", title: "Proposal Review", summary: "Review compliance reports and approve, reject, or request changes.", status: "Available", icon: FileSearch },
+  { key: "schedule", title: "Defense Schedule", summary: "All defense sessions assigned to you by the coordinator.", status: "Available", icon: CalendarDays },
+  { key: "criteria", title: "Evaluation Criteria", summary: "Score against criteria while drafting or submitting evaluations.", status: "Available", icon: ListChecks },
+  { key: "scoring", title: "Scoring & Feedback", summary: "Save drafts and submit scored feedback for assigned defenses.", status: "Available", icon: MessageSquareText },
+  { key: "history", title: "Decision History", summary: "Submitted evaluation decisions for your assigned defenses.", status: "Available", icon: History },
 ];
 
-export function EvaluatorOverview({ onSelect }: EvaluatorOverviewProps) {
+export function EvaluatorOverview({ api, onSelect }: EvaluatorOverviewProps) {
+  const [assigned, setAssigned] = useState(0);
+  const [pending, setPending] = useState(0);
+  const [submitted, setSubmitted] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch(`${api}/api/v1/panel-schedules`, { credentials: "include", signal: controller.signal });
+        if (!response.ok) return;
+        const schedules = await response.json() as Schedule[];
+        setAssigned(schedules.length);
+        const active = schedules.filter((row) => !["COMPLETED", "CANCELLED"].includes(row.status));
+        setPending(active.length);
+        const evalCounts = await Promise.all(schedules.slice(0, 12).map(async (row) => {
+          const evalResponse = await fetch(`${api}/api/v1/panel-evaluations/schedule/${row.id}`, { credentials: "include", signal: controller.signal });
+          if (!evalResponse.ok) return 0;
+          const rows = await evalResponse.json() as Evaluation[];
+          return rows.filter((item) => item.status === "SUBMITTED").length;
+        }));
+        if (!controller.signal.aborted) setSubmitted(evalCounts.reduce((sum, n) => sum + n, 0));
+      } catch {
+        /* keep zeros on load failure */
+      }
+    })();
+    return () => controller.abort();
+  }, [api]);
+
   return (
     <section className="student-overview evaluator-overview" aria-labelledby="evaluator-overview-heading">
       <PageHeader
         className="student-overview__hero"
         eyebrow="Evaluator workspace"
         title="Evaluation workspace"
-        description="Review assigned project work, configured criteria, and evaluation history when the corresponding authorized workflows are available."
+        description="Review assigned defenses, proposals, and evaluation history for work assigned to you."
       />
       <div className="student-overview__summary" aria-label="Evaluator workspace summary">
-        <div><strong>0</strong><span>assigned evaluations</span></div>
-        <div><strong>0</strong><span>pending actions</span></div>
-        <div><strong>—</strong><span>submitted results</span></div>
+        <div><strong>{assigned}</strong><span>assigned evaluations</span></div>
+        <div><strong>{pending}</strong><span>pending actions</span></div>
+        <div><strong>{submitted || "—"}</strong><span>submitted results</span></div>
       </div>
-      <div className="student-overview__heading"><div><h2>Evaluator features</h2><p>Only authorized, implemented evaluator data will be displayed.</p></div></div>
+      <div className="student-overview__heading"><div><h2>Evaluator features</h2><p>Open a feature to work with your assigned records.</p></div></div>
       <div className="student-overview__grid">
         {cards.map((card) => {
           const Icon = card.icon;

@@ -507,6 +507,9 @@ def update_submission_status(submission_id: int, payload: ProposalStatusUpdate, 
     desired = payload.status.strip().upper()
     if desired not in PROPOSAL_REVIEW_STATUSES:
         raise _error("invalid_submission_status", "Review status must be CHANGES_REQUESTED, APPROVED, or REJECTED.", 422)
+    comment = (payload.comment or "").strip()
+    if not comment:
+        raise _error("review_comment_required", "A review comment is required before Approve, Reject, or Request changes.", 422)
     row = session.get(ProposalComplianceSubmission, submission_id)
     if row is None or not _can_view(session, actor, row):
         raise _error("submission_not_found", "The proposal submission was not found.", 404)
@@ -514,6 +517,9 @@ def update_submission_status(submission_id: int, payload: ProposalStatusUpdate, 
         raise _error("invalid_submission_state", "A withdrawn proposal cannot be reviewed.", 409)
     row.status = desired
     row.processing_status = "COMPLETED"
+    fields = dict(row.extracted_fields or {})
+    fields["review_decision"] = {"status": desired, "comment": comment, "reviewer_id": actor.id, "reviewer_name": actor.full_name}
+    row.extracted_fields = fields
     session.commit()
     session.refresh(row)
     return _submission_out(session, row)
