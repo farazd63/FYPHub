@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -55,4 +55,44 @@ class ProposalComplianceReport(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     total_checks: Mapped[int] = mapped_column(Integer, nullable=False)
     report: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ProposalVersionComparison(Base):
+    """Stored comparison snapshot between two audited versions."""
+
+    __tablename__ = "proposal_version_comparisons"
+    __table_args__ = (
+        UniqueConstraint("current_submission_id", name="uq_proposal_version_comparison_current"),
+        UniqueConstraint("previous_submission_id", "current_submission_id", name="uq_proposal_version_comparison_pair"),
+        Index("ix_proposal_version_comparison_current_created", "current_submission_id", "created_at"),
+        Index("ix_proposal_version_comparison_previous", "previous_submission_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    previous_submission_id: Mapped[int] = mapped_column(ForeignKey("proposal_compliance_submissions.id", ondelete="RESTRICT"), nullable=False)
+    current_submission_id: Mapped[int] = mapped_column(ForeignKey("proposal_compliance_submissions.id", ondelete="RESTRICT"), nullable=False)
+    previous_report_id: Mapped[int] = mapped_column(ForeignKey("proposal_compliance_reports.id", ondelete="RESTRICT"), nullable=False)
+    current_report_id: Mapped[int] = mapped_column(ForeignKey("proposal_compliance_reports.id", ondelete="RESTRICT"), nullable=False)
+    previous_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    current_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    previous_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    current_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score_difference: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    overall_result: Mapped[str] = mapped_column(String(16), nullable=False)
+    previous_issue_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    current_issue_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    fixed_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    remaining_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    new_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    unchanged_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    net_issue_change: Mapped[int] = mapped_column(Integer, nullable=False)
+    different_template_versions: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    comparison: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    ai_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ai_model: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    ai_provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ai_generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

@@ -11,7 +11,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./requirements.txt
-RUN python -m pip install --no-cache-dir --disable-pip-version-check --retries 10 --timeout 120 --index-url https://pypi.org/simple -r requirements.txt
+RUN python -m pip install --no-cache-dir --disable-pip-version-check --retries 10 --timeout 120 --trusted-host pypi.org --trusted-host files.pythonhosted.org --index-url https://pypi.org/simple -r requirements.txt
 
 COPY app ./app
 COPY alembic ./alembic

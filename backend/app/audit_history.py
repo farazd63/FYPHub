@@ -26,6 +26,7 @@ SAFE_KEYS = {
     "account_created": {"email", "role", "is_active"},
     "account_status_changed": {"is_active", "previous_is_active"},
     "account_role_changed": {"role", "previous_role"},
+    "account_updated": {"before", "after"},
     "password_reset_requested": {"identifier_type", "delivery"},
     "password_reset_completed": {"sessions_revoked"},
     "academic_cycle_created": {"code", "display_name", "registration_open"},
@@ -49,7 +50,7 @@ SAFE_KEYS = {
     "archived_project_deactivated": {"is_active"},
     "archived_project_document_uploaded": {"document_type", "version", "file_hash"},
 }
-NESTED_KEYS = {"academic_cycle_updated": {"code", "display_name", "registration_open"}, "supervisor_capacity_updated": {"academic_year", "session", "maximum_groups", "supervisor_id", "academic_cycle_id", "max_group_capacity"}, "archived_project_updated": {"title", "abstract_summary", "keywords", "academic_year", "department_program", "project_scope", "completion_stage", "implemented_scope", "remaining_gaps", "future_work", "supervisor_display_reference", "source_label", "source_metadata"}, "archived_project_metadata_rolled_back": {"title", "abstract_summary", "keywords", "academic_year", "department_program", "project_scope", "completion_stage", "implemented_scope", "remaining_gaps", "future_work", "supervisor_display_reference", "source_label", "source_metadata"}}
+NESTED_KEYS = {"academic_cycle_updated": {"code", "display_name", "registration_open"}, "supervisor_capacity_updated": {"academic_year", "session", "maximum_groups", "supervisor_id", "academic_cycle_id", "max_group_capacity"}, "account_updated": {"full_name", "email", "registration_number", "role", "sessions_revoked"}, "archived_project_updated": {"title", "abstract_summary", "keywords", "academic_year", "department_program", "project_scope", "completion_stage", "implemented_scope", "remaining_gaps", "future_work", "supervisor_display_reference", "source_label", "source_metadata"}, "archived_project_metadata_rolled_back": {"title", "abstract_summary", "keywords", "academic_year", "department_program", "project_scope", "completion_stage", "implemented_scope", "remaining_gaps", "future_work", "supervisor_display_reference", "source_label", "source_metadata"}}
 
 def scalar(value: Any) -> bool:
     return value is None or type(value) in (str, int, float, bool)

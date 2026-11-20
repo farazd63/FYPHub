@@ -13,19 +13,22 @@ from .dashboard_requirement import DashboardRequirement
 from .academic_deadline import AcademicDeadline, AcademicDeadlineVersion
 from .document_requirement import DocumentArchiveReviewQueue, DocumentRequirementSection, DocumentSubmission, DocumentSubmissionReviewEvent, DocumentSubmissionVersion, DocumentUploadRequirement
 
-__all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "PasswordResetToken", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion", "EvaluationRecord", "EvaluationAuditEvent", "EvaluationCorrection", "EvaluationAggregationConfig", "AcademicDeadline", "AcademicDeadlineVersion", "DashboardRequirement", "DocumentUploadRequirement", "DocumentSubmission", "DocumentSubmissionVersion", "DocumentRequirementSection", "DocumentSubmissionReviewEvent", "DocumentArchiveReviewQueue", "ArchivedProject", "ArchivedProjectDocument", "ArchivedProjectDocumentType", "ArchiveImportBatch"]
+__all__ = ["User", "UserRole", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "PasswordResetToken", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion", "EvaluationRecord", "EvaluationAuditEvent", "EvaluationCorrection", "EvaluationAggregationConfig", "AcademicDeadline", "AcademicDeadlineVersion", "DashboardRequirement", "DocumentUploadRequirement", "DocumentSubmission", "DocumentSubmissionVersion", "DocumentRequirementSection", "DocumentSubmissionReviewEvent", "DocumentArchiveReviewQueue", "ArchivedProject", "ArchivedProjectDocument", "ArchivedProjectDocumentType", "ArchiveImportBatch", "ProposalComplianceSubmission", "ProposalComplianceReport", "ProposalVersionComparison"]
 
 from .reminder_rule import ReminderRule, ReminderRuleVersion
 
 from .supervisor_assignment import SupervisorAssignment
 
 from .group_message import GroupMessage
+from .group_ai import GroupAIDocumentChunk, GroupAIResponse
+from .student_ai import StudentAIMessage
+__all__.extend(["GroupMessage", "GroupAIDocumentChunk", "GroupAIResponse", "StudentAIMessage"])
 
 from .supervisor_request import SupervisorRequest, SupervisorRequestDocument, SupervisorRequestExtractionStatus, SupervisorRequestStatus, SupervisorRequestStatusHistory, SupervisorRequestSubmissionNoteVersion
 from .proposal import Proposal, ProposalVersion
 from .proposal_ai_review import ProposalAIReviewRun
 from .proposal_reference import ProposalReference, ProposalReferenceDocument
-from .proposal_compliance import ProposalComplianceSubmission, ProposalComplianceReport
+from .proposal_compliance import ProposalComplianceSubmission, ProposalComplianceReport, ProposalVersionComparison
 from .supervisor_request_conversation import SupervisorRequestMessage
 from .archived_project import ArchivedProject, ArchivedProjectDocument, ArchivedProjectDocumentType
 from .archive_import_batch import ArchiveImportBatch

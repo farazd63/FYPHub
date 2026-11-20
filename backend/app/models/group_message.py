@@ -11,6 +11,7 @@ class GroupMessage(Base):
     channel: Mapped[str] = mapped_column(String(32), nullable=False)
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     author_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("supervisor_requests.id", ondelete="SET NULL"), nullable=True)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     thread_root_id: Mapped[int | None] = mapped_column(ForeignKey("group_messages.id", ondelete="SET NULL"), nullable=True)
     mentions: Mapped[list] = mapped_column(JSON, nullable=False, default=list, server_default="[]")

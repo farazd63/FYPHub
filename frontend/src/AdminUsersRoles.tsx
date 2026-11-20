@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { PasswordField } from "./PasswordField";
 import { passwordPolicyError } from "./passwordPolicy";
 import { emailValidationMessage, normalizeEmail } from "./emailValidation";
-import { Button } from "./ui/Button";
 
 type Role = "STUDENT" | "SUPERVISOR" | "COORDINATOR" | "PANEL_MEMBER" | "ADMIN";
 type User = {
@@ -49,6 +48,12 @@ export function AdminUsersRoles({ api }: { api: string }) {
   const [notice, setNotice] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
   const [busy, setBusy] = useState<number | "create" | null>(null);
+  const [passwordUser, setPasswordUser] = useState<User | null>(null);
+  const [passwordForm, setPasswordForm] = useState({ new_password: "", confirm_password: "" });
+  const [passwordError, setPasswordError] = useState("");
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", email: "", registration_number: "", role: "SUPERVISOR" as Role });
+  const [editError, setEditError] = useState("");
   const [confirm, setConfirm] = useState<{
     user: User;
     type: "status" | "delete";
@@ -168,6 +173,85 @@ export function AdminUsersRoles({ api }: { api: string }) {
       setBusy(null);
     }
   };
+  const changePassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!passwordUser || busy) return;
+    const passwordError = passwordPolicyError(passwordForm.new_password);
+    if (passwordError) {
+      setPasswordError(passwordError);
+      return;
+    }
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      setPasswordError("Passwords do not match.");
+      return;
+    }
+    setBusy(passwordUser.id);
+    setPasswordError("");
+    try {
+      const response = await fetch(`${api}/api/v1/admin/users/${passwordUser.id}/password`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(passwordForm),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setPasswordError(detail(body));
+        return;
+      }
+      setPasswordUser(null);
+      setPasswordForm({ new_password: "", confirm_password: "" });
+      setNotice(`Password changed for ${passwordUser.full_name}. Existing sessions were signed out.`);
+    } catch {
+      setPasswordError("The account service is unavailable.");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const editAccount = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editUser || busy) return;
+    const emailError = editForm.email.trim() ? emailValidationMessage(editForm.email) : "Email is required.";
+    if (emailError) {
+      setEditError(emailError);
+      return;
+    }
+    if (!editForm.full_name.trim()) {
+      setEditError("Full name is required.");
+      return;
+    }
+    if (editForm.role === "STUDENT" && !editForm.registration_number.trim()) {
+      setEditError("Registration number is required for STUDENT accounts.");
+      return;
+    }
+    setBusy(editUser.id);
+    setEditError("");
+    try {
+      const response = await fetch(`${api}/api/v1/admin/users/${editUser.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: editForm.full_name,
+          email: normalizeEmail(editForm.email),
+          registration_number: editForm.registration_number.trim() || null,
+          role: editForm.role,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setEditError(detail(body));
+        return;
+      }
+      setEditUser(null);
+      setNotice(`Account updated for ${editForm.full_name}. The user must sign in again if account details changed.`);
+      await load();
+    } catch {
+      setEditError("The account service is unavailable.");
+    } finally {
+      setBusy(null);
+    }
+  };
   const searchSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     setPage(1);
@@ -196,22 +280,22 @@ export function AdminUsersRoles({ api }: { api: string }) {
           {notice}
         </p>
       )}
-      <div className="admin-users-layout grid min-w-0 gap-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0">
           <form
             onSubmit={searchSubmit}
-            className="admin-users-toolbar mb-4 grid gap-3 rounded-xl border border-[#dce4de] bg-white p-4"
+            className="mb-4 grid gap-3 rounded-xl border border-[#dce4de] bg-white p-4 sm:grid-cols-[minmax(0,1fr)_140px_120px_auto]"
           >
             <input
               aria-label="Search accounts"
-              className={`admin-users-toolbar__search ${input}`}
+              className={input}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search name, email, or registration"
             />
             <select
               aria-label="Filter by role"
-              className={`admin-users-toolbar__select ${input}`}
+              className={input}
               value={role}
               onChange={(event) => {
                 setRole(event.target.value);
@@ -225,7 +309,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
             </select>
             <select
               aria-label="Filter by status"
-              className={`admin-users-toolbar__select ${input}`}
+              className={input}
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value);
@@ -236,7 +320,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
               <option value="true">Active</option>
               <option value="false">Inactive</option>
             </select>
-            <button type="submit" className="admin-users-toolbar__submit rounded-lg bg-[#176b66] px-4 py-2 text-sm font-semibold text-white transition duration-200 hover:bg-[#125650] active:scale-[.98]">
+            <button className="rounded-lg bg-[#176b66] px-4 py-2 text-sm font-semibold text-white transition duration-200 hover:bg-[#125650] active:scale-[.98]">
               Search
             </button>
           </form>
@@ -259,11 +343,17 @@ export function AdminUsersRoles({ api }: { api: string }) {
             </div>
           )}
           {state === "ready" && Boolean(data.items.length) && (
-            <div className="admin-table-scroll users-table overflow-x-auto rounded-xl border border-[#dce4de] bg-white">
-              <table className="users-table__grid w-full text-left text-sm">
+            <div className="users-table overflow-x-auto rounded-xl border border-[#dce4de] bg-white">
+              <table className="w-full table-fixed text-left text-sm">
+                <colgroup>
+                  <col className="w-[42%]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[20%]" />
+                </colgroup>
                 <thead className="bg-[#fbfcfa] text-xs uppercase tracking-wide text-[#60716b]">
                   <tr>
-                    <th className="users-table__account px-4 py-3">Account</th>
+                    <th className="px-4 py-3">Account</th>
                     <th className="px-3 py-3">Role</th>
                     <th className="px-3 py-3">Status</th>
                     <th className="px-3 py-3">Actions</th>
@@ -272,7 +362,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                 <tbody className="divide-y divide-[#e8ede9]">
                   {data.items.map((user) => (
                     <tr key={user.id}>
-                      <td className="users-table__account px-4 py-3">
+                      <td className="px-4 py-3">
                         <p
                           className="truncate font-semibold"
                           title={user.full_name}
@@ -310,11 +400,8 @@ export function AdminUsersRoles({ api }: { api: string }) {
                         </span>
                       </td>
                       <td className="px-3 py-3">
-                        <div className="users-table__actions flex flex-col gap-2">
-                        <Button
+                        <button
                           type="button"
-                          size="sm"
-                          variant="secondary"
                           disabled={busy === user.id}
                           onClick={() =>
                             setConfirm({
@@ -323,19 +410,13 @@ export function AdminUsersRoles({ api }: { api: string }) {
                               value: String(!user.is_active),
                             })
                           }
+                          className="w-full rounded-lg border border-[#b8cdc1] px-2 py-1.5 text-xs font-semibold text-[#176b66] transition duration-200 hover:bg-[#e4eee7] disabled:opacity-60"
                         >
                           {user.is_active ? "Deactivate" : "Activate"}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="danger"
-                          disabled={busy === user.id || !user.is_active}
-                          onClick={() => setConfirm({ user, type: "delete", value: "delete" })}
-                        >
-                          Remove access
-                        </Button>
-                        </div>
+                        </button>
+                        <button type="button" disabled={busy === user.id || !user.is_active} onClick={() => setConfirm({ user, type: "delete", value: "delete" })} className="mt-2 w-full rounded-lg border border-[#d38b83] px-2 py-1.5 text-xs font-semibold text-[#a43a33] transition duration-200 hover:bg-[#fff3f0] disabled:opacity-60">Remove access</button>
+                        <button type="button" disabled={busy === user.id} onClick={() => { setPasswordUser(user); setPasswordForm({ new_password: "", confirm_password: "" }); setPasswordError(""); }} className="mt-2 w-full rounded-lg border border-[#cbd6d0] px-2 py-1.5 text-xs font-semibold text-[#243746] transition duration-200 hover:bg-[#f5f8f6] disabled:opacity-60">Change password</button>
+                        <button type="button" disabled={busy === user.id} onClick={() => { setEditUser(user); setEditForm({ full_name: user.full_name, email: user.email, registration_number: user.registration_number ?? "", role: user.role }); setEditError(""); }} className="mt-2 w-full rounded-lg border border-[#cbd6d0] px-2 py-1.5 text-xs font-semibold text-[#243746] transition duration-200 hover:bg-[#f5f8f6] disabled:opacity-60">Edit account</button>
                       </td>
                     </tr>
                   ))}
@@ -343,28 +424,26 @@ export function AdminUsersRoles({ api }: { api: string }) {
               </table>
             </div>
           )}
-          <div className="mt-4 flex items-center justify-between gap-3 text-sm">
-            <Button
+          <div className="mt-4 flex items-center justify-between text-sm">
+            <button
               type="button"
-              size="sm"
-              variant="secondary"
               disabled={page <= 1 || state === "loading"}
               onClick={() => setPage((value) => value - 1)}
+              className="rounded-lg border border-[#cbd6d0] px-3 py-2 disabled:opacity-50"
             >
               Previous
-            </Button>
+            </button>
             <span>Page {data.page}</span>
-            <Button
+            <button
               type="button"
-              size="sm"
-              variant="secondary"
               disabled={
                 page * data.page_size >= data.total || state === "loading"
               }
               onClick={() => setPage((value) => value + 1)}
+              className="rounded-lg border border-[#cbd6d0] px-3 py-2 disabled:opacity-50"
             >
               Next
-            </Button>
+            </button>
           </div>
         </div>
         <form
@@ -472,24 +551,60 @@ export function AdminUsersRoles({ api }: { api: string }) {
               {confirm.type === "delete" ? `Remove portal access for ${confirm.user.full_name}? They will be signed out and unable to sign in. All previous records and audit history will be preserved.` : `${confirm.value === "true" ? "Activate" : "Deactivate"} ${confirm.user.full_name}?`}
             </p>
             <div className="mt-5 flex justify-end gap-3">
-              <Button
+              <button
                 type="button"
-                variant="secondary"
                 disabled={busy !== null}
                 onClick={() => setConfirm(null)}
+                className="rounded-lg border border-[#cbd6d0] px-4 py-2 text-sm font-semibold"
               >
                 Cancel
-              </Button>
-              <Button
+              </button>
+              <button
                 type="button"
-                variant={confirm.type === "delete" ? "danger" : "primary"}
                 disabled={busy !== null}
                 onClick={() => void mutate()}
+                className="rounded-lg bg-[#176b66] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {busy ? "Saving…" : confirm.type === "delete" ? "Remove access" : "Confirm"}
-              </Button>
+              </button>
             </div>
           </div>
+        </div>
+      )}
+      {passwordUser && (
+        <div role="dialog" aria-modal="true" aria-labelledby="password-heading" className="fixed inset-0 z-50 grid place-items-center bg-[#243746]/35 p-4">
+          <form onSubmit={(event) => void changePassword(event)} className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <h2 id="password-heading" className="text-lg font-bold">Change account password</h2>
+            <p className="mt-2 text-sm text-[#60716b]">Set a new password for {passwordUser.full_name}. Existing passwords are never displayed because only one-way password hashes are stored.</p>
+            <div className="mt-4 grid gap-3">
+              <PasswordField label="New password" value={passwordForm.new_password} guidance disabled={busy === passwordUser.id} error={passwordError && !passwordError.includes("match") ? passwordError : undefined} onChange={(value) => { setPasswordForm({ ...passwordForm, new_password: value }); setPasswordError(""); }} />
+              <PasswordField label="Confirm new password" value={passwordForm.confirm_password} confirm disabled={busy === passwordUser.id} error={passwordError.includes("match") ? passwordError : undefined} onChange={(value) => { setPasswordForm({ ...passwordForm, confirm_password: value }); setPasswordError(""); }} />
+              {passwordError && <p role="alert" className="text-sm text-[#a43a33]">{passwordError}</p>}
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" disabled={busy === passwordUser.id} onClick={() => setPasswordUser(null)} className="rounded-lg border border-[#cbd6d0] px-4 py-2 text-sm font-semibold">Cancel</button>
+              <button type="submit" disabled={busy === passwordUser.id} className="rounded-lg bg-[#176b66] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{busy === passwordUser.id ? "Saving…" : "Change password"}</button>
+            </div>
+          </form>
+        </div>
+      )}
+      {editUser && (
+        <div role="dialog" aria-modal="true" aria-labelledby="edit-account-heading" className="fixed inset-0 z-50 grid place-items-center bg-[#243746]/35 p-4">
+          <form onSubmit={(event) => void editAccount(event)} className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <h2 id="edit-account-heading" className="text-lg font-bold">Edit account</h2>
+            <p className="mt-2 text-sm text-[#60716b]">Update this account’s profile and role. Password changes are handled separately.</p>
+            <div className="mt-4 grid gap-3">
+              <label className="grid gap-1 text-sm font-semibold">Full name<input required className={input} value={editForm.full_name} onChange={(event) => setEditForm({ ...editForm, full_name: event.target.value })} /></label>
+              <label className="grid gap-1 text-sm font-semibold">Email<input required type="email" className={input} value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} /></label>
+              <label className="grid gap-1 text-sm font-semibold">Registration number<input className={input} value={editForm.registration_number} onChange={(event) => setEditForm({ ...editForm, registration_number: event.target.value })} placeholder={editForm.role === "STUDENT" ? "Required for students" : "Optional"} /></label>
+              <label className="grid gap-1 text-sm font-semibold">Role<select className={input} value={editForm.role} onChange={(event) => setEditForm({ ...editForm, role: event.target.value as Role })}>{roles.map((item) => <option key={item} value={item}>{roleLabel[item]}</option>)}</select></label>
+              {editError && <p role="alert" className="text-sm text-[#a43a33]">{editError}</p>}
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" disabled={busy === editUser.id} onClick={() => setEditUser(null)} className="rounded-lg border border-[#cbd6d0] px-4 py-2 text-sm font-semibold">Cancel</button>
+              <button type="submit" disabled={busy === editUser.id} className="rounded-lg bg-[#176b66] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{busy === editUser.id ? "Saving…" : "Save changes"}</button>
+            </div>
+          </form>
         </div>
       )}
     </section>

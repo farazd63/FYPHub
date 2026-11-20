@@ -73,6 +73,43 @@ class AdminUserCreate(BaseModel):
         return self
 
 
+class AdminUserUpdate(BaseModel):
+    """Editable account metadata; credentials are managed separately."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    full_name: str
+    email: EmailStr
+    registration_number: str | None = None
+    role: UserRole
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalized_email(cls, value: object) -> object:
+        return normalize_email(value)
+
+    @field_validator("full_name")
+    @classmethod
+    def valid_name(cls, value: str) -> str:
+        return validate_full_name(value)
+
+    @field_validator("registration_number")
+    @classmethod
+    def normalized_registration(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().upper()
+        if not normalized or len(normalized) > 100:
+            raise ValueError("registration_number must be between 1 and 100 characters.")
+        return normalized
+
+    @model_validator(mode="after")
+    def student_has_registration(self) -> "AdminUserUpdate":
+        if self.role == UserRole.STUDENT and self.registration_number is None:
+            raise ValueError("registration_number is required for STUDENT accounts.")
+        return self
+
+
 class AdminUserRoleChange(BaseModel):
     model_config = ConfigDict(extra="forbid")
     role: UserRole
@@ -81,3 +118,27 @@ class AdminUserRoleChange(BaseModel):
 class AdminUserStatusChange(BaseModel):
     model_config = ConfigDict(extra="forbid")
     is_active: bool
+
+
+class AdminUserPasswordChange(BaseModel):
+    """A replacement password; existing credentials are never readable."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    new_password: str
+    confirm_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def valid_password(cls, value: str) -> str:
+        try:
+            validate_password(value)
+        except ValueError as error:
+            raise ValueError(str(error)) from error
+        return value
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> "AdminUserPasswordChange":
+        if self.new_password != self.confirm_password:
+            raise ValueError("Password and confirmation password must match.")
+        return self

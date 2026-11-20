@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from .database import engine, get_db
 from .config import settings
-from .models import AdminAuditEvent, AuthSession, Team, TeamMember, User, UserRole
+from .models import AdminAuditEvent, AuthSession, PasswordResetToken, Team, TeamMember, User, UserRole
 from .models import AcademicCycle, AcademicGroupPolicy, SupervisorCapacityPolicy, SupervisorAssignment, SupervisorRequest, SupervisorRequestStatus
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType, ProposalComplianceSubmission
 from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
@@ -30,7 +30,7 @@ from .coordinator_operations import router as coordinator_operations_router
 from .academic_cycle_overview import router as academic_cycle_overview_router
 from .schemas.academic import CycleCreate, CycleOut, CycleUpdate, PolicyOut, PolicyUpdate
 from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
-from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange
+from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserPasswordChange, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange, AdminUserUpdate
 from .schemas.supervisor_capacity import CapacitySession, SupervisorCapacityOut, SupervisorCapacityWrite
 from .schemas.team_registration import StudentGroupRegistrationRequest, TeamMemberInput, TeamRegistrationRequest, TeamRegistrationResponse
 from .security import generate_session_token, hash_password, hash_session_token, validate_password, verify_password
@@ -1106,12 +1106,13 @@ def lock_and_protect_last_active_admin(session: Session, user: User, *, will_rem
         )
 
 
-def revoke_user_sessions(session: Session, user_id: int) -> None:
-    session.execute(
+def revoke_user_sessions(session: Session, user_id: int) -> int:
+    result = session.execute(
         update(AuthSession)
         .where(AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None))
         .values(revoked_at=utc_now())
     )
+    return result.rowcount or 0
 
 
 def supervisor_capacity_counts(
@@ -1308,6 +1309,98 @@ def change_admin_user_status(
     try:
         session.commit()
         session.refresh(user)
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+    return user
+
+
+@app.patch("/api/v1/admin/users/{user_id}/password", response_model=AdminUserResponse)
+def change_admin_user_password(
+    user_id: int,
+    payload: AdminUserPasswordChange,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> User:
+    """Replace an account password without ever exposing the old password."""
+    validate_mutating_origin(request)
+    user = session.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one_or_none()
+    if user is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "account_not_found", "Account was not found.")
+    user.password_hash = hash_password(payload.new_password)
+    sessions_revoked = revoke_user_sessions(session, user.id)
+    reset_tokens_revoked = session.execute(
+        update(PasswordResetToken)
+        .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None))
+        .values(used_at=utc_now())
+    ).rowcount or 0
+    add_admin_audit_event(
+        session,
+        actor_id=actor.id,
+        affected_user_id=user.id,
+        action="account_password_changed",
+        changed_values={"sessions_revoked": sessions_revoked, "reset_tokens_revoked": reset_tokens_revoked},
+    )
+    try:
+        session.commit()
+        session.refresh(user)
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+    return user
+
+
+@app.patch("/api/v1/admin/users/{user_id}", response_model=AdminUserResponse)
+def update_admin_user(
+    user_id: int,
+    payload: AdminUserUpdate,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> User:
+    """Update editable account metadata without exposing or accepting a stored password."""
+    validate_mutating_origin(request)
+    user = session.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one_or_none()
+    if user is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "account_not_found", "Account was not found.")
+    if user.id != actor.id and shared_team_account(session, user.id) and user.role != payload.role:
+        raise admin_user_error(status.HTTP_409_CONFLICT, "shared_team_account", "Shared team account roles cannot be changed here.")
+    if user.role == UserRole.ADMIN and payload.role != UserRole.ADMIN:
+        lock_and_protect_last_active_admin(session, user, will_remain_active_admin=False)
+    previous = {
+        "full_name": user.full_name,
+        "email": user.email,
+        "registration_number": user.registration_number,
+        "role": user.role.value,
+    }
+    user.full_name = payload.full_name
+    user.email = str(payload.email).strip().lower()
+    user.registration_number = payload.registration_number
+    user.role = payload.role
+    current = {
+        "full_name": user.full_name,
+        "email": user.email,
+        "registration_number": user.registration_number,
+        "role": user.role.value,
+    }
+    changed = {key: value for key, value in current.items() if previous[key] != value}
+    if not changed:
+        return user
+    sessions_revoked = revoke_user_sessions(session, user.id)
+    add_admin_audit_event(
+        session,
+        actor_id=actor.id,
+        affected_user_id=user.id,
+        action="account_updated",
+        changed_values={"before": previous, "after": {**changed, "sessions_revoked": sessions_revoked}},
+    )
+    try:
+        session.commit()
+        session.refresh(user)
+    except IntegrityError as error:
+        session.rollback()
+        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_account", "An account with that email or registration number already exists.") from error
     except SQLAlchemyError:
         session.rollback()
         raise

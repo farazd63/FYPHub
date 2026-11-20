@@ -1,0 +1,7 @@
+services:
+  ollama:
+    gpus: all
+    volumes:
+      - ./ollama-local-ca.crt:/usr/local/share/ca-certificates/ollama-local-ca.crt:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["update-ca-certificates && exec /bin/ollama serve"]

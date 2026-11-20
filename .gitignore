@@ -43,3 +43,7 @@ frontend/.audit-working/
 # Local binary DB dumps and OS junk
 *.dump
 .DS_Store
+
+# Local host TLS-inspection root for Ollama model downloads
+ollama-local-ca.crt
+ollama-local-ca.cer

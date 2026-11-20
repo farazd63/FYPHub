@@ -42,17 +42,21 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    cpus: 4
+    cpus: 8
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
       # Keep full-document contexts within local Docker memory capacity.
       OLLAMA_FLASH_ATTENTION: "1"
       OLLAMA_KV_CACHE_TYPE: q4_0
+      OLLAMA_CONTEXT_LENGTH: "2048"
       OLLAMA_NUM_PARALLEL: "1"
       OLLAMA_MAX_LOADED_MODELS: "1"
-      OLLAMA_KEEP_ALIVE: "30m"
+      OLLAMA_KEEP_ALIVE: "24h"
     volumes:
       - fyphub-p1-ollama-models:/root/.ollama
+      - ./ollama-local-ca.crt:/usr/local/share/ca-certificates/ollama-local-ca.crt:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["update-ca-certificates && exec /bin/ollama serve"]
     expose:
       - "11434"
     networks:
@@ -66,22 +70,42 @@ services:
     restart: unless-stopped
 
   ollama-init:
-    image: ollama/ollama:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
       OLLAMA_HOST: http://ollama:11434
-      OLLAMA_PROPOSAL_MODEL: ${OLLAMA_PROPOSAL_MODEL:-llama3.2:3b}
-      OLLAMA_AGENT_MODEL: ${OLLAMA_AGENT_MODEL:-llama3.2:3b}
-      OLLAMA_FALLBACK_MODEL: ${OLLAMA_FALLBACK_MODEL:-llama3.1:8b}
+      OLLAMA_AGENT_MODEL: ${OLLAMA_AGENT_MODEL:-llama3.1:8b}
     depends_on:
       ollama:
         condition: service_healthy
     networks:
       - fyphub-p1-network
-    entrypoint: ["/bin/sh", "-c"]
-    command: >-
-      ollama pull "$${OLLAMA_PROPOSAL_MODEL}" &&
-      if [ "$${OLLAMA_AGENT_MODEL}" != "$${OLLAMA_PROPOSAL_MODEL}" ]; then ollama pull "$${OLLAMA_AGENT_MODEL}"; fi &&
-      if [ -n "$${OLLAMA_FALLBACK_MODEL}" ] && [ "$${OLLAMA_FALLBACK_MODEL}" != "$${OLLAMA_PROPOSAL_MODEL}" ] && [ "$${OLLAMA_FALLBACK_MODEL}" != "$${OLLAMA_AGENT_MODEL}" ]; then ollama pull "$${OLLAMA_FALLBACK_MODEL}"; fi
+    command: ["python", "-m", "app.ollama_init"]
+    restart: "no"
+
+  ollama-warmup:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_AGENT_MODEL: ${OLLAMA_AGENT_MODEL:-llama3.1:8b}
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+    networks:
+      - fyphub-p1-network
+    command:
+      - python
+      - -c
+      - >-
+        import json, os, urllib.request;
+        payload = json.dumps({"model": os.environ["OLLAMA_AGENT_MODEL"], "messages": [{"role": "user", "content": "Reply with READY."}], "stream": False, "keep_alive": "24h", "options": {"num_predict": 1}}).encode();
+        request = urllib.request.Request(os.environ["OLLAMA_URL"] + "/api/chat", data=payload, headers={"Content-Type": "application/json"});
+        urllib.request.urlopen(request, timeout=300).read()
     restart: "no"
 
   storage-init:
@@ -108,12 +132,14 @@ services:
       OLLAMA_URL: http://ollama:11434
       OLLAMA_ALLOWED_HOSTS: ollama
       OLLAMA_PROPOSAL_MODEL: ${OLLAMA_PROPOSAL_MODEL:-llama3.2:3b}
-      OLLAMA_AGENT_MODEL: ${OLLAMA_AGENT_MODEL:-llama3.2:3b}
+      OLLAMA_AGENT_MODEL: ${OLLAMA_AGENT_MODEL:-llama3.1:8b}
       OLLAMA_FALLBACK_MODEL: ${OLLAMA_FALLBACK_MODEL:-llama3.1:8b}
     depends_on:
       migrate:
         condition: service_completed_successfully
       ollama-init:
+        condition: service_completed_successfully
+      ollama-warmup:
         condition: service_completed_successfully
       storage-init:
         condition: service_completed_successfully

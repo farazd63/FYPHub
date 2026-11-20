@@ -135,8 +135,8 @@ async def _run_ai_json_once(prompt: str, schema: type[T], *, model_kind: str, ra
             logger.warning("ai_response_invalid request_id=%s model=%s response_length=%s validation_error_type=%s", request_id, model, len(content) if isinstance(locals().get("content"), str) else 0, type(exc).__name__)
             return {**base,"status":"UNAVAILABLE","source":"DETERMINISTIC_FALLBACK","fallback_reason":"invalid_response","error_type":type(exc).__name__,"failure_stage":"response_validation","retry_count":attempt,"latency_ms":round((time.monotonic()-started_request)*1000,2)}
 
-async def run_ai_json(prompt: str, schema: type[T], *, model_kind: str, rate_key: str) -> dict[str, Any]:
-    result = await _run_ai_json_once(prompt, schema, model_kind=model_kind, rate_key=rate_key)
+async def run_ai_json(prompt: str, schema: type[T], *, model_kind: str, rate_key: str, model_override: str | None = None) -> dict[str, Any]:
+    result = await _run_ai_json_once(prompt, schema, model_kind=model_kind, rate_key=rate_key, model_override=model_override)
     cfg = provider_config()
     if result.get("status") == "UNAVAILABLE" and result.get("provider") == "ollama" and cfg.get("fallback_model") and cfg.get("fallback_model") != result.get("model"):
         return await _run_ai_json_once(prompt, schema, model_kind=model_kind, rate_key=rate_key, model_override=cfg["fallback_model"])
