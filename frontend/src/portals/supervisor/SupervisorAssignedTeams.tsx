@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Alert } from "../../ui";
 import { SupervisorGroupDetails, type GroupWorkspace, type GroupTab, date } from "./SupervisorGroupDetails";
 
 export function SupervisorAssignedTeams({ api }: { api: string }) {
@@ -17,7 +18,12 @@ export function SupervisorAssignedTeams({ api }: { api: string }) {
   if (selected) return <SupervisorGroupDetails key={selected.id} api={api} groupId={selected.id} initialTab={selected.tab} onBack={() => { setSelected(null); window.history.replaceState(window.history.state, "", "/supervisor/assigned-groups"); void load(); }} />;
   return <section className="supervisor-page" aria-labelledby="supervisor-assigned-heading">
     <div className="supervisor-page-heading"><h1 id="supervisor-assigned-heading">Assigned Students &amp; Teams</h1><span>Group members, proposals, documents and project progress for your active assignments.</span></div>
-    {error && <p role="alert">{error} <button type="button" onClick={() => void load()}>Retry</button></p>}
+    {error && (
+      <Alert tone="danger" title="Assigned groups unavailable" role="alert">
+        <p className="m-0">{error}</p>
+        <button type="button" className="fy-btn fy-btn--secondary fy-btn--sm mt-3" onClick={() => void load()}>Retry</button>
+      </Alert>
+    )}
     {loading ? <div className="supervisor-card">Loading assigned groups…</div> : !groups.length ? <div className="supervisor-card">No active assignments. Accepted groups will appear here.</div> : <div className="grid gap-4">{groups.map(data => <article key={data.group.id} className="supervisor-card">
       <h2>{data.group.name}</h2><p>{data.group.email}</p><p>{data.group.academic_cycle.name} · {data.group.academic_cycle.year} · {data.group.academic_cycle.session}</p>
       <dl className="my-4 grid gap-3 sm:grid-cols-3">{[

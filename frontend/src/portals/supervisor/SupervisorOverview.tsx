@@ -60,7 +60,7 @@ export function SupervisorOverview({ api, onOpenRequest }: { api: string; onOpen
             <div className="supervisor-card">
               <div className="flex items-center justify-between gap-3">
                 <h2>Recent proposal activity</h2>
-                <button type="button" className="text-sm font-semibold text-fy-brand underline" onClick={() => onOpenRequest()}>Open requests</button>
+                <button type="button" className="fy-btn fy-btn--secondary fy-btn--sm" onClick={() => onOpenRequest()}>Open requests</button>
               </div>
               <div className="supervisor-overview-list">
                 {recent.map((row) => (
