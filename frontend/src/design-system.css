@@ -231,11 +231,16 @@ main:has(.admin-sidebar) > header {
   backdrop-filter: blur(12px);
 }
 
-/* The student report scrolls with the document. Keep its sticky header flush
-   with the viewport so content cannot appear in the inset gap above it. */
-.student-shell > .student-header {
+/* Keep every dashboard header flush with the viewport. The inset offset made
+   scrolling content appear above the header on admin, student, and reviewer
+   dashboards. */
+.student-shell > .student-header,
+.portal-shell > .portal-header,
+.admin-shell > .admin-shell__header,
+.admin-shell > header,
+main:has(.admin-sidebar) > header {
   top: 0 !important;
-  margin-top: 0 !important;
+  margin: 0 !important;
 }
 
 .student-header .student-brand,
