@@ -954,6 +954,18 @@ html[data-theme="light"] .fy-logo--auth .fy-logo__wordmark {
 .auth-member-card__grid {
   display: grid;
   gap: var(--fy-space-4);
+  align-items: start;
+}
+
+.auth-member-card__grid .fy-field,
+.auth-member-card__grid label {
+  min-width: 0;
+}
+
+.auth-member-card__grid input {
+  min-height: 2.75rem;
+  max-height: none;
+  height: auto;
 }
 
 @media (min-width: 640px) {

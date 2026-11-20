@@ -6,7 +6,24 @@ type Requirement = { id: number; title: string; description?: string | null; aca
 const errorText = (body: unknown, fallback: string) => {
   if (!body || typeof body !== "object") return fallback;
   const detail = (body as { detail?: unknown }).detail;
-  return typeof detail === "string" ? detail : fallback;
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    const message = (detail as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((item) => {
+        if (!item || typeof item !== "object") return "";
+        const entry = item as { loc?: unknown[]; msg?: unknown };
+        const field = Array.isArray(entry.loc) ? entry.loc.filter((part) => part !== "body").join(".") : "";
+        const msg = typeof entry.msg === "string" ? entry.msg : "";
+        return field && msg ? `${field}: ${msg}` : msg;
+      })
+      .filter(Boolean);
+    if (parts.length) return parts.join(" ");
+  }
+  return fallback;
 };
 
 export function AdminDocumentRequirementManagerClean({ api }: { api: string }) {

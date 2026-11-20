@@ -253,24 +253,6 @@ export function WelcomeLanding({ onLogin, onSignup }: WelcomeLandingProps) {
             </div>
           </Section>
 
-          <Section title="How it works" description="The same six steps as concise cards.">
-            <div className="welcome-landing__how-grid">
-              {WORKFLOW_STEPS.map((step) => (
-                <Card key={step.id} padding="md" className="welcome-landing__how-card">
-                  <h3>{step.label}</h3>
-                  <p>
-                    {step.id === "group" && "Register your academic cycle and create the shared group account."}
-                    {step.id === "supervisor" && "Browse supervisors, send proposal requests, and track decisions."}
-                    {step.id === "proposal" && "Upload proposal documents against your cycle requirements."}
-                    {step.id === "compliance" && "Run compliance checks against the active template rules."}
-                    {step.id === "progress" && "Monitor supervision milestones and required submissions."}
-                    {step.id === "defence" && "Panel members schedule, review, and record defence outcomes."}
-                  </p>
-                </Card>
-              ))}
-            </div>
-          </Section>
-
           <section className="welcome-landing__cta-band" aria-labelledby="welcome-cta-heading">
             <h2 id="welcome-cta-heading" className="fy-title">
               Ready to open your final year workspace?
@@ -289,6 +271,10 @@ export function WelcomeLanding({ onLogin, onSignup }: WelcomeLandingProps) {
 
       <footer className="welcome-landing__footer">
         <Container>
+          <div className="welcome-landing__footer-brand">
+            <BrandMark />
+            <p>FYPHub keeps final-year groups, supervisors, and panels on one academic cycle from signup to defence.</p>
+          </div>
           <div className="welcome-landing__footer-grid">
             <div>
               <h3>Product</h3>

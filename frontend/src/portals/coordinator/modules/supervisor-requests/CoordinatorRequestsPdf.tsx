@@ -42,6 +42,12 @@ export function CoordinatorRequestsPdf({ api }: { api: string }) {
   const [message, setMessage] = useState("");
   const [showScheduling, setShowScheduling] = useState(false);
   useEffect(() => {
+    if (fromDate && toDate && fromDate > toDate) {
+      setRows([]);
+      setLoading(false);
+      setMessage("To-date must be on or after From-date.");
+      return;
+    }
     const controller = new AbortController();
     void (async () => {
       setLoading(true);

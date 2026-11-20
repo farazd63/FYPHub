@@ -128,11 +128,7 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, session: S
         user = session.execute(select(User).where(User.registration_number == value, User.is_active.is_(True)).with_for_update()).scalar_one_or_none()
     if user is None:
         session.rollback()
-        if kind == "email" and _development_or_demo_mode() and not _smtp_configured() and _is_valid_email(value):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={"code": "account_not_found", "message": PASSWORD_RESET_DEVELOPMENT_UNKNOWN_MESSAGE},
-            )
+        # Always return a neutral message so forgot-password cannot enumerate accounts.
         return _generic_response()
 
     now = utc_now()

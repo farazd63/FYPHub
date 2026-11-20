@@ -1107,17 +1107,30 @@ def revoke_user_sessions(session: Session, user_id: int) -> None:
     )
 
 
-def supervisor_capacity_counts(session: Session, supervisor_id: int, academic_year: int | None) -> dict[str, int]:
-    if academic_year is None:
+def supervisor_capacity_counts(
+    session: Session,
+    supervisor_id: int,
+    academic_year: int | None,
+    academic_cycle_id: int | None = None,
+) -> dict[str, int]:
+    if academic_year is None and academic_cycle_id is None:
         return {"FALL": 0, "SPRING": 0, "total": 0}
+    year_match = (
+        (SupervisorAssignment.academic_year == academic_year)
+        | ((SupervisorAssignment.academic_year.is_(None)) & (AcademicCycle.academic_year == academic_year))
+    ) if academic_year is not None else None
+    cycle_match = SupervisorAssignment.academic_cycle_id == academic_cycle_id if academic_cycle_id is not None else None
+    if year_match is not None and cycle_match is not None:
+        period_filter = year_match | cycle_match
+    else:
+        period_filter = year_match if year_match is not None else cycle_match
     rows = session.execute(
         select(SupervisorAssignment, AcademicCycle.session, AcademicCycle.academic_year)
         .outerjoin(AcademicCycle, AcademicCycle.id == SupervisorAssignment.academic_cycle_id)
         .where(
             SupervisorAssignment.supervisor_id == supervisor_id,
             SupervisorAssignment.ended_at.is_(None),
-            (SupervisorAssignment.academic_year == academic_year)
-            | ((SupervisorAssignment.academic_year.is_(None)) & (AcademicCycle.academic_year == academic_year)),
+            period_filter,
         )
     ).all()
     counts = {"FALL": 0, "SPRING": 0, "total": 0}
@@ -1133,7 +1146,8 @@ def supervisor_capacity_out(policy: SupervisorCapacityPolicy, session: Session) 
     supervisor = policy.supervisor
     cycle = policy.academic_cycle
     academic_year = policy.academic_year if policy.academic_year is not None else cycle.academic_year if cycle else None
-    counts = supervisor_capacity_counts(session, policy.supervisor_id, academic_year)
+    academic_cycle_id = policy.academic_cycle_id if policy.academic_cycle_id is not None else (cycle.id if cycle else None)
+    counts = supervisor_capacity_counts(session, policy.supervisor_id, academic_year, academic_cycle_id)
     assigned = counts["total"]
     eligible = supervisor.is_active and supervisor.role == UserRole.SUPERVISOR
     if not eligible:

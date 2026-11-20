@@ -19,7 +19,7 @@ from app.auth import SESSION_COOKIE_NAME, get_current_user, require_roles, utc_n
 from app.database import engine, get_db
 from app.main import app
 from app.models import AuthSession, DocumentUploadRequirement, PasswordResetToken, User, UserRole
-from app.password_reset import PASSWORD_RESET_DEVELOPMENT_UNKNOWN_MESSAGE, PASSWORD_RESET_GENERIC_MESSAGE
+from app.password_reset import PASSWORD_RESET_GENERIC_MESSAGE
 from app.security import generate_session_token, hash_password, hash_session_token
 
 
@@ -407,8 +407,7 @@ class AuthSessionTests(unittest.TestCase):
             status, _, body = request("GET", "/api/v1/auth/password-reset-status")
             self.assertEqual((status, body), (200, {"development_mode": True, "smtp_configured": False}))
             status, _, body = request("POST", "/api/v1/auth/forgot-password", {"email": "unknown-development@example.com"})
-            self.assertEqual((status, body["detail"]["message"]), (404, PASSWORD_RESET_DEVELOPMENT_UNKNOWN_MESSAGE))
-            self.assertEqual(body["detail"]["code"], "account_not_found")
+            self.assertEqual((status, body["message"]), (200, PASSWORD_RESET_GENERIC_MESSAGE))
             status, _, body = request("POST", "/api/v1/auth/forgot-password", {"email": self.email})
             self.assertEqual((status, body["message"]), (200, PASSWORD_RESET_GENERIC_MESSAGE))
             status, _, body = request("GET", f"/api/v1/auth/dev/password-reset-link?identifier={self.email}")
@@ -476,4 +475,4 @@ class AuthSessionTests(unittest.TestCase):
         )
         with patch("app.password_reset.settings", demo_settings):
             status, _, body = request("POST", "/api/v1/auth/forgot-password", {"email": "unknown-demo@example.com"})
-            self.assertEqual((status, body["detail"]["message"]), (404, PASSWORD_RESET_DEVELOPMENT_UNKNOWN_MESSAGE))
+            self.assertEqual((status, body["message"]), (200, PASSWORD_RESET_GENERIC_MESSAGE))

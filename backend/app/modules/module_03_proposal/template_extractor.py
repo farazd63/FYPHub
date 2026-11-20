@@ -460,13 +460,38 @@ def _section_list(value: Any) -> list[str]:
     return []
 
 
+_RULE_RANGES: dict[str, tuple[float, float]] = {
+    "top_margin_mm": (10.0, 50.0),
+    "bottom_margin_mm": (10.0, 50.0),
+    "left_margin_mm": (10.0, 50.0),
+    "right_margin_mm": (10.0, 50.0),
+    "line_spacing": (0.8, 3.0),
+    "font_size_pt": (8.0, 16.0),
+}
+
+
+def _clamp_detected_rule(key: str, value: Any) -> Any:
+    if value in (None, "") or (isinstance(value, str) and value.strip().casefold().startswith("not detected")):
+        return NOT_DETECTED
+    bounds = _RULE_RANGES.get(key)
+    if bounds is None:
+        return value
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return NOT_DETECTED
+    low, high = bounds
+    if numeric < low or numeric > high:
+        return NOT_DETECTED
+    return numeric if key == "line_spacing" else round(numeric, 2)
+
+
 def normalize_template_rules(rules: dict[str, Any]) -> dict[str, Any]:
     """Keep only comparable main rules and explicit optional requirements."""
     cleaned: dict[str, Any] = {}
     for key in MAIN_RULE_KEYS:
         if key in rules:
-            value = rules[key]
-            cleaned[key] = NOT_DETECTED if value in (None, "") or (isinstance(value, str) and value.strip().casefold().startswith("not detected")) else value
+            cleaned[key] = _clamp_detected_rule(key, rules[key])
     sections = _section_list(rules.get("required_sections")) or _section_list(rules.get("section_sequence"))
     if sections:
         cleaned["required_sections"] = sections

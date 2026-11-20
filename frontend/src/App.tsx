@@ -74,13 +74,13 @@ const SIGNUP_STEP_IDS = ["cycle", "members", "credentials"] as const;
 const isLandingPath = (pathname: string) => pathname === "/" || pathname === "/welcome";
 const welcomePublicPath = () => (window.location.pathname === "/welcome" ? "/welcome" : "/");
 const formatCycleLabel = (cycle: Cycle) => {
-  const status = cycle.registration_open ? "Open" : "Closed";
   const named = cycle.display_name?.trim();
-  if (named) return `${named} · ${status}`;
+  if (named) return named;
   const session = cycle.session?.trim();
-  if (session) return `${session} · ${status}`;
-  if (cycle.academic_year) return `${cycle.academic_year} · ${status}`;
-  return `Cycle · ${status}`;
+  if (session && cycle.academic_year) return `${session === "FALL" || session === "Fall" ? "Fall" : session === "SPRING" || session === "Spring" ? "Spring" : session} ${cycle.academic_year}`;
+  if (session) return session;
+  if (cycle.academic_year) return String(cycle.academic_year);
+  return `Cycle #${cycle.id}`;
 };
 const configuredApi = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 // Production is served with an nginx /api proxy. Keeping the API same-origin
@@ -95,7 +95,7 @@ const PRIMARY =
   "fy-btn fy-btn--primary rounded-lg bg-fy-brand px-5 py-2.5 text-sm font-semibold text-fy-text-on-brand transition-colors hover:bg-fy-brand-hover disabled:cursor-not-allowed";
 const AUTH_PRIMARY =
   "auth-primary fy-btn fy-btn--primary rounded-xl bg-fy-brand px-5 py-2.5 text-sm font-semibold text-fy-text-on-brand transition-colors hover:bg-fy-brand-hover disabled:cursor-not-allowed";
-const DEVELOPMENT_UNKNOWN_ACCOUNT_MESSAGE = "No account was found with this email address.";
+const PASSWORD_RESET_GENERIC_MESSAGE = "If an account exists for that email, a reset link will be sent.";
 const academicCycleError = (status: number) => ({ 401: "Your session has expired. Please sign in again.", 403: "You are not authorized to load academic cycles.", 404: "The academic-cycles endpoint was not found.", 500: "The backend could not load academic cycles." }[status] ?? "Academic cycles could not be loaded.");
 
 const newMember = (): Member => ({
@@ -327,7 +327,15 @@ export default function App() {
         if (!response.ok) throw new Error(academicCycleError(response.status));
         const data: Cycle[] = await response.json();
         if (!controller.signal.aborted) {
-          setCycles(data);
+          const seen = new Set<string>();
+          const openCycles = data.filter((cycle) => {
+            if (!cycle.registration_open) return false;
+            const key = `${cycle.academic_year ?? ""}|${(cycle.session ?? "").toUpperCase()}|${(cycle.display_name ?? "").trim().toLowerCase()}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          setCycles(openCycles);
           setCyclesState("ready");
         }
       } catch {
@@ -550,6 +558,9 @@ export default function App() {
     if (isLandingPath(pathname) && stored?.page === "in") {
       initial = publicRoute("welcome");
     }
+    if (pathname === "/recover") {
+      initial = publicRoute("recover");
+    }
     if (window.location.pathname === "/reset-password") {
       queueMicrotask(() => {
         setRecoveryView("reset");
@@ -557,6 +568,12 @@ export default function App() {
         setPage("recover");
       });
       window.history.replaceState({ fyphubNavigation: publicRoute("recover") }, "", window.location.href);
+    } else if (pathname === "/recover") {
+      queueMicrotask(() => {
+        setRecoveryView("forgot");
+        setPage("recover");
+      });
+      window.history.replaceState({ fyphubNavigation: publicRoute("recover") }, "", "/recover");
     } else {
       if (!readPublicRoute(window.history.state)) window.history.replaceState({ fyphubNavigation: initial }, "", window.location.href);
       publicNavigationRef.current(initial, "pop");
@@ -788,7 +805,7 @@ export default function App() {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setRecoveryError(body.detail?.code === "account_not_found" ? DEVELOPMENT_UNKNOWN_ACCOUNT_MESSAGE : "Password reset could not be requested.");
+        setRecoveryError(PASSWORD_RESET_GENERIC_MESSAGE);
         return;
       }
       setRecoveryMessage(body.message ?? "If an account exists, a password reset link will be sent.");
@@ -1311,7 +1328,7 @@ export default function App() {
               )}
               {step === 2 && (
                 <div className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-[#4f6470]">{teamSize} of {maximum ?? "—"} members added</p><button type="button" disabled={submitting || !maximum || teamSize >= maximum} onClick={() => setMembers((current) => [...current, newMember()])} className="rounded-lg border border-[#176B66] px-3 py-2 text-sm font-semibold text-[#176B66] disabled:cursor-not-allowed disabled:border-[#cbd6d0] disabled:text-[#4f6470]">+ Add member</button></div>
+                  <div className="flex flex-wrap items-center justify-between gap-3"><p className="min-w-0 flex-1 overflow-visible py-0.5 text-sm leading-5 text-[#4f6470]">{teamSize} of {maximum ?? "—"} members added</p><button type="button" disabled={submitting || !maximum || teamSize >= maximum} onClick={() => setMembers((current) => [...current, newMember()])} className="shrink-0 rounded-lg border border-[#176B66] px-3 py-2 text-sm font-semibold text-[#176B66] disabled:cursor-not-allowed disabled:border-[#cbd6d0] disabled:text-[#4f6470]">+ Add member</button></div>
                   {maximum && teamSize >= maximum && <p className="text-sm text-[#4f6470]">Maximum group size reached for this cycle.</p>}
                   {errors["members.configuration"] && <p role="alert" className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{errors["members.configuration"]}</p>}
                   {members.map((member, index) => (
