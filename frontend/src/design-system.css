@@ -387,7 +387,7 @@ main [role="status"],
   border-color: color-mix(in srgb, var(--fy-info) 24%, white);
   border-radius: var(--fy-radius-card);
 }
-main [role="alert"],
+main [role="alert"]:not(.fy-field__error),
 .student-request-alert,
 .supervisor-alert {
   background: var(--fy-danger-soft);

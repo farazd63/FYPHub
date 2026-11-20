@@ -350,9 +350,15 @@ main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] textarea:focus 
   box-shadow: var(--fy-focus-ring);
 }
 
-main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] [role="alert"] {
+main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] [role="alert"]:not(.fy-field__error) {
   border: 1px solid color-mix(in srgb, var(--fy-danger) 45%, var(--fy-border));
   background: var(--fy-danger-soft);
+  color: var(--fy-danger);
+  box-shadow: none;
+}
+main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .fy-field__error {
+  border: 0;
+  background: transparent;
   color: var(--fy-danger);
   box-shadow: none;
 }

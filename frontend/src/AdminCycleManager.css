@@ -1,4 +1,35 @@
 ﻿/* Academic cycles screen only. */
+.academic-cycles__create {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+.academic-cycles__field {
+  min-width: 0;
+  max-width: 100%;
+}
+.academic-cycles__field .fy-field__error {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--fy-danger, #9a4337);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.academic-cycles__hint {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
 .academic-cycles__heading {
   animation: academic-cycles-entrance 380ms ease-out backwards;
 }
@@ -9,7 +40,7 @@
 }
 .academic-cycles__card {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 5px 22px rgb(24 48 71 / 0.06);
   animation: academic-cycles-entrance 420ms ease-out 70ms backwards;
   transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
