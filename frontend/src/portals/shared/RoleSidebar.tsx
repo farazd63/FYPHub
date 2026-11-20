@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, X } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import "./role-sidebar.css";
 
 export type RoleSidebarIcon =
@@ -79,6 +79,14 @@ export function RoleSidebar({ ariaLabel, workspaceLabel, items, active, collapse
     }
     setInternalExpanded((current) => ({ ...current, [section]: !isSectionOpen(section) }));
   };
+
+  useEffect(() => {
+    if (onToggleSection) return;
+    const activeItem = items.find((item) => item.id === active);
+    const section = activeItem?.section ?? "";
+    if (!section) return;
+    setInternalExpanded((current) => (current[section] ? current : { ...current, [section]: true }));
+  }, [active, items, onToggleSection]);
 
   return <>
     <aside className={`student-sidebar role-sidebar ${className} ${mobileOpen ? "student-sidebar--open" : ""} ${collapsed ? "student-sidebar--collapsed" : ""}`}>

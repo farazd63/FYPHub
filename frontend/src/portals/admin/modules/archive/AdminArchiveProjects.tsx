@@ -151,8 +151,10 @@ export function AdminArchiveProjects({ api }: { api: string }) {
     <OldProjectArchiveImport api={api} onImported={load} />
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div><h2 id="archive-projects-heading" className="text-xl font-bold">Archived projects</h2><p className="mt-1 text-sm text-[#60716b]">Each project title is one archive record with its related information grouped together.</p></div>
-      <button type="button" disabled={repairing} onClick={() => void repairImported()} className="rounded-lg border border-[#cdd5ff] px-3 py-2 text-sm font-semibold text-[#354fe0] disabled:opacity-50">{repairing ? "Repairing…" : "Repair imported duplicates"}</button>
-      <span className="text-sm text-[#60716b]">{data.total} total</span>
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <button type="button" disabled={repairing} onClick={() => void repairImported()} className="rounded-lg border border-[#cdd5ff] px-3 py-2 text-sm font-semibold text-[#354fe0] disabled:opacity-50">{repairing ? "Repairing…" : "Repair imported duplicates"}</button>
+        <span className="text-sm font-semibold text-[#60716b]">{data.total} total</span>
+      </div>
     </div>
     <form className="mb-4 flex gap-2" onSubmit={(event) => { event.preventDefault(); setPage(1); void load(); }}>
       <input className="w-full rounded-lg border border-[#cbd6d0] bg-white px-3 py-2 text-sm" placeholder="Search project title" value={search} onChange={(event) => setSearch(event.target.value)} />

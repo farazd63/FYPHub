@@ -142,7 +142,7 @@ main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"]:hover {
   color: var(--fy-brand, #1d4ed8);
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .admin-drawer-top { display: none; }
   main:has(.admin-sidebar) .admin-sidebar {
     position: sticky;
@@ -162,7 +162,7 @@ main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"]:hover {
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   main:has(.admin-sidebar).admin-sidebar-collapsed .admin-sidebar,
   .admin-shell.admin-sidebar-collapsed .admin-sidebar {
     flex: 0 0 0 !important;

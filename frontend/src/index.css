@@ -100,6 +100,51 @@ main:has(.admin-sidebar) > header > div:last-child > button { line-height: 1.25r
 section[aria-labelledby="users-heading"] .admin-create-role { grid-column: 1 / -1; }
 section[aria-labelledby="users-heading"] .admin-create-role select { width: 100%; }
 
+section[aria-labelledby="users-heading"] .admin-users-toolbar {
+  grid-template-columns: minmax(0, 1fr);
+}
+section[aria-labelledby="users-heading"] .admin-users-toolbar__search {
+  width: 100%;
+  min-width: 0;
+}
+section[aria-labelledby="users-heading"] .admin-users-toolbar__select {
+  min-width: 160px;
+  width: 100%;
+  padding-right: 2.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+section[aria-labelledby="users-heading"] .admin-users-toolbar__submit {
+  width: 100%;
+}
+@media (min-width: 768px) {
+  section[aria-labelledby="users-heading"] .admin-users-toolbar {
+    grid-template-columns: minmax(0, 1fr) minmax(160px, auto) minmax(160px, auto) auto;
+    align-items: center;
+  }
+  section[aria-labelledby="users-heading"] .admin-users-toolbar__search {
+    grid-column: auto;
+  }
+  section[aria-labelledby="users-heading"] .admin-users-toolbar__submit {
+    width: auto;
+    justify-self: end;
+  }
+}
+
+.password-field__toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  translate: 0 -50%;
+  min-height: 2rem;
+  padding-inline: 0.65rem;
+}
+.password-field__toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--fy-focus-ring);
+}
+
 /* Auth card presentation lives in auth.css (dark studio). */
 
 /* Create Account remains one column because its sidebar panel is intentionally narrow. */

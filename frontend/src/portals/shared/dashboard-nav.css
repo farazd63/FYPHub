@@ -260,16 +260,88 @@ main:has(.admin-sidebar) button:focus-visible {
 }
 
 @media (max-width: 1024px) and (min-width: 768px) {
-  .student-shell .student-sidebar,
-  .admin-shell .admin-sidebar,
-  main:has(.admin-sidebar) .admin-sidebar {
+  .student-shell .student-sidebar {
     width: 224px;
     flex-basis: 224px;
   }
 }
 
 @media (max-width: 767px) {
+  .student-shell .student-sidebar {
+    position: fixed;
+    inset: 76px 14px 14px 14px;
+    z-index: 40;
+    display: flex;
+    width: min(84vw, 304px);
+    height: auto;
+    max-height: calc(100dvh - 90px);
+    margin: 0;
+    padding: 12px;
+    transform: translateX(calc(-100% - 20px));
+    border-radius: 24px;
+    opacity: 0;
+    pointer-events: none;
+    box-shadow: 0 22px 46px rgb(9 24 52 / 0.3);
+  }
+
+  .student-shell .student-sidebar.student-sidebar--open {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .student-shell .student-sidebar__mobile-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 4px 12px;
+    border-bottom: 1px solid rgb(194 215 250 / 0.2);
+  }
+
+  .student-shell .student-sidebar__collapse { display: none; }
+
+  .student-shell .student-sidebar__nav {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-top: 12px;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .student-shell .student-sidebar__overlay {
+    position: fixed;
+    inset: 64px 0 0;
+    z-index: 35;
+    display: block;
+    border: 0;
+    background: rgb(16 36 74 / 0.28);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+  }
+
+  .student-shell .student-sidebar__overlay.student-sidebar__overlay--open { opacity: 1; pointer-events: auto; }
+
   .student-shell .student-sidebar,
+  .student-shell .student-sidebar--collapsed {
+    flex: 0 0 0 !important;
+    width: min(84vw, 304px) !important;
+    min-width: 0 !important;
+    max-width: min(84vw, 304px) !important;
+    margin: 0 !important;
+  }
+
+  .student-shell .student-sidebar--collapsed .student-sidebar__label { display: inline; }
+
+  .student-shell .student-sidebar--collapsed .student-sidebar__item { justify-content: flex-start; }
+
+  .student-shell .student-header { padding-inline: 14px; }
+
+  .student-shell .student-body { gap: 0; }
+}
+
+@media (max-width: 1023px) {
   .admin-shell .admin-sidebar,
   main:has(.admin-sidebar) .admin-sidebar {
     position: fixed;
@@ -288,7 +360,6 @@ main:has(.admin-sidebar) button:focus-visible {
     box-shadow: 0 22px 46px rgb(9 24 52 / 0.3);
   }
 
-  .student-shell .student-sidebar.student-sidebar--open,
   .admin-shell .admin-sidebar.translate-x-0,
   main:has(.admin-sidebar) .admin-sidebar.student-sidebar--open,
   main:has(.admin-sidebar) .admin-sidebar.translate-x-0 {
@@ -297,7 +368,6 @@ main:has(.admin-sidebar) button:focus-visible {
     pointer-events: auto;
   }
 
-  .student-shell .student-sidebar__mobile-head,
   .admin-shell .admin-drawer-top {
     display: flex;
     align-items: center;
@@ -307,10 +377,8 @@ main:has(.admin-sidebar) button:focus-visible {
     border-bottom: 1px solid rgb(194 215 250 / 0.2);
   }
 
-  .student-shell .student-sidebar__collapse,
   .admin-shell .admin-sidebar-toggle { display: none; }
 
-  .student-shell .student-sidebar__nav,
   .admin-shell .admin-sidebar nav,
   main:has(.admin-sidebar) .admin-sidebar nav {
     flex: 1 1 auto;
@@ -320,7 +388,6 @@ main:has(.admin-sidebar) button:focus-visible {
     overflow-y: auto;
   }
 
-  .student-shell .student-sidebar__overlay,
   .admin-shell .admin-sidebar-overlay,
   main:has(.admin-sidebar) .student-sidebar__overlay {
     position: fixed;
@@ -334,13 +401,10 @@ main:has(.admin-sidebar) button:focus-visible {
     transition: opacity 180ms ease;
   }
 
-  .student-shell .student-sidebar__overlay.student-sidebar__overlay--open,
   .admin-shell .admin-sidebar-overlay.admin-sidebar-overlay--open,
   .admin-shell .admin-sidebar-overlay.opacity-100,
   main:has(.admin-sidebar) .student-sidebar__overlay.student-sidebar__overlay--open { opacity: 1; pointer-events: auto; }
 
-  .student-shell .student-sidebar,
-  .student-shell .student-sidebar--collapsed,
   .admin-shell.admin-sidebar-collapsed .admin-sidebar,
   .admin-shell .admin-sidebar,
   main:has(.admin-sidebar).admin-sidebar-collapsed .admin-sidebar,
@@ -352,18 +416,14 @@ main:has(.admin-sidebar) button:focus-visible {
     margin: 0 !important;
   }
 
-  .student-shell .student-sidebar--collapsed .student-sidebar__label,
   .admin-shell.admin-sidebar-collapsed .admin-sidebar nav button > span:last-child,
   main:has(.admin-sidebar).admin-sidebar-collapsed .admin-sidebar nav button > span:last-child { display: inline; }
 
-  .student-shell .student-sidebar--collapsed .student-sidebar__item,
   .admin-shell.admin-sidebar-collapsed .admin-sidebar nav button,
   main:has(.admin-sidebar).admin-sidebar-collapsed .admin-sidebar nav button { justify-content: flex-start; }
 
-  .student-shell .student-header,
   main:has(.admin-sidebar) > header { padding-inline: 14px; }
 
-  .student-shell .student-body,
   .admin-shell > div,
   main:has(.admin-sidebar) > div { gap: 0; }
 }

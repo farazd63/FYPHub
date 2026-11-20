@@ -38,7 +38,7 @@ export function PasswordField({ label, value, onChange, autoComplete = "new-pass
       <label htmlFor={id} className="text-sm font-semibold">{label}</label>
       <div className="relative">
         <input id={id} className={`${fieldClass} pr-16 ${error ? "border-fy-danger" : ""}`} type={visible ? "text" : "password"} value={value} autoComplete={autoComplete} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={describedBy} onChange={(event) => onChange(event.target.value)} />
-        <button type="button" disabled={disabled} aria-controls={id} aria-pressed={visible} aria-label={`${visible ? "Hide" : "Show"} ${label.toLowerCase()}`} onClick={() => setVisible((current) => !current)} className="absolute inset-y-0 right-3 text-xs font-semibold text-fy-brand disabled:text-fy-text-secondary">{visible ? "Hide" : "Show"}</button>
+        <button type="button" disabled={disabled} aria-controls={id} aria-pressed={visible} aria-label={`${visible ? "Hide" : "Show"} ${label.toLowerCase()}`} onClick={() => setVisible((current) => !current)} className="password-field__toggle fy-btn fy-btn--ghost fy-btn--sm">{visible ? "Hide" : "Show"}</button>
       </div>
       {showGuidance && <PasswordGuidance value={value} id={guidanceId} />}
       {isConfirmation && value && <p id={error ? errorId : undefined} className={error ? "text-sm text-fy-danger" : "text-sm text-fy-success"}>{error ? "Passwords do not match." : "Passwords match."}</p>}

@@ -199,18 +199,18 @@ export function AdminUsersRoles({ api }: { api: string }) {
         <div className="min-w-0">
           <form
             onSubmit={searchSubmit}
-            className="mb-4 grid gap-3 rounded-xl border border-[#dce4de] bg-white p-4 sm:grid-cols-[minmax(0,1fr)_140px_120px_auto]"
+            className="admin-users-toolbar mb-4 grid gap-3 rounded-xl border border-[#dce4de] bg-white p-4"
           >
             <input
               aria-label="Search accounts"
-              className={input}
+              className={`admin-users-toolbar__search ${input}`}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search name, email, or registration"
             />
             <select
               aria-label="Filter by role"
-              className={input}
+              className={`admin-users-toolbar__select ${input}`}
               value={role}
               onChange={(event) => {
                 setRole(event.target.value);
@@ -224,7 +224,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
             </select>
             <select
               aria-label="Filter by status"
-              className={input}
+              className={`admin-users-toolbar__select ${input}`}
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value);
@@ -235,7 +235,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
               <option value="true">Active</option>
               <option value="false">Inactive</option>
             </select>
-            <button className="rounded-lg bg-[#176b66] px-4 py-2 text-sm font-semibold text-white transition duration-200 hover:bg-[#125650] active:scale-[.98]">
+            <button type="submit" className="admin-users-toolbar__submit rounded-lg bg-[#176b66] px-4 py-2 text-sm font-semibold text-white transition duration-200 hover:bg-[#125650] active:scale-[.98]">
               Search
             </button>
           </form>
@@ -258,14 +258,8 @@ export function AdminUsersRoles({ api }: { api: string }) {
             </div>
           )}
           {state === "ready" && Boolean(data.items.length) && (
-            <div className="users-table overflow-x-auto rounded-xl border border-[#dce4de] bg-white">
-              <table className="w-full table-fixed text-left text-sm">
-                <colgroup>
-                  <col className="w-[42%]" />
-                  <col className="w-[22%]" />
-                  <col className="w-[16%]" />
-                  <col className="w-[20%]" />
-                </colgroup>
+            <div className="admin-table-scroll users-table overflow-x-auto rounded-xl border border-[#dce4de] bg-white">
+              <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="bg-[#fbfcfa] text-xs uppercase tracking-wide text-[#60716b]">
                   <tr>
                     <th className="px-4 py-3">Account</th>
@@ -315,6 +309,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                         </span>
                       </td>
                       <td className="px-3 py-3">
+                        <div className="flex min-w-[11.5rem] flex-col gap-2 whitespace-nowrap">
                         <button
                           type="button"
                           disabled={busy === user.id}
@@ -325,11 +320,12 @@ export function AdminUsersRoles({ api }: { api: string }) {
                               value: String(!user.is_active),
                             })
                           }
-                          className="w-full rounded-lg border border-[#b8cdc1] px-2 py-1.5 text-xs font-semibold text-[#176b66] transition duration-200 hover:bg-[#e4eee7] disabled:opacity-60"
+                          className="rounded-lg border border-[#b8cdc1] px-2.5 py-1.5 text-xs font-semibold text-[#176b66] transition duration-200 hover:bg-[#e4eee7] disabled:opacity-60"
                         >
                           {user.is_active ? "Deactivate" : "Activate"}
                         </button>
-                        <button type="button" disabled={busy === user.id || !user.is_active} onClick={() => setConfirm({ user, type: "delete", value: "delete" })} className="mt-2 w-full rounded-lg border border-[#d38b83] px-2 py-1.5 text-xs font-semibold text-[#a43a33] transition duration-200 hover:bg-[#fff3f0] disabled:opacity-60">Remove access</button>
+                        <button type="button" disabled={busy === user.id || !user.is_active} onClick={() => setConfirm({ user, type: "delete", value: "delete" })} className="rounded-lg border border-[#d38b83] px-2.5 py-1.5 text-xs font-semibold text-[#a43a33] transition duration-200 hover:bg-[#fff3f0] disabled:opacity-60">Remove access</button>
+                        </div>
                       </td>
                     </tr>
                   ))}

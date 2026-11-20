@@ -228,7 +228,7 @@
 .student-sidebar.role-sidebar.student-sidebar--collapsed .student-sidebar__collapse { right: 50%; transform: translateX(50%); }
 
 @media (max-width: 1024px) and (min-width: 768px) {
-  .student-sidebar.role-sidebar { width: 228px; flex-basis: 228px; }
+  .student-shell .student-sidebar.role-sidebar { width: 228px; flex-basis: 228px; }
 }
 
 @media (max-width: 767px) {
@@ -276,10 +276,15 @@
     text-transform: uppercase;
   }
 
+  .role-sidebar .role-sidebar__section-heading {
+    min-height: 40px;
+    padding-block: 8px;
+  }
+
   .role-sidebar .student-sidebar__close {
     display: grid;
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     place-items: center;
     padding: 0;
     border: 1px solid var(--fy-border, #d8dee6);
