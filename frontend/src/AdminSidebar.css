@@ -173,7 +173,29 @@ main:has(.admin-sidebar) .admin-sidebar nav button[aria-current="page"]:hover {
 }
 
 @media (max-width: 420px) {
-  main:has(.admin-sidebar) .admin-account { gap: 6px; }
+  main:has(.admin-sidebar) .admin-shell__header {
+    padding-inline: 0.65rem !important;
+    gap: 0.5rem;
+  }
+  main:has(.admin-sidebar) .admin-shell__header > div:first-child {
+    min-width: 0;
+    gap: 0.4rem !important;
+  }
+  main:has(.admin-sidebar) .admin-brand {
+    font-size: 1rem !important;
+    letter-spacing: -0.02em;
+  }
+  main:has(.admin-sidebar) .admin-account {
+    gap: 0.35rem;
+    flex-shrink: 0;
+  }
+  main:has(.admin-sidebar) .admin-account .fy-theme-toggle {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+  main:has(.admin-sidebar) .admin-logout {
+    padding-inline: 0.55rem !important;
+  }
   .admin-avatar { width: 30px; height: 30px; }
 }
 
