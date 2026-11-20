@@ -1,0 +1,31 @@
+[
+  {
+    "role": "PUBLIC",
+    "theme": "light",
+    "nav": "landing",
+    "path": "/welcome",
+    "title": "FYPHub | Welcome",
+    "h1": "Manage Your Final Year Project with Intelligence",
+    "total": 101,
+    "below45": 0,
+    "samples": []
+  },
+  {
+    "role": "PUBLIC",
+    "theme": "light",
+    "nav": "sign-in",
+    "path": "/login",
+    "title": "FYPHub | Sign In",
+    "h1": "From your first idea to your final defense.",
+    "total": 12,
+    "below45": 1,
+    "samples": [
+      {
+        "t": "Login",
+        "ratio": 1,
+        "need": 4.5,
+        "disabled": false
+      }
+    ]
+  }
+]

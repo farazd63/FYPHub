@@ -2,12 +2,10 @@ AcademicCycleDashboard.css
 AdminCycleManager.css
 AdminCycleManager.tsx
 AdminDeadlines.tsx
-AdminDocumentArchive.tsx
 AdminDocumentRequirementManagerClean.tsx
 AdminOverview.css
 AdminReminderRules.tsx
 AdminSidebar.css
-AdminStudentGroups.tsx
 AdminSupervisorCapacity.tsx
 AdminUsersRoles.tsx
 App.tsx
@@ -24,11 +22,9 @@ portals/shared/dashboard-nav.css
 portals/shared/portal-dark.css
 portals/shared/portal-shell.css
 portals/shared/role-sidebar.css
-portals/student/StudentOverview.tsx
 portals/student/components/GroupMembers.tsx
 portals/student/modules/EvaluatorWorkflow.tsx
 portals/student/modules/StudentRequiredDocumentsComplete.tsx
-portals/student/modules/StudentRequiredDocumentsDashboard.tsx
 portals/student/modules/StudentSupervisorInfo.tsx
 portals/student/modules/archive-knowledge.css
 portals/student/modules/student-collaboration.css
@@ -37,7 +33,6 @@ portals/student/student-admin-theme.css
 portals/student/student-content.css
 portals/student/student.css
 portals/supervisor/SupervisorGroupDetails.tsx
-portals/supervisor/SupervisorOverview.tsx
 portals/supervisor/modules/supervisor-requests/supervisor-requests.css
 portals/supervisor/supervisor-capacity.css
 ui/theme.tsx

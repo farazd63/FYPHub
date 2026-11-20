@@ -92,9 +92,9 @@ export const API = !configuredApi || isLocalBackendUrl ? browserOrigin : configu
 const INPUT =
   "w-full rounded-lg border border-fy-border bg-fy-page px-3.5 py-3 text-base text-fy-text transition-colors focus:border-fy-brand disabled:cursor-not-allowed disabled:bg-fy-surface-muted disabled:opacity-70";
 const PRIMARY =
-  "rounded-lg bg-fy-brand px-5 py-2.5 text-sm font-semibold text-[#1a1208] transition-colors hover:bg-fy-brand-hover disabled:cursor-not-allowed disabled:bg-[#2a3140] disabled:text-[#9aa3b5]";
+  "fy-btn fy-btn--primary rounded-lg bg-fy-brand px-5 py-2.5 text-sm font-semibold text-fy-text-on-brand transition-colors hover:bg-fy-brand-hover disabled:cursor-not-allowed";
 const AUTH_PRIMARY =
-  "auth-primary rounded-xl bg-fy-brand px-5 py-2.5 text-sm font-semibold text-[#1a1208] transition-colors hover:bg-fy-brand-hover disabled:cursor-not-allowed disabled:bg-[#2a3140] disabled:text-[#9aa3b5]";
+  "auth-primary fy-btn fy-btn--primary rounded-xl bg-fy-brand px-5 py-2.5 text-sm font-semibold text-fy-text-on-brand transition-colors hover:bg-fy-brand-hover disabled:cursor-not-allowed";
 const DEVELOPMENT_UNKNOWN_ACCOUNT_MESSAGE = "No account was found with this email address.";
 const academicCycleError = (status: number) => ({ 401: "Your session has expired. Please sign in again.", 403: "You are not authorized to load academic cycles.", 404: "The academic-cycles endpoint was not found.", 500: "The backend could not load academic cycles." }[status] ?? "Academic cycles could not be loaded.");
 

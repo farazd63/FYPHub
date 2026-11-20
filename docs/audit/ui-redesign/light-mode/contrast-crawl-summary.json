@@ -1,0 +1,6 @@
+{
+  "light::PUBLIC": {
+    "screens": 2,
+    "belowAA": 1
+  }
+}
