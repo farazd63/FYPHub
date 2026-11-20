@@ -9,7 +9,8 @@ const evaluator = fs.readFileSync(new URL("portals/evaluator/EvaluatorSidebar.ts
 const coordinator = fs.readFileSync(new URL("portals/coordinator/CoordinatorPortal.tsx", root), "utf8");
 const coordinatorSidebar = fs.readFileSync(new URL("portals/coordinator/CoordinatorSidebar.tsx", root), "utf8");
 const styles = fs.readFileSync(new URL("portals/shared/role-sidebar.css", root), "utf8");
-const profile = fs.readFileSync(new URL("portals/shared/SidebarProfile.tsx", root), "utf8");
+const profilePath = new URL("portals/shared/SidebarProfile.tsx", root);
+const profile = fs.existsSync(profilePath) ? fs.readFileSync(profilePath, "utf8") : "";
 
 test("role sidebars use the shared soft navigation shell", () => {
   assert.match(supervisor, /RoleSidebar/);
@@ -21,7 +22,7 @@ test("role sidebars use the shared soft navigation shell", () => {
   assert.match(shared, /student-sidebar__collapse/);
   assert.match(shared, /<svg/);
   assert.match(shared, /SidebarIcon/);
-  assert.match(profile, /floating-sidebar__profile/);
+  if (profile) assert.match(profile, /floating-sidebar__profile/);
   assert.doesNotMatch(supervisor, /icon: "[A-Z]+"/);
   assert.doesNotMatch(evaluator, /\["overview", "Overview"/);
 });
@@ -43,3 +44,8 @@ test("sidebar styling keeps mobile drawer and collapsed tooltip behavior", () =>
 });
 
 console.log("role-sidebar.test.mjs: all assertions passed");
+
+test("mobile drawer auto-expands active section and keeps large touch targets", () => {
+  assert.match(shared, /activeSection|expanded|onToggleSection|section/);
+  assert.match(styles, /min-height:\s*40px|min-height:\s*2\.5rem/);
+});

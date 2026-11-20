@@ -91,3 +91,35 @@ test("legacy light admin card rules are not reintroduced in index.css", () => {
   assert.doesNotMatch(index, /background:\s*#fbfdff/);
   assert.doesNotMatch(index, /color:\s*#172b4d/);
 });
+
+test("badge and disabled token pairs meet WCAG AA in both themes", () => {
+  const css = read("design-tokens.css");
+  const light = (css.split(':root[data-theme="light"]')[1] || css.split(":root,")[1] || "").split(':root[data-theme="dark"]')[0];
+  const dark = css.split(':root[data-theme="dark"]')[1] || "";
+  for (const [label, block] of [["light", light], ["dark", dark]]) {
+    const pairs = [
+      ["--fy-badge-success-fg", "--fy-badge-success-bg"],
+      ["--fy-badge-warning-fg", "--fy-badge-warning-bg"],
+      ["--fy-badge-danger-fg", "--fy-badge-danger-bg"],
+      ["--fy-badge-info-fg", "--fy-badge-info-bg"],
+      ["--fy-badge-neutral-fg", "--fy-badge-neutral-bg"],
+      ["--fy-disabled-fg", "--fy-disabled-bg"],
+    ];
+    for (const [fgName, bgName] of pairs) {
+      const fg = pick(block, fgName);
+      const bg = pick(block, bgName);
+      assert.ok(fg && bg, `${label} missing ${fgName}/${bgName}`);
+      assert.ok(ratio(fg, bg) >= 4.5, `${label} ${fgName} on ${bgName} ${ratio(fg, bg).toFixed(2)}`);
+    }
+  }
+});
+
+test("disabled button styles avoid opacity and use disabled tokens", () => {
+  const ui = read("ui/ui.css");
+  const ds = read("design-system.css");
+  const progress = read("portals/student/student-content.css");
+  assert.match(ui, /--fy-disabled-bg/);
+  assert.match(ds, /--fy-disabled-fg/);
+  assert.match(progress, /\.progress-button:disabled[\s\S]{0,220}opacity:\s*1\s*!important/);
+  assert.doesNotMatch(progress, /\.progress-button:disabled\s*\{\s*cursor:[^}]*opacity:\s*\.?55/);
+});
