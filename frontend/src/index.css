@@ -478,3 +478,57 @@ main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) table the
   background: var(--fy-page);
   color: var(--fy-text);
 }
+
+/* Admin Users & Capacity responsive layout */
+.admin-users-layout,
+.admin-capacity-layout {
+  width: 100%;
+  min-width: 0;
+}
+@media (min-width: 1280px) {
+  .admin-users-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 300px);
+  }
+  .admin-capacity-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
+  }
+}
+.admin-table-scroll {
+  position: relative;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background:
+    linear-gradient(var(--fy-surface) 30%, transparent),
+    linear-gradient(transparent, var(--fy-surface) 70%) 0 100%,
+    linear-gradient(90deg, rgb(11 27 63 / 0.12), transparent 40%),
+    linear-gradient(270deg, rgb(11 27 63 / 0.12), transparent 40%) 100% 0;
+  background-repeat: no-repeat;
+  background-size: 100% 24px, 100% 24px, 18px 100%, 18px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+section[aria-labelledby="users-heading"] .users-table__grid {
+  min-width: 640px;
+  table-layout: fixed;
+  width: 100%;
+}
+section[aria-labelledby="users-heading"] .users-table__account {
+  width: 240px;
+  max-width: 240px;
+}
+section[aria-labelledby="users-heading"] .users-table__account p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+section[aria-labelledby="users-heading"] .users-table__actions {
+  min-width: 0;
+  white-space: normal;
+}
+@media (max-width: 767px) {
+  section[aria-labelledby="users-heading"] .users-table__account {
+    width: 160px;
+    max-width: 160px;
+  }
+}

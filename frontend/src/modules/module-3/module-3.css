@@ -191,3 +191,71 @@
 .module3-final-metrics span:nth-child(4) strong { color: var(--fy-badge-warning-fg) !important; }
 .module3-success-text { color: var(--fy-badge-success-fg) !important; }
 .module3-missing-list strong { color: var(--fy-badge-info-fg) !important; }
+.module3-workspace,
+.module3-admin-page,
+.module3-report-hero,
+.module3-score-wrap,
+.module3-report-actions,
+.module3-page-heading {
+  min-width: 0;
+  max-width: 100%;
+}
+.module3-report-actions {
+  flex-wrap: wrap !important;
+}
+.module3-danger-button,
+.module3-primary-button,
+.module3-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  padding: 0.55rem 1rem;
+  border-radius: var(--fy-radius-control, 0.55rem);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.module3-danger-button {
+  border: 1px solid color-mix(in srgb, var(--fy-badge-danger-fg) 35%, var(--fy-border));
+  background: var(--fy-badge-danger-bg);
+  color: var(--fy-badge-danger-fg);
+}
+.module3-danger-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--fy-badge-danger-fg) 12%, var(--fy-badge-danger-bg));
+}
+.module3-workspace .proposal-ai-summary,
+.module3-workspace .proposal-ai-summary__text,
+.module3-workspace .proposal-ai-summary__body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+@media (max-width: 767px) {
+  .module3-workspace,
+  .module3-admin-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+  .module3-report-hero,
+  .module3-score-wrap,
+  .module3-metrics,
+  .module3-report-grid,
+  .module3-page-heading,
+  .module3-report-heading {
+    width: 100%;
+    min-width: 0 !important;
+    max-width: 100%;
+    grid-template-columns: 1fr !important;
+  }
+  .module3-score-ring {
+    width: 120px;
+    height: 120px;
+  }
+  .module3-report-meta dl {
+    min-width: 0 !important;
+  }
+}

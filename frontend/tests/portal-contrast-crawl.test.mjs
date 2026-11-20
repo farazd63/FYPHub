@@ -213,6 +213,9 @@ test("public and portal contrast crawl runs in both themes", async (t) => {
             /add criterion/i,
             /score|evaluate|open evaluation/i,
             /view group|open group|open request/i,
+            /users|roles/i,
+            /capacity/i,
+            /proposal review/i,
           ];
           for (const pattern of subviews) {
             const btn = page.getByRole("button", { name: pattern }).first();
@@ -222,6 +225,61 @@ test("public and portal contrast crawl runs in both themes", async (t) => {
               await page.waitForTimeout(700);
               await measure(`${label} › ${pattern.source.slice(0, 40)}`);
             } catch { /* ignore unavailable */ }
+          }
+        }
+
+        if (account.role === "ADMIN" && theme === "light") {
+          await openNav();
+          for (const btn of await page.locator("nav button[aria-expanded='false']").all()) {
+            try { await btn.click({ timeout: 300 }); } catch { /* */ }
+          }
+          const usersNav = page.getByRole("button", { name: /users|roles/i }).first();
+          if (await usersNav.count()) {
+            await usersNav.click({ timeout: 800 }).catch(() => undefined);
+            await page.waitForTimeout(900);
+            const disabledCheck = await page.evaluate(() => {
+              const parseColor = (c) => {
+                if (!c || c === "transparent" || c === "rgba(0, 0, 0, 0)") return null;
+                const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+                if (!m) return null;
+                const a = m[4] === undefined ? 1 : Number(m[4]);
+                if (a < 0.05) return null;
+                return [Number(m[1]), Number(m[2]), Number(m[3]), a];
+              };
+              const lum = ([r, g, b]) => {
+                const f = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+                return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+              };
+              const blend = (fg, bg) => [0, 1, 2].map((i) => Math.round(fg[i] * fg[3] + bg[i] * (1 - fg[3])));
+              const bgOf = (el) => {
+                let n = el;
+                while (n && n !== document.documentElement) {
+                  const bg = parseColor(getComputedStyle(n).backgroundColor);
+                  if (bg && bg[3] >= 0.95) return bg.slice(0, 3);
+                  if (bg && bg[3] > 0.05) {
+                    const parent = bgOf(n.parentElement) || [255, 255, 255];
+                    return blend(bg, parent);
+                  }
+                  n = n.parentElement;
+                }
+                return [255, 255, 255];
+              };
+              const fails = [];
+              for (const el of document.querySelectorAll('button:disabled, [aria-disabled="true"]')) {
+                const text = (el.textContent || "").replace(/\s+/g, " ").trim();
+                if (!/remove access|previous|next|deactivate|activate/i.test(text)) continue;
+                const cs = getComputedStyle(el);
+                const fg = parseColor(cs.color);
+                if (!fg) continue;
+                const bg = bgOf(el);
+                const solid = fg[3] < 0.99 ? blend(fg, bg) : fg.slice(0, 3);
+                const ratio = (Math.max(lum(solid), lum(bg)) + 0.05) / (Math.min(lum(solid), lum(bg)) + 0.05);
+                if (ratio < 4.5) fails.push({ text: text.slice(0, 40), ratio: +ratio.toFixed(2), opacity: cs.opacity });
+              }
+              return fails;
+            });
+            report.push({ role: "ADMIN", theme: "light", nav: "Users & Roles › disabled", below45: disabledCheck.length, samples: disabledCheck, total: disabledCheck.length });
+            assert.equal(disabledCheck.length, 0, `light ADMIN Users disabled controls below AA\n${JSON.stringify(disabledCheck, null, 2)}`);
           }
         }
 

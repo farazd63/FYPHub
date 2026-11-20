@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PasswordField } from "./PasswordField";
 import { passwordPolicyError } from "./passwordPolicy";
 import { emailValidationMessage, normalizeEmail } from "./emailValidation";
+import { Button } from "./ui/Button";
 
 type Role = "STUDENT" | "SUPERVISOR" | "COORDINATOR" | "PANEL_MEMBER" | "ADMIN";
 type User = {
@@ -195,7 +196,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
           {notice}
         </p>
       )}
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="admin-users-layout grid min-w-0 gap-5">
         <div className="min-w-0">
           <form
             onSubmit={searchSubmit}
@@ -259,10 +260,10 @@ export function AdminUsersRoles({ api }: { api: string }) {
           )}
           {state === "ready" && Boolean(data.items.length) && (
             <div className="admin-table-scroll users-table overflow-x-auto rounded-xl border border-[#dce4de] bg-white">
-              <table className="w-full min-w-[760px] text-left text-sm">
+              <table className="users-table__grid w-full text-left text-sm">
                 <thead className="bg-[#fbfcfa] text-xs uppercase tracking-wide text-[#60716b]">
                   <tr>
-                    <th className="px-4 py-3">Account</th>
+                    <th className="users-table__account px-4 py-3">Account</th>
                     <th className="px-3 py-3">Role</th>
                     <th className="px-3 py-3">Status</th>
                     <th className="px-3 py-3">Actions</th>
@@ -271,7 +272,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                 <tbody className="divide-y divide-[#e8ede9]">
                   {data.items.map((user) => (
                     <tr key={user.id}>
-                      <td className="px-4 py-3">
+                      <td className="users-table__account px-4 py-3">
                         <p
                           className="truncate font-semibold"
                           title={user.full_name}
@@ -309,9 +310,11 @@ export function AdminUsersRoles({ api }: { api: string }) {
                         </span>
                       </td>
                       <td className="px-3 py-3">
-                        <div className="flex min-w-[11.5rem] flex-col gap-2 whitespace-nowrap">
-                        <button
+                        <div className="users-table__actions flex flex-col gap-2">
+                        <Button
                           type="button"
+                          size="sm"
+                          variant="secondary"
                           disabled={busy === user.id}
                           onClick={() =>
                             setConfirm({
@@ -320,11 +323,18 @@ export function AdminUsersRoles({ api }: { api: string }) {
                               value: String(!user.is_active),
                             })
                           }
-                          className="rounded-lg border border-[#b8cdc1] px-2.5 py-1.5 text-xs font-semibold text-[#176b66] transition duration-200 hover:bg-[#e4eee7] disabled:opacity-60"
                         >
                           {user.is_active ? "Deactivate" : "Activate"}
-                        </button>
-                        <button type="button" disabled={busy === user.id || !user.is_active} onClick={() => setConfirm({ user, type: "delete", value: "delete" })} className="rounded-lg border border-[#d38b83] px-2.5 py-1.5 text-xs font-semibold text-[#a43a33] transition duration-200 hover:bg-[#fff3f0] disabled:opacity-60">Remove access</button>
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="danger"
+                          disabled={busy === user.id || !user.is_active}
+                          onClick={() => setConfirm({ user, type: "delete", value: "delete" })}
+                        >
+                          Remove access
+                        </Button>
                         </div>
                       </td>
                     </tr>
@@ -333,26 +343,28 @@ export function AdminUsersRoles({ api }: { api: string }) {
               </table>
             </div>
           )}
-          <div className="mt-4 flex items-center justify-between text-sm">
-            <button
+          <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+            <Button
               type="button"
+              size="sm"
+              variant="secondary"
               disabled={page <= 1 || state === "loading"}
               onClick={() => setPage((value) => value - 1)}
-              className="rounded-lg border border-[#cbd6d0] px-3 py-2 disabled:opacity-50"
             >
               Previous
-            </button>
+            </Button>
             <span>Page {data.page}</span>
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant="secondary"
               disabled={
                 page * data.page_size >= data.total || state === "loading"
               }
               onClick={() => setPage((value) => value + 1)}
-              className="rounded-lg border border-[#cbd6d0] px-3 py-2 disabled:opacity-50"
             >
               Next
-            </button>
+            </Button>
           </div>
         </div>
         <form
@@ -460,22 +472,22 @@ export function AdminUsersRoles({ api }: { api: string }) {
               {confirm.type === "delete" ? `Remove portal access for ${confirm.user.full_name}? They will be signed out and unable to sign in. All previous records and audit history will be preserved.` : `${confirm.value === "true" ? "Activate" : "Deactivate"} ${confirm.user.full_name}?`}
             </p>
             <div className="mt-5 flex justify-end gap-3">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 disabled={busy !== null}
                 onClick={() => setConfirm(null)}
-                className="rounded-lg border border-[#cbd6d0] px-4 py-2 text-sm font-semibold"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant={confirm.type === "delete" ? "danger" : "primary"}
                 disabled={busy !== null}
                 onClick={() => void mutate()}
-                className="rounded-lg bg-[#176b66] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {busy ? "Saving…" : confirm.type === "delete" ? "Remove access" : "Confirm"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

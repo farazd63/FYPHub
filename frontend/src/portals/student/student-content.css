@@ -1,3 +1,4 @@
+.student-content,.student-content__inner{min-width:0;max-width:100%;overflow-x:clip}
 /* Student content presentation only. Shell geometry is owned by the shared
    PortalShell/dashboard navigation styles. */
 .student-overview,
