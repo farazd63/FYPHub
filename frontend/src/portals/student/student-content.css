@@ -4,6 +4,12 @@
 .student-overview,
 .student-phase-page { animation: student-content-enter 300ms ease-out both; }
 
+.student-overview {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .student-overview__hero {
   position: relative;
   overflow: hidden;
@@ -145,6 +151,77 @@
   overflow: hidden;
   overflow-wrap: anywhere;
 }
+
+/* Compact context cards keep the overview hierarchy clear without letting a
+   long project title make the whole row oversized. */
+.student-overview__context {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.student-overview__context .fy-stat-card {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  min-height: 104px;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 14px 16px;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgb(24 56 112 / 0.06);
+}
+
+.student-overview__context .fy-stat-card__label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-overview__context .fy-stat-card__value {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  margin-top: 7px;
+  overflow: visible;
+  color: var(--fy-text);
+  font-size: clamp(1.1rem, 1.35vw, 1.45rem);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.student-overview__context .student-stat-value-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+@media (max-width: 767px) {
+  .student-overview__context {
+    grid-template-columns: 1fr;
+  }
+
+  .student-overview__context .fy-stat-card {
+    min-height: 96px;
+    padding: 14px 15px;
+  }
+
+  .student-overview__context .fy-stat-card__value {
+    font-size: 1.2rem;
+  }
+}
+
 .student-page-heading p:last-child { max-width: 700px; margin: 9px 0 0; color: var(--fy-text-secondary); line-height: 1.55; }
 
 .student-placeholder {

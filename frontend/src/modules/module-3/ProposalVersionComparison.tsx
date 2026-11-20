@@ -52,7 +52,7 @@ export function ProposalVersionComparison({ api, submissionId }: { api: string; 
       const response = await fetch(`${api}/api/v1/proposal-compliance/submissions/${submissionId}/comparison`, { credentials: "include" });
       const payload = await response.json().catch(() => ({})) as { status?: string; message?: string; comparison?: Comparison | null; detail?: string | { message?: string } };
       if (!response.ok) throw new Error(typeof payload.detail === "object" ? payload.detail.message : payload.detail || "Version comparison could not be loaded.");
-      if (payload.status === "NO_PREVIOUS_VERSION" || !payload.comparison) { setComparison(null); setMessage(payload.message || "No previous version available for comparison."); return; }
+      if (payload.status === "NO_PREVIOUS_VERSION" || !payload.comparison) { setComparison(null); setMessage("No previous audited version is linked to this proposal yet. Use ‘Resubmit new version’ to create Version 2 for comparison."); return; }
       setComparison(payload.comparison);
       if (!payload.comparison.aiSummary) {
         setSummaryLoading(true);

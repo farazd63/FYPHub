@@ -26,6 +26,12 @@ type Preview = { url: string; title: string; pageCount: number; error?: string }
 
 const emptyFilters: Filters = { search: "", section: "", status: "", student: "", requirement: "", date_from: "", date_to: "" };
 const statuses = ["NOT_SUBMITTED", "DRAFT", "SUBMITTED", "UNDER_REVIEW", "CHANGES_REQUESTED", "ACCEPTED", "REJECTED", "CLOSED"];
+const fileFormatOptions = [
+  { value: "pdf", label: "PDF" }, { value: "doc", label: "DOC" }, { value: "docx", label: "DOCX" }, { value: "txt", label: "TXT" },
+  { value: "ppt", label: "PPT" }, { value: "pptx", label: "PPTX" }, { value: "zip", label: "ZIP" },
+  { value: "mp3", label: "MP3 audio" }, { value: "wav", label: "WAV audio" }, { value: "m4a", label: "M4A audio" }, { value: "ogg", label: "OGG audio" },
+  { value: "mp4", label: "MP4 video" }, { value: "mov", label: "MOV video" }, { value: "avi", label: "AVI video" }, { value: "mkv", label: "MKV video" }, { value: "webm", label: "WEBM video" },
+];
 
 const FIELD_MESSAGES: Record<string, Record<string, string>> = {
   max_file_size_mb: {
@@ -99,7 +105,7 @@ export function AdminDocumentArchive({ api }: { api: string }) {
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
   const [module, setModule] = useState("General");
-  const [format, setFormat] = useState("pdf");
+  const [formats, setFormats] = useState<string[]>(["pdf"]);
   const [maxSize, setMaxSize] = useState("10");
   const [required, setRequired] = useState(true);
 
@@ -209,11 +215,11 @@ export function AdminDocumentArchive({ api }: { api: string }) {
   };
 
   const createRequirement = async (publish: boolean) => {
-    if (selectedCycleId === null || !title.trim() || !deadline) { setNotice("Select a cycle and provide a title and deadline."); return; }
+    if (selectedCycleId === null || !title.trim() || !deadline || !formats.length) { setNotice("Select a cycle, provide a title and deadline, and choose at least one file format."); return; }
     setBusy("create"); setNotice("");
     try {
       const response = await fetch(`${api}/api/v1/document-requirements`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-        title: title.trim(), description: description.trim() || null, academic_cycle_id: selectedCycleId, module: module.trim() || "General", allowed_file_types: [format], max_file_size_mb: Number(maxSize), is_required: required, due_at: new Date(deadline).toISOString(),
+        title: title.trim(), description: description.trim() || null, academic_cycle_id: selectedCycleId, module: module.trim() || "General", allowed_file_types: formats, max_file_size_mb: Number(maxSize), is_required: required, due_at: new Date(deadline).toISOString(),
       }) });
       const body = await readJson(response);
       if (!response.ok) throw new Error(errorText(body, "The requirement could not be created."));
@@ -221,7 +227,7 @@ export function AdminDocumentArchive({ api }: { api: string }) {
         const publishResponse = await fetch(`${api}/api/v1/document-requirements/${(body as { id: number }).id}/publish`, { method: "POST", credentials: "include" });
         if (!publishResponse.ok) throw new Error(errorText(await readJson(publishResponse), "The requirement was created but could not be published."));
       }
-      setTitle(""); setDescription(""); setDeadline(""); setNotice(publish ? "Requirement published." : "Requirement saved as draft.");
+      setTitle(""); setDescription(""); setDeadline(""); setFormats(["pdf"]); setNotice(publish ? "Requirement published." : "Requirement saved as draft.");
       await loadCycles(); await loadGroups(selectedCycleId);
       if (selectedGroupId !== null) await loadArchive(selectedCycleId, selectedGroupId, appliedFilters);
     } catch (error) { setNotice(error instanceof Error ? error.message : "The requirement could not be created."); }
@@ -236,7 +242,7 @@ export function AdminDocumentArchive({ api }: { api: string }) {
     {cycleState === "ready" && selectedCycleId === null && <div className="mt-6 rounded-xl border border-dashed border-fy-border bg-fy-surface p-8 text-center text-sm text-fy-text-secondary">Select an academic cycle to view only its groups and document archive.</div>}
     {selectedCycle && <>
       <section className="mt-6 rounded-xl border border-fy-border bg-fy-surface p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-fy-text-secondary">Selected cycle</p><h2 className="text-xl font-bold text-fy-text">{selectedCycle.display_name || selectedCycle.name}</h2><p className="text-sm text-fy-text-secondary">{selectedCycle.code}</p></div><button type="button" onClick={() => setShowCreate((value) => !value)} className="rounded-lg border border-fy-brand px-3 py-2 text-sm font-semibold text-fy-brand">{showCreate ? "Hide requirement form" : "Create requirement"}</button></div>
-        {showCreate && <div className="mt-5 grid gap-4 border-t pt-5"><h3 className="text-lg font-semibold">Create requirement for this cycle</h3><label className="grid gap-1 text-sm">Requirement name<input value={title} onChange={(event) => setTitle(event.target.value)} className="rounded border p-3" /></label><label className="grid gap-1 text-sm">Requirement section<input value={module} onChange={(event) => setModule(event.target.value)} className="rounded border p-3" /></label><label className="grid gap-1 text-sm">Instructions<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="rounded border p-3" /></label><label className="grid gap-1 text-sm">Deadline<input type="datetime-local" value={deadline} onChange={(event) => setDeadline(event.target.value)} className="rounded border p-3" /></label><div className="grid gap-3 sm:grid-cols-3"><label className="grid gap-1 text-sm">File format<select value={format} onChange={(event) => setFormat(event.target.value)} className="rounded border p-3"><option value="pdf">PDF</option><option value="doc">DOC</option><option value="docx">DOCX</option><option value="txt">TXT</option><option value="zip">ZIP</option></select></label><label className="grid gap-1 text-sm">Max size (MB)<input type="number" min="1" max="100" value={maxSize} onChange={(event) => setMaxSize(event.target.value)} className="rounded border p-3" /></label><label className="flex items-center gap-2 pt-6 text-sm"><input type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} /> Required</label></div><div className="flex flex-wrap gap-2"><button type="button" disabled={busy !== null} onClick={() => void createRequirement(false)} className="fy-btn fy-btn--primary">Save draft</button><button type="button" disabled={busy !== null} onClick={() => void createRequirement(true)} className="fy-btn fy-btn--primary">Publish requirement</button></div></div>}
+        {showCreate && <div className="mt-5 grid gap-4 border-t pt-5"><h3 className="text-lg font-semibold">Create requirement for this cycle</h3><label className="grid gap-1 text-sm">Requirement name<input value={title} onChange={(event) => setTitle(event.target.value)} className="rounded border p-3" /></label><label className="grid gap-1 text-sm">Requirement section<input value={module} onChange={(event) => setModule(event.target.value)} className="rounded border p-3" /></label><label className="grid gap-1 text-sm">Instructions<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="rounded border p-3" /></label><label className="grid gap-1 text-sm">Deadline<input type="datetime-local" value={deadline} onChange={(event) => setDeadline(event.target.value)} className="rounded border p-3" /></label><div className="grid gap-3 sm:grid-cols-3"><div className="grid gap-2 text-sm sm:col-span-2"><span>Allowed file formats</span><div className="flex flex-wrap gap-2">{fileFormatOptions.map((option) => <label key={option.value} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-fy-border bg-fy-surface px-3 py-2 font-normal"><input type="checkbox" checked={formats.includes(option.value)} onChange={(event) => setFormats((current) => event.target.checked ? [...current, option.value] : current.filter((item) => item !== option.value))} />{option.label}</label>)}</div><span className="text-xs font-normal text-fy-text-secondary">Students may upload any selected format.</span></div><label className="grid gap-1 text-sm">Max size (MB)<input type="number" min="1" max="100" value={maxSize} onChange={(event) => setMaxSize(event.target.value)} className="rounded border p-3" /></label><label className="flex items-center gap-2 pt-6 text-sm"><input type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} /> Required</label></div><div className="flex flex-wrap gap-2"><button type="button" disabled={busy !== null} onClick={() => void createRequirement(false)} className="fy-btn fy-btn--primary">Save draft</button><button type="button" disabled={busy !== null} onClick={() => void createRequirement(true)} className="fy-btn fy-btn--primary">Publish requirement</button></div></div>}
       </section>
       {groupState === "loading" && <p className="mt-6 rounded-xl border bg-fy-surface p-5 text-sm">Loading groups for {selectedCycle.display_name || selectedCycle.name}...</p>}
       {groupState === "error" && <p role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">Groups could not be loaded.</p>}

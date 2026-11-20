@@ -247,7 +247,7 @@ def _validate(req, upload, data):
     if upload.content_type != MIMES[suffix]: raise HTTPException(422, "File MIME type does not match the extension.")
     if not data or len(data) > req.max_file_size_mb * 1024 * 1024: raise HTTPException(413, "File is empty or exceeds the configured size limit.")
     signatures = {key: False for key in MIMES}
-    signatures.update({"pdf": data.startswith(b"%PDF-"), "doc": data.startswith(bytes.fromhex("D0CF11E0A1B11AE1")), "txt": True, "md": True, "tex": True, "csv": True, "svg": data.lstrip().startswith(b"<svg"), "jpg": data.startswith(b"\xff\xd8\xff"), "jpeg": data.startswith(b"\xff\xd8\xff"), "png": data.startswith(b"\x89PNG\r\n\x1a\n"), "gif": data.startswith((b"GIF87a", b"GIF89a")), "webp": data.startswith(b"RIFF") and data[8:12] == b"WEBP", "zip": data.startswith(b"PK"), "rar": data.startswith(b"Rar!\x1a\x07"), "7z": data.startswith(b"7z\xbc\xaf\x27\x1c")})
+    signatures.update({"pdf": data.startswith(b"%PDF-"), "doc": data.startswith(bytes.fromhex("D0CF11E0A1B11AE1")), "ppt": data.startswith(bytes.fromhex("D0CF11E0A1B11AE1")), "txt": True, "md": True, "tex": True, "csv": True, "svg": data.lstrip().startswith(b"<svg"), "jpg": data.startswith(b"\xff\xd8\xff"), "jpeg": data.startswith(b"\xff\xd8\xff"), "png": data.startswith(b"\x89PNG\r\n\x1a\n"), "gif": data.startswith((b"GIF87a", b"GIF89a")), "webp": data.startswith(b"RIFF") and data[8:12] == b"WEBP", "zip": data.startswith(b"PK"), "rar": data.startswith(b"Rar!\x1a\x07"), "7z": data.startswith(b"7z\xbc\xaf\x27\x1c"), "mp3": data.startswith(b"ID3") or (len(data) > 1 and data[0] == 0xFF and (data[1] & 0xE0) == 0xE0)})
     if suffix == "docx":
         try: signatures["docx"] = data.startswith(b"PK") and "[Content_Types].xml" in ZipFile(BytesIO(data)).namelist()
         except BadZipFile: signatures["docx"] = False
@@ -260,6 +260,7 @@ def _validate(req, upload, data):
     signatures["ogg"] = data.startswith(b"OggS")
     signatures["avi"] = data.startswith(b"RIFF") and data[8:12] == b"AVI "
     signatures["mkv"] = data.startswith(b"\x1a\x45\xdf\xa3")
+    signatures["webm"] = signatures["mkv"]
     if not signatures[suffix]: raise HTTPException(422, "File signature is invalid.")
     return suffix
 

@@ -50,19 +50,26 @@ main:has(.admin-sidebar) > header > div:first-child { gap: 16px; }
 .admin-menu svg { width: 22px; height: 22px; }
 .admin-menu:hover { background: #eef2ff; }
 
+.fyp-hub-brand,
 .student-brand,
 main:has(.admin-sidebar) .admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
   color: var(--dash-ink);
   font-size: 17px;
   font-weight: 650;
   letter-spacing: -0.02em;
 }
 
+.fyp-hub-brand svg,
 .student-brand svg,
 main:has(.admin-sidebar) .admin-brand svg {
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
+  color: var(--fy-brand, var(--dash-blue));
 }
 
 .student-role,
