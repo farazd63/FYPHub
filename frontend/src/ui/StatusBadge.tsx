@@ -12,6 +12,10 @@ const STATUS_LABELS = {
   DRAFT: "Draft",
   OPEN: "Open",
   CLOSED: "Closed",
+  UNDER_REVIEW: "Under review",
+  UPLOADED: "Submitted",
+  RESUBMISSION_REQUIRED: "Changes requested",
+  INACTIVE: "Inactive",
 } as const;
 
 export type StatusBadgeValue = keyof typeof STATUS_LABELS;
@@ -32,6 +36,10 @@ const STATUS_TONE: Partial<Record<StatusBadgeValue, StatusTone>> = {
   DRAFT: "neutral",
   OPEN: "success",
   CLOSED: "neutral",
+  UNDER_REVIEW: "warning",
+  UPLOADED: "info",
+  RESUBMISSION_REQUIRED: "warning",
+  INACTIVE: "neutral",
 };
 
 type StatusBadgeProps = {

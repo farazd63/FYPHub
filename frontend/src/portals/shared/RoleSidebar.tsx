@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import "./role-sidebar.css";
 
@@ -83,7 +84,7 @@ export function RoleSidebar({ ariaLabel, workspaceLabel, items, active, collapse
     <aside className={`student-sidebar role-sidebar ${className} ${mobileOpen ? "student-sidebar--open" : ""} ${collapsed ? "student-sidebar--collapsed" : ""}`}>
       <div className="student-sidebar__mobile-head">
         <span className="student-sidebar__section-label">{workspaceLabel}</span>
-        <button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onClose}>×</button>
+        <button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onClose}><X strokeWidth={1.75} size={18} aria-hidden /></button>
       </div>
       <button type="button" className="student-sidebar__collapse" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={onToggle}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={collapsed ? "m9 6 6 6-6 6" : "m15 6-6 6 6 6"}/></svg>
@@ -95,7 +96,7 @@ export function RoleSidebar({ ariaLabel, workspaceLabel, items, active, collapse
           return <div className="role-sidebar__section" key={section || "ungrouped"}>
             {section && <button type="button" className="role-sidebar__section-heading" aria-expanded={open} onClick={() => toggleSection(section)}>
               <span className="role-sidebar__section-title">{section}</span>
-              <span className="role-sidebar__section-chevron" aria-hidden="true">{open ? "⌄" : "›"}</span>
+              <span className="role-sidebar__section-chevron" aria-hidden="true">{open ? <ChevronDown strokeWidth={1.75} size={16} /> : <ChevronRight strokeWidth={1.75} size={16} />}</span>
             </button>}
             {open && sectionItems.map((item) => <button key={item.id} type="button" className="student-sidebar__item" disabled={item.disabled} aria-current={active === item.id ? "page" : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={() => { onSelect(item.id); onClose(); }}>
               <span className="student-sidebar__icon" aria-hidden="true">{item.icon}</span>

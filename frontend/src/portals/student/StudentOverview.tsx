@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PageHeader, StatCard } from "../../ui";
 
 type Notification = {
   id: number;
@@ -43,11 +44,11 @@ export function StudentOverview({ api }: Props) {
   useEffect(() => { const controller = new AbortController(); void fetch(`${api}/api/v1/student/group/me`, { credentials: "include", signal: controller.signal }).then((response) => response.ok ? response.json() as Promise<Group> : Promise.reject(new Error())).then((value) => { if (!controller.signal.aborted) setGroup(value); }).catch(() => undefined); return () => controller.abort(); }, [api]);
 
   return <section className="student-overview" aria-labelledby="student-overview-heading">
-    <header className="student-overview__hero"><p className="student-overview__eyebrow">Student workspace</p><h1 id="student-overview-heading">Your FYP workspace</h1><p>Important updates for your group appear here.</p></header>
-    {group && <section className="student-overview__summary" aria-label="Group project overview"><div><strong>{group.project?.title || group.group_name}</strong><span>project</span></div><div><strong>{group.supervisor?.name || "Pending"}</strong><span>supervisor</span></div><div><strong>{group.academic_cycle || "Not set"}</strong><span>academic cycle</span></div></section>}
-    {state === "loading" && <p className="mt-6 text-sm text-slate-600">Loading notifications…</p>}
-    {state === "error" && <p role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Notifications could not be loaded.</p>}
-    {state === "ready" && notifications.length > 0 && <section className="mt-6 rounded-2xl border border-[#dce4de] bg-white p-6" aria-labelledby="student-notifications-heading"><div className="flex items-center justify-between gap-3"><h2 id="student-notifications-heading" className="text-xl font-semibold">Notifications</h2><span className="text-sm text-slate-500">{notifications.length}</span></div><div className="mt-4 grid gap-3">{notifications.map((notification) => <article key={notification.id} className={`rounded-xl border p-4 ${notification.read_at ? "border-[#e3e8e5]" : "border-[#b9ddc8] bg-[#f4fbf6]"}`}><div className="flex flex-wrap items-start justify-between gap-3"><p className="font-semibold">{notificationText(notification)}</p>{!notification.read_at && <span className="rounded-full bg-[#176B66] px-2.5 py-1 text-xs font-semibold text-white">New</span>}</div><time className="mt-1 block text-xs text-slate-500">{new Date(notification.created_at).toLocaleString()}</time></article>)}</div></section>}
+    <PageHeader className="student-overview__hero" eyebrow="Student workspace" title="Your FYP workspace" description="Important updates for your group appear here." />
+    {group && <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Group project overview"><StatCard label="Project" value={group.project?.title || group.group_name} hint="project" /><StatCard label="Supervisor" value={group.supervisor?.name || "Pending"} hint="supervisor" /><StatCard label="Academic cycle" value={group.academic_cycle || "Not set"} hint="academic cycle" /></section>}
+    {state === "loading" && <p className="mt-6 text-sm text-fy-text-secondary">Loading notifications…</p>}
+    {state === "error" && <p role="alert" className="mt-6 rounded-xl border border-fy-danger bg-fy-danger-soft p-4 text-sm text-fy-danger">Notifications could not be loaded.</p>}
+    {state === "ready" && notifications.length > 0 && <section className="mt-6 rounded-2xl border border-fy-border bg-fy-surface p-6" aria-labelledby="student-notifications-heading"><div className="flex items-center justify-between gap-3"><h2 id="student-notifications-heading" className="text-xl font-semibold">Notifications</h2><span className="text-sm text-fy-text-secondary">{notifications.length}</span></div><div className="mt-4 grid gap-3">{notifications.map((notification) => <article key={notification.id} className={`rounded-xl border border-fy-border p-4 ${notification.read_at ? "bg-fy-surface" : "bg-fy-success-soft"}`}><div className="flex flex-wrap items-start justify-between gap-3"><p className="font-semibold">{notificationText(notification)}</p>{!notification.read_at && <span className="fy-status-badge fy-status-badge--brand">New</span>}</div><time className="mt-1 block text-xs text-fy-text-secondary">{new Date(notification.created_at).toLocaleString()}</time></article>)}</div></section>}
   </section>;
 }
 

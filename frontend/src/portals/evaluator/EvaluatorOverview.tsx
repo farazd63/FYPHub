@@ -1,3 +1,5 @@
+import { PageHeader } from "../../ui";
+
 type FeatureKey = "queue" | "proposal" | "schedule" | "criteria" | "scoring" | "history";
 type EvaluatorOverviewProps = { onSelect: (key: FeatureKey) => void };
 
@@ -13,11 +15,12 @@ const cards: Array<{ key: FeatureKey; title: string; summary: string; status: st
 export function EvaluatorOverview({ onSelect }: EvaluatorOverviewProps) {
   return (
     <section className="student-overview evaluator-overview" aria-labelledby="evaluator-overview-heading">
-      <header className="student-overview__hero">
-        <p className="student-overview__eyebrow">Evaluator workspace</p>
-        <h1 id="evaluator-overview-heading">Evaluation workspace</h1>
-        <p>Review assigned project work, configured criteria, and evaluation history when the corresponding authorized workflows are available.</p>
-      </header>
+      <PageHeader
+        className="student-overview__hero"
+        eyebrow="Evaluator workspace"
+        title="Evaluation workspace"
+        description="Review assigned project work, configured criteria, and evaluation history when the corresponding authorized workflows are available."
+      />
       <div className="student-overview__summary" aria-label="Evaluator workspace summary">
         <div><strong>0</strong><span>assigned evaluations</span></div>
         <div><strong>0</strong><span>pending actions</span></div>
