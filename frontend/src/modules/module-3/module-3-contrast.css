@@ -16,3 +16,16 @@
 .student-shell .module3-friendly-report .module3-final-panel small {
   color: #536a89 !important;
 }
+
+/* The priority cards also sit inside the dark-themed module workspace. Keep
+   their direct text nodes dark even when a broader workspace rule wins. */
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row > div,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row > div > strong {
+  color: #111827 !important;
+  opacity: 1 !important;
+}
+
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row > div > p {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
