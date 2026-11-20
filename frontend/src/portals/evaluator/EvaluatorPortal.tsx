@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { EvaluatorOverview } from "./EvaluatorOverview";
 import { EvaluatorSidebar } from "./EvaluatorSidebar";
 import { FypHubBrand } from "../shared/FypHubBrand";
+import { ThemeToggle } from "../../ui/ThemeToggle";
 import "../student/student.css";
 import "./evaluator.css";
 
@@ -36,7 +37,7 @@ export function EvaluatorPortal({ user, onLogout }: Props) {
           <FypHubBrand className="student-brand" />
           <span className="student-role">Evaluator</span>
         </div>
-        <div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name">{user.full_name}</span><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div>
+        <div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name">{user.full_name}</span><ThemeToggle /><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div>
       </header>
       <div className="student-body">
         <EvaluatorSidebar active={active} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={setActive} onToggle={() => setCollapsed((value) => !value)} onClose={() => setMobileOpen(false)} />

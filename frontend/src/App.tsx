@@ -11,6 +11,7 @@ import { SupervisorPortal } from "./portals/supervisor/SupervisorPortal";
 import { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";
 import { StudentEvaluatorPortal as EvaluatorPortal } from "./portals/student/modules/StudentEvaluatorPortal";
 import authHeroImage from "./assets/fyphub-auth-hero.jpg";
+import { ThemeToggle } from "./ui/ThemeToggle";
 import "./auth.css";
 
 type Member = { id: string; full_name: string; email: string; registration: string };
@@ -149,7 +150,10 @@ function AuthLayout({ children, actions, compact = false }: { children: ReactNod
             <div className="auth-card__shine" aria-hidden="true" />
             <header className={`auth-card__header ${actions ? "auth-card__header--actions" : ""}`}>
               <div className="auth-card__mobile-brand"><Logo authMobile /></div>
-              {actions && <div className="auth-card__actions">{actions}</div>}
+              <div className="auth-card__actions auth-card__actions--tools">
+                {actions}
+                <ThemeToggle />
+              </div>
             </header>
             <div className="auth-card__body">{children}</div>
           </section>

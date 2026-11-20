@@ -2,10 +2,19 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-sans/700.css";
 import App from "./App";
+import { ThemeProvider } from "./ui/theme";
 import "./index.css";
 import "./dashboard-theme.css";
 import "./design-system.css";
+import "./ui/ui.css";
 import "./portals/shared/portal-dark.css";
-createRoot(document.getElementById("root")!).render(<StrictMode><App /></StrictMode>);
 
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  </StrictMode>,
+);

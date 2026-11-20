@@ -1,40 +1,40 @@
 @import "tailwindcss";
 
-/* Phase 1 — Tailwind theme tokens (mapped to --fy-* in design-system.css) */
-@theme {
-  --color-fy-page: #0c0e12;
-  --color-fy-surface: #151922;
-  --color-fy-surface-muted: #1c222e;
-  --color-fy-border: #2a3140;
-  --color-fy-text: #f4f6fa;
-  --color-fy-text-secondary: #c4ccd9;
-  --color-fy-brand: #e0a85c;
-  --color-fy-brand-hover: #f0bc74;
-  --color-fy-brand-soft: #2a2116;
-  --color-fy-success: #3dba7a;
-  --color-fy-success-soft: #132a1c;
-  --color-fy-warning: #e0a85c;
-  --color-fy-warning-soft: #2a2116;
-  --color-fy-danger: #f07178;
-  --color-fy-danger-soft: #2a1518;
-  --color-fy-info: #7eb8c9;
-  --color-fy-info-soft: #152228;
-  --font-fy: "IBM Plex Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-  --radius-fy-control: 0.5rem;
-  --radius-fy-card: 0.75rem;
-  --shadow-fy: 0 1px 0 rgb(255 255 255 / 0.04), 0 18px 40px rgb(0 0 0 / 0.35);
+/* Tailwind colour utilities resolve to live --fy-* theme tokens */
+@theme inline {
+  --color-fy-page: var(--fy-page);
+  --color-fy-surface: var(--fy-surface);
+  --color-fy-surface-muted: var(--fy-surface-muted);
+  --color-fy-border: var(--fy-border);
+  --color-fy-text: var(--fy-text);
+  --color-fy-text-secondary: var(--fy-text-secondary);
+  --color-fy-brand: var(--fy-brand);
+  --color-fy-brand-hover: var(--fy-brand-hover);
+  --color-fy-brand-soft: var(--fy-brand-soft);
+  --color-fy-success: var(--fy-success);
+  --color-fy-success-soft: var(--fy-success-soft);
+  --color-fy-warning: var(--fy-warning);
+  --color-fy-warning-soft: var(--fy-warning-soft);
+  --color-fy-danger: var(--fy-danger);
+  --color-fy-danger-soft: var(--fy-danger-soft);
+  --color-fy-info: var(--fy-info);
+  --color-fy-info-soft: var(--fy-info-soft);
+  --font-fy: var(--fy-font);
+  --radius-fy-control: var(--fy-radius-control);
+  --radius-fy-card: var(--fy-radius-card);
+  --shadow-fy: var(--fy-shadow);
 }
 
 :root {
-  --app-primary: var(--fy-brand, #e0a85c);
-  --app-primary-hover: var(--fy-brand-hover, #f0bc74);
-  --app-selected: var(--fy-brand-soft, #2a2116);
-  --app-text: var(--fy-text, #eceef2);
-  --app-muted: var(--fy-text-secondary, #9aa3b5);
-  --app-page: var(--fy-page, #0c0e12);
-  --app-surface: var(--fy-surface, #151922);
-  --app-border: var(--fy-border, #2a3140);
-  font-family: var(--fy-font, "IBM Plex Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif);
+  --app-primary: var(--fy-brand);
+  --app-primary-hover: var(--fy-brand-hover);
+  --app-selected: var(--fy-brand-soft);
+  --app-text: var(--fy-text);
+  --app-muted: var(--fy-text-secondary);
+  --app-page: var(--fy-page);
+  --app-surface: var(--fy-surface);
+  --app-border: var(--fy-border);
+  font-family: var(--fy-font);
   color: var(--app-text);
   background: var(--app-page);
 }
@@ -45,7 +45,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgb(224 168 92 / 0.38);
+  box-shadow: var(--fy-focus-ring);
 }
 
 /* Keep dashboard headers focused on the feature itself; role/section eyebrow labels are intentionally omitted. */
