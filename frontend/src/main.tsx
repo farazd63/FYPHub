@@ -10,6 +10,7 @@ import "./dashboard-theme.css";
 import "./design-system.css";
 import "./ui/ui.css";
 import "./portals/shared/portal-dark.css";
+import "./modules/module-3/module-3-contrast.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

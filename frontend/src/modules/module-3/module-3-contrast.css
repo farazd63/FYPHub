@@ -1,0 +1,18 @@
+/* Keep text readable when the student portal dark theme wraps white report cards. */
+.student-shell .module3-friendly-report .module3-report-stats > div strong,
+.student-shell .module3-friendly-report .module3-priority-row strong,
+.student-shell .module3-friendly-report .module3-passed-list strong,
+.student-shell .module3-friendly-report .module3-evidence-panel strong,
+.student-shell .module3-friendly-report .module3-final-panel strong {
+  color: #19304f !important;
+}
+
+.student-shell .module3-friendly-report .module3-report-stats > div span,
+.student-shell .module3-friendly-report .module3-priority-row p,
+.student-shell .module3-friendly-report .module3-passed-list small,
+.student-shell .module3-friendly-report .module3-evidence-panel p,
+.student-shell .module3-friendly-report .module3-evidence-panel small,
+.student-shell .module3-friendly-report .module3-final-panel span,
+.student-shell .module3-friendly-report .module3-final-panel small {
+  color: #536a89 !important;
+}
