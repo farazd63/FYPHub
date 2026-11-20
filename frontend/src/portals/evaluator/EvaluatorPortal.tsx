@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { EvaluatorOverview } from "./EvaluatorOverview";
 import { EvaluatorSidebar } from "./EvaluatorSidebar";
 import { FypHubBrand } from "../shared/FypHubBrand";
+import { Menu } from "lucide-react";
 import { ThemeToggle } from "../../ui/ThemeToggle";
 import "../student/student.css";
 import "./evaluator.css";
@@ -33,7 +34,7 @@ export function EvaluatorPortal({ user, onLogout }: Props) {
     <main className="student-shell evaluator-shell">
       <header className="student-header">
         <div className="student-header__left">
-          <button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>☰</button>
+          <button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}><Menu aria-hidden="true" strokeWidth={1.75} size={20} /></button>
           <FypHubBrand className="student-brand" />
           <span className="student-role">Evaluator</span>
         </div>

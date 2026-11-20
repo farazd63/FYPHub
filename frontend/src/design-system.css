@@ -211,14 +211,24 @@ main:has(.admin-sidebar) {
 }
 
 /* App shell: dark top bar + gold accents. */
+/* Floating top bar — inset rounded surface (all portals) */
 .student-header,
 .portal-header,
 .admin-shell > header,
+.admin-shell__header,
 main:has(.admin-sidebar) > header {
+  position: sticky !important;
+  top: var(--fy-shell-inset) !important;
+  z-index: 50;
+  width: auto !important;
+  max-width: none;
+  margin: var(--fy-shell-inset) var(--fy-shell-inset) 0 !important;
+  border: 1px solid var(--fy-border) !important;
+  border-radius: var(--fy-radius-nav) !important;
   background: var(--fy-surface) !important;
-  border-bottom: 1px solid var(--fy-border);
   color: var(--fy-text);
-  box-shadow: var(--fy-shadow-sm);
+  box-shadow: var(--fy-shadow-nav) !important;
+  backdrop-filter: blur(12px);
 }
 .student-header .student-brand,
 .student-header .student-account__name,
