@@ -54,8 +54,8 @@ export function ProposalAiSummary(props: ProposalAiSummaryProps) {
     return () => window.clearTimeout(timer);
   }, [generate, autoGenerate]);
 
-  return <section className="rounded-xl border p-4 my-4" aria-label="Report summary">
-    <h3>Report summary</h3>
-    {busy ? <p role="status">Summarizing the report...</p> : result?.status === "COMPLETED" && result.summary ? <p className="whitespace-pre-wrap">{result.summary}</p> : <><p role="status">{error || result?.message || "Generate a concise summary from the report content."}</p><button type="button" onClick={() => void generate()}>{result || error ? "Retry report summary" : "Generate report summary"}</button></>}
+  return <section className="proposal-ai-summary fy-card fy-card--pad-md" aria-label="Report summary">
+    <h3 className="proposal-ai-summary__title">Report summary</h3>
+    {busy ? <p className="proposal-ai-summary__body" role="status">Summarizing the report...</p> : result?.status === "COMPLETED" && result.summary ? <p className="proposal-ai-summary__body proposal-ai-summary__text">{result.summary}</p> : <><p className="proposal-ai-summary__body" role="status">{error || result?.message || "Generate a concise summary from the report content."}</p><button type="button" className="fy-btn fy-btn--secondary fy-btn--sm" onClick={() => void generate()}>{result || error ? "Retry report summary" : "Generate report summary"}</button></>}
   </section>;
 }

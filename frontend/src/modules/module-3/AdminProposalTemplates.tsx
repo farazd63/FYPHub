@@ -126,7 +126,7 @@ export function AdminProposalTemplates({ api }: { api: string }) {
 
   const visibleOptionalRules = optionalRules.filter(([key]) => key in draftRules);
   return <section className="module3-admin-page" aria-labelledby="module3-templates-heading">
-    <div className="module3-page-heading"><h1 id="module3-templates-heading">Proposal Templates</h1><p>Upload the official university PDF or DOCX. Rules are measured from that file only; unclear values remain Not detected.</p></div>
+    <div className="module3-page-heading module3-admin-page-heading"><div><h1 id="module3-templates-heading">Proposal Templates</h1><p>Upload the official university PDF or DOCX. Rules are measured from that file only; unclear values remain Not detected.</p></div></div>
     {message && <p className="module3-alert module3-alert--success" role="status">{message}</p>}
     {error && <p className="module3-alert module3-alert--error" role="alert">{error}</p>}
     <div className="module3-admin-grid">

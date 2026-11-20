@@ -646,11 +646,14 @@ html[data-theme="light"] .auth-stage__brand {
   min-height: 100%;
   height: 100%;
   overflow: hidden;
-  background:
+  /* Solid base so contrast audits resolve white text against brand blue */
+  background-color: var(--fy-brand);
+  background-image:
     radial-gradient(ellipse 70% 55% at 18% 12%, rgb(255 255 255 / 0.22), transparent 55%),
     radial-gradient(ellipse 50% 45% at 92% 88%, rgb(10 20 80 / 0.35), transparent 60%),
     linear-gradient(148deg, #3a54ff 0%, #243ffa 42%, #1528c4 78%, #0f1f8a 100%);
   border-right: 0;
+  color: var(--fy-text-inverse);
 }
 
 html[data-theme="light"] .auth-stage__orb {
@@ -850,7 +853,8 @@ html[data-theme="light"] .auth-card button[type="submit"],
 html[data-theme="light"] .auth-card button.auth-primary {
   margin-top: 0.35rem;
   min-height: 3.05rem;
-  background: linear-gradient(180deg, #3a54ff 0%, var(--fy-brand) 100%);
+  background-color: var(--fy-brand);
+  background-image: linear-gradient(180deg, #3a54ff 0%, var(--fy-brand) 100%);
   color: var(--fy-text-on-brand);
   border-radius: var(--fy-radius-control);
   box-shadow:

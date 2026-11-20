@@ -461,6 +461,9 @@ html[data-theme="dark"] {
 .module3-live-dot,
 .module3-count,
 .module3-category-icon {
+  display: inline-grid !important;
+  place-items: center !important;
+  line-height: 1 !important;
   background: var(--fy-surface-muted) !important;
   color: var(--fy-brand) !important;
 }
@@ -524,32 +527,36 @@ html[data-theme="dark"] {
 
 .module3-status-pill--pass,
 .module3-status-pill--compliant,
-.module3-metric-icon--pass {
-  background: var(--fy-success-soft) !important;
-  border-color: color-mix(in srgb, var(--fy-success) 35%, var(--fy-border)) !important;
-  color: var(--fy-success) !important;
+.module3-metric-icon--pass,
+.module3-live-dot {
+  background: var(--fy-badge-success-bg) !important;
+  border-color: color-mix(in srgb, var(--fy-badge-success-fg) 35%, var(--fy-border)) !important;
+  color: var(--fy-badge-success-fg) !important;
 }
 .module3-status-pill--fail,
 .module3-status-pill--not-compliant,
 .module3-metric-icon--fail {
-  background: var(--fy-danger-soft) !important;
-  border-color: color-mix(in srgb, var(--fy-danger) 35%, var(--fy-border)) !important;
-  color: var(--fy-danger) !important;
+  background: var(--fy-badge-danger-bg) !important;
+  border-color: color-mix(in srgb, var(--fy-badge-danger-fg) 35%, var(--fy-border)) !important;
+  color: var(--fy-badge-danger-fg) !important;
 }
 .module3-status-pill--partial,
 .module3-status-pill--review-required,
 .module3-metric-icon--partial {
-  background: var(--fy-warning-soft) !important;
-  border-color: color-mix(in srgb, var(--fy-warning) 35%, var(--fy-border)) !important;
-  color: var(--fy-warning) !important;
+  background: var(--fy-badge-warning-bg) !important;
+  border-color: color-mix(in srgb, var(--fy-badge-warning-fg) 35%, var(--fy-border)) !important;
+  color: var(--fy-badge-warning-fg) !important;
 }
 .module3-status-pill--muted,
 .module3-status-pill--unverifiable,
 .module3-status-pill--review,
 .module3-metric-icon--total {
-  background: var(--fy-surface-muted) !important;
-  border-color: var(--fy-border) !important;
-  color: var(--fy-text-secondary) !important;
+  background: var(--fy-badge-neutral-bg) !important;
+  border-color: var(--fy-disabled-border) !important;
+  color: var(--fy-badge-neutral-fg) !important;
+}
+.module3-score-wrap h2 {
+  color: var(--fy-text) !important;
 }
 .module3-metric,
 .module3-metric strong {
@@ -785,7 +792,7 @@ html[data-theme="dark"] {
 .student-shell .supervisor-monitor-table td span,
 .student-shell .supervisor-detail-top > span,
 .student-shell .supervisor-overview-list em,
-.student-shell .supervisor-history-list span,
+.student-shell .supervisor-history-list span:not(.fy-status-badge),
 .student-shell .supervisor-queue-item--selected {
   background: var(--fy-surface-muted) !important;
   color: var(--fy-brand) !important;
@@ -1030,18 +1037,15 @@ html[data-theme="dark"] {
 }
 .student-shell .progress-button:disabled,
 .student-shell .fy-btn--primary:disabled,
-.student-shell button.fy-btn.fy-btn--primary:disabled {
-  background: var(--fy-brand) !important;
-  color: var(--fy-text-on-brand) !important;
-  border-color: transparent !important;
-  opacity: 0.55 !important;
-}
+.student-shell button.fy-btn.fy-btn--primary:disabled,
 .student-shell .fy-btn--secondary:disabled,
 .student-shell button.fy-btn.fy-btn--secondary:disabled {
-  background: var(--fy-surface-muted) !important;
-  color: var(--fy-text) !important;
-  border-color: var(--fy-border) !important;
-  opacity: 0.55 !important;
+  background: var(--fy-disabled-bg) !important;
+  color: var(--fy-disabled-fg) !important;
+  border: 1px dashed var(--fy-disabled-border) !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+  filter: none !important;
 }
 .student-shell [aria-label="Required Documents & Uploads"] article {
   background: var(--fy-page) !important;
@@ -1267,6 +1271,19 @@ html[data-theme="dark"] {
   color: var(--fy-text-secondary) !important;
 }
 
+.student-shell .supervisor-history-list article {
+  border-bottom-color: var(--fy-border) !important;
+}
+
+.student-shell .supervisor-history-list .fy-status-badge,
+.student-shell .supervisor-overview-list .fy-status-badge,
+.student-shell .supervisor-latest-request .fy-status-badge {
+  align-self: flex-start !important;
+  width: max-content !important;
+  height: auto !important;
+  flex-shrink: 0 !important;
+}
+
 /* Available / status pills — force readable semantic colours */
 .admin-shell .supervisor-capacity-status--available,
 .student-shell .supervisor-capacity-status--available,
@@ -1476,6 +1493,9 @@ html[data-theme="dark"] {
 
 .student-shell .module3-category-icon,
 .module3-workspace .module3-category-icon {
+  display: inline-grid !important;
+  place-items: center !important;
+  line-height: 1 !important;
   width: 1.65rem !important;
   height: 1.65rem !important;
   border-radius: 0.45rem !important;
