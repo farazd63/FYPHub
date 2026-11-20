@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from app.modules.module_03_proposal.compliance_engine import build_change_summary, build_compliance_report
-from app.modules.module_03_proposal.router import _allowed_template_upload
+from app.modules.module_03_proposal.router import _allowed_template_upload, _template_compatible_proposal_fields
 
 
 def test_template_upload_contract_only_accepts_pdf_and_docx():
@@ -83,6 +83,44 @@ def test_compliance_report_checks_structure_and_academic_consistency():
     assert "Academic Consistency" in {category["name"] for category in report["categories"]}
     assert report["academicConsistency"]
     assert not any(item["title"] == "References" and item["status"] == "Non-Compliant" for item in report["violations"])
+
+
+def test_same_uploaded_template_uses_the_admin_measurement_contract():
+    import fitz
+
+    document = fitz.open()
+    page = document.new_page(width=595.28, height=841.89)
+    page.insert_text((72, 72), "1. Introduction", fontsize=14, fontname="Times-Bold")
+    page.insert_text((72, 110), "This is the official body text for the template.", fontsize=12, fontname="Times-Roman")
+    page.insert_text((72, 145), "2. Methodology", fontsize=14, fontname="Times-Bold")
+    page.insert_text((72, 183), "Method details belong here.", fontsize=12, fontname="Times-Roman")
+    page.insert_text((72, 220), "References", fontsize=14, fontname="Times-Bold")
+    page.insert_text((270, 810), "Page 1", fontsize=10, fontname="Times-Roman")
+    data = document.tobytes()
+    document.close()
+
+    from app.modules.module_03_proposal.template_extractor import extract_template_rules
+
+    rules = extract_template_rules(data, "application/pdf", "official.pdf")
+    fields = _template_compatible_proposal_fields(data, "application/pdf", "official.pdf")
+    assert "References" in [item["name"] for item in fields["detected_headings"]]
+    assert fields["alignment"] == rules["alignment"]
+
+    submission = SimpleNamespace(
+        id=43,
+        proposal_key="same-template-43",
+        title="Official Template",
+        proposal_type="SHORT",
+        version=1,
+        processing_status="COMPLETED",
+        filename="official.pdf",
+        page_count=1,
+        extracted_text="1. Introduction\n2. Methodology\nReferences",
+        extracted_fields=fields,
+        template_reference_version_id=11,
+    )
+    report = build_compliance_report(submission=submission, rules=rules)
+    assert report["reportSummary"]["metrics"]["failed"] == 0
 
 
 def test_version_change_summary_is_structured_and_advisory():

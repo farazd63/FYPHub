@@ -168,6 +168,55 @@ def _detected_headings(text: str) -> list[dict[str, Any]]:
     return result[:100]
 
 
+_TEMPLATE_COMPARISON_KEYS = (
+    "page_size",
+    "top_margin_mm",
+    "bottom_margin_mm",
+    "left_margin_mm",
+    "right_margin_mm",
+    "font_family",
+    "font_size_pt",
+    "line_spacing",
+    "alignment",
+    "heading_style",
+    "page_numbering",
+)
+
+
+def _template_compatible_proposal_fields(data: bytes, content_type: str | None, filename: str | None) -> dict[str, Any]:
+    """Measure proposal layout with the same extractor used for the baseline.
+
+    Admin template rules are produced by ``template_extractor`` while the
+    proposal upload historically used the lighter ``pdf_extraction`` path.
+    Those two paths can disagree about bold/larger headings, alignment, and
+    DOCX styles even when the uploaded bytes are identical.  Reusing the
+    baseline extractor for comparable fields keeps the student report on the
+    same measurement contract without replacing the proposal content parser.
+    """
+    try:
+        measured = extract_template_rules(data, content_type, filename)
+    except PdfExtractionError:
+        # TXT proposals and documents that are readable by the proposal parser
+        # but not measurable by the template parser remain safely unverifiable.
+        return {}
+
+    compatible: dict[str, Any] = {}
+    for key in _TEMPLATE_COMPARISON_KEYS:
+        value = measured.get(key)
+        if value is None or value == "":
+            continue
+        if isinstance(value, str) and value.casefold().startswith("not detected"):
+            continue
+        compatible[key] = value
+
+    # Section comparison uses detected headings from the uploaded proposal.
+    # Preserve an empty canonical list as well: it prevents the old fallback
+    # detector from inventing sections that the admin extractor would ignore.
+    if isinstance(measured.get("detected_headings"), list):
+        compatible["detected_headings"] = measured["detected_headings"]
+    return compatible
+
+
 def _submission_out(session: Session, row: ProposalComplianceSubmission) -> dict[str, Any]:
     report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
     summary = prepare_user_friendly_report(report.report).get("reportSummary", {}) if report else {}
@@ -469,6 +518,7 @@ async def submit_proposal(
     path = _storage_path("submissions", key, f"v{version_number}-{proposal_file.filename or 'proposal'}")
     path.write_bytes(data)
     fields = {**extracted.extracted_fields, "detected_headings": _detected_headings(extracted.extracted_text)}
+    fields.update(_template_compatible_proposal_fields(data, extracted.content_type, proposal_file.filename))
     template_version, rules = active
     if action not in {"draft", "submit"}:
         raise _error("invalid_submission_action", "Action must be draft or submit.", 422)
@@ -493,6 +543,14 @@ async def submit_proposal(
 
 def _run_submission(session: Session, row: ProposalComplianceSubmission, template_version: TemplateReferenceVersion, rules: dict[str, Any]) -> dict[str, Any]:
     history = _version_history(session, row)
+    stored_path = _safe_stored_path(row.storage_key)
+    if stored_path is not None and stored_path.is_file():
+        try:
+            refreshed_fields = _template_compatible_proposal_fields(stored_path.read_bytes(), row.content_type, row.filename)
+        except OSError:
+            refreshed_fields = {}
+        if refreshed_fields:
+            row.extracted_fields = {**(row.extracted_fields or {}), **refreshed_fields}
     row.template_reference_version_id = template_version.id
     row.status = "SUBMITTED" if row.status == "DRAFT" else row.status
     row.processing_status = "COMPLETED"
