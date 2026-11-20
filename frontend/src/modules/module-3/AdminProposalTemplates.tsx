@@ -42,6 +42,7 @@ export function AdminProposalTemplates({ api }: { api: string }) {
   const [selected, setSelected] = useState<Template | null>(null);
   const [draftRules, setDraftRules] = useState<Record<string, unknown>>({});
   const [sectionsText, setSectionsText] = useState("");
+  const [editingRules, setEditingRules] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -69,8 +70,20 @@ export function AdminProposalTemplates({ api }: { api: string }) {
   };
 
   const review = (template: Template) => {
-    setSelected(template); setDraftRules({ ...template.rules });
+    setSelected(template); setDraftRules({ ...template.rules }); setEditingRules(false);
     setSectionsText(Array.isArray(template.rules.required_sections) ? (template.rules.required_sections as string[]).join("\n") : ""); setError("");
+  };
+
+  const updateRule = (key: string, value: string) => {
+    setDraftRules((current) => ({ ...current, [key]: value }));
+  };
+
+  const cancelRuleEdit = () => {
+    if (!selected) return;
+    setDraftRules({ ...selected.rules });
+    setSectionsText(Array.isArray(selected.rules.required_sections) ? (selected.rules.required_sections as string[]).join("\n") : "");
+    setEditingRules(false);
+    setError("");
   };
 
   const saveRules = async () => {
@@ -82,7 +95,7 @@ export function AdminProposalTemplates({ api }: { api: string }) {
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof payload.detail === "object" ? payload.detail.message : payload.detail || "Rule confirmation failed.");
       const saved = payload as Template;
-      setSelected(saved); setDraftRules({ ...saved.rules }); setSectionsText(Array.isArray(saved.rules.required_sections) ? (saved.rules.required_sections as string[]).join("\n") : "");
+      setSelected(saved); setDraftRules({ ...saved.rules }); setSectionsText(Array.isArray(saved.rules.required_sections) ? (saved.rules.required_sections as string[]).join("\n") : ""); setEditingRules(false);
       setMessage("Deterministic rules confirmed and saved as a new immutable snapshot. Activate this official baseline when ready."); await load();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Rule confirmation failed."); } finally { setBusy(false); }
   };
@@ -124,7 +137,7 @@ export function AdminProposalTemplates({ api }: { api: string }) {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Template deletion failed."); } finally { setBusy(false); }
   };
 
-  const visibleOptionalRules = optionalRules.filter(([key]) => key in draftRules);
+  const visibleOptionalRules = editingRules ? optionalRules : optionalRules.filter(([key]) => key in draftRules);
   return <section className="module3-admin-page" aria-labelledby="module3-templates-heading">
     <div className="module3-page-heading module3-admin-page-heading"><div><h1 id="module3-templates-heading">Proposal Templates</h1><p>Upload the official university PDF or DOCX. Rules are measured from that file only; unclear values remain Not detected.</p></div></div>
     {message && <p className="module3-alert module3-alert--success" role="status">{message}</p>}
@@ -141,6 +154,6 @@ export function AdminProposalTemplates({ api }: { api: string }) {
       </form>
       <section className="module3-panel"><div className="module3-panel-heading"><div><span className="module3-kicker">Version control</span><h2>Baseline history</h2></div><span className="module3-count">{templates.length}</span></div>{!templates.length ? <p className="module3-empty">No official template has been uploaded yet.</p> : <div className="module3-template-list">{templates.map((template) => <article className={`module3-template-row ${template.is_active ? "module3-template-row--active" : ""}`} key={template.id}><div><div className="module3-template-row__top"><strong>{template.template_type} · v{template.version}</strong><span className={`module3-status-pill ${template.is_active ? "module3-status-pill--pass" : "module3-status-pill--muted"}`}>{template.is_active ? "Active baseline" : "Not active"}</span></div><h3>{template.title}</h3><p>{template.source_note}</p></div><div className="module3-row-actions"><button type="button" onClick={() => review(template)}>Review extracted rules</button>{template.is_active ? <button type="button" onClick={() => void deactivate(template)} disabled={busy}>Deactivate</button> : <><button type="button" onClick={() => void activate(template)} disabled={busy}>Activate</button><button type="button" className="module3-danger-button" onClick={() => void remove(template)} disabled={busy}>Delete</button></>}</div></article>)}</div>}</section>
     </div>
-    {selected && <section className="module3-panel module3-rule-review"><div className="module3-panel-heading"><div><span className="module3-kicker">Deterministic evidence</span><h2>{selected.title} · {selected.template_type} v{selected.version}</h2></div><button className="module3-close-button" type="button" onClick={() => setSelected(null)}>Close</button></div><p className="module3-muted">These values were measured from the official template file. Values that are not clearly confirmed stay Not detected. Source pages and extraction provenance are retained internally for verification.</p><div className="module3-rule-grid">{mainRules.map(([key, label]) => <label key={key}><span>{label}</span><input value={displayRule(key, draftRules[key])} readOnly placeholder="Not detected" aria-readonly="true" /></label>)}</div>{visibleOptionalRules.length > 0 && <div className="module3-section-review"><h3>Explicitly required template elements</h3><div className="module3-rule-grid">{visibleOptionalRules.map(([key, label]) => <label key={key}><span>{label}</span><input value={displayRule(key, draftRules[key])} readOnly aria-readonly="true" /></label>)}</div></div>}<div className="module3-section-review"><label><h3>Required sections (one per line)</h3><textarea value={sectionsText} readOnly aria-readonly="true" rows={7} placeholder="Not detected" /></label></div><div className="module3-review-actions"><button className="module3-primary-button" type="button" onClick={() => void saveRules()} disabled={busy}>{busy ? "Saving…" : "Confirm extracted rules"}</button>{!selected.is_active && <button className="module3-secondary-button" type="button" onClick={() => void activate(selected)} disabled={busy}>Activate baseline</button>}</div></section>}
+    {selected && <section className="module3-panel module3-rule-review"><div className="module3-panel-heading"><div><span className="module3-kicker">Deterministic evidence</span><h2>{selected.title} · {selected.template_type} v{selected.version}</h2></div><button className="module3-close-button" type="button" onClick={() => { if (editingRules) cancelRuleEdit(); setSelected(null); }}>Close</button></div><p className="module3-muted">These values were measured from the official template file. You can correct them before activating the baseline. Saving creates a new immutable rule snapshot; source pages and extraction provenance remain retained internally.</p><div className="module3-rule-grid">{mainRules.map(([key, label]) => <label key={key}><span>{label}</span><input value={displayRule(key, draftRules[key])} readOnly={!editingRules} aria-readonly={!editingRules} onChange={(event) => updateRule(key, event.target.value)} placeholder="Not detected" /></label>)}</div>{visibleOptionalRules.length > 0 && <div className="module3-section-review"><h3>Explicitly required template elements</h3><div className="module3-rule-grid">{visibleOptionalRules.map(([key, label]) => <label key={key}><span>{label}</span><input value={displayRule(key, draftRules[key])} readOnly={!editingRules} aria-readonly={!editingRules} onChange={(event) => updateRule(key, event.target.value)} /></label>)}</div></div>}<div className="module3-section-review"><label><h3>Required sections (one per line)</h3><textarea value={sectionsText} readOnly={!editingRules} aria-readonly={!editingRules} onChange={(event) => setSectionsText(event.target.value)} rows={7} placeholder="Not detected" /></label></div><div className="module3-review-actions">{editingRules ? <><button className="module3-primary-button" type="button" onClick={() => void saveRules()} disabled={busy}>{busy ? "Saving…" : "Save changes"}</button><button className="module3-secondary-button" type="button" onClick={cancelRuleEdit} disabled={busy}>Cancel</button></> : <button className="module3-primary-button" type="button" onClick={() => { setEditingRules(true); setMessage(""); }} disabled={busy}>Edit extracted rules</button>}{!selected.is_active && <button className="module3-secondary-button" type="button" onClick={() => void activate(selected)} disabled={busy || editingRules}>Activate baseline</button>}</div></section>}
   </section>;
 }
