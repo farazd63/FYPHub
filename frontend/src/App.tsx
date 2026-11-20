@@ -154,13 +154,21 @@ function AuthLayout({ children, actions, compact = false }: { children: ReactNod
       <div className="auth-stage__glow auth-stage__glow--b" aria-hidden="true" />
       <div className="auth-stage__noise" aria-hidden="true" />
       <div className="auth-stage__panel">
+        <div className="auth-stage__theme-dock" data-corner="top-right">
+          <ThemeToggle />
+        </div>
         <div className="auth-stage__media" aria-hidden="true">
           <img src={authHeroImage} alt="" width="1600" height="900" />
         </div>
         <div className="auth-stage__veil" aria-hidden="true" />
         <div className="auth-stage__grid">
           <section className="auth-stage__brand">
+            <div className="auth-stage__orb auth-stage__orb--a" aria-hidden="true" />
+            <div className="auth-stage__orb auth-stage__orb--b" aria-hidden="true" />
+            <div className="auth-stage__orb auth-stage__orb--c" aria-hidden="true" />
             <svg className="auth-stage__line-art" viewBox="0 0 420 320" aria-hidden="true">
+              <circle cx="310" cy="70" r="54" fill="none" stroke="currentColor" strokeWidth="1.25" opacity="0.35" />
+              <circle cx="310" cy="70" r="28" fill="none" stroke="currentColor" strokeWidth="1.25" opacity="0.5" />
               <path
                 d="M36 248c48-78 132-118 212-98 54 14 96 58 118 110M52 184c36-44 96-66 154-58M300 56c28 36 42 82 34 128"
                 fill="none"
@@ -180,16 +188,16 @@ function AuthLayout({ children, actions, compact = false }: { children: ReactNod
               <div className="auth-stage__reveal auth-stage__reveal--1"><Logo auth /></div>
               <p className="auth-stage__eyebrow auth-stage__reveal auth-stage__reveal--2">Final year project workspace</p>
               <h1 className="auth-stage__reveal auth-stage__reveal--3">From your first idea to your final defense.</h1>
+              <p className="auth-stage__lead auth-stage__reveal auth-stage__reveal--4">
+                One calm place for proposals, milestones, feedback, and the day you present.
+              </p>
             </div>
           </section>
           <section className={`auth-card ${compact ? "auth-card--compact" : ""}`}>
             <div className="auth-card__shine" aria-hidden="true" />
             <header className={`auth-card__header ${actions ? "auth-card__header--actions" : ""}`}>
               <div className="auth-card__mobile-brand"><Logo authMobile /></div>
-              <div className="auth-card__actions auth-card__actions--tools">
-                {actions}
-                <ThemeToggle />
-              </div>
+              {actions ? <div className="auth-card__actions auth-card__actions--tools">{actions}</div> : null}
             </header>
             <div className="auth-card__body">{children}</div>
           </section>
