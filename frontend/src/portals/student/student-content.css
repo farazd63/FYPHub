@@ -116,7 +116,34 @@
 .student-status--future { border-color: #d8dfea; background: #f1f4f8; color: var(--fy-text-secondary); }
 
 .student-page-heading { margin-bottom: 20px; }
-.student-page-heading h1 { margin: 0; color: #172b4d; font-size: clamp(1.65rem, 2.2vw, 2.15rem); letter-spacing: -0.03em; line-height: 1.15; }
+.student-page-heading h1 {
+  margin: 0;
+  color: #172b4d;
+  font-size: clamp(1.65rem, 2.2vw, 2.15rem);
+  font-weight: var(--fy-weight-semibold);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+.student-overview-stack { min-width: 0; }
+.student-request-layout--stacked {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  width: 100%;
+}
+.student-request-layout--stacked .student-request-card,
+.student-request-card--span {
+  width: 100%;
+  max-width: none;
+}
+.evaluator-workflow-grid { width: 100%; min-width: 0; }
+.student-stat-value-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
 .student-page-heading p:last-child { max-width: 700px; margin: 9px 0 0; color: var(--fy-text-secondary); line-height: 1.55; }
 
 .student-placeholder {
@@ -201,7 +228,7 @@
   border: 1px solid var(--fy-border); border-radius: 20px; background: var(--fy-surface);
   box-shadow: var(--fy-shadow); color: var(--fy-text);
 }
-.progress-board { overflow: hidden; margin-bottom: 18px; }
+.progress-board { overflow-x: auto; margin-bottom: 18px; }
 .progress-board__heading {
   display: flex; align-items: flex-end; justify-content: space-between; gap: 18px;
   border-bottom: 1px solid var(--fy-border); padding: 20px 22px 16px;
@@ -214,13 +241,31 @@
 .progress-legend__swatch--violet,
 .progress-legend__swatch--mint { background: var(--fy-brand); }
 .progress-gantt { display: grid; grid-template-columns: minmax(205px, .34fr) minmax(610px, 1fr); min-width: 840px; }
-.progress-gantt__labels { border-right: 1px solid var(--fy-border); }
-.progress-gantt__labels-heading {
-  display: flex; justify-content: space-between; border-bottom: 1px solid var(--fy-border);
-  color: var(--fy-text-secondary); font-size: 11px; font-weight: 800; letter-spacing: .08em;
-  padding: 13px 16px; text-transform: uppercase;
+.progress-gantt__labels {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  border-right: 1px solid var(--fy-border);
+  background: var(--fy-surface);
 }
-.progress-gantt__labels-heading span { color: var(--fy-text-secondary); }
+.progress-gantt__labels-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  border-bottom: 1px solid var(--fy-border);
+  color: var(--fy-text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  padding: 13px 16px;
+  text-transform: uppercase;
+}
+.progress-gantt__labels-heading span {
+  margin-inline-start: auto;
+  color: var(--fy-text-secondary);
+  letter-spacing: .08em;
+}
 .progress-gantt__label {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   min-height: 54px; border-bottom: 1px solid var(--fy-border); padding: 8px 16px;
@@ -247,8 +292,14 @@
   border-bottom: 1px solid var(--fy-border); background: var(--fy-surface-muted);
 }
 .progress-gantt__dates span {
-  display: grid; place-content: center; gap: 2px; color: var(--fy-text-secondary);
-  font-size: 11px; text-align: center;
+  display: grid;
+  place-content: center;
+  gap: 3px;
+  min-width: 40px;
+  padding-inline: 4px;
+  color: var(--fy-text-secondary);
+  font-size: 11px;
+  text-align: center;
 }
 .progress-gantt__dates b { color: var(--fy-text-secondary); font-size: 9px; text-transform: uppercase; }
 .progress-gantt__track {
@@ -311,7 +362,14 @@
   border: 0; border-radius: 9px; background: var(--fy-brand); color: var(--fy-text-on-brand);
   padding: 10px 12px; font-size: 12px; font-weight: 800;
 }
-.progress-button:disabled { cursor: not-allowed; opacity: .55; }
+.progress-button:disabled {
+  cursor: not-allowed;
+  opacity: 1 !important;
+  background: var(--fy-disabled-bg) !important;
+  border: 1px dashed var(--fy-disabled-border) !important;
+  color: var(--fy-disabled-fg) !important;
+  box-shadow: none !important;
+}
 .progress-button--violet,
 .progress-button--mint,
 .progress-button--orange { background: var(--fy-brand); color: var(--fy-text-on-brand); }

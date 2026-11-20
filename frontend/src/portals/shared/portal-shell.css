@@ -147,7 +147,13 @@
 }
 
 .portal-content button:hover:not(:disabled) { transform: translateY(-1px); }
-.portal-content button:disabled { cursor: not-allowed; opacity: 0.62; }
+.portal-content button:disabled {
+  cursor: not-allowed;
+  opacity: 1 !important;
+  background: var(--fy-disabled-bg) !important;
+  border: 1px dashed var(--fy-disabled-border) !important;
+  color: var(--fy-disabled-fg) !important;
+}
 
 .portal-content input,
 .portal-content select,

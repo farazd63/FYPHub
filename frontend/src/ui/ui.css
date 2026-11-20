@@ -132,19 +132,19 @@
 }
 .fy-btn--disabled,
 .fy-btn:disabled,
-.fy-btn--loading:disabled {
-  opacity: 1;
-  cursor: not-allowed;
-  background: var(--fy-surface-muted);
-  border-color: var(--fy-border);
-  color: var(--fy-text-secondary);
-  box-shadow: none;
-}
+.fy-btn--loading:disabled,
 .fy-btn--primary.fy-btn--disabled,
-.fy-btn--primary:disabled {
-  background: color-mix(in srgb, var(--fy-brand) 35%, var(--fy-surface-muted));
-  color: var(--fy-text-secondary);
-  border-color: transparent;
+.fy-btn--primary:disabled,
+.fy-btn--secondary:disabled,
+.fy-btn--ghost:disabled,
+.fy-btn--danger:disabled {
+  opacity: 1 !important;
+  cursor: not-allowed;
+  background: var(--fy-disabled-bg) !important;
+  border: 1px dashed var(--fy-disabled-border) !important;
+  color: var(--fy-disabled-fg) !important;
+  box-shadow: none !important;
+  filter: none !important;
 }
 .fy-btn__spinner {
   animation: fy-spin 0.8s linear infinite;
@@ -293,6 +293,31 @@
   color: var(--fy-brand);
 }
 
+.proposal-ai-summary {
+  min-width: 0;
+  margin-block: var(--fy-space-4);
+  border-color: var(--fy-border);
+  background: var(--fy-surface);
+}
+.proposal-ai-summary__title {
+  margin: 0 0 var(--fy-space-3);
+  font-size: var(--fy-text-section);
+  font-weight: var(--fy-weight-semibold);
+  color: var(--fy-text);
+}
+.proposal-ai-summary__body {
+  min-width: 0;
+  margin: 0;
+  color: var(--fy-text-secondary);
+  font-size: var(--fy-text-small);
+  line-height: 1.55;
+}
+.proposal-ai-summary__text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  color: var(--fy-text);
+}
+
 .fy-role-card__head {
   display: flex;
   align-items: center;
@@ -320,46 +345,55 @@
   font-size: var(--fy-text-small);
 }
 
-/* Badges */
+/* Badges — never stretch; AA-safe badge tokens */
 .fy-status-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.55rem;
+  justify-content: center;
+  align-self: flex-start;
+  width: max-content;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: 0.28rem 0.65rem;
   border-radius: var(--fy-radius-pill);
   border: 1px solid var(--fy-border);
   font-size: var(--fy-text-label);
   font-weight: var(--fy-weight-semibold);
-  line-height: 1.2;
+  line-height: 1.25;
   white-space: nowrap;
+  vertical-align: middle;
+  box-sizing: border-box;
 }
 .fy-status-badge--neutral {
-  background: var(--fy-surface-muted);
-  color: var(--fy-text-secondary);
+  background: var(--fy-badge-neutral-bg);
+  color: var(--fy-badge-neutral-fg);
+  border-color: var(--fy-disabled-border);
 }
 .fy-status-badge--success {
-  background: var(--fy-success-soft);
-  color: var(--fy-success);
-  border-color: color-mix(in srgb, var(--fy-success) 25%, var(--fy-border));
+  background: var(--fy-badge-success-bg);
+  color: var(--fy-badge-success-fg);
+  border-color: color-mix(in srgb, var(--fy-badge-success-fg) 28%, var(--fy-border));
 }
 .fy-status-badge--warning {
-  background: var(--fy-warning-soft);
-  color: var(--fy-warning);
-  border-color: color-mix(in srgb, var(--fy-warning) 25%, var(--fy-border));
+  background: var(--fy-badge-warning-bg);
+  color: var(--fy-badge-warning-fg);
+  border-color: color-mix(in srgb, var(--fy-badge-warning-fg) 28%, var(--fy-border));
 }
 .fy-status-badge--danger {
-  background: var(--fy-danger-soft);
-  color: var(--fy-danger);
-  border-color: color-mix(in srgb, var(--fy-danger) 25%, var(--fy-border));
+  background: var(--fy-badge-danger-bg);
+  color: var(--fy-badge-danger-fg);
+  border-color: color-mix(in srgb, var(--fy-badge-danger-fg) 28%, var(--fy-border));
 }
 .fy-status-badge--info {
-  background: var(--fy-info-soft);
-  color: var(--fy-info);
-  border-color: color-mix(in srgb, var(--fy-info) 25%, var(--fy-border));
+  background: var(--fy-badge-info-bg);
+  color: var(--fy-badge-info-fg);
+  border-color: color-mix(in srgb, var(--fy-badge-info-fg) 28%, var(--fy-border));
 }
 .fy-status-badge--brand {
   background: var(--fy-brand-soft);
-  color: var(--fy-brand);
-  border-color: color-mix(in srgb, var(--fy-brand) 25%, var(--fy-border));
+  color: var(--fy-badge-info-fg);
+  border-color: color-mix(in srgb, var(--fy-brand) 30%, var(--fy-border));
 }
 
 /* Tabs */

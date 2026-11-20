@@ -64,8 +64,8 @@
 .cycle-overview__policy { display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 15px; border-top: 1px solid #e6edf7; }
 .cycle-overview__policy svg { width: 20px; height: 20px; flex: 0 0 auto; color: #6683b3; }
 .cycle-overview__policy div { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
-.cycle-overview__policy span { color: #71819a; font-size: .78rem; }
-.cycle-overview__policy strong { color: #334c73; font-size: .8rem; }
+.cycle-overview__policy span { color: var(--fy-text-muted); font-size: .78rem; }
+.cycle-overview__policy strong { color: var(--fy-text); font-size: .8rem; }
 .cycle-overview__message, .cycle-overview__error, .cycle-overview__empty { margin-top: 22px; padding: 28px; border: 1px solid #dfe8f6; border-radius: 16px; background: #fff; }
 .cycle-overview__error { color: #a12835; }
 .cycle-overview__retry { margin-left: 12px; color: #2855a7; font-weight: 700; text-decoration: underline; }

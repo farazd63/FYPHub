@@ -96,6 +96,23 @@
   --fy-neutral: #475671;
   --fy-neutral-soft: #eef2fa;
 
+  /* Disabled controls — AA without opacity */
+  --fy-disabled-bg: #e8eef8;
+  --fy-disabled-fg: #3d4d66;
+  --fy-disabled-border: #b7c4de;
+
+  /* Badge pairs tuned for ≥4.5:1 */
+  --fy-badge-success-bg: #d8f3e4;
+  --fy-badge-success-fg: #0a5c2e;
+  --fy-badge-warning-bg: #ffe9b8;
+  --fy-badge-warning-fg: #6b4000;
+  --fy-badge-danger-bg: #fcdada;
+  --fy-badge-danger-fg: #8f1a12;
+  --fy-badge-info-bg: #dce4ff;
+  --fy-badge-info-fg: #1a2fd6;
+  --fy-badge-neutral-bg: #e8eef8;
+  --fy-badge-neutral-fg: #3d4d66;
+
   --fy-shadow-sm: 0 1px 2px rgba(11, 27, 63, 0.06);
   --fy-shadow-md: 0 8px 24px rgba(36, 63, 250, 0.08);
   --fy-shadow-nav: 0 10px 30px rgba(11, 27, 63, 0.1);
@@ -173,6 +190,21 @@
   --fy-info-soft: #152228;
   --fy-neutral: #d5dce8;
   --fy-neutral-soft: #1c222e;
+
+  --fy-disabled-bg: #222833;
+  --fy-disabled-fg: #c5cddc;
+  --fy-disabled-border: #3a4254;
+
+  --fy-badge-success-bg: #132a1c;
+  --fy-badge-success-fg: #7ddea0;
+  --fy-badge-warning-bg: #2a2116;
+  --fy-badge-warning-fg: #e0a85c;
+  --fy-badge-danger-bg: #2a1518;
+  --fy-badge-danger-fg: #f07178;
+  --fy-badge-info-bg: #152228;
+  --fy-badge-info-fg: #7eb8c9;
+  --fy-badge-neutral-bg: #1c222e;
+  --fy-badge-neutral-fg: #d5dce8;
 
   --fy-shadow-sm: 0 1px 0 rgb(255 255 255 / 0.04);
   --fy-shadow-md: 0 1px 0 rgb(255 255 255 / 0.04), 0 18px 40px rgb(0 0 0 / 0.35);

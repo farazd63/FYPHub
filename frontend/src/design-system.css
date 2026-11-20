@@ -231,6 +231,13 @@ main:has(.admin-sidebar) > header {
   backdrop-filter: blur(12px);
 }
 .student-header .student-brand,
+.student-header .student-account__name--clamp {
+  max-width: min(42vw, 16rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .student-header .student-account__name,
 .student-header .student-menu,
 .portal-brand,
@@ -297,10 +304,12 @@ main:has(.admin-sidebar) .admin-enter {
 .fy-btn:disabled,
 .fy-btn[aria-disabled="true"] {
   cursor: not-allowed;
-  opacity: 1;
-  background: var(--fy-surface-muted) !important;
-  border: 1px solid var(--fy-border-strong) !important;
-  color: var(--fy-text-muted) !important;
+  opacity: 1 !important;
+  background: var(--fy-disabled-bg) !important;
+  border: 1px dashed var(--fy-disabled-border) !important;
+  color: var(--fy-disabled-fg) !important;
+  box-shadow: none !important;
+  filter: none !important;
 }
 .fy-btn--primary {
   background: var(--fy-brand);
@@ -455,11 +464,31 @@ main:has(.admin-sidebar) .admin-enter {
   :root { --fy-shell-pad: 1rem; }
   .admin-shell__content,
   .student-shell .student-content { padding: var(--fy-shell-pad); }
+  .student-shell .student-menu {
+    display: grid;
+    min-width: 40px;
+    min-height: 40px;
+    place-items: center;
+  }
 }
 
 /* Phase 2 authority — desktop sticky sidebar; mobile drawer takes no flow width */
 @media (min-width: 768px) {
-  .student-shell .student-sidebar.role-sidebar,
+  .student-shell .student-sidebar.role-sidebar {
+    position: sticky !important;
+    top: var(--fy-shell-sidebar-top) !important;
+    align-self: flex-start;
+    height: calc(100dvh - var(--fy-shell-sidebar-top) - var(--fy-shell-pad)) !important;
+    max-height: calc(100dvh - var(--fy-shell-sidebar-top) - var(--fy-shell-pad)) !important;
+    margin: var(--fy-shell-pad) 0 var(--fy-shell-pad) var(--fy-shell-pad) !important;
+    border-color: var(--fy-border) !important;
+    background: var(--fy-surface) !important;
+    color: var(--fy-text) !important;
+    box-shadow: var(--fy-shadow) !important;
+  }
+}
+
+@media (min-width: 1024px) {
   .admin-shell .student-sidebar.role-sidebar,
   main:has(.admin-sidebar) .student-sidebar.role-sidebar {
     position: sticky !important;
@@ -477,11 +506,7 @@ main:has(.admin-sidebar) .admin-enter {
 
 @media (max-width: 767px) {
   .student-shell .student-sidebar.role-sidebar,
-  .admin-shell .student-sidebar.role-sidebar,
-  main:has(.admin-sidebar) .student-sidebar.role-sidebar,
-  .student-shell .student-sidebar.role-sidebar.student-sidebar--collapsed,
-  .admin-shell .student-sidebar.role-sidebar.student-sidebar--collapsed,
-  .admin-shell.admin-sidebar-collapsed .student-sidebar.role-sidebar {
+  .student-shell .student-sidebar.role-sidebar.student-sidebar--collapsed {
     position: fixed !important;
     inset: calc(var(--fy-shell-header) + 0.75rem) 0.85rem 0.85rem 0.85rem !important;
     top: calc(var(--fy-shell-header) + 0.75rem) !important;
@@ -505,7 +530,50 @@ main:has(.admin-sidebar) .admin-enter {
     box-shadow: var(--fy-shadow) !important;
   }
 
-  .student-shell .student-sidebar.role-sidebar.student-sidebar--open,
+  .student-shell .student-sidebar.role-sidebar.student-sidebar--open {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .student-shell .student-body {
+    gap: 0 !important;
+  }
+
+  .student-shell .student-content {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .admin-shell .student-sidebar.role-sidebar,
+  main:has(.admin-sidebar) .student-sidebar.role-sidebar,
+  .admin-shell .student-sidebar.role-sidebar.student-sidebar--collapsed,
+  .admin-shell.admin-sidebar-collapsed .student-sidebar.role-sidebar {
+    position: fixed !important;
+    inset: calc(var(--fy-shell-header) + 0.75rem) 0.85rem 0.85rem 0.85rem !important;
+    top: calc(var(--fy-shell-header) + 0.75rem) !important;
+    z-index: 40;
+    flex: 0 0 0 !important;
+    width: min(84vw, 304px) !important;
+    min-width: 0 !important;
+    max-width: min(84vw, 304px) !important;
+    height: auto !important;
+    max-height: calc(100dvh - var(--fy-shell-header) - 1.5rem) !important;
+    margin: 0 !important;
+    padding-inline: 12px;
+    transform: translateX(calc(-100% - 24px));
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    border-color: var(--fy-border) !important;
+    background: var(--fy-surface) !important;
+    color: var(--fy-text) !important;
+    box-shadow: var(--fy-shadow) !important;
+  }
+
   .admin-shell .student-sidebar.role-sidebar.student-sidebar--open,
   main:has(.admin-sidebar) .student-sidebar.role-sidebar.student-sidebar--open {
     transform: translateX(0) !important;
@@ -513,14 +581,12 @@ main:has(.admin-sidebar) .admin-enter {
     pointer-events: auto !important;
   }
 
-  .student-shell .student-body,
   .admin-shell__body,
   .admin-shell > div {
     gap: 0 !important;
   }
 
-  .admin-shell__content,
-  .student-shell .student-content {
+  .admin-shell__content {
     width: 100% !important;
     flex: 1 1 100% !important;
     max-width: 100% !important;

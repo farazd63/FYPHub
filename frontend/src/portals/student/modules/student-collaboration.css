@@ -3,7 +3,13 @@
 .student-collab h2 { font-size: 1.3rem; font-weight: 700; margin: 0; }
 .student-collab__heading p, .student-collab small, .student-collab dt { color: var(--student-muted, var(--fy-text-secondary)); }
 .student-collab button { border: 1px solid var(--student-border, #dce3ed); border-radius: 10px; padding: 8px 14px; color: var(--brand-blue, #124bc4); background: white; cursor: pointer; }
-.student-collab button:disabled { opacity: .55; cursor: not-allowed; }
+.student-collab button:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  background: var(--fy-disabled-bg, #eef1f4);
+  border-color: var(--fy-disabled-border, #c8d0d9);
+  color: var(--fy-disabled-fg, #8a96a3);
+}
 .student-collab button:focus-visible, .student-collab textarea:focus-visible, .student-collab__history:focus-visible { outline: 3px solid #a9d6ff; outline-offset: 3px; }
 .student-collab__details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
 .student-collab dt { font-size: .8rem; }
