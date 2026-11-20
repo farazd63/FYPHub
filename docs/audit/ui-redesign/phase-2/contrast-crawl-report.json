@@ -24,8 +24,8 @@
     "nav": "Student Groups",
     "path": "/admin/student-groups",
     "title": "FYPHub | Administrator",
-    "h1": "Student Groups",
-    "total": 96,
+    "h1": "FYP Cycles",
+    "total": 27,
     "below45": 0,
     "samples": []
   },
@@ -54,8 +54,8 @@
     "nav": "Required Documents",
     "path": "/admin/document-requirements",
     "title": "FYPHub | Administrator",
-    "h1": "Required Documents",
-    "total": 61,
+    "h1": "Document Submission Archive",
+    "total": 4,
     "below45": 0,
     "samples": []
   },
@@ -91,7 +91,7 @@
     "path": "/",
     "title": "FYPHub | Student",
     "h1": "",
-    "total": 16,
+    "total": 4,
     "below45": 0,
     "samples": []
   },
@@ -243,7 +243,7 @@
     "path": "/",
     "title": "FYPHub | Coordinator",
     "h1": "Supervisor Request Monitoring",
-    "total": 278,
+    "total": 277,
     "below45": 0,
     "samples": []
   },
@@ -253,7 +253,7 @@
     "path": "/",
     "title": "FYPHub | Coordinator",
     "h1": "Panel Scheduling & Defense",
-    "total": 179,
+    "total": 178,
     "below45": 0,
     "samples": []
   },
@@ -299,7 +299,7 @@
     "role": "COORDINATOR",
     "nav": "__phone_390__::Supervisor Request Monitoring",
     "below45": 0,
-    "total": 278,
+    "total": 277,
     "overflowX": 0,
     "samples": []
   },
@@ -339,7 +339,7 @@
     "path": "/",
     "title": "FYPHub | Evaluator",
     "h1": "Compliance Report",
-    "total": 161,
+    "total": 160,
     "below45": 0,
     "samples": []
   },

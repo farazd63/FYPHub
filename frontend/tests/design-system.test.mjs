@@ -19,7 +19,7 @@ test("design tokens define dark academic surfaces and gold brand", () => {
   assert.match(css, /--fy-page:\s*#0c0e12/);
   assert.match(css, /--fy-surface:\s*#151922/);
   assert.match(css, /--fy-brand:\s*#e0a85c/);
-  assert.match(css, /--fy-success:\s*#3dba7a/);
+  assert.match(css, /--fy-success:\s*#7ddea0/);
   assert.match(css, /--fy-warning:\s*#e0a85c/);
   assert.match(css, /--fy-danger:\s*#f07178/);
   assert.match(css, /--fy-radius-card:\s*0\.75rem/);
@@ -36,13 +36,15 @@ test("Tailwind theme exposes fy colour tokens for shared components", () => {
   assert.match(index, /--radius-fy-card:\s*0\.75rem/);
 });
 
-test("auth stage uses dark studio layout without frosted glass card", () => {
+test("auth stage uses dark studio unified panel with glass dock", () => {
   const app = read("App.tsx");
   const auth = read("auth.css");
   assert.match(app, /auth-stage/);
+  assert.match(app, /auth-stage__panel/);
   assert.match(app, /import "\.\/auth\.css"/);
   assert.match(auth, /\.auth-stage/);
   assert.match(auth, /--fy-brand/);
-  assert.doesNotMatch(auth, /backdrop-filter:\s*blur/);
+  assert.match(auth, /\.auth-stage__panel/);
+  assert.match(auth, /backdrop-filter:\s*blur/);
   assert.match(app, /bg-fy-brand/);
 });

@@ -1640,3 +1640,80 @@
     transform: none;
   }
 }
+
+
+/* —— New main screens: Document Archive (from origin/main) —— */
+.admin-shell [aria-label="Document Submission Archive"],
+.admin-shell [aria-label="Document Submission Archive"] * {
+  color: inherit;
+}
+.admin-shell [aria-label="Document Submission Archive"] {
+  color: var(--fy-text);
+}
+.admin-shell [aria-label="Document Submission Archive"] [class*="bg-white"],
+.admin-shell [aria-label="Document Submission Archive"] [class*="bg-slate-50"],
+.admin-shell [aria-label="Document Submission Archive"] [class*="bg-slate-100"],
+.admin-shell [aria-label="Document Submission Archive"] [class*="bg-[#f6f8ff]"],
+.admin-shell [aria-label="Document Submission Archive"] [class*="bg-[#fbfcfa]"],
+.admin-shell [aria-label="Document Submission Archive"] section,
+.admin-shell [aria-label="Document Submission Archive"] form,
+.admin-shell [aria-label="Document Submission Archive"] article,
+.admin-shell [aria-label="Document Submission Archive"] details {
+  background: var(--fy-surface) !important;
+  background-color: var(--fy-surface) !important;
+  border-color: var(--fy-border) !important;
+  color: var(--fy-text) !important;
+}
+.admin-shell [aria-label="Document Submission Archive"] h1,
+.admin-shell [aria-label="Document Submission Archive"] h2,
+.admin-shell [aria-label="Document Submission Archive"] h3,
+.admin-shell [aria-label="Document Submission Archive"] strong,
+.admin-shell [aria-label="Document Submission Archive"] label {
+  color: var(--fy-text) !important;
+}
+.admin-shell [aria-label="Document Submission Archive"] p,
+.admin-shell [aria-label="Document Submission Archive"] span,
+.admin-shell [aria-label="Document Submission Archive"] td,
+.admin-shell [aria-label="Document Submission Archive"] th,
+.admin-shell [aria-label="Document Submission Archive"] [class*="text-slate-"],
+.admin-shell [aria-label="Document Submission Archive"] [class*="text-[#"] {
+  color: var(--fy-text-secondary) !important;
+}
+.admin-shell [aria-label="Document Submission Archive"] input,
+.admin-shell [aria-label="Document Submission Archive"] select,
+.admin-shell [aria-label="Document Submission Archive"] textarea {
+  background: var(--fy-page) !important;
+  border-color: var(--fy-border) !important;
+  color: var(--fy-text) !important;
+}
+.admin-shell [aria-label="Document Submission Archive"] thead {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text-secondary) !important;
+}
+.admin-shell [aria-label="Document Submission Archive"] button[class*="bg-[#315db4]"],
+.admin-shell [aria-label="Document Submission Archive"] button[class*="bg-[#176b66]"] {
+  background: var(--fy-brand) !important;
+  color: var(--fy-text-on-brand) !important;
+  border-color: transparent !important;
+}
+.admin-shell [aria-label="Document Submission Archive"] button[class*="border-[#315db4]"],
+.admin-shell [aria-label="Document Submission Archive"] button[class*="text-[#315db4]"] {
+  border-color: var(--fy-border) !important;
+  color: var(--fy-brand) !important;
+  background: transparent !important;
+}
+.admin-shell [aria-label="Document Submission Archive"] [class*="bg-emerald-100"],
+.admin-shell [aria-label="Document Submission Archive"] [class*="bg-blue-100"],
+.admin-shell [aria-label="Document Submission Archive"] [class*="bg-amber-100"],
+.admin-shell [aria-label="Document Submission Archive"] [class*="bg-orange-100"],
+.admin-shell [aria-label="Document Submission Archive"] [class*="bg-red-100"],
+.admin-shell [aria-label="Document Submission Archive"] [class*="bg-slate-100"],
+.admin-shell [aria-label="Document Submission Archive"] [class*="bg-slate-200"] {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text) !important;
+}
+.admin-shell [aria-label="Document Submission Archive"] [role="dialog"] > div {
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+  border-color: var(--fy-border) !important;
+}
