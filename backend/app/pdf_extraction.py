@@ -17,12 +17,59 @@ from pypdf.errors import PdfReadError
 MAX_SUPERVISOR_REQUEST_PDF_BYTES = 5 * 1024 * 1024
 EXTRACTION_RUNTIME = "pypdf-local"
 
+_FONT_ALIASES = {
+    "timesnewromanpsmt": "Times New Roman",
+    "timesnewromanps": "Times New Roman",
+    "timesnewroman": "Times New Roman",
+    "times": "Times New Roman",
+    "arialmt": "Arial",
+    "arial": "Arial",
+    "calibri": "Calibri",
+    "cambriamath": "Cambria",
+    "cambria": "Cambria",
+    "georgia": "Georgia",
+    "couriernewpsmt": "Courier New",
+    "couriernew": "Courier New",
+}
+
+
+def _normalize_document_font(value: object) -> str:
+    name = re.sub(r"\s+", " ", str(value or "")).strip()
+    name = re.sub(r"^[A-Z]{6}\+", "", name)
+    key = re.sub(r"[^a-z0-9]", "", name.casefold())
+    return _FONT_ALIASES.get(key, name)
+
+
+def _weighted_mode(items: list[tuple[object, int]], minimum_share: float = 0.55) -> object | None:
+    weighted: Counter[object] = Counter()
+    total = 0
+    for value, weight in items:
+        if value in (None, ""):
+            continue
+        amount = max(1, int(weight))
+        weighted[value] += amount
+        total += amount
+    if not weighted or not total:
+        return None
+    value, weight = weighted.most_common(1)[0]
+    return value if len(weighted) == 1 or weight / total >= minimum_share else None
+
+
+def _page_size_label(width_pt: float, height_pt: float) -> str:
+    width_mm = width_pt * 25.4 / 72
+    height_mm = height_pt * 25.4 / 72
+    short, long = sorted((width_mm, height_mm))
+    for name, expected_short, expected_long in (("A4", 210.0, 297.0), ("Letter", 215.9, 279.4)):
+        if abs(short - expected_short) <= 1.0 and abs(long - expected_long) <= 1.0:
+            return name
+    return f"{round(width_mm, 2)} x {round(height_mm, 2)} mm"
+
 
 def _docx_formatting(document: Document) -> dict[str, object]:
     """Read measurable formatting from the first DOCX section and its runs."""
     section = document.sections[0] if document.sections else None
-    families: list[str] = []
-    sizes: list[float] = []
+    families: list[tuple[str, int]] = []
+    sizes: list[tuple[float, int]] = []
     spacings: list[float] = []
     alignments: list[str] = []
     heading_styles: list[str] = []
@@ -46,25 +93,42 @@ def _docx_formatting(document: Document) -> dict[str, object]:
             spacing = paragraph.paragraph_format.line_spacing
             if isinstance(spacing, (int, float)):
                 spacings.append(float(spacing))
+            elif getattr(spacing, "pt", None) and paragraph.runs:
+                run_size = next((run.font.size.pt for run in paragraph.runs if run.font.size and run.font.size.pt), None)
+                if run_size:
+                    spacings.append(float(spacing.pt) / float(run_size))
+        else:
+            spacing_rule = str(paragraph.paragraph_format.line_spacing_rule).upper()
+            spacings.extend({"SINGLE": [1.0], "ONE_POINT_FIVE": [1.5], "DOUBLE": [2.0]}.get(spacing_rule.split(" ", 1)[0], []))
         for run in paragraph.runs:
-            if run.font.name:
-                families.append(run.font.name)
-            if run.font.size and run.font.size.pt:
-                sizes.append(float(run.font.size.pt))
+            run_text = run.text.strip()
+            style_font = getattr(getattr(paragraph, "style", None), "font", None)
+            family = _normalize_document_font(run.font.name or getattr(style_font, "name", None))
+            if family:
+                families.append((family, max(1, len(run_text))))
+            size = run.font.size or getattr(style_font, "size", None)
+            if size and size.pt:
+                sizes.append((round(float(size.pt), 2), max(1, len(run_text))))
     result: dict[str, object] = {}
     if section is not None:
         width = section.page_width.inches
         height = section.page_height.inches
         if width and height:
-            result["page_size"] = "A4" if abs(width - 8.27) < 0.15 and abs(height - 11.69) < 0.15 else "Letter" if abs(width - 8.5) < 0.15 and abs(height - 11) < 0.15 else f"{round(width, 2)}x{round(height, 2)} in"
+            result["page_size"] = _page_size_label(section.page_width.pt, section.page_height.pt)
+            result["orientation"] = "Portrait" if height >= width else "Landscape"
+        result["left_margin_mm"] = round(section.left_margin.mm, 2)
         result["margin_mm"] = round(section.left_margin.mm, 2)
         result["right_margin_mm"] = round(section.right_margin.mm, 2)
         result["top_margin_mm"] = round(section.top_margin.mm, 2)
         result["bottom_margin_mm"] = round(section.bottom_margin.mm, 2)
     if families:
-        result["font_family"] = Counter(families).most_common(1)[0][0]
+        font_family = _weighted_mode(families)
+        if font_family:
+            result["font_family"] = font_family
     if sizes:
-        result["font_size_pt"] = round(float(median(sizes)), 2)
+        font_size = _weighted_mode(sizes)
+        if isinstance(font_size, (int, float)):
+            result["font_size_pt"] = round(float(font_size), 2)
     if spacings:
         result["line_spacing"] = round(float(median(spacings)), 2)
     if alignments:
@@ -73,7 +137,8 @@ def _docx_formatting(document: Document) -> dict[str, object]:
         result["heading_style"] = Counter(heading_styles).most_common(1)[0][0]
     result["table_count"] = len(document.tables)
     result["figure_count"] = len(getattr(document, "inline_shapes", ()))
-    result["page_numbering"] = any("PAGE" in paragraph.text.upper() for paragraph in document.paragraphs)
+    result["page_numbering"] = bool(re.search(r"<w:(?:instrText|fldSimple)[^>]*>[^<]*\b(?:PAGE|NUMPAGES)\b", document.part.element.xml, re.IGNORECASE))
+    result["page_numbering_pages"] = [1] if result["page_numbering"] else []
     result["caption_count"] = caption_count
     result["reference_count"] = reference_count
     result["appendix_count"] = appendix_count
@@ -96,11 +161,12 @@ def _pdf_formatting(data: bytes) -> dict[str, object]:
         width_in = rect.width / 72
         height_in = rect.height / 72
         result: dict[str, object] = {
-            "page_size": "A4" if abs(width_in - 8.27) < 0.15 and abs(height_in - 11.69) < 0.15 else "Letter" if abs(width_in - 8.5) < 0.15 and abs(height_in - 11) < 0.15 else f"{round(width_in, 2)}x{round(height_in, 2)} in",
+            "page_size": _page_size_label(rect.width, rect.height),
+            "orientation": "Portrait" if height_in >= width_in else "Landscape",
             "page_count": document.page_count,
         }
-        families: list[str] = []
-        sizes: list[float] = []
+        families: list[tuple[str, int]] = []
+        sizes: list[tuple[float, int]] = []
         left_edges: list[float] = []
         right_edges: list[float] = []
         top_edges: list[float] = []
@@ -109,23 +175,27 @@ def _pdf_formatting(data: bytes) -> dict[str, object]:
         table_count = 0
         figure_count = 0
         page_numbering = False
+        page_numbering_pages: list[int] = []
         caption_count = 0
         reference_count = 0
         appendix_count = 0
-        for page in document:
+        for page_index, page in enumerate(document, start=1):
             page_rect = page.rect
             blocks = page.get_text("dict").get("blocks", [])
             table_count += len(page.find_tables().tables) if hasattr(page, "find_tables") else 0
             figure_count += len(page.get_images(full=True))
             page_text = page.get_text("text")
-            page_numbering = page_numbering or bool(re.search(r"(?:page\s+\d+|\b\d+\s*(?:of|/)\s*\d+\b)", page_text, re.IGNORECASE))
+            page_has_number = bool(re.search(r"(?:page\s+\d+|\b\d+\s*(?:of|/)\s*\d+\b)", page_text, re.IGNORECASE))
+            page_numbering = page_numbering or page_has_number
+            if page_has_number:
+                page_numbering_pages.append(page_index)
             caption_count += len(re.findall(r"^(?:figure|fig\.?|table)\s*\d+", page_text, re.IGNORECASE | re.MULTILINE))
             reference_count += len(re.findall(r"^\s*(?:references|bibliography)\b", page_text, re.IGNORECASE | re.MULTILINE))
             appendix_count += len(re.findall(r"^\s*(?:appendix|appendices)\b", page_text, re.IGNORECASE | re.MULTILINE))
-            previous_line_bottom: float | None = None
             for block in blocks:
                 if block.get("type") != 0:
                     continue
+                previous_line_top: float | None = None
                 for line in block.get("lines", []):
                     line_box = line.get("bbox")
                     if not line_box:
@@ -135,28 +205,42 @@ def _pdf_formatting(data: bytes) -> dict[str, object]:
                     right_edges.append(page_rect.width - x1)
                     top_edges.append(y0)
                     bottom_edges.append(page_rect.height - y1)
-                    if previous_line_bottom is not None and y0 >= previous_line_bottom:
-                        line_gaps.append(y0 - previous_line_bottom)
-                    previous_line_bottom = y1
+                    line_sizes = [float(span.get("size")) for span in line.get("spans", []) if span.get("size")]
+                    if previous_line_top is not None and y0 >= previous_line_top and line_sizes:
+                        # Keep the physical baseline distance here.  The final
+                        # line-spacing ratio is calculated against the median
+                        # font size below.
+                        line_gaps.append(y0 - previous_line_top)
+                    previous_line_top = y0
                     for span in line.get("spans", []):
-                        if span.get("font"):
-                            families.append(str(span["font"]).split("+")[-1])
-                        if span.get("size"):
-                            sizes.append(float(span["size"]))
+                        span_text = str(span.get("text") or "").strip()
+                        weight = max(1, len(span_text))
+                        if span.get("font") and span_text:
+                            families.append((_normalize_document_font(str(span["font"]).split("+")[-1]), weight))
+                        if span.get("size") and span_text:
+                            sizes.append((round(float(span["size"]), 2), weight))
         if families:
-            result["font_family"] = Counter(families).most_common(1)[0][0]
+            font_family = _weighted_mode(families)
+            if font_family:
+                result["font_family"] = font_family
         if sizes:
-            result["font_size_pt"] = round(float(median(sizes)), 2)
+            font_size = _weighted_mode(sizes)
+            if isinstance(font_size, (int, float)):
+                result["font_size_pt"] = round(float(font_size), 2)
         if left_edges:
-            result["margin_mm"] = round(float(median(left_edges)) * 25.4 / 72, 2)
-            result["right_margin_mm"] = round(float(median(right_edges)) * 25.4 / 72, 2)
-            result["top_margin_mm"] = round(float(median(top_edges)) * 25.4 / 72, 2)
-            result["bottom_margin_mm"] = round(float(median(bottom_edges)) * 25.4 / 72, 2)
+            result["left_margin_mm"] = round(float(min(left_edges)) * 25.4 / 72, 2)
+            result["margin_mm"] = result["left_margin_mm"]
+            result["right_margin_mm"] = round(float(min(right_edges)) * 25.4 / 72, 2)
+            result["top_margin_mm"] = round(float(min(top_edges)) * 25.4 / 72, 2)
+            result["bottom_margin_mm"] = round(float(min(bottom_edges)) * 25.4 / 72, 2)
         if line_gaps and sizes:
-            result["line_spacing"] = round(float(median(line_gaps)) / float(median(sizes)), 2)
+            size_values = [size for size, _weight in sizes]
+            if size_values:
+                result["line_spacing"] = round(float(median(line_gaps)) / float(median(size_values)), 2)
         result["table_count"] = table_count
         result["figure_count"] = figure_count
         result["page_numbering"] = page_numbering
+        result["page_numbering_pages"] = page_numbering_pages
         result["caption_count"] = caption_count
         result["reference_count"] = reference_count
         result["appendix_count"] = appendix_count
@@ -262,11 +346,51 @@ def _normalize_text(text: str) -> str:
     """Normalize pypdf output while retaining line boundaries used by section parsing."""
     normalized_lines = []
     for raw_line in text.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ").split("\n"):
-        line = re.sub(r"[ \t]+", " ", raw_line).strip()
+        # Some PDFs expose unmapped glyphs as control characters. Remove those
+        # markers before sending extracted content to the summary model.
+        clean_line = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]", " ", raw_line)
+        line = re.sub(r"[ \t]+", " ", clean_line).strip()
         if line:
             line = re.sub(r"\s*:\s*", ": ", line, count=1)
             normalized_lines.append(line)
     return "\n".join(normalized_lines).strip()
+
+
+def _pdf_text_needs_ocr(text: str) -> bool:
+    control_count = sum(1 for character in text if ord(character) < 32 and character not in "\r\n\t")
+    return not text.strip() or control_count >= max(4, len(text) // 250)
+
+
+def _fitz_pdf_text(data: bytes, *, ocr_fallback: bool = False) -> str:
+    """Extract page text with PyMuPDF, which preserves custom-font PDFs better."""
+    try:
+        import fitz
+
+        document = fitz.open(stream=data, filetype="pdf")
+    except (ImportError, RuntimeError, ValueError):
+        return ""
+    try:
+        pages = []
+        for page_number, page in enumerate(document, start=1):
+            content = (page.get_text("text") or "").strip()
+            if ocr_fallback and _pdf_text_needs_ocr(content):
+                try:
+                    textpage = page.get_textpage_ocr(language="eng", dpi=120, full=True)
+                    ocr_content = (page.get_text("text", textpage=textpage) or "").strip()
+                    if len(ocr_content) >= 20:
+                        content = ocr_content
+                except Exception:
+                    pass
+            if content:
+                pages.append(f"[PAGE {page_number}]\n{content}")
+        return "\n".join(pages)
+    finally:
+        document.close()
+
+
+def extract_pdf_text_for_summary(data: bytes) -> str:
+    """Return readable PDF text, using OCR only for damaged/unreadable pages."""
+    return _normalize_text(_fitz_pdf_text(data, ocr_fallback=True))
 
 
 def _heading(line: str) -> tuple[str, str | None] | None:
@@ -328,7 +452,9 @@ def extract_one_page_pdf(data: bytes, content_type: str | None, filename: str | 
         if page_count < 1:
             raise PdfExtractionError("invalid_page_count", "The proposal PDF contains no pages.")
         page_text = [(reader.pages[index].extract_text() or "").strip() for index in range(page_count)]
-        text = "\n".join(f"[PAGE {index + 1}]\n{content}" for index, content in enumerate(page_text) if content)
+        pypdf_text = "\n".join(f"[PAGE {index + 1}]\n{content}" for index, content in enumerate(page_text) if content)
+        fitz_text = _fitz_pdf_text(data)
+        text = fitz_text if len(_normalize_text(fitz_text)) >= 20 else pypdf_text
     except PdfExtractionError:
         raise
     except (PdfReadError, ValueError, OSError) as error:

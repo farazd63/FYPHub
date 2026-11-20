@@ -1,6 +1,7 @@
 import io
 import unittest
 
+import fitz
 from docx import Document
 
 from app.pdf_extraction import PdfExtractionError, _extract_fields, _normalize_text, extract_proposal_document
@@ -68,6 +69,22 @@ class PdfExtractionFieldTests(unittest.TestCase):
         self.assertEqual(result.extracted_fields["title"]["value"], "DOCX Proposal")
         self.assertEqual(result.extracted_fields["purpose"]["value"], "Improve campus safety.")
         self.assertEqual(len(result.sha256), 64)
+
+    def test_pdf_formatting_calculates_line_spacing_from_numeric_font_sizes(self):
+        document = fitz.open()
+        page = document.new_page()
+        page.insert_textbox(
+            fitz.Rect(72, 72, 500, 150),
+            "Title: PDF Proposal\nPurpose: A readable proposal.",
+            fontsize=12,
+        )
+        payload = document.tobytes()
+        document.close()
+
+        result = extract_proposal_document(payload, "application/pdf", "proposal.pdf")
+
+        self.assertEqual(result.extracted_fields["font_size_pt"], 12.0)
+        self.assertAlmostEqual(result.extracted_fields["line_spacing"], 1.5, places=1)
 
     def test_unsupported_upload_is_rejected(self):
         with self.assertRaises(PdfExtractionError) as error:

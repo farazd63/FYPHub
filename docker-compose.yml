@@ -145,6 +145,7 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:5173:80"
+      - "127.0.0.1:5174:80"
     networks:
       - fyphub-p1-network
     restart: unless-stopped

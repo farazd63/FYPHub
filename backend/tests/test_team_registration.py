@@ -253,6 +253,37 @@ class TeamRegistrationApiTests(unittest.TestCase):
         self.assertNotEqual(password_hash, password)
         self.assertTrue(verify_password(password, password_hash))
 
+    def test_group_number_restarts_for_each_cycle(self) -> None:
+        first_cycle = self.create_cycle(open_for_registration=True, max_size=3)
+        second_cycle = self.create_cycle(open_for_registration=True, max_size=3)
+
+        first_status, first_response = request_json(self.payload(first_cycle))
+        second_status, second_response = request_json(self.payload(
+            first_cycle,
+            creator={
+                "full_name": "Second Cycle Group Two Creator",
+                "registration_number": self.registration("creator-two"),
+                "university_email": self.email("creator-two-contact"),
+            },
+            shared_login_email=self.email("shared-login-two"),
+            members=[],
+        ))
+        third_status, third_response = request_json(self.payload(
+            second_cycle,
+            creator={
+                "full_name": "Second Cycle Group One Creator",
+                "registration_number": self.registration("creator-three"),
+                "university_email": self.email("creator-three-contact"),
+            },
+            shared_login_email=self.email("shared-login-three"),
+            members=[],
+        ))
+
+        self.assertEqual((first_status, second_status, third_status), (201, 201, 201))
+        self.assertEqual(first_response["team"]["group_number"], 1)
+        self.assertEqual(second_response["team"]["group_number"], 2)
+        self.assertEqual(third_response["team"]["group_number"], 1)
+
     def test_student_group_registration_creates_one_shared_student_account(self) -> None:
         cycle_id = self.create_cycle(open_for_registration=True, max_size=3)
         payload = {

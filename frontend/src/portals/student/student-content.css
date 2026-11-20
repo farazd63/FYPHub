@@ -318,4 +318,3 @@
 .progress-toast { margin-top: 15px; }
 @media (max-width: 1020px) { .progress-actions-grid { grid-template-columns: 1fr 1fr; }.progress-card:last-child { grid-column: 1 / -1; } }
 @media (max-width: 720px) { .progress-hero { flex-direction: column; }.progress-summary { grid-template-columns: 1fr; }.progress-actions-grid { grid-template-columns: 1fr; }.progress-card:last-child { grid-column: auto; }.progress-board { overflow-x: auto; }.progress-board__heading { align-items: flex-start; flex-direction: column; }.progress-gantt { grid-template-columns: 175px 610px; } }
-

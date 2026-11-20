@@ -5,9 +5,10 @@ from ..database import Base
 
 class Team(Base):
  __tablename__="teams"
- __table_args__=(UniqueConstraint("id","academic_cycle_id",name="uq_teams_id_cycle"),CheckConstraint("status IN ('forming','complete','locked','dissolved')",name="ck_teams_status"))
+ __table_args__=(UniqueConstraint("id","academic_cycle_id",name="uq_teams_id_cycle"),UniqueConstraint("academic_cycle_id","group_number",name="uq_teams_cycle_group_number"),CheckConstraint("status IN ('forming','complete','locked','dissolved')",name="ck_teams_status"),CheckConstraint("group_number IS NULL OR group_number > 0",name="ck_teams_group_number_positive"))
  id:Mapped[int]=mapped_column(primary_key=True)
  academic_cycle_id:Mapped[int]=mapped_column(ForeignKey("academic_cycles.id"),nullable=False)
+ group_number:Mapped[int | None]=mapped_column(Integer,nullable=True)
  shared_user_id:Mapped[int]=mapped_column(ForeignKey("users.id"),nullable=False,unique=True)
  status:Mapped[str]=mapped_column(String(16),nullable=False,default="forming",server_default="forming")
  locked_at:Mapped[datetime | None]=mapped_column(DateTime(timezone=True),nullable=True)

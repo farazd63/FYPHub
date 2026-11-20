@@ -59,6 +59,7 @@ class SafeAccountOut(BaseModel):
 class SafeTeamOut(BaseModel):
     id: int
     academic_cycle_id: int
+    group_number: int | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

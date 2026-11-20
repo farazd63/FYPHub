@@ -1186,7 +1186,7 @@ export default function App() {
               <h1 className="mb-7 text-center text-2xl font-bold">Sign In</h1>
               <div className="space-y-5">
                 <Field
-                  label="Group email"
+                  label="Email"
                   type="email"
                   autoComplete="username"
                   value={signIn.email}
@@ -1308,7 +1308,7 @@ export default function App() {
               )}
               {step === 3 && (
                 <div className="space-y-4">
-                  <Field label="Group email" type="email" autoComplete="username" value={login.email} disabled={submitting} error={errors["login.email"]} onChange={(value) => updateLogin("email", value)} />
+                  <Field label="Email" type="email" autoComplete="username" value={login.email} disabled={submitting} error={errors["login.email"]} onChange={(value) => updateLogin("email", value)} />
                   <PasswordField label="Password" value={login.password} disabled={submitting} error={errors["login.password"]} onChange={(value) => updateLogin("password", value)} />
                   <PasswordField label="Confirm password" value={login.confirm} disabled={submitting} error={errors["login.confirm"]} onChange={(value) => updateLogin("confirm", value)} />
                 </div>

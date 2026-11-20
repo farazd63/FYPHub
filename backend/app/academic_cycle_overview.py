@@ -93,7 +93,7 @@ def cycle_overview(cycle_id: int, _: User = Depends(require_roles(*COORDINATOR_R
     for team in teams:
         assignment = assignment_by_team.get(team.id)
         project = requests_by_team.get(team.id, [None])[0]
-        group_rows.append({"id": team.id, "group_id": team.id, "name": f"Group {team.id}", "leader": _user(users.get(team.shared_user_id)), "members": [{"id": member.id, "name": member.full_name, "registration_number": member.registration_number, "email": member.university_email} for member in members_by_team.get(team.id, [])], "assigned_supervisor": _user(users.get(assignment.supervisor_id)) if assignment else None, "project_title": project.title if project else None, "status": "ACTIVE", "created_at": team.created_at})
+        group_rows.append({"id": team.id, "group_id": team.id, "group_number": team.group_number, "name": f"Group {team.group_number or '—'}", "leader": _user(users.get(team.shared_user_id)), "members": [{"id": member.id, "name": member.full_name, "registration_number": member.registration_number, "email": member.university_email} for member in members_by_team.get(team.id, [])], "assigned_supervisor": _user(users.get(assignment.supervisor_id)) if assignment else None, "project_title": project.title if project else None, "status": "ACTIVE", "created_at": team.created_at})
 
     active_requirements = [item for item in requirements if item.status != "ARCHIVED"]
     student_rows = []

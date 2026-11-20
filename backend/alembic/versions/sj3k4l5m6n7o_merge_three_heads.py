@@ -1,16 +1,14 @@
-"""Merge the three Alembic heads into a single head.
+"""Merge the Alembic history into the current application head.
 
 Joins:
-- fb1c2d3e4f5 (Module 03 compliance tables + historical archive fields)
-- qa1b2c3d4e5f (Module 2 collaboration completion / Module 3 workspace)
-- ri2d3e4f5a6b (archive import, document lifecycle, collaboration read markers)
+- u789a001 (legacy merge revision already used by existing deployments)
 """
 
 from alembic import op
 
 
 revision = "sj3k4l5m6n7o"
-down_revision = ("fb1c2d3e4f5", "qa1b2c3d4e5f", "ri2d3e4f5a6b")
+down_revision = "u789a001"
 branch_labels = None
 depends_on = None
 

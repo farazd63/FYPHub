@@ -3,12 +3,159 @@
 from __future__ import annotations
 
 from difflib import SequenceMatcher
+from datetime import datetime, timezone
 import re
 from typing import Any
 
 
 def _text(value: Any) -> str:
     return "" if value is None else str(value).strip()
+
+
+def _not_detected(value: Any) -> bool:
+    return value is None or _text(value).casefold() in {"", "not detected", "not detected in pdf", "not detected in the provided report"}
+
+
+def _document_pages(page_count: Any) -> list[int]:
+    try:
+        count = max(1, int(page_count))
+    except (TypeError, ValueError):
+        count = 1
+    return list(range(1, count + 1))
+
+
+def _format_number(value: Any) -> str:
+    if isinstance(value, float):
+        return f"{value:.2f}".rstrip("0").rstrip(".")
+    return str(value)
+
+
+def _format_comparison_value(value: Any, *, label: str, template: bool = False) -> str:
+    if _not_detected(value):
+        return "Template rule not configured" if template else "Measurement not detected"
+    if isinstance(value, bool):
+        if label == "Page Numbering":
+            return "Page number required on every page" if value else "Page number not required"
+        return "Required" if value else "Not required"
+    if label == "Page Count":
+        return f"{_format_number(value)} page" if int(value) == 1 else f"{_format_number(value)} pages"
+    if label in {"Left Margin", "Right Margin", "Top Margin", "Bottom Margin"}:
+        return f"{_format_number(value)} mm"
+    if isinstance(value, list):
+        return " → ".join(_text(item) for item in value if _text(item)) or "No required sections configured"
+    return _text(value)
+
+
+def _page_range_label(pages: list[int]) -> str:
+    normalized = sorted(set(pages))
+    if len(normalized) == 1:
+        return f"Page {normalized[0]}"
+    if normalized == list(range(normalized[0], normalized[-1] + 1)):
+        return f"Pages {normalized[0]}-{normalized[-1]}"
+    return "Pages " + ", ".join(str(page) for page in normalized)
+
+
+def _required_action(label: str, expected: Any, status: str) -> str:
+    if status == "PASS":
+        return "No action required."
+    if label == "Page Count":
+        return f"Submit exactly {_format_comparison_value(expected, label=label, template=True)}."
+    if label == "Page Size":
+        return f"Convert the document to {_format_comparison_value(expected, label=label, template=True)}."
+    if label == "Page Orientation":
+        return f"Set the document orientation to {_format_comparison_value(expected, label=label, template=True)}."
+    if label == "Page Numbering":
+        return "Add the correct page number to every affected page."
+    if label == "Template Structure" or label == "Section Sequence":
+        return "Use the university template without changing its structure."
+    if label.startswith("Missing section"):
+        return f"Add the required section: {label.split(':', 1)[-1].strip()}."
+    if label in {"Left Margin", "Right Margin", "Top Margin", "Bottom Margin"}:
+        return "Match the approved template margin."
+    if expected is None or expected == "":
+        return "Provide a document format that allows this requirement to be checked."
+    return f"Update the document to match the approved template {label.lower()} rule."
+
+
+def _issue_severity(item: dict[str, Any]) -> str:
+    if item.get("status") == "PASS":
+        return "passed"
+    strict_labels = {
+        "Page Count", "Page Size", "Page Orientation", "Left Margin", "Right Margin",
+        "Top Margin", "Bottom Margin", "Page Numbering", "Template Structure", "Section Sequence",
+    }
+    strict_categories = {"Document Structure", "Section Sequence", "Template Structure"}
+    return "critical" if item.get("name") in strict_labels or item.get("category") in strict_categories or str(item.get("name", "")).startswith("Missing section") else "warning"
+
+
+def _difference_text(item: dict[str, Any]) -> str:
+    status = item.get("status")
+    if status == "PASS":
+        return "Matches the approved university template."
+    expected = item.get("expected")
+    actual = item.get("actual")
+    label = str(item.get("name", "Issue"))
+    if expected is None or actual is None or expected == "" or actual == "":
+        return "Could not verify this requirement from the uploaded document."
+    if isinstance(expected, bool) and isinstance(actual, bool):
+        if label == "Page Numbering":
+            return "Page numbering requirement violated"
+        return "Requirement does not match the approved template."
+    if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
+        delta = round(float(actual) - float(expected), 2)
+        sign = "+" if delta > 0 else ""
+        unit = " pages" if label == "Page Count" else " mm" if "Margin" in label else ""
+        suffix = " — page limit violated" if label == "Page Count" and delta > 0 else ""
+        return f"{sign}{_format_number(delta)}{unit}{suffix}"
+    if label == "Page Size":
+        return "Wrong page size"
+    if label == "Page Orientation":
+        return "Wrong page orientation"
+    if label == "Page Numbering":
+        return "Page numbering requirement violated"
+    if label in {"Template Structure", "Section Sequence"} or label.startswith("Missing section"):
+        return "Required template structure not followed"
+    return "Does not match the approved university template."
+
+
+def _clean_issue(item: dict[str, Any], page_count: int, *, affected_pages: list[int] | None = None) -> dict[str, Any]:
+    pages = sorted(set(affected_pages or _document_pages(page_count))) or [1]
+    label = str(item.get("name") or "Compliance requirement")
+    status = str(item.get("status") or "UNVERIFIABLE")
+    severity = _issue_severity(item)
+    student_document = _format_comparison_value(item.get("actual"), label=label)
+    if label == "Page Numbering" and status != "PASS":
+        student_document = f"Page number missing on {_page_range_label(pages)}"
+    return {
+        "id": str(item.get("id") or label.lower().replace(" ", "-")),
+        "category": str(item.get("category") or "Template Compliance"),
+        "severity": severity,
+        "issue": label,
+        "originalTemplate": _format_comparison_value(item.get("expected"), label=label, template=True),
+        "studentDocument": student_document,
+        "difference": _difference_text(item),
+        "affectedPages": pages,
+        "requiredAction": _required_action(label, item.get("expected"), status),
+        "status": "passed" if status == "PASS" else "failed" if status == "FAIL" else "warning",
+    }
+
+
+def build_document_difference_issues(checks: list[dict[str, Any]], page_count: int) -> list[dict[str, Any]]:
+    """Map internal checks to the student-facing six-field comparison contract."""
+    all_pages = _document_pages(page_count)
+    clean: list[dict[str, Any]] = []
+    for item in checks:
+        location = item.get("location") if isinstance(item.get("location"), dict) else {}
+        page = location.get("page")
+        label = str(item.get("name") or "")
+        document_wide = label in {"Page Count", "Page Size", "Page Orientation", "Page Numbering", "Template Structure", "Section Sequence"} or str(item.get("category")) in {"Document Structure", "Template Structure", "Section Sequence"}
+        if label == "Page Numbering" and isinstance(location.get("page_numbering_pages"), list):
+            numbered_pages = {int(value) for value in location["page_numbering_pages"] if isinstance(value, int) and value > 0}
+            pages = [value for value in all_pages if value not in numbered_pages] or all_pages
+        else:
+            pages = all_pages if document_wide or not isinstance(page, int) or page < 1 else [int(page)]
+        clean.append(_clean_issue(item, page_count, affected_pages=pages))
+    return clean
 
 
 def _same(expected: Any, actual: Any) -> bool:
@@ -20,9 +167,9 @@ def _same(expected: Any, actual: Any) -> bool:
 
 
 def _status(expected: Any, actual: Any) -> tuple[str, str | None]:
-    if expected is None:
+    if _not_detected(expected):
         return "UNVERIFIABLE", "The active template does not expose a measurable value for this requirement."
-    if actual is None or actual == "":
+    if _not_detected(actual):
         return "UNVERIFIABLE", "The uploaded document does not expose a measurable value for this requirement."
     return ("PASS", "The detected document value matches the active university template.") if _same(expected, actual) else ("FAIL", "The detected document value does not match the active template requirement.")
 
@@ -109,15 +256,18 @@ def build_change_summary(previous_fields: dict[str, Any] | None, current_fields:
     }
 
 
-def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_versions: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_versions: list[dict[str, Any]] | None = None, template_name: str | None = None) -> dict[str, Any]:
     actual = submission.extracted_fields or {}
     checks: list[dict[str, Any]] = []
     category_items: dict[str, list[dict[str, Any]]] = {}
     violations: list[dict[str, Any]] = []
 
+    comparison_rules = dict(rules)
+    if "left_margin_mm" not in comparison_rules and "margin_mm" in comparison_rules:
+        comparison_rules["left_margin_mm"] = comparison_rules["margin_mm"]
     fields = (
         ("Page Layout", "page_size", "Page Size"),
-        ("Page Layout", "margin_mm", "Left Margin"),
+        ("Page Layout", "left_margin_mm", "Left Margin"),
         ("Page Layout", "right_margin_mm", "Right Margin"),
         ("Page Layout", "top_margin_mm", "Top Margin"),
         ("Page Layout", "bottom_margin_mm", "Bottom Margin"),
@@ -127,19 +277,17 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
         ("Paragraph Formatting", "alignment", "Alignment"),
         ("Heading Styles", "heading_style", "Heading Style"),
         ("Headers and Footers", "page_numbering", "Page Numbering"),
-        ("Tables and Figures", "table_count", "Table Count"),
-        ("Tables and Figures", "figure_count", "Figure Count"),
-        ("Tables and Figures", "caption_count", "Caption Count"),
-        ("Document Structure", "reference_count", "References"),
-        ("Document Structure", "appendix_count", "Appendices"),
     )
     for category, key, label in fields:
-        if key not in rules:
+        if key not in comparison_rules or _not_detected(comparison_rules.get(key)):
             continue
-        expected = rules.get(key)
+        expected = comparison_rules.get(key)
         detected = actual.get(key)
         status, evidence = _status(expected, detected)
-        item = {"id": f"{category.lower().replace(' ', '-')}-{key}", "name": label, "category": category, "status": status, "expected": expected, "actual": detected, "difference": (round(abs(float(expected) - float(detected)), 2) if isinstance(expected, (int, float)) and isinstance(detected, (int, float)) else None), "location": {"scope": "document", "page": 1, "document_level": True}, "evidence": evidence or ""}
+        location = {"scope": "document", "page": 1, "document_level": True}
+        if key == "page_numbering":
+            location["page_numbering_pages"] = actual.get("page_numbering_pages", [])
+        item = {"id": f"{category.lower().replace(' ', '-')}-{key}", "name": label, "category": category, "status": status, "expected": expected, "actual": detected, "difference": (round(abs(float(expected) - float(detected)), 2) if isinstance(expected, (int, float)) and isinstance(detected, (int, float)) else None), "location": location, "evidence": evidence or ""}
         checks.append(item)
         category_items.setdefault(category, []).append(item)
         if status == "FAIL":
@@ -147,7 +295,7 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
 
     actual_heading_rows = [item for item in actual.get("detected_headings", []) if item.get("name")]
     actual_sections = [str(item.get("name", "")) for item in actual_heading_rows]
-    expected_sections = [str(item) for item in rules.get("required_sections", []) if str(item).strip()]
+    expected_sections = [str(item) for item in (comparison_rules.get("required_sections") or comparison_rules.get("section_sequence") or []) if str(item).strip()]
     section_results: list[dict[str, Any]] = []
     missing_sections: list[dict[str, str]] = []
     for index, expected in enumerate(expected_sections):
@@ -171,6 +319,20 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
             item = {"id": "sequence-order", "name": "Section Sequence", "category": "Section Sequence", "status": "FAIL", "expected": expected_sections, "actual": actual_sections, "difference": None, "location": {"scope": "document", "page": actual_heading_rows[0].get("page") if actual_heading_rows else None, "section_number": "order", "section_name": "Required section sequence"}, "evidence": "The detected section order differs from the active university template."}
             checks.append(item)
             category_items.setdefault("Section Sequence", []).append(item)
+        else:
+            item = {"id": "sequence-order", "name": "Section Sequence", "category": "Section Sequence", "status": "PASS", "expected": expected_sections, "actual": actual_sections, "difference": None, "location": {"scope": "document", "page": 1, "document_level": True}, "evidence": "The detected sections follow the active university template order."}
+            checks.append(item)
+            category_items.setdefault("Section Sequence", []).append(item)
+    elif expected_sections:
+        item = {"id": "template-structure", "name": "Template Structure", "category": "Template Structure", "status": "FAIL", "expected": "Approved university template structure", "actual": "Custom student layout", "difference": None, "location": {"scope": "document", "page": 1, "document_level": True}, "evidence": "The required template headings could not be matched in the uploaded proposal."}
+        checks.append(item)
+        category_items.setdefault("Template Structure", []).append(item)
+        violations.append(_violation(item, len(violations) + 1, "Template Structure"))
+    if expected_sections and missing_sections and not any(item.get("id") == "template-structure" for item in checks):
+        item = {"id": "template-structure", "name": "Template Structure", "category": "Template Structure", "status": "FAIL", "expected": "Approved university template structure", "actual": "Custom student layout", "difference": None, "location": {"scope": "document", "page": 1, "document_level": True}, "evidence": "The required template headings or their order were not followed in the uploaded proposal."}
+        checks.append(item)
+        category_items.setdefault("Template Structure", []).append(item)
+        violations.append(_violation(item, len(violations) + 1, "Template Structure"))
 
     # Optional structural rules let an administrator require references,
     # appendices, and captions without hard-coding a particular university format.
@@ -178,11 +340,13 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
         ("required_references", "reference_count", "References"),
         ("required_appendices", "appendix_count", "Appendices"),
         ("required_captions", "caption_count", "Captions"),
+        ("required_tables", "table_count", "Tables"),
+        ("required_figures", "figure_count", "Figures"),
     )
     for rule_key, actual_key, label in structural_counts:
-        if rule_key not in rules:
+        if rule_key not in comparison_rules or _not_detected(comparison_rules.get(rule_key)):
             continue
-        expected = rules.get(rule_key)
+        expected = comparison_rules.get(rule_key)
         try:
             expected_number = int(expected)
         except (TypeError, ValueError):
@@ -208,11 +372,6 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
         category_items.setdefault("Academic Consistency", []).append(item)
         if item["status"] == "FAIL":
             violations.append(_violation(item, len(violations) + 1, "Academic Consistency"))
-            violations.append(_violation(item, len(violations) + 1, "Section Sequence"))
-        else:
-            item = {"id": "sequence-order", "name": "Section Sequence", "category": "Section Sequence", "status": "PASS", "expected": expected_sections, "actual": actual_sections, "difference": None, "location": {"scope": "document", "page": actual_heading_rows[0].get("page") if actual_heading_rows else None, "section_number": "order", "section_name": "Required section sequence"}, "evidence": "The detected sections follow the active template order."}
-            checks.append(item)
-            category_items.setdefault("Section Sequence", []).append(item)
 
     categories = [{"name": category, "status": _category_status(items), "detail": _category_detail(items), "checks": items} for category, items in category_items.items()]
     passed = sum(item["status"] == "PASS" for item in checks)
@@ -220,9 +379,14 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
     partial = sum(item["status"] in {"PARTIAL", "UNVERIFIABLE"} for item in checks)
     total = len(checks)
     score = round((passed / total) * 100) if total else 0
-    report_status = "Compliant" if total and failed == 0 and partial == 0 else "Not Compliant" if failed else "Review Required"
+    clean_issues = build_document_difference_issues(checks, submission.page_count)
+    critical_issues = [item for item in clean_issues if item["severity"] == "critical" and item["status"] != "passed"]
+    warning_issues = [item for item in clean_issues if item["severity"] == "warning" and item["status"] != "passed"]
+    report_status = "Rejected" if any(item["status"] == "failed" for item in critical_issues) else "Needs Correction" if critical_issues or warning_issues else "Compliant"
     return {
         "reportSummary": {"score": score, "status": report_status, "totalIssues": failed + partial, "metrics": {"passed": passed, "failed": failed, "partial": partial, "total": total}},
+        "reportMetadata": {"reportVersion": "2.0", "templateName": template_name or f"{submission.proposal_type.title()} University Template", "analysisDate": datetime.now(timezone.utc).isoformat()},
+        "documentDifferenceIssues": clean_issues,
         "categories": categories,
         "sectionCompliance": section_results,
         "violations": violations,
@@ -230,7 +394,7 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
         "finalResults": {"totalChecks": total, "passed": passed, "failed": failed, "partial": partial, "totalViolations": len(violations), "severityBreakdown": {"major": sum(v["severity"] == "Major" for v in violations), "minor": sum(v["severity"] == "Minor" for v in violations), "info": sum(v["severity"] == "Info" for v in violations)}},
         "document": {"filename": submission.filename, "pageCount": submission.page_count, "previewText": submission.extracted_text[:800], "selectedPage": 1},
         "proposal": {"id": submission.id, "proposalKey": submission.proposal_key, "title": submission.title, "type": submission.proposal_type, "version": submission.version, "processingStatus": submission.processing_status},
-        "template": {"versionId": getattr(submission, "template_reference_version_id", None), "rules": rules},
+        "template": {"versionId": getattr(submission, "template_reference_version_id", None), "title": template_name or f"{submission.proposal_type.title()} University Template", "rules": rules},
         "versionHistory": previous_versions or [],
         "academicConsistency": category_items.get("Academic Consistency", []),
         "engine": {"name": "FYPHub deterministic compliance engine", "source": "PYTHON", "advisory": False},

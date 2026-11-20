@@ -39,6 +39,7 @@ class RequirementWrite(BaseModel):
 class RequirementPatch(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
+    module: str | None = Field(default=None, min_length=1, max_length=120)
     due_at: datetime | None = None
     allowed_file_types: list[str] | None = None
     max_file_size_mb: int | None = Field(default=None, ge=1, le=100)
@@ -47,11 +48,20 @@ class RequirementPatch(BaseModel):
 
 class RequirementOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: int; title: str; description: str | None; academic_cycle_id: int; module: str; visible_to_roles: list; assigned_user_id: int | None; assigned_group_id: int | None; allowed_file_types: list; max_file_size_mb: int; due_at: datetime; reminder_days_before: int; is_required: bool; status: str; late_upload_allowed: bool; created_at: datetime; updated_at: datetime; submission_count: int = 0
+    id: int; title: str; description: str | None; academic_cycle_id: int; section_id: int | None = None; module: str; visible_to_roles: list; assigned_user_id: int | None; assigned_group_id: int | None; allowed_file_types: list; max_file_size_mb: int; due_at: datetime; reminder_days_before: int; is_required: bool; status: str; late_upload_allowed: bool; created_at: datetime; updated_at: datetime; submission_count: int = 0
 
 class VersionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: int; version_number: int; original_filename: str; mime_type: str; file_size: int; storage_reference: str; uploaded_at: datetime; download_url: str | None = None
+    id: int; version_number: int; original_filename: str; mime_type: str; file_size: int; storage_reference: str; uploaded_at: datetime; uploaded_by_id: int | None = None; download_url: str | None = None; preview_url: str | None = None
+
+class ReviewEventOut(BaseModel):
+    id: int
+    status: str
+    version_id: int | None = None
+    reviewer_id: int
+    reviewer_name: str | None = None
+    comment: str | None = None
+    created_at: datetime
 
 class SubmissionOut(BaseModel):
-    id: int; requirement_id: int; status: str; is_late: bool; review_comment: str | None; uploaded_at: datetime; updated_at: datetime; versions: list[VersionOut] = []
+    id: int; requirement_id: int; academic_cycle_id: int | None = None; group_id: int | None = None; project_id: int | None = None; requirement_section_id: int | None = None; student_id: int | None = None; uploader_id: int | None = None; status: str; is_late: bool; review_comment: str | None; reviewed_by_id: int | None = None; reviewed_at: datetime | None = None; uploaded_at: datetime; updated_at: datetime; versions: list[VersionOut] = []; review_history: list[ReviewEventOut] = []

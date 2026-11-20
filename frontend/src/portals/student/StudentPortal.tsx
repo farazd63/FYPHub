@@ -9,6 +9,7 @@ import { KnowledgeSearch } from "./modules/knowledge-search/KnowledgeSearch";
 import { ProposalComplianceWorkspace } from "../../modules/module-3/ProposalComplianceWorkspace";
 import { GroupMembers } from "./components/GroupMembers";
 import { StudentSupervisorInfo } from "./modules/StudentSupervisorInfo";
+import { FypHubBrand } from "../shared/FypHubBrand";
 import "./student.css";
 import "./student-content.css";
 import "./student-admin-theme.css";
@@ -42,8 +43,6 @@ export const STUDENT_PHASES: readonly StudentPhase[] = [
   { id: "search", name: "FYP Archive & Knowledge Search", route: "/student/search", status: "Implemented", icon: icon("knowledge") },
 ];
 
-function Brand() { return <div className="student-brand"><svg aria-hidden="true" viewBox="0 0 56 40" fill="none"><path d="m4 14 24-10 24 10-24 10L4 14Z" fill="currentColor"/><path d="M15 20v8c5 5 21 5 26 0v-8M49 16v11" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg><span>FYPHub</span></div>; }
-
 export function StudentPortal({ api, user, onLogout }: { api: string; user: StudentUser; onLogout: () => void }) {
   const [activeId, setActiveId] = useState("overview");
   const [collapsed, setCollapsed] = useState(false);
@@ -53,5 +52,5 @@ export function StudentPortal({ api, user, onLogout }: { api: string; user: Stud
   const groupLabel = user.group_name || "Student Group";
   const initials = groupLabel.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "G";
   const content = activeId === "overview" ? <div className="grid gap-5"><StudentOverview api={api} /><GroupMembers members={user.members ?? []} /><StudentCollaborationChannel api={api} userId={user.id} /></div> : phase?.id === "documents" ? <StudentRequiredDocumentsDashboard api={api} /> : phase?.id === "proposal" ? <ProposalComplianceWorkspace api={api} /> : phase?.id === "supervisor-info" ? <StudentSupervisorInfo api={api} /> : phase?.id === "supervisors" ? <StudentSupervisorSelection api={api} userId={user.id} /> : phase?.id === "search" || phase?.id === "archive" ? <KnowledgeSearch api={api} /> : phase ? <StudentPhasePlaceholder phase={phase} api={api} /> : null;
-  return <main className="student-shell"><header className="student-header"><div className="student-header__left"><button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>☰</button><Brand/><span className="student-role">Student group</span></div><div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name" title={user.group_email || user.email}>{groupLabel}{user.academic_cycle ? ` · ${user.academic_cycle}` : ""}</span><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div></header><div className="student-body"><StudentSidebar phases={STUDENT_PHASES} activeId={activeId} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={(item) => setActiveId(item.id)} onOverview={() => setActiveId("overview")} onToggleCollapse={() => setCollapsed((value) => !value)} onCloseMobile={() => setMobileOpen(false)} /><section className="student-content"><div className="student-content__inner">{content}</div></section></div></main>;
+  return <main className="student-shell"><header className="student-header"><div className="student-header__left"><button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>☰</button><FypHubBrand className="student-brand" /><span className="student-role">Student group</span></div><div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name" title={user.group_email || user.email}>{groupLabel}{user.academic_cycle ? ` · ${user.academic_cycle}` : ""}</span><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div></header><div className="student-body"><StudentSidebar phases={STUDENT_PHASES} activeId={activeId} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={(item) => setActiveId(item.id)} onOverview={() => setActiveId("overview")} onToggleCollapse={() => setCollapsed((value) => !value)} onCloseMobile={() => setMobileOpen(false)} /><section className="student-content"><div className="student-content__inner">{content}</div></section></div></main>;
 }
