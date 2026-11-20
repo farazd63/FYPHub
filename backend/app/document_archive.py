@@ -48,6 +48,11 @@ def _group_code(cycle: AcademicCycle, group: Team) -> str:
     return f"{cycle.code}-{group.group_number if group.group_number is not None else 'UNASSIGNED'}"
 
 
+def _group_name(group: Team, members: list[TeamMember]) -> str:
+    leader = next((member for member in members if member.is_creator), members[0] if members else None)
+    return f"{leader.full_name}'s Group" if leader else f"Group {group.group_number or '—'}"
+
+
 def _members(db: Session, group_id: int, cycle_id: int) -> list[TeamMember]:
     return db.scalars(select(TeamMember).where(TeamMember.team_id == group_id, TeamMember.academic_cycle_id == cycle_id, TeamMember.is_active.is_(True)).order_by(TeamMember.is_creator.desc(), TeamMember.id)).all()
 
@@ -79,7 +84,10 @@ def _version_url(submission_id: int, version_id: int, kind: str) -> str:
 
 
 def _row_matches(row: dict, *, search: str | None, section: str | None, status: str | None, student: str | None, requirement: str | None, date_from: date | None, date_to: date | None) -> bool:
-    values = " ".join(str(row.get(key) or "") for key in ("group_code", "project_title", "requirement_section", "requirement_name", "student_name", "registration_number", "submitted_file_name")).casefold()
+    # The quick search is intentionally limited to the archive identity:
+    # group id/code and student registration number. Use the dedicated fields
+    # below for requirements, sections, statuses, and dates.
+    values = " ".join(str(row.get(key) or "") for key in ("group_id", "group_code", "group_name", "registration_number")).casefold()
     if search and search.casefold() not in values:
         return False
     if section and section.casefold() not in str(row.get("requirement_section") or "").casefold():
@@ -116,6 +124,7 @@ def _group_summary(db: Session, cycle: AcademicCycle, group: Team, requirements:
         "id": group.id,
         "group_id": group.id,
         "group_code": _group_code(cycle, group),
+        "group_name": _group_name(group, members),
         "cycle_id": cycle.id,
         "cycle_name": cycle.display_name,
         "project": {"id": project.id, "title": project.title or f"Project {project.id}", "status": project.status, "updated_at": project.updated_at} if project else None,
@@ -132,6 +141,8 @@ def _group_summary(db: Session, cycle: AcademicCycle, group: Team, requirements:
 
 
 def _archive_rows(db: Session, cycle: AcademicCycle, group: Team, requirements: list[DocumentUploadRequirement], submissions: list[DocumentSubmission]) -> list[dict]:
+    members = _members(db, group.id, cycle.id)
+    group_name = _group_name(group, members)
     submission_by_requirement: dict[int, DocumentSubmission] = {}
     for submission in sorted(submissions, key=lambda item: (item.updated_at, item.id), reverse=True):
         submission_by_requirement.setdefault(submission.requirement_id, submission)
@@ -166,6 +177,7 @@ def _archive_rows(db: Session, cycle: AcademicCycle, group: Team, requirements: 
             "cycle_name": cycle.display_name,
             "group_id": group.id,
             "group_code": _group_code(cycle, group),
+            "group_name": group_name,
             "project_id": submission.project_id if submission else (project.id if project else None),
             "project_title": row_project.title if row_project else None,
             "requirement_section_id": requirement.section_id,
@@ -218,11 +230,10 @@ def _group_matches_archive(archive: dict, *, search: str | None, section: str | 
         return True
     if search:
         group_values = " ".join([
+            str(archive.get("group_id") or ""),
             str(archive.get("group_code") or ""),
-            str(archive.get("project_title") or ""),
-            " ".join(str(member.get("name") or "") for member in archive.get("members", [])),
+            str(archive.get("group_name") or ""),
             " ".join(str(member.get("registration_number") or "") for member in archive.get("members", [])),
-            str((archive.get("supervisor") or {}).get("name") or ""),
         ]).casefold()
         if search.casefold() in group_values:
             return True
