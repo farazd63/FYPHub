@@ -159,7 +159,7 @@
 }
 .module3-report-actions .module3-review-decisions {
   display: inline-flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
 }
@@ -227,10 +227,42 @@
 }
 .module3-workspace .proposal-ai-summary,
 .module3-workspace .proposal-ai-summary__text,
-.module3-workspace .proposal-ai-summary__body {
+.module3-workspace .proposal-ai-summary__body,
+.module3-page-heading > div,
+.module3-page-heading p,
+.module3-muted,
+.module3-panel p {
   min-width: 0;
+  max-width: 100%;
   overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.module3-workspace .proposal-ai-summary__text,
+.module3-workspace .proposal-ai-summary__body {
   white-space: pre-wrap;
+}
+.module3-history-row,
+.module3-form-actions,
+.module3-report-actions,
+.module3-review-actions,
+.module3-review-decisions {
+  flex-wrap: wrap !important;
+  max-width: 100%;
+}
+.module3-history-row {
+  align-items: flex-start !important;
+}
+.module3-history-row > button:first-child {
+  flex: 1 1 12rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.module3-history-row > button:not(:first-child),
+.module3-form-actions > button,
+.module3-report-actions > button {
+  flex: 0 1 auto;
+  max-width: 100%;
+  white-space: normal;
 }
 @media (max-width: 767px) {
   .module3-workspace,
@@ -238,7 +270,14 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    overflow-x: clip;
+    overflow: visible;
+  }
+  .module3-page-heading,
+  .module3-report-heading,
+  .module3-panel-heading {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.75rem !important;
   }
   .module3-report-hero,
   .module3-score-wrap,
@@ -257,5 +296,13 @@
   }
   .module3-report-meta dl {
     min-width: 0 !important;
+  }
+  .module3-history-row {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  .module3-history-row > button:first-child {
+    flex: 1 1 auto;
+    width: 100%;
   }
 }

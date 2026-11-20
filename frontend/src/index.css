@@ -532,3 +532,20 @@ section[aria-labelledby="users-heading"] .users-table__actions {
     max-width: 160px;
   }
 }
+@media (max-width: 480px) {
+  section[aria-labelledby="users-heading"] .admin-table-scroll::after {
+    content: "Swipe for actions →";
+    position: sticky;
+    left: 0;
+    display: block;
+    padding: 0.45rem 0.75rem;
+    border-top: 1px solid var(--fy-border);
+    background: var(--fy-surface-muted);
+    color: var(--fy-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  section[aria-labelledby="users-heading"] .users-table__grid {
+    min-width: 560px;
+  }
+}

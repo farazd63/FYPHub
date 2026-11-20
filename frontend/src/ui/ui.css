@@ -295,25 +295,35 @@
 
 .proposal-ai-summary {
   min-width: 0;
+  max-width: 100%;
   margin-block: var(--fy-space-4);
   border-color: var(--fy-border);
   background: var(--fy-surface);
+  overflow: visible;
 }
 .proposal-ai-summary__title {
   margin: 0 0 var(--fy-space-3);
   font-size: var(--fy-text-section);
   font-weight: var(--fy-weight-semibold);
   color: var(--fy-text);
+  overflow-wrap: anywhere;
 }
 .proposal-ai-summary__body {
   min-width: 0;
+  max-width: 100%;
   margin: 0;
   color: var(--fy-text-secondary);
   font-size: var(--fy-text-small);
   line-height: 1.55;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 .proposal-ai-summary__text {
+  min-width: 0;
+  max-width: 100%;
   overflow-wrap: anywhere;
+  word-break: break-word;
   white-space: pre-wrap;
   color: var(--fy-text);
 }

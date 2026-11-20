@@ -278,10 +278,9 @@ html[data-theme="dark"] {
   box-sizing: border-box;
   max-width: 100%;
   min-width: 0;
-  overflow-x: hidden;
 }
 
-/* Phone: layout fits 390px; tables scroll inside the card only */
+/* Phone: page does not scroll sideways; content wraps instead of clipping */
 @media (max-width: 480px) {
   html:has(.admin-shell),
   html:has(.student-shell),
@@ -295,14 +294,22 @@ html[data-theme="dark"] {
 
   .admin-shell,
   .student-shell,
-  .portal-shell,
+  .portal-shell {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
   .admin-shell__content,
   .student-shell .student-content,
   .portal-shell .portal-content,
   .admin-shell .admin-enter,
-  .student-shell .student-content__inner {
+  .student-shell .student-content__inner,
+  .module3-workspace,
+  .module3-panel,
+  .proposal-ai-summary {
     max-width: 100% !important;
-    overflow-x: hidden !important;
+    min-width: 0 !important;
+    overflow-x: visible !important;
   }
 
   .admin-shell table,
@@ -1354,7 +1361,7 @@ html[data-theme="dark"] {
 .student-shell .module3-report-hero,
 .module3-workspace .module3-report-hero {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   gap: 1.5rem !important;
   padding: 1.35rem 1.45rem !important;
   border: 1px solid color-mix(in srgb, var(--fy-brand) 22%, var(--fy-border)) !important;
@@ -1600,12 +1607,41 @@ html[data-theme="dark"] {
 
 .student-shell .module3-history-row,
 .module3-workspace .module3-history-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 0.75rem !important;
   border: 1px solid var(--fy-border);
   border-radius: 0.75rem;
   background: var(--fy-page);
   padding: 0.7rem 0.85rem;
+  min-width: 0;
+  max-width: 100%;
   transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.student-shell .module3-history-row > button,
+.module3-workspace .module3-history-row > button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.student-shell .module3-report-actions,
+.module3-workspace .module3-report-actions {
+  flex-wrap: wrap !important;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.student-shell .module3-page-heading p,
+.module3-workspace .module3-page-heading p,
+.student-shell .proposal-ai-summary,
+.module3-workspace .proposal-ai-summary {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .student-shell .module3-history-row:hover,
