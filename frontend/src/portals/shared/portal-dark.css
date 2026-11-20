@@ -1779,3 +1779,103 @@ html[data-theme="dark"] {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Keep dashboard content on the dark surface in every authenticated portal.
+   Status pills and brand buttons keep their own semantic colors. */
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-report__header,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-summary,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-report-stats > div,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-passed-list > div,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-table-wrap,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-table,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-table th,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-table td,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-evidence-panel,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-evidence-list,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-evidence-list article,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-final-panel,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-history-panel,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-history-row,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-history-list button {
+  background: var(--fy-surface) !important;
+  background-image: none !important;
+  border-color: var(--fy-border) !important;
+}
+
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-table th {
+  background: var(--fy-surface-muted) !important;
+}
+
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-report__header h2,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-summary h2,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-report-stats strong,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row > div > strong,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-passed-list strong,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-table td strong,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-evidence-list strong,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-final-panel strong {
+  color: var(--fy-text) !important;
+}
+
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-summary p,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-report-stats > div span,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row > div,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row > div > p,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-passed-list small,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-table th,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-table td,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-table td small,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-evidence-panel summary span,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-evidence-list p,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-evidence-list small,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-final-panel span,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-final-panel small {
+  color: var(--fy-text-secondary) !important;
+}
+
+/* Shared dashboard cards outside Module 3. */
+html[data-theme="dark"] .cycle-overview,
+html[data-theme="dark"] .cycle-overview__summary,
+html[data-theme="dark"] .cycle-overview__summary > div,
+html[data-theme="dark"] .cycle-overview__message,
+html[data-theme="dark"] .cycle-overview__error,
+html[data-theme="dark"] .cycle-overview__empty,
+html[data-theme="dark"] .cycle-overview__card,
+html[data-theme="dark"] .academic-cycle-dashboard__meta,
+html[data-theme="dark"] .academic-cycle-dashboard__state,
+html[data-theme="dark"] .academic-cycle-dashboard__summary > div,
+html[data-theme="dark"] .academic-cycle-dashboard__tabs button,
+html[data-theme="dark"] .academic-cycle-dashboard__table-wrap,
+html[data-theme="dark"] .academic-cycle-dashboard__card,
+html[data-theme="dark"] .academic-cycle-dashboard__management,
+html[data-theme="dark"] .supervisor-card,
+html[data-theme="dark"] .supervisor-monitor-summary > span,
+html[data-theme="dark"] .supervisor-monitor-table,
+html[data-theme="dark"] .group-ai-card,
+html[data-theme="dark"] .group-ai-scope,
+html[data-theme="dark"] .group-ai-messages,
+html[data-theme="dark"] .group-ai-message,
+html[data-theme="dark"] .group-ai-composer,
+html[data-theme="dark"] .group-ai-prompts,
+html[data-theme="dark"] .group-ai-rules,
+html[data-theme="dark"] .student-collab__history,
+html[data-theme="dark"] .student-collab__message,
+html[data-theme="dark"] .student-collab__composer textarea {
+  background: var(--fy-surface) !important;
+  background-image: none !important;
+  border-color: var(--fy-border) !important;
+  color: var(--fy-text) !important;
+}
+
+html[data-theme="dark"] .group-ai-message--user {
+  background: var(--fy-brand-soft) !important;
+}
+
+html[data-theme="dark"] .group-ai-messages {
+  background: var(--fy-page) !important;
+}
+
+html[data-theme="dark"] .student-collab__message--own {
+  background: var(--fy-brand-soft) !important;
+}

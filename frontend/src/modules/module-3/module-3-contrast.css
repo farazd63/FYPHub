@@ -1,31 +1,18 @@
 /* Keep text readable when the student portal dark theme wraps white report cards. */
-.student-shell .module3-friendly-report .module3-report-stats > div strong,
-.student-shell .module3-friendly-report .module3-priority-row strong,
-.student-shell .module3-friendly-report .module3-passed-list strong,
-.student-shell .module3-friendly-report .module3-evidence-panel strong,
-.student-shell .module3-friendly-report .module3-final-panel strong {
+html:not([data-theme="dark"]) .student-shell .module3-friendly-report .module3-report-stats > div strong,
+html:not([data-theme="dark"]) .student-shell .module3-friendly-report .module3-priority-row strong,
+html:not([data-theme="dark"]) .student-shell .module3-friendly-report .module3-passed-list strong,
+html:not([data-theme="dark"]) .student-shell .module3-friendly-report .module3-evidence-panel strong,
+html:not([data-theme="dark"]) .student-shell .module3-friendly-report .module3-final-panel strong {
   color: #19304f !important;
 }
 
-.student-shell .module3-friendly-report .module3-report-stats > div span,
-.student-shell .module3-friendly-report .module3-priority-row p,
-.student-shell .module3-friendly-report .module3-passed-list small,
-.student-shell .module3-friendly-report .module3-evidence-panel p,
-.student-shell .module3-friendly-report .module3-evidence-panel small,
-.student-shell .module3-friendly-report .module3-final-panel span,
-.student-shell .module3-friendly-report .module3-final-panel small {
+html:not([data-theme="dark"]) .student-shell .module3-friendly-report .module3-report-stats > div span,
+html:not([data-theme="dark"]) .student-shell .module3-friendly-report .module3-priority-row p,
+html:not([data-theme="dark"]) .student-shell .module3-friendly-report .module3-passed-list small,
+html:not([data-theme="dark"]) .student-shell .module3-friendly-report .module3-evidence-panel p,
+html:not([data-theme="dark"]) .student-shell .module3-friendly-report .module3-evidence-panel small,
+html:not([data-theme="dark"]) .student-shell .module3-friendly-report .module3-final-panel span,
+html:not([data-theme="dark"]) .student-shell .module3-friendly-report .module3-final-panel small {
   color: #536a89 !important;
-}
-
-/* The priority cards also sit inside the dark-themed module workspace. Keep
-   their direct text nodes dark even when a broader workspace rule wins. */
-html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row > div,
-html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row > div > strong {
-  color: #111827 !important;
-  opacity: 1 !important;
-}
-
-html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row > div > p {
-  color: #374151 !important;
-  opacity: 1 !important;
 }
