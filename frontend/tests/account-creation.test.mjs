@@ -48,3 +48,11 @@ test("registration number is student-only for every other role", () => {
   assert.match(admin, /\{form\.role === "STUDENT" && \(/);
   assert.match(admin, /nextRole === "STUDENT" \? \{\} : \{ registration_number: "" \}/);
 });
+
+test("admin can edit account metadata without exposing passwords", () => {
+  assert.match(admin, /Edit account/);
+  assert.match(admin, /\/api\/v1\/admin\/users\/\$\{editUser\.id\}/);
+  assert.match(admin, /Save changes/);
+  assert.match(admin, /registration_number: editForm\.registration_number\.trim\(\) \|\| null/);
+  assert.doesNotMatch(admin, /password_hash/);
+});

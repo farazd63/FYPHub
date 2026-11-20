@@ -15,7 +15,7 @@ from app.auth import SESSION_COOKIE_NAME, utc_now
 from app.database import engine, get_db
 from app.main import app
 from app.models import AdminAuditEvent, AuthSession, Team, User, UserRole
-from app.security import generate_session_token, hash_password, hash_session_token
+from app.security import generate_session_token, hash_password, hash_session_token, verify_password
 
 
 def request(method: str, path: str, payload: dict[str, Any] | None = None, *, token: str | None = None) -> tuple[int, Any]:
@@ -146,6 +146,51 @@ class AdminUserTests(unittest.TestCase):
                     token=self.token,
                 )
                 self.assertEqual(status, 422)
+
+    def test_admin_can_replace_password_without_reading_or_returning_credentials(self) -> None:
+        old_hash = self.connection.execute(text("SELECT password_hash FROM users WHERE id = :id"), {"id": self.user_id}).scalar_one()
+        target_token = generate_session_token()
+        self.connection.execute(
+            text("INSERT INTO auth_sessions (user_id, token_hash, expires_at) VALUES (:id, :token, :expires)"),
+            {"id": self.user_id, "token": hash_session_token(target_token), "expires": utc_now().replace(year=utc_now().year + 1)},
+        )
+        status, body = request(
+            "PATCH",
+            f"/api/v1/admin/users/{self.user_id}/password",
+            {"new_password": "Replacement Password!2", "confirm_password": "Replacement Password!2"},
+            token=self.token,
+        )
+        self.assertEqual((status, body["id"]), (200, self.user_id))
+        self.assertNotIn("password", body)
+        self.assertNotIn("password_hash", body)
+        new_hash = self.connection.execute(text("SELECT password_hash FROM users WHERE id = :id"), {"id": self.user_id}).scalar_one()
+        self.assertNotEqual(old_hash, new_hash)
+        self.assertTrue(verify_password("Replacement Password!2", new_hash))
+        self.assertFalse(verify_password("Test Password!", new_hash))
+        self.assertIsNotNone(self.connection.execute(text("SELECT revoked_at FROM auth_sessions WHERE token_hash = :token"), {"token": hash_session_token(target_token)}).scalar_one())
+        audit = self.connection.execute(text("SELECT action, changed_values FROM admin_audit_events WHERE affected_user_id = :id ORDER BY id DESC LIMIT 1"), {"id": self.user_id}).one()
+        self.assertEqual(audit.action, "account_password_changed")
+        self.assertNotIn("password", audit.changed_values)
+
+    def test_admin_can_edit_account_metadata_without_credentials(self) -> None:
+        status, body = request(
+            "PATCH",
+            f"/api/v1/admin/users/{self.user_id}",
+            {
+                "full_name": "Edited Supervisor",
+                "email": " edited-supervisor@example.com ",
+                "registration_number": None,
+                "role": "SUPERVISOR",
+            },
+            token=self.token,
+        )
+        self.assertEqual((status, body["full_name"], body["email"], body["role"]), (200, "Edited Supervisor", "edited-supervisor@example.com", "SUPERVISOR"))
+        self.assertIsNone(body["registration_number"])
+        self.assertNotIn("password", body)
+        self.assertNotIn("password_hash", body)
+        audit = self.connection.execute(text("SELECT action, changed_values FROM admin_audit_events WHERE affected_user_id = :id ORDER BY id DESC LIMIT 1"), {"id": self.user_id}).one()
+        self.assertEqual(audit.action, "account_updated")
+        self.assertNotIn("password", audit.changed_values)
 
     def test_admin_can_create_each_fixed_non_public_role(self) -> None:
         for role in ("SUPERVISOR", "COORDINATOR", "PANEL_MEMBER", "ADMIN"):

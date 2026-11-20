@@ -122,6 +122,24 @@ def _dedupe_headings(items: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     return output
 
 
+def _looks_like_project_title(value: Any, index: int, page: Any = 1) -> bool:
+    """Keep a cover-page project title out of the required section list."""
+    name = _clean_text(value)
+    if index != 0 or page not in (None, 1):
+        return False
+    if re.match(r"^(?:chapter\s+\d+|\d+(?:\.\d+)*[.)]?)\s+", name, re.IGNORECASE):
+        return False
+    return len(name) >= 32 and bool(re.search(r"[:\-]|\b(?:project|platform|system|management|application)\b", name, re.IGNORECASE))
+
+
+def _required_section_names(headings: list[dict[str, Any]]) -> list[str]:
+    return [
+        str(item["name"])
+        for index, item in enumerate(headings)
+        if not _looks_like_project_title(item.get("name"), index, item.get("page"))
+    ]
+
+
 def _explicit_requirement(text: str, term: str) -> bool:
     term_pattern = rf"\b{term}(?:s)?\b"
     required = r"(?:must|required|mandatory|shall|should)"
@@ -146,7 +164,7 @@ def _optional_requirements(text: str, headings: list[dict[str, Any]]) -> dict[st
 
 def _base_rules(*, source: dict[str, Any], headings: list[dict[str, Any]], text: str) -> dict[str, Any]:
     rules: dict[str, Any] = {key: NOT_DETECTED for key in MAIN_RULE_KEYS}
-    rules["required_sections"] = [item["name"] for item in headings]
+    rules["required_sections"] = _required_section_names(headings)
     rules["section_sequence"] = list(rules["required_sections"])
     rules["detected_headings"] = headings
     rules.update(_optional_requirements(text, headings))
@@ -468,6 +486,7 @@ def normalize_template_rules(rules: dict[str, Any]) -> dict[str, Any]:
             value = rules[key]
             cleaned[key] = NOT_DETECTED if value in (None, "") or (isinstance(value, str) and value.strip().casefold().startswith("not detected")) else value
     sections = _section_list(rules.get("required_sections")) or _section_list(rules.get("section_sequence"))
+    sections = [name for index, name in enumerate(sections) if not _looks_like_project_title(name, index)]
     if sections:
         cleaned["required_sections"] = sections
         cleaned["section_sequence"] = list(sections)

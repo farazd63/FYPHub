@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 import re
 from typing import Any
 
+from .report_summary import prepare_user_friendly_report
+
 
 def _text(value: Any) -> str:
     return "" if value is None else str(value).strip()
@@ -95,8 +97,10 @@ def _difference_text(item: dict[str, Any]) -> str:
     expected = item.get("expected")
     actual = item.get("actual")
     label = str(item.get("name", "Issue"))
+    if status in {"PARTIAL", "UNVERIFIABLE"}:
+        return "Evidence was insufficient to verify this requirement."
     if expected is None or actual is None or expected == "" or actual == "":
-        return "Could not verify this requirement from the uploaded document."
+        return "The required value or section was not found in the uploaded document."
     if isinstance(expected, bool) and isinstance(actual, bool):
         if label == "Page Numbering":
             return "Page numbering requirement violated"
@@ -123,9 +127,17 @@ def _clean_issue(item: dict[str, Any], page_count: int, *, affected_pages: list[
     label = str(item.get("name") or "Compliance requirement")
     status = str(item.get("status") or "UNVERIFIABLE")
     severity = _issue_severity(item)
-    student_document = _format_comparison_value(item.get("actual"), label=label)
+    actual = item.get("actual")
+    if status in {"PARTIAL", "UNVERIFIABLE"}:
+        student_document = "Could not verify from the uploaded document"
+    elif _not_detected(actual):
+        student_document = "Not found in the uploaded document"
+    else:
+        student_document = _format_comparison_value(actual, label=label)
     if label == "Page Numbering" and status != "PASS":
         student_document = f"Page number missing on {_page_range_label(pages)}"
+    status_label = {"PASS": "Passed", "FAIL": "Failed", "PARTIAL": "Verify", "UNVERIFIABLE": "Verify"}.get(status, "Verify")
+    priority = "High" if status == "FAIL" and severity == "critical" else "Medium"
     return {
         "id": str(item.get("id") or label.lower().replace(" ", "-")),
         "category": str(item.get("category") or "Template Compliance"),
@@ -137,6 +149,10 @@ def _clean_issue(item: dict[str, Any], page_count: int, *, affected_pages: list[
         "affectedPages": pages,
         "requiredAction": _required_action(label, item.get("expected"), status),
         "status": "passed" if status == "PASS" else "failed" if status == "FAIL" else "warning",
+        "statusCode": status,
+        "statusLabel": status_label,
+        "priority": priority,
+        "evidence": item.get("evidence", "") or "Evidence was not recorded for this check.",
     }
 
 
@@ -323,17 +339,6 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
             item = {"id": "sequence-order", "name": "Section Sequence", "category": "Section Sequence", "status": "PASS", "expected": expected_sections, "actual": actual_sections, "difference": None, "location": {"scope": "document", "page": 1, "document_level": True}, "evidence": "The detected sections follow the active university template order."}
             checks.append(item)
             category_items.setdefault("Section Sequence", []).append(item)
-    elif expected_sections:
-        item = {"id": "template-structure", "name": "Template Structure", "category": "Template Structure", "status": "FAIL", "expected": "Approved university template structure", "actual": "Custom student layout", "difference": None, "location": {"scope": "document", "page": 1, "document_level": True}, "evidence": "The required template headings could not be matched in the uploaded proposal."}
-        checks.append(item)
-        category_items.setdefault("Template Structure", []).append(item)
-        violations.append(_violation(item, len(violations) + 1, "Template Structure"))
-    if expected_sections and missing_sections and not any(item.get("id") == "template-structure" for item in checks):
-        item = {"id": "template-structure", "name": "Template Structure", "category": "Template Structure", "status": "FAIL", "expected": "Approved university template structure", "actual": "Custom student layout", "difference": None, "location": {"scope": "document", "page": 1, "document_level": True}, "evidence": "The required template headings or their order were not followed in the uploaded proposal."}
-        checks.append(item)
-        category_items.setdefault("Template Structure", []).append(item)
-        violations.append(_violation(item, len(violations) + 1, "Template Structure"))
-
     # Optional structural rules let an administrator require references,
     # appendices, and captions without hard-coding a particular university format.
     structural_counts = (
@@ -382,8 +387,8 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
     clean_issues = build_document_difference_issues(checks, submission.page_count)
     critical_issues = [item for item in clean_issues if item["severity"] == "critical" and item["status"] != "passed"]
     warning_issues = [item for item in clean_issues if item["severity"] == "warning" and item["status"] != "passed"]
-    report_status = "Rejected" if any(item["status"] == "failed" for item in critical_issues) else "Needs Correction" if critical_issues or warning_issues else "Compliant"
-    return {
+    report_status = "Needs Major Corrections" if any(item["status"] == "failed" for item in critical_issues) else "Needs Corrections" if critical_issues or warning_issues else "Compliant"
+    report = {
         "reportSummary": {"score": score, "status": report_status, "totalIssues": failed + partial, "metrics": {"passed": passed, "failed": failed, "partial": partial, "total": total}},
         "reportMetadata": {"reportVersion": "2.0", "templateName": template_name or f"{submission.proposal_type.title()} University Template", "analysisDate": datetime.now(timezone.utc).isoformat()},
         "documentDifferenceIssues": clean_issues,
@@ -399,6 +404,7 @@ def build_compliance_report(*, submission: Any, rules: dict[str, Any], previous_
         "academicConsistency": category_items.get("Academic Consistency", []),
         "engine": {"name": "FYPHub deterministic compliance engine", "source": "PYTHON", "advisory": False},
     }
+    return prepare_user_friendly_report(report)
 
 
 def _pill(value: str) -> str:

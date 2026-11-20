@@ -1,105 +1,199 @@
-"""Team-scoped, advisory local Ollama chat."""
+"""Student-only general chatbot backed directly by the local Llama model."""
+
+from __future__ import annotations
+
 import json
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import Request as UrlRequest, HTTPRedirectHandler, build_opener
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from urllib.request import HTTPRedirectHandler, Request as UrlRequest, build_opener
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
 from .auth import get_current_user, validate_mutating_origin
 from .config import settings
-from .database import get_db
-from .group_channels import MessageWrite, output
-from .models import AcademicDeadline, AcademicDeadlineVersion, AcademicGroupPolicy, GroupMessage, ProjectTask, SupervisorAssignment, Team, User, UserRole
+from .database import SessionLocal, get_db
+from .group_channels import MessageWrite
+from .models import StudentAIMessage, User, UserRole
 
-router = APIRouter(prefix="/api/v1/group-ai")
+router = APIRouter(prefix="/api/v1/group-ai", tags=["student-ai"])
+
+CHAT_MODEL = "llama3.1:8b"
+MAX_HISTORY_MESSAGES = 12
+MAX_GENERATION_TOKENS = 256
+CHAT_TIMEOUT_SECONDS = 180
+MODEL_KEEP_ALIVE = "24h"
+
 
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
 
-def require_team(session, actor, team_id):
-    team = session.get(Team, team_id)
-    if team is None or not (actor.role in (UserRole.ADMIN, UserRole.COORDINATOR) or (actor.role == UserRole.STUDENT and team.shared_user_id == actor.id)):
-        raise HTTPException(status_code=403, detail="Team access is not permitted.")
-    return team
+
+def unavailable() -> HTTPException:
+    return HTTPException(status_code=503, detail="Llama 3.1 8B is unavailable. Check the local Ollama service.")
 
 
-def scoped_context(session, team):
-    messages = session.scalars(select(GroupMessage).where(GroupMessage.team_id == team.id, GroupMessage.channel != "group_ai").order_by(GroupMessage.id.desc()).limit(60)).all()
-    policy = session.scalar(select(AcademicGroupPolicy).where(AcademicGroupPolicy.academic_cycle_id == team.academic_cycle_id))
-    deadlines = session.scalars(select(AcademicDeadlineVersion).join(AcademicDeadline, AcademicDeadline.id == AcademicDeadlineVersion.academic_deadline_id).where(AcademicDeadline.academic_cycle_id == team.academic_cycle_id).order_by(AcademicDeadlineVersion.due_at_utc)).all()
-    tasks = session.scalars(select(ProjectTask).where(ProjectTask.team_id == team.id).order_by(ProjectTask.due_at.nulls_last()).limit(40)).all()
+def _require_student(actor: User) -> None:
+    if actor.role != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="The AI chatbot is available in the student portal only.")
+
+
+def _message_out(message: StudentAIMessage) -> dict:
     return {
-        "team_id": team.id,
-        "cycle_id": team.academic_cycle_id,
-        "group_policy": {"min_size": policy.min_group_size, "max_size": policy.max_group_size} if policy else {},
-        "deadlines": [{"name": version.name, "due_at": version.due_at_utc.isoformat()} for version in deadlines],
-        "tasks": [{"title": task.title, "due_at": task.due_at.isoformat() if task.due_at else None, "completion_percent": task.completion_percent} for task in tasks],
-        "recent_channel_messages": [{"channel": row.channel, "body": row.body[:1000]} for row in reversed(messages)],
+        "id": message.id,
+        "author_kind": message.author_kind,
+        "body": message.body,
+        "created_at": message.created_at,
     }
 
-def unavailable():
-    return HTTPException(status_code=503, detail="Group AI chatbot is unavailable. Check the configured local runtime and model.")
 
-def generate(question, context=None):
+def _recent_rows(session: Session, actor: User) -> list[StudentAIMessage]:
+    rows = session.scalars(
+        select(StudentAIMessage)
+        .where(StudentAIMessage.user_id == actor.id)
+        .order_by(StudentAIMessage.id.desc())
+        .limit(MAX_HISTORY_MESSAGES)
+    ).all()
+    return list(reversed(rows))
+
+
+def _model_messages(rows: list[StudentAIMessage], question: str) -> list[dict[str, str]]:
+    messages = [
+        {
+            "role": "assistant" if row.author_kind == "AI" else "user",
+            "content": row.body,
+        }
+        for row in rows
+        if row.body.strip()
+    ]
+    messages.append({"role": "user", "content": question})
+    return messages
+
+
+def _request(question: str, recent_messages: list[StudentAIMessage] | None = None) -> UrlRequest:
+    """Build the direct Llama request without adding application context."""
+
     url = settings.ollama_url.strip().rstrip("/")
-    primary = str(getattr(settings, "ollama_agent_model", getattr(settings, "ollama_model", ""))).strip()
-    fallback = str(getattr(settings, "ollama_fallback_model", "")).strip()
-    models = [model for index, model in enumerate((primary, fallback)) if model and model not in (primary, fallback)[:index]]
     parts = urlsplit(url)
-    allowed_hosts = getattr(
-        settings,
-        "ollama_allowed_hosts",
-        ("127.0.0.1", "localhost", "::1"),
-    )
+    allowed_hosts = getattr(settings, "ollama_allowed_hosts", ("127.0.0.1", "localhost", "::1", "ollama"))
     hostname = (parts.hostname or "").lower()
-    if not models or parts.scheme != "http" or hostname not in allowed_hosts or parts.username or parts.password or parts.query or parts.fragment:
+    if (
+        parts.scheme != "http"
+        or hostname not in allowed_hosts
+        or parts.username
+        or parts.password
+        or parts.query
+        or parts.fragment
+    ):
         raise unavailable()
-    system = "You are an advisory group assistant. Your output is AI-generated advice, not an academic decision."
-    if context:
-        system += " You are strictly scoped to this group context and must not reveal other group data:\n" + json.dumps(context, sort_keys=True)
-    last_error: Exception | None = None
-    for model in models:
-        try:
-            payload = json.dumps({"model": model, "stream": False, "messages": [{"role": "system", "content": system}, {"role": "user", "content": question}]}).encode("utf-8")
-            request = UrlRequest(url + "/api/chat", data=payload, headers={"Content-Type": "application/json"}, method="POST")
-            with build_opener(NoRedirect()).open(request, timeout=30) as response:
-                raw = response.read(65537)
-            if len(raw) > 65536:
-                raise ValueError("response too large")
-            data = json.loads(raw)
-            content = data["message"]["content"]
-            if not isinstance(content, str) or not content.strip() or len(content) > 16000:
-                raise ValueError("invalid response")
-            return content
-        except HTTPException:
-            raise
-        except (ValueError, KeyError, TypeError, UnicodeError, URLError, HTTPError, TimeoutError, OSError) as error:
-            last_error = error
-    if last_error is not None:
-        raise unavailable() from None
-    raise unavailable()
 
-@router.get("/{team_id}")
-def history(team_id: int, before_id: int | None = Query(None, gt=0), actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
-    require_team(session, actor, team_id)
-    query = select(GroupMessage).where(GroupMessage.team_id == team_id, GroupMessage.channel == "group_ai")
-    if before_id is not None: query = query.where(GroupMessage.id < before_id)
-    return [output(row) for row in reversed(session.scalars(query.order_by(GroupMessage.id.desc()).limit(100)).all())]
+    payload = json.dumps(
+        {
+            "model": CHAT_MODEL,
+            "stream": True,
+            "keep_alive": MODEL_KEEP_ALIVE,
+            "options": {"num_predict": MAX_GENERATION_TOKENS},
+            "messages": _model_messages(recent_messages or [], question),
+        }
+    ).encode("utf-8")
+    return UrlRequest(
+        url + "/api/chat",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
 
-@router.post("/{team_id}", status_code=201)
-def chat(team_id: int, payload: MessageWrite, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
-    validate_mutating_origin(request)
-    team = require_team(session, actor, team_id)
-    context = scoped_context(session, team)
-    answer = generate(payload.body, context)
+
+def generate(question: str, recent_messages: list[StudentAIMessage] | None = None) -> str:
+    """Send only the question and optional chatbot history to Llama 3.1 8B."""
+
+    request = _request(question, recent_messages)
     try:
-        user_message = GroupMessage(team_id=team_id, channel="group_ai", author_id=actor.id, author_kind="TEAM", body=payload.body)
-        ai_message = GroupMessage(team_id=team_id, channel="group_ai", author_id=actor.id, author_kind="AI", body=answer)
-        session.add_all([user_message, ai_message]); session.flush(); session.commit()
-        session.refresh(user_message); session.refresh(ai_message)
-        return {"question": output(user_message), "answer": output(ai_message)}
-    except Exception:
-        session.rollback()
-        raise HTTPException(status_code=500, detail="Group AI conversation could not be saved.") from None
+        with build_opener(NoRedirect()).open(request, timeout=CHAT_TIMEOUT_SECONDS) as response:
+            content = ""
+            for line in response:
+                if not line.strip():
+                    continue
+                data = json.loads(line)
+                content += str(data.get("message", {}).get("content", ""))
+                if data.get("done"):
+                    break
+                if len(content) > 16000:
+                    raise ValueError("response too large")
+        if not content.strip():
+            raise ValueError("invalid response")
+        return content.strip()
+    except HTTPException:
+        raise
+    except (ValueError, KeyError, TypeError, UnicodeError, URLError, HTTPError, TimeoutError, OSError):
+        raise unavailable() from None
+
+
+@router.get("")
+def history(actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    _require_student(actor)
+    return [_message_out(row) for row in _recent_rows(session, actor)]
+
+
+@router.post("", status_code=200)
+def chat(
+    payload: MessageWrite,
+    request: Request,
+    actor: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    _require_student(actor)
+    validate_mutating_origin(request)
+    recent = _recent_rows(session, actor)
+    def events():
+        question = StudentAIMessage(user_id=actor.id, author_kind="USER", body=payload.body)
+        answer_parts: list[str] = []
+        try:
+            request_to_ollama = _request(payload.body, recent)
+            with build_opener(NoRedirect()).open(request_to_ollama, timeout=CHAT_TIMEOUT_SECONDS) as ollama_response:
+                for line in ollama_response:
+                    if not line.strip():
+                        continue
+                    data = json.loads(line)
+                    token = str(data.get("message", {}).get("content", ""))
+                    if token:
+                        answer_parts.append(token)
+                        yield f"data: {json.dumps({'type': 'token', 'token': token}, ensure_ascii=False)}\n\n"
+                    if data.get("done"):
+                        break
+                    if sum(len(part) for part in answer_parts) > 16000:
+                        raise ValueError("response too large")
+            answer_text = "".join(answer_parts).strip()
+            if not answer_text:
+                raise ValueError("invalid response")
+            response = StudentAIMessage(user_id=actor.id, author_kind="AI", body=answer_text)
+            persistence_session = SessionLocal()
+            try:
+                persistence_session.add_all([question, response])
+                persistence_session.commit()
+                persistence_session.refresh(question)
+                persistence_session.refresh(response)
+            except Exception:
+                persistence_session.rollback()
+                raise
+            finally:
+                persistence_session.close()
+            yield f"data: {json.dumps({'type': 'done', 'model': CHAT_MODEL, 'question': _message_out(question), 'answer': _message_out(response)}, ensure_ascii=False, default=str)}\n\n"
+        except HTTPException as error:
+            yield f"data: {json.dumps({'type': 'error', 'message': error.detail}, ensure_ascii=False, default=str)}\n\n"
+        except (ValueError, KeyError, TypeError, UnicodeError, URLError, HTTPError, TimeoutError, OSError) as error:
+            detail = "Llama 3.1 8B is unavailable. Check the local Ollama service."
+            if isinstance(error, HTTPException):
+                detail = str(error.detail)
+            yield f"data: {json.dumps({'type': 'error', 'message': detail}, ensure_ascii=False)}\n\n"
+        except Exception:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'The chatbot response could not be saved.'}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )

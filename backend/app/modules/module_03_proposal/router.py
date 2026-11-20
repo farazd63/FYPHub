@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import re
-import json
-import hashlib
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,14 +21,15 @@ from sqlalchemy.orm import Session
 from ...auth import get_current_user, require_roles, utc_now, validate_mutating_origin
 from ...config import settings
 from ...database import get_db
-from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, SupervisorAssignment, Team, TeamMember, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
-from ...pdf_extraction import PdfExtractionError, extract_pdf_text_for_summary, extract_proposal_document
+from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, ProposalVersionComparison, SupervisorAssignment, Team, TeamMember, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
+from ...pdf_extraction import PdfExtractionError, extract_proposal_document
 from ...document_preview import DocumentPreviewError, render_document_preview
 from .compliance_engine import build_change_summary, build_compliance_report, build_document_difference_issues
+from .comparison import build_version_comparison, generate_comparison_summary
 from .template_extractor import extract_template_rules, normalize_template_rules
 from ...team_lifecycle import lock_team
-from ...ai_provider import run_ai_json
-from .ai_report import REPORT_VERSION, generate_full_report
+from ...ai_provider import provider_config, run_ai_json
+from .report_summary import generate_report_summary, prepare_user_friendly_report
 
 router = APIRouter(prefix="/api/v1/proposal-compliance", tags=["module-3-proposal-compliance"])
 REVIEW_ROLES = (UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR, UserRole.PANEL_MEMBER)
@@ -89,23 +89,6 @@ def _safe_stored_path(storage_key: str | None) -> Path | None:
     root = settings.document_storage_root.resolve()
     candidate = (root / storage_key).resolve()
     return candidate if candidate.is_relative_to(root) else None
-
-
-def _summary_source_text(row: ProposalComplianceSubmission) -> str:
-    """Use the stored report as the source, refreshing PDF text with PyMuPDF."""
-    path = _safe_stored_path(getattr(row, "storage_key", None))
-    if path is not None and path.is_file():
-        try:
-            if getattr(row, "content_type", "") == "application/pdf":
-                readable_text = extract_pdf_text_for_summary(path.read_bytes())
-                if len(readable_text) >= 20:
-                    return readable_text
-            extracted = extract_proposal_document(path.read_bytes(), row.content_type, row.filename)
-            if len(extracted.extracted_text) >= 20:
-                return extracted.extracted_text
-        except (OSError, PdfExtractionError):
-            pass
-    return row.extracted_text or ""
 
 
 def _inline_headers(filename: str, page_count: int) -> dict[str, str]:
@@ -187,8 +170,15 @@ def _detected_headings(text: str) -> list[dict[str, Any]]:
 
 def _submission_out(session: Session, row: ProposalComplianceSubmission) -> dict[str, Any]:
     report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
-    summary = report.report.get("reportSummary", {}) if report else {}
+    summary = prepare_user_friendly_report(report.report).get("reportSummary", {}) if report else {}
     return {"id": row.id, "proposal_key": row.proposal_key, "title": row.title, "proposal_type": row.proposal_type, "version": row.version, "status": row.status, "processing_status": row.processing_status, "filename": row.filename, "page_count": row.page_count, "created_at": row.created_at, "score": summary.get("score"), "report_status": summary.get("status"), "report_available": report is not None}
+
+
+def _report_out(session: Session, row: ProposalComplianceSubmission, report: dict[str, Any]) -> dict[str, Any]:
+    payload = prepare_user_friendly_report(report)
+    owner = session.get(User, row.owner_user_id)
+    payload["student"] = {"name": owner.full_name if owner else "Student", "email": owner.email if owner else None, "registrationNumber": owner.registration_number if owner else None}
+    return payload
 
 
 def _version_history(session: Session, row: ProposalComplianceSubmission) -> list[dict[str, Any]]:
@@ -212,6 +202,56 @@ def _version_history(session: Session, row: ProposalComplianceSubmission) -> lis
             "changeSummary": build_change_summary(item.extracted_fields, row.extracted_fields, item.version, row.version),
         })
     return history
+
+
+def _previous_audited_submission(session: Session, row: ProposalComplianceSubmission) -> tuple[ProposalComplianceSubmission, ProposalComplianceReport] | None:
+    owner_scope = or_(ProposalComplianceSubmission.team_id == row.team_id, ProposalComplianceSubmission.owner_user_id == row.owner_user_id) if row.team_id is not None else ProposalComplianceSubmission.owner_user_id == row.owner_user_id
+    match = session.execute(
+        select(ProposalComplianceSubmission, ProposalComplianceReport)
+        .join(ProposalComplianceReport, ProposalComplianceReport.submission_id == ProposalComplianceSubmission.id)
+        .where(ProposalComplianceSubmission.proposal_key == row.proposal_key, owner_scope, ProposalComplianceSubmission.version < row.version)
+        .order_by(desc(ProposalComplianceSubmission.version))
+        .limit(1)
+    ).first()
+    return (match[0], match[1]) if match else None
+
+
+def _comparison_out(comparison: ProposalVersionComparison) -> dict[str, Any]:
+    payload = dict(comparison.comparison or {})
+    payload.update({
+        "id": comparison.id,
+        "previousSubmissionId": comparison.previous_submission_id,
+        "currentSubmissionId": comparison.current_submission_id,
+        "previousReportId": comparison.previous_report_id,
+        "currentReportId": comparison.current_report_id,
+        "createdAt": comparison.created_at,
+        "aiSummary": comparison.ai_summary,
+        "aiStatus": comparison.ai_status,
+        "aiMeta": {"source": comparison.ai_source, "model": comparison.ai_model, "provider": comparison.ai_provider, "generatedAt": comparison.ai_generated_at, "inputScope": "STRUCTURED_VERSION_COMPARISON_V1"} if comparison.ai_status else None,
+    })
+    return payload
+
+
+def _ensure_version_comparison(session: Session, row: ProposalComplianceSubmission) -> tuple[ProposalVersionComparison | None, bool]:
+    current_report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
+    if current_report is None:
+        return None, False
+    existing = session.scalar(select(ProposalVersionComparison).where(ProposalVersionComparison.current_submission_id == row.id).limit(1))
+    if existing is not None:
+        return existing, False
+    previous = _previous_audited_submission(session, row)
+    if previous is None:
+        return None, False
+    previous_row, previous_report = previous
+    result = build_version_comparison(previous_report=previous_report.report, current_report=current_report.report, previous_version=previous_row.version, current_version=row.version, previous_template_version_id=previous_row.template_reference_version_id, current_template_version_id=row.template_reference_version_id)
+    comparison = ProposalVersionComparison(
+        previous_submission_id=previous_row.id, current_submission_id=row.id, previous_report_id=previous_report.id, current_report_id=current_report.id,
+        previous_version=result["previousVersion"], current_version=result["currentVersion"], previous_score=result["previousScore"], current_score=result["newScore"], score_difference=result["scoreDifference"], overall_result=result["overallResult"],
+        previous_issue_count=result["previousIssueCount"], current_issue_count=result["currentIssueCount"], fixed_count=len(result["fixedIssues"]), remaining_count=len(result["remainingIssues"]), new_count=len(result["newIssues"]), unchanged_count=len(result["unchangedIssues"]), net_issue_change=result["netIssueChange"], different_template_versions=result["differentTemplateVersions"], comparison=result,
+    )
+    session.add(comparison)
+    session.flush()
+    return comparison, True
 
 
 def _can_view(session: Session, actor: User, row: ProposalComplianceSubmission) -> bool:
@@ -442,6 +482,8 @@ async def submit_proposal(
     history = _version_history(session, row)
     report = build_compliance_report(submission=row, rules=rules, previous_versions=history, template_name=template_version.title)
     session.add(ProposalComplianceReport(submission_id=row.id, status=report["reportSummary"]["status"], score=report["reportSummary"]["score"], total_checks=report["finalResults"]["totalChecks"], report=report))
+    session.flush()
+    _ensure_version_comparison(session, row)
     session.commit()
     if team is not None and not is_draft:
         lock_team(session, team.id, "proposal_submitted")
@@ -465,6 +507,8 @@ def _run_submission(session: Session, row: ProposalComplianceSubmission, templat
         saved.score = report_data["reportSummary"]["score"]
         saved.total_checks = report_data["finalResults"]["totalChecks"]
         saved.report = report_data
+    session.flush()
+    _ensure_version_comparison(session, row)
     session.commit()
     session.refresh(row)
     return {"submission": _submission_out(session, row), "report": report_data}
@@ -533,13 +577,29 @@ def get_submission(submission_id: int, actor: User = Depends(get_current_user), 
     if row is None or not _can_view(session, actor, row):
         raise _error("submission_not_found", "The proposal submission was not found.", 404)
     report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
-    return {"submission": _submission_out(session, row), "report": report.report if report else None, "versionHistory": _version_history(session, row)}
+    return {"submission": _submission_out(session, row), "report": _report_out(session, row, report.report) if report else None, "versionHistory": _version_history(session, row)}
 
 
 @router.get("/reports")
 def report_queue(actor: User = Depends(require_roles(*REVIEW_ROLES)), session: Session = Depends(get_db)):
     rows = session.scalars(select(ProposalComplianceSubmission).order_by(desc(ProposalComplianceSubmission.created_at), desc(ProposalComplianceSubmission.version))).all()
     return [_submission_out(session, row) for row in rows if _can_view(session, actor, row)]
+
+
+@router.get("/submissions/{submission_id}/comparison")
+def get_version_comparison(submission_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    row = session.get(ProposalComplianceSubmission, submission_id)
+    if row is None or not _can_view(session, actor, row):
+        raise _error("submission_not_found", "The proposal submission was not found.", 404)
+    if session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1)) is None:
+        raise _error("report_pending", "Run the compliance check before comparing versions.", 409)
+    comparison, created = _ensure_version_comparison(session, row)
+    if created:
+        session.commit()
+        session.refresh(comparison)
+    if comparison is None:
+        return {"status": "NO_PREVIOUS_VERSION", "message": "No previous version available for comparison.", "comparison": None}
+    return {"status": "AVAILABLE", "comparison": _comparison_out(comparison)}
 
 
 @router.get("/reports/{submission_id}")
@@ -550,55 +610,73 @@ def get_report(submission_id: int, actor: User = Depends(get_current_user), sess
     report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
     if report is None:
         raise _error("report_pending", "The compliance report is not available yet.", 409)
-    return report.report
+    return _report_out(session, row, report.report)
 
 
-def _report_fingerprint(report: dict) -> str:
-    return hashlib.sha256(json.dumps({key: value for key, value in report.items() if key != "aiSummary"}, sort_keys=True, default=str).encode()).hexdigest()
-
-
-def _summary_source_fingerprint(text: str | None) -> str:
-    return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
-
-
-@router.post("/reports/{submission_id}/ai-summary")
-async def generate_compliance_summary(submission_id: int, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+@router.post("/reports/{submission_id}/summary")
+async def generate_report_ai_summary(submission_id: int, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    """Explain the verified report without sending the proposal or PDF to the model."""
     validate_mutating_origin(request)
     row = session.get(ProposalComplianceSubmission, submission_id)
     if row is None or not _can_view(session, actor, row):
         raise _error("report_not_found", "The compliance report was not found.", 404)
-    report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id))
-    if report is None:
-        raise _error("report_pending", "Run the compliance check before generating its summary.", 409)
-    source_text = _summary_source_text(row)
-    source_fingerprint = _summary_source_fingerprint(source_text)
-    cached = report.report.get("aiSummary")
-    if cached and cached.get("status") == "COMPLETED" and cached.get("source_fingerprint") == source_fingerprint and cached.get("input_scope") == "STUDENT_REPORT_TEXT_V2" and cached.get("report_format") == REPORT_VERSION:
-        return cached
-    context = {"student_report_text": source_text}
+    saved = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).limit(1))
+    if saved is None:
+        raise _error("report_pending", "The compliance report is not available yet.", 409)
+    current = prepare_user_friendly_report(saved.report)
+    if current.get("aiSummary") and current.get("aiSummaryStatus") in {"COMPLETED", "FALLBACK"}:
+        return _report_out(session, row, current)
     actor_id = actor.id
-    source_sha = row.sha256
+    model_override = settings.ollama_fallback_model if provider_config().get("provider") == "ollama" else None
     session.rollback()
-    result = await generate_full_report(context, run_ai_json, rate_key=f"compliance-summary:{actor_id}")
-    saved = {"status": result.get("status", "UNAVAILABLE"), "source": result.get("source"), "generation_mode": result.get("generation_mode"), "fallback_reason": result.get("fallback_reason"), "model": result.get("model"), "provider": result.get("provider"), "generated_at": result.get("timestamp"), "advisory": True, "source_fingerprint": source_fingerprint, "source_sha256": source_sha, "input_scope": "STUDENT_REPORT_TEXT_V2", "report_format": REPORT_VERSION, "summary_word_count": result.get("summary_word_count")}
-    if result.get("status") == "COMPLETED":
-        payload = result.get("payload") or {}
-        summary = payload.get("summary") if isinstance(payload, dict) else None
-        if isinstance(summary, str):
-            saved["summary"] = summary
-        else:
-            saved["status"] = "UNAVAILABLE"
-            saved["message"] = "AI summary is unavailable because the model returned no final summary. Retry generation when the model is ready."
-    else:
-        saved["message"] = result.get("message") or "AI summary is unavailable. The rule-based compliance report remains available. Retry generation when the model is ready."
-    current_row = session.get(ProposalComplianceSubmission, submission_id)
-    report = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == submission_id).with_for_update())
-    if current_row is None or _summary_source_fingerprint(_summary_source_text(current_row)) != source_fingerprint or report is None:
+    result = await generate_report_summary(current, run_ai_json, rate_key=f"proposal-compliance-report:{actor_id}", model_override=model_override)
+    refreshed = session.scalar(select(ProposalComplianceReport).where(ProposalComplianceReport.submission_id == row.id).with_for_update())
+    if refreshed is None:
         session.rollback()
-        raise _error("report_changed", "The uploaded report changed during generation. Retry its summary.", 409)
-    report.report = {**report.report, "aiSummary": saved}
+        raise _error("report_changed", "The compliance report changed during summary generation. Retry.", 409)
+    report_payload = prepare_user_friendly_report(refreshed.report)
+    report_payload["aiSummary"] = result.get("summary")
+    report_payload["aiSummaryStatus"] = result.get("status")
+    report_payload["aiSummaryMeta"] = {key: result.get(key) for key in ("source", "model", "provider", "generatedAt", "inputScope", "fallbackReason") if result.get(key) is not None}
+    refreshed.report = report_payload
     session.commit()
-    return saved
+    session.refresh(refreshed)
+    return _report_out(session, row, refreshed.report)
+
+
+@router.post("/comparisons/{comparison_id}/summary")
+async def generate_version_comparison_summary(comparison_id: int, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    comparison = session.get(ProposalVersionComparison, comparison_id)
+    current = session.get(ProposalComplianceSubmission, comparison.current_submission_id) if comparison else None
+    if comparison is None or current is None or not _can_view(session, actor, current):
+        raise _error("comparison_not_found", "The version comparison was not found.", 404)
+    if comparison.ai_summary and comparison.ai_status in {"COMPLETED", "FALLBACK"}:
+        return _comparison_out(comparison)
+    structured_comparison = dict(comparison.comparison or {})
+    actor_id = actor.id
+    session.rollback()
+    result = await generate_comparison_summary(structured_comparison, run_ai_json, rate_key=f"proposal-version-comparison:{actor_id}")
+    generated_at = result.get("generatedAt")
+    parsed_generated_at = None
+    if isinstance(generated_at, str):
+        try:
+            parsed_generated_at = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+        except ValueError:
+            parsed_generated_at = None
+    saved = session.scalar(select(ProposalVersionComparison).where(ProposalVersionComparison.id == comparison_id).with_for_update())
+    if saved is None:
+        session.rollback()
+        raise _error("comparison_changed", "The version comparison changed during summary generation. Retry.", 409)
+    saved.ai_summary = result.get("summary")
+    saved.ai_status = result.get("status")
+    saved.ai_source = result.get("source")
+    saved.ai_model = result.get("model")
+    saved.ai_provider = result.get("provider")
+    saved.ai_generated_at = parsed_generated_at
+    session.commit()
+    session.refresh(saved)
+    return _comparison_out(saved)
 
 
 @router.post("/reports/{submission_id}/run")
@@ -741,14 +819,15 @@ def _render_pdf(report: dict[str, Any]) -> bytes:
     styles["Title"].textColor = "#19304F"
     styles["Title"].fontSize = 20
     styles["Heading2"].textColor = "#19304F"
+    report = prepare_user_friendly_report(report)
     summary = report.get("reportSummary", {})
     metadata = report.get("reportMetadata", {})
     proposal = report.get("proposal", {})
     template = report.get("template", {})
-    issues = _report_issues(report)
-    critical = [item for item in issues if item.get("severity") == "critical" and item.get("status") != "passed"]
-    warnings = [item for item in issues if item.get("severity") == "warning" and item.get("status") != "passed"]
-    status = "Rejected" if any(item.get("status") == "failed" for item in critical) else "Needs Correction" if critical or warnings else "Compliant"
+    issues = report.get("comparisonRows") or _report_issues(report)
+    critical = [item for item in issues if item.get("statusCode") == "FAIL" or (item.get("severity") == "critical" and item.get("status") != "passed")]
+    warnings = [item for item in issues if item.get("statusCode") in {"PARTIAL", "UNVERIFIABLE"} or (item.get("severity") == "warning" and item.get("status") != "passed")]
+    status = summary.get("status") or "Needs Corrections"
     page_count = int(report.get("document", {}).get("pageCount") or 1)
     template_name = metadata.get("templateName") or template.get("title") or "Active University Template"
     analysis_date = str(metadata.get("analysisDate") or "").split("T", 1)[0] or "Current analysis"
@@ -772,7 +851,7 @@ def _render_pdf(report: dict[str, Any]) -> bytes:
     ], colWidths=[42.5 * mm] * 4, style=TableStyle([["BACKGROUND", (0, 0), (-1, 0), "#1E2436"], ["TEXTCOLOR", (0, 0), (-1, 0), "white"], ["GRID", (0, 0), (-1, -1), 0.25, "#D8E0EA"], ["ALIGN", (0, 0), (-1, -1), "CENTER"], ["BACKGROUND", (0, 1), (-1, 1), "#F5F8FC"], ["FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"], ["TOPPADDING", (0, 0), (-1, -1), 8], ["BOTTOMPADDING", (0, 0), (-1, -1), 8]]))
     story.append(summary_table)
     story.append(Spacer(1, 14))
-    for heading, group in (("Critical Violations", critical), ("Warnings", warnings), ("Passed Checks", [item for item in issues if item.get("status") == "passed"])):
+    for heading, group in (("What to Fix First", critical), ("Checks Requiring Verification", warnings), ("Passed Checks", [item for item in issues if item.get("statusCode") == "PASS" or item.get("status") == "passed"])):
         story.append(Paragraph(heading, styles["Heading2"]))
         if not group:
             story.append(Paragraph("No checks in this group.", styles["BodyText"]))
@@ -780,12 +859,12 @@ def _render_pdf(report: dict[str, Any]) -> bytes:
             continue
         for item in group:
             rows = [
-                ("Issue", item.get("issue") or "Compliance requirement"),
-                ("Original / University Template", item.get("originalTemplate") or "Template rule not configured"),
+                ("Issue", item.get("problem") or item.get("issue") or "Compliance requirement"),
+                ("University Requirement", item.get("requirement") or item.get("originalTemplate") or "Requirement not configured"),
                 ("Student Document", item.get("studentDocument") or "Measurement not detected"),
-                ("Difference", item.get("difference") or "Matches the approved university template."),
-                ("Strict Page Number", _page_label(item.get("affectedPages"), page_count)),
-                ("Required Action", item.get("requiredAction") or "Follow the active university template requirement."),
+                ("Difference", item.get("difference") or "No difference detected"),
+                ("Result", item.get("status") or "Verify"),
+                ("Correction", item.get("correction") or item.get("requiredAction") or "Follow the active university template requirement."),
             ]
             story.append(Table([[Paragraph(f"<b>{escape(str(label))}</b>", styles["BodyText"]), Paragraph(escape(str(value)), styles["BodyText"])] for label, value in rows], colWidths=[48 * mm, 122 * mm], style=TableStyle([["BACKGROUND", (0, 0), (0, -1), "#F8FAFD"], ["GRID", (0, 0), (-1, -1), 0.25, "#D8E0EA"], ["VALIGN", (0, 0), (-1, -1), "TOP"], ["LEFTPADDING", (0, 0), (-1, -1), 7], ["RIGHTPADDING", (0, 0), (-1, -1), 7], ["TOPPADDING", (0, 0), (-1, -1), 6], ["BOTTOMPADDING", (0, 0), (-1, -1), 6]])))
             story.append(Spacer(1, 8))

@@ -105,3 +105,6 @@ def test_module3_lifecycle_and_review_routes_are_exposed():
     assert "/api/v1/proposal-compliance/submissions/{submission_id}/withdraw" in paths
     assert "/api/v1/proposal-compliance/submissions/{submission_id}/status" in paths
     assert "/api/v1/proposal-compliance/submissions/{submission_id}" in paths
+    assert "/api/v1/proposal-compliance/submissions/{submission_id}/comparison" in paths
+    assert "/api/v1/proposal-compliance/comparisons/{comparison_id}/summary" in paths
+    assert "/api/v1/proposal-compliance/reports/{submission_id}/ai-summary" not in paths
