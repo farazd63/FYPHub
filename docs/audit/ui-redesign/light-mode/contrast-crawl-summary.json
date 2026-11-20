@@ -1,6 +1,50 @@
 {
   "light::PUBLIC": {
-    "screens": 2,
-    "belowAA": 1
+    "screens": 6,
+    "belowAA": 0
+  },
+  "light::ADMIN": {
+    "screens": 10,
+    "belowAA": 0
+  },
+  "light::STUDENT": {
+    "screens": 10,
+    "belowAA": 0
+  },
+  "light::SUPERVISOR": {
+    "screens": 11,
+    "belowAA": 0
+  },
+  "light::COORDINATOR": {
+    "screens": 6,
+    "belowAA": 0
+  },
+  "light::EVALUATOR": {
+    "screens": 16,
+    "belowAA": 0
+  },
+  "dark::PUBLIC": {
+    "screens": 6,
+    "belowAA": 0
+  },
+  "dark::ADMIN": {
+    "screens": 10,
+    "belowAA": 0
+  },
+  "dark::STUDENT": {
+    "screens": 10,
+    "belowAA": 0
+  },
+  "dark::SUPERVISOR": {
+    "screens": 11,
+    "belowAA": 0
+  },
+  "dark::COORDINATOR": {
+    "screens": 6,
+    "belowAA": 0
+  },
+  "dark::EVALUATOR": {
+    "screens": 16,
+    "belowAA": 0
   }
 }
