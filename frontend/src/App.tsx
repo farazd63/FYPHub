@@ -75,12 +75,12 @@ const isLandingPath = (pathname: string) => pathname === "/" || pathname === "/w
 const welcomePublicPath = () => (window.location.pathname === "/welcome" ? "/welcome" : "/");
 const formatCycleLabel = (cycle: Cycle) => {
   const named = cycle.display_name?.trim();
-  if (named) return named;
-  const session = cycle.session?.trim();
-  if (session && cycle.academic_year) return `${session === "FALL" || session === "Fall" ? "Fall" : session === "SPRING" || session === "Spring" ? "Spring" : session} ${cycle.academic_year}`;
-  if (session) return session;
-  if (cycle.academic_year) return String(cycle.academic_year);
-  return `Cycle #${cycle.id}`;
+  const code = cycle.code?.trim();
+  const base = named
+    || (cycle.session && cycle.academic_year
+      ? `${cycle.session === "FALL" || cycle.session === "Fall" ? "Fall" : cycle.session === "SPRING" || cycle.session === "Spring" ? "Spring" : cycle.session} ${cycle.academic_year}`
+      : cycle.session?.trim() || (cycle.academic_year ? String(cycle.academic_year) : `Cycle #${cycle.id}`));
+  return code && !base.includes(code) ? `${base} (${code})` : base;
 };
 const configuredApi = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 // Production is served with an nginx /api proxy. Keeping the API same-origin
@@ -338,7 +338,7 @@ export default function App() {
           const seen = new Set<string>();
           const openCycles = data.filter((cycle) => {
             if (!cycle.registration_open) return false;
-            const key = `${cycle.academic_year ?? ""}|${(cycle.session ?? "").toUpperCase()}|${(cycle.display_name ?? "").trim().toLowerCase()}`;
+            const key = `${cycle.academic_year ?? ""}|${(cycle.session ?? "").toUpperCase()}|${(cycle.code ?? "").trim().toLowerCase()}|${(cycle.display_name ?? "").trim().toLowerCase()}`;
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
@@ -569,6 +569,9 @@ export default function App() {
     if (pathname === "/recover") {
       initial = publicRoute("recover");
     }
+    if (pathname === "/signup") {
+      initial = publicRoute("up");
+    }
     if (window.location.pathname === "/reset-password") {
       queueMicrotask(() => {
         setRecoveryView("reset");
@@ -582,6 +585,12 @@ export default function App() {
         setPage("recover");
       });
       window.history.replaceState({ fyphubNavigation: publicRoute("recover") }, "", "/recover");
+    } else if (pathname === "/signup") {
+      queueMicrotask(() => {
+        setPage("up");
+        setStep(1);
+      });
+      window.history.replaceState({ fyphubNavigation: publicRoute("up") }, "", "/signup");
     } else {
       if (!readPublicRoute(window.history.state)) window.history.replaceState({ fyphubNavigation: initial }, "", window.location.href);
       publicNavigationRef.current(initial, "pop");

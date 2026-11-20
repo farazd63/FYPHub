@@ -199,7 +199,41 @@ export function WelcomeLanding({ onLogin, onSignup }: WelcomeLandingProps) {
                 </FeatureChip>
               </div>
             </div>
-            <div className="welcome-landing__hero-visual" aria-hidden="true" />
+            <div className="welcome-landing__hero-visual" aria-hidden="true">
+              <div className="welcome-landing__preview">
+                <div className="welcome-landing__preview-chrome">
+                  <span /><span /><span />
+                  <strong>FYPHub workspace</strong>
+                </div>
+                <div className="welcome-landing__preview-body">
+                  <aside>
+                    <p>Student</p>
+                    <ul>
+                      <li className="is-active">Overview</li>
+                      <li>Supervisor</li>
+                      <li>Compliance</li>
+                      <li>Progress</li>
+                    </ul>
+                  </aside>
+                  <div className="welcome-landing__preview-main">
+                    <header>
+                      <em>Fall 2027 · Team workspace</em>
+                      <b>Project progress</b>
+                    </header>
+                    <div className="welcome-landing__preview-cards">
+                      <article><span>Health</span><strong>On track</strong></article>
+                      <article><span>Milestones</span><strong>4</strong></article>
+                      <article><span>Documents</span><strong>2 due</strong></article>
+                    </div>
+                    <div className="welcome-landing__preview-bars">
+                      <i style={{ width: "72%" }} />
+                      <i style={{ width: "48%" }} />
+                      <i style={{ width: "86%" }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
 
           <Section

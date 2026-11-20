@@ -909,19 +909,57 @@ html[data-theme="light"] .fy-logo--auth .fy-logo__wordmark {
 }
 
 .auth-signup-stepper {
+  display: flex;
   margin-bottom: var(--fy-space-5);
   flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--fy-space-2);
   overflow-x: auto;
-  gap: var(--fy-space-3);
+  max-width: 100%;
+}
+
+.auth-signup-stepper.fy-stepper {
+  flex-wrap: nowrap !important;
 }
 
 .auth-signup-stepper .fy-stepper__item {
-  flex: 1 0 auto;
+  flex: 1 1 0;
+  min-width: 0;
   white-space: nowrap;
 }
 
 .auth-signup-stepper .fy-stepper__label {
   font-size: var(--fy-text-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.auth-signup-stepper .fy-stepper__connector {
+  flex: 0 0 1rem;
+  min-width: 0.75rem;
+}
+
+@media (max-width: 420px) {
+  .auth-signup-stepper .fy-stepper__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .auth-signup-stepper .fy-stepper__item {
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  .auth-signup-stepper .fy-stepper__connector {
+    flex: 1 1 auto;
+  }
 }
 
 .auth-signup-step-title {

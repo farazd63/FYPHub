@@ -2,6 +2,20 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert } from "../../ui";
 import { SupervisorGroupDetails, type GroupWorkspace, type GroupTab, date } from "./SupervisorGroupDetails";
 
+const projectStatusLabel = (value?: string | null) => ({
+  IN_PROGRESS: "In progress",
+  NOT_STARTED: "Not started",
+  COMPLETED: "Completed",
+}[value || ""] || (value ? value.replaceAll("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : "Not started yet"));
+
+const projectTitleLabel = (data: GroupWorkspace) => {
+  const proposalTitle = data.proposal?.title?.trim();
+  const projectTitle = data.project?.title?.trim();
+  if (proposalTitle) return proposalTitle;
+  if (projectTitle && !/\'s project$/i.test(projectTitle) && projectTitle !== data.group.name) return projectTitle;
+  return "No project title yet";
+};
+
 export function SupervisorAssignedTeams({ api }: { api: string }) {
   const [groups, setGroups] = useState<GroupWorkspace[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [selected, setSelected] = useState<{ id: number; tab: GroupTab } | null>(() => {
@@ -28,8 +42,8 @@ export function SupervisorAssignedTeams({ api }: { api: string }) {
       <h2>{data.group.name}</h2><p>{data.group.email}</p><p>{data.group.academic_cycle.name} · {data.group.academic_cycle.year} · {data.group.academic_cycle.session}</p>
       <dl className="my-4 grid gap-3 sm:grid-cols-3">{[
         ["Group status", data.group.status], ["Assignment", data.assignment?.status], ["Assigned", date(data.assignment?.assigned_at)],
-        ["Supervisor", data.supervisor.name], ["Members", data.members.length], ["Project title", data.project?.title || data.proposal?.title || "Not submitted yet"],
-        ["Proposal", data.proposal?.status || "Not submitted yet"], ["Project", data.project?.status || "Not started yet"],
+        ["Supervisor", data.supervisor.name], ["Members", data.members.length], ["Project title", projectTitleLabel(data)],
+        ["Proposal", data.proposal?.status || "Not submitted yet"], ["Project", projectStatusLabel(data.project?.status)],
         ["Completion", data.project?.completion_percentage == null ? "No progress recorded" : `${data.project.completion_percentage}%`], ["Last activity", date(data.group.last_activity_at)]
       ].map(([label, value]) => <div key={label}><dt className="text-xs font-semibold uppercase text-slate-500">{label}</dt><dd className="text-sm">{value}</dd></div>)}</dl>
       <div className="flex flex-wrap gap-2">{([["overview", "View full details"], ["proposal", "Open proposal"], ["project", "Open project"], ["members", "View members"], ["documents", "View documents"], ["discussion", "Open group discussion"]] as [GroupTab, string][]).map(([tab, label]) => <button key={tab} type="button" onClick={() => open(data.group.id, tab)} className="rounded-lg border px-3 py-2 text-sm">{label}</button>)}</div>

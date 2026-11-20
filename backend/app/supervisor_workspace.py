@@ -81,7 +81,7 @@ def workspace(db, actor, group, assignment=None, request_row=None):
     project = None
     if assignment and (proposal or completion_items):
         project = {
-            "title": (proposal["title"] if proposal else None) or (f"{leader.full_name}'s project" if leader else f"Group {group.id} project"),
+            "title": (proposal["title"] if proposal else None) or None,
             "description": (proposal["abstract"] if proposal else None) or "Progress is tracked from milestones and tasks.",
             "domain": proposal["domain"] if proposal else None,
             "technologies": proposal["technologies"] if proposal else None,
