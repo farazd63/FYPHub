@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FileUpload, StatusBadge } from "../../../ui";
+import { Alert, Button, FileUpload, StatusBadge } from "../../../ui";
 
 type Requirement = {
   id: number;
@@ -151,7 +151,8 @@ export function StudentRequiredDocumentsDashboard({ api }: { api: string }) {
   }, [requirements]);
 
   return <section aria-label="Required Documents & Uploads" className="mt-8 rounded-2xl border border-fy-border bg-fy-surface p-6">
-    <div className="flex items-start justify-between gap-4"><div><p className="student-overview__eyebrow">Student documents</p><h2 className="text-2xl font-semibold">Required Documents &amp; Uploads</h2><p className="mt-1 text-sm text-fy-text-secondary">Your active cycle requirements, grouped by submission section.</p></div>{state === "error" && <button type="button" onClick={() => void load()} className="fy-btn fy-btn--secondary fy-btn--sm">Retry</button>}</div>
+    <div className="flex items-start justify-between gap-4"><div><p className="student-overview__eyebrow">Student documents</p><h2 className="text-2xl font-semibold">Required Documents &amp; Uploads</h2><p className="mt-1 text-sm text-fy-text-secondary">Your active cycle requirements, grouped by submission section.</p></div></div>
+    {state === "error" && <Alert tone="danger" title="Required documents unavailable" className="mt-4"><p className="m-0">{message}</p><div className="mt-3"><Button type="button" variant="secondary" size="sm" onClick={() => void load()}>Retry</Button></div></Alert>}
     {(group || requirements.length > 0) && <div className="mt-4 grid gap-2 rounded-xl bg-fy-surface-muted p-4 text-sm sm:grid-cols-3"><div><span className="block text-xs uppercase tracking-wide text-fy-text-secondary">Academic cycle</span><strong>{group?.academic_cycle || (requirements[0] ? `Cycle ${requirements[0].academic_cycle_id}` : "Not detected")}</strong></div><div><span className="block text-xs uppercase tracking-wide text-fy-text-secondary">Group</span><strong>{group?.group_name || "Not detected"}</strong></div><div><span className="block text-xs uppercase tracking-wide text-fy-text-secondary">Project</span><strong>{group?.project?.title || "Not assigned"}</strong></div></div>}
     {message && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{message}</p>}
     {state === "loading" && <p className="mt-5">Loading required documents…</p>}

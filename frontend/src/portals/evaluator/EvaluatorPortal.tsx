@@ -4,6 +4,7 @@ import { EvaluatorSidebar } from "./EvaluatorSidebar";
 import { FypHubBrand } from "../shared/FypHubBrand";
 import { Menu } from "lucide-react";
 import { ThemeToggle } from "../../ui/ThemeToggle";
+import { displayInitials } from "../shared/displayInitials";
 import "../student/student.css";
 import "./evaluator.css";
 
@@ -29,7 +30,7 @@ export function EvaluatorPortal({ user, onLogout }: Props) {
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, []);
-  const initials = user.full_name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "E";
+  const initials = displayInitials(user.full_name, "E");
   return (
     <main className="student-shell evaluator-shell">
       <header className="student-header">
