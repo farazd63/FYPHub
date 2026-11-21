@@ -102,7 +102,7 @@ def workspace(db, actor, group, assignment=None, request_row=None):
     channel = db.scalar(select(CollaborationChannel).where(CollaborationChannel.assignment_id == assignment.id, CollaborationChannel.supervisor_id == actor.id, CollaborationChannel.status == "ACTIVE")) if assignment else None
     if channel:
         activity.append(channel.updated_at)
-    return {"group": {"id": group.id, "name": f"{leader.full_name}'s Group" if leader else account.full_name, "email": account.email, "status": group.status.upper() if account.is_active else "INACTIVE", "created_at": group.created_at, "updated_at": group.updated_at, "last_activity_at": max(activity), "academic_cycle": {"id": cycle.id, "name": cycle.display_name, "year": cycle.academic_year, "session": cycle.session}}, "members": [{"id": m.id, "full_name": m.full_name, "registration_number": m.registration_number, "email": m.university_email, "designation": "Leader" if m.is_creator else "Member", "is_active": m.is_active, "account_active": account.is_active} for m in members], "supervisor": {"id": actor.id, "name": actor.full_name, "email": actor.email}, "assignment": {"id": assignment.id, "status": "ACTIVE", "assigned_at": assignment.created_at, "request_id": request_row.id if request_row and request_row.assignment_id == assignment.id else None} if assignment else None, "proposal": proposal, "project": project, "documents": documents, "progress": progress, "conversation": {"channel_id": channel.id, "assignment_id": channel.assignment_id, "group_id": group.id} if channel else None}
+    return {"group": {"id": group.id, "name": group.group_name or f"Group {group.group_number or '—'}", "email": account.email, "status": group.status.upper() if account.is_active else "INACTIVE", "created_at": group.created_at, "updated_at": group.updated_at, "last_activity_at": max(activity), "academic_cycle": {"id": cycle.id, "name": cycle.display_name, "year": cycle.academic_year, "session": cycle.session}}, "members": [{"id": m.id, "full_name": m.full_name, "registration_number": m.registration_number, "email": m.university_email, "designation": "Leader" if m.is_creator else "Member", "is_active": m.is_active, "account_active": account.is_active} for m in members], "supervisor": {"id": actor.id, "name": actor.full_name, "email": actor.email}, "assignment": {"id": assignment.id, "status": "ACTIVE", "assigned_at": assignment.created_at, "request_id": request_row.id if request_row and request_row.assignment_id == assignment.id else None} if assignment else None, "proposal": proposal, "project": project, "documents": documents, "progress": progress, "conversation": {"channel_id": channel.id, "assignment_id": channel.assignment_id, "group_id": group.id} if channel else None}
 
 
 @router.get("/assigned-groups")
@@ -130,6 +130,11 @@ def group_section(group_id: int, request: Request, actor: User = Depends(supervi
 def requests(actor: User = Depends(supervisor), db: Session = Depends(get_db), include_history: bool = False):
     statuses = ["SUBMITTED", "CHANGES_REQUESTED", "ACCEPTED", "REJECTED", "WITHDRAWN"] if include_history else ["SUBMITTED", "CHANGES_REQUESTED"]
     rows = db.scalars(select(SupervisorRequest).where(SupervisorRequest.supervisor_id == actor.id, SupervisorRequest.status.in_(statuses)).order_by(SupervisorRequest.updated_at.desc())).all()
+    accepted_team_ids = {
+        row.team_id
+        for row in db.scalars(select(SupervisorRequest).where(SupervisorRequest.team_id.is_not(None), SupervisorRequest.status == "ACCEPTED")).all()
+    }
+    rows = [row for row in rows if row.status not in {"SUBMITTED", "CHANGES_REQUESTED"} or row.team_id not in accepted_team_ids]
     return [request_detail(row.id, actor, db) for row in rows]
 
 

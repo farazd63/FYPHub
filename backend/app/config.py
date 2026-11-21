@@ -31,6 +31,7 @@ class Settings:
     smtp_from: str = ""
     smtp_from_email: str = ""
     password_reset_base_url: str = "http://localhost:5173/reset-password"
+    email_verification_base_url: str = "http://localhost:8010/api/v1/auth/verify-email"
     app_env: str = "production"
     registration_mode: str = "restricted"
     AI_PROVIDER: str = ""
@@ -86,6 +87,7 @@ def get_settings() -> Settings:
         smtp_from=os.getenv("SMTP_FROM", os.getenv("SMTP_FROM_EMAIL", "")),
         smtp_from_email=os.getenv("SMTP_FROM_EMAIL", os.getenv("SMTP_FROM", "")),
         password_reset_base_url=os.getenv("PASSWORD_RESET_BASE_URL", "http://localhost:5173/reset-password").rstrip("/"),
+        email_verification_base_url=os.getenv("EMAIL_VERIFICATION_BASE_URL", "http://localhost:8010/api/v1/auth/verify-email").rstrip("/"),
         app_env=os.getenv("APP_ENV", "production").strip().lower(),
         registration_mode=os.getenv("REGISTRATION_MODE", "restricted"),
         AI_PROVIDER=os.getenv("AI_PROVIDER", "").strip().lower(),

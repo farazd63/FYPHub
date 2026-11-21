@@ -285,6 +285,16 @@ class SupervisorRequestTests(unittest.TestCase):
         session = Session(bind=self.connection, join_transaction_mode="create_savepoint"); session.add(other_cycle); session.flush(); other_id = other_cycle.id; session.commit(); session.close()
         self.assertEqual(self.create_draft(self.tokens["team"], cycle_id=other_id)[1]["detail"]["code"], "cycle_mismatch")
 
+    def test_duplicate_group_request_is_rejected_even_for_another_supervisor(self):
+        _, draft = self.create_draft(self.tokens["team"])
+        session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        session.add(SupervisorCapacityPolicy(supervisor_id=self.other_supervisor.id, academic_cycle_id=self.cycle.id, max_group_capacity=2))
+        session.commit()
+        session.close()
+        status, body = self.create_draft(self.tokens["team"], supervisor_id=self.other_supervisor.id)
+        self.assertEqual((status, body["detail"]["code"]), (409, "duplicate_active_request"))
+        self.assertEqual(self.connection.execute(text("SELECT count(*) FROM supervisor_requests WHERE id=:id AND status='DRAFT'"), {"id": draft["id"]}).scalar_one(), 1)
+
     def test_supervisor_only_decision_comment_and_accept_assignment(self):
         _, draft = self.create_draft(self.tokens["team"])
         _, submitted = self.submit(draft, self.tokens["team"])

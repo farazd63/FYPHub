@@ -17,6 +17,7 @@ class AdminUserResponse(BaseModel):
     role: UserRole
     is_active: bool
     created_at: datetime
+    verification_token: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -142,3 +143,48 @@ class AdminUserPasswordChange(BaseModel):
         if self.new_password != self.confirm_password:
             raise ValueError("Password and confirmation password must match.")
         return self
+
+
+class AdminStudentGroupMemberCreate(BaseModel):
+    """Member identity data added to an existing group portal account."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    full_name: str
+    email: EmailStr
+    registration_number: str
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalized_email(cls, value: object) -> object:
+        return normalize_email(value)
+
+    @field_validator("full_name")
+    @classmethod
+    def valid_name(cls, value: str) -> str:
+        return validate_full_name(value)
+
+    @field_validator("registration_number")
+    @classmethod
+    def normalized_registration(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if not normalized or len(normalized) > 100:
+            raise ValueError("registration_number must be between 1 and 100 characters.")
+        return normalized
+
+
+class AdminStudentGroupApproval(BaseModel):
+    """Administrator-assigned identity for a group portal approval."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    group_name: str
+
+    @field_validator("group_name")
+    @classmethod
+    def normalized_group_name(cls, value: str) -> str:
+        normalized = " ".join(value.split())
+        if not normalized or len(normalized) > 255:
+            raise ValueError("group_name must be between 1 and 255 characters.")
+        return normalized
+

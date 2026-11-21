@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { RequestConversation } from "./RequestConversation";
 import { PanelScheduling } from "./PanelScheduling";
+import { BackButton } from "../../../../ui";
 
 type Field = { display: string; source: string | null };
 type RequestRecord = {
@@ -75,7 +76,7 @@ export function CoordinatorRequestsPdf({ api }: { api: string }) {
   const supervisors = useMemo(() => Array.from(new Map(rows.map((row) => [row.supervisor_id ?? row.supervisor_name, row.supervisor_name])).entries()), [rows]);
   const counts = useMemo(() => rows.reduce<Record<string, number>>((result, row) => { result[row.status] = (result[row.status] ?? 0) + 1; return result; }, {}), [rows]);
   const clearFilters = () => { setCycleFilter(""); setSupervisorFilter(""); setStatusFilter(""); setFromDate(""); setToDate(""); };
-  if (showScheduling) return <section className="supervisor-page"><button type="button" className="supervisor-filter-clear" onClick={() => setShowScheduling(false)}>Back to monitoring</button><PanelScheduling api={api} /></section>;
+  if (showScheduling) return <section className="supervisor-page"><BackButton className="mb-3" onClick={() => setShowScheduling(false)}>Back to monitoring</BackButton><PanelScheduling api={api} /></section>;
   return <section className="supervisor-page" aria-labelledby="coordinator-requests-heading">
     <div className="supervisor-page-heading supervisor-page-heading--with-actions"><p>Coordinator / PM workspace</p><h1 id="coordinator-requests-heading">Supervisor Request Monitoring</h1><span>Read-only monitoring for authorized cycles. Supervisor decisions remain with the selected supervisor.</span><button type="button" className="fy-btn fy-btn--secondary fy-btn--sm supervisor-page-heading__action" onClick={() => setShowScheduling(true)}>Open Panel Scheduling</button></div>
     {message && <p className="supervisor-alert" role="alert">{message}</p>}

@@ -9,6 +9,32 @@ html[data-theme="dark"] {
   --fy-text-secondary: #c4ccd9;
 }
 
+/* Dark-mode data-entry controls need a clear boundary against charcoal surfaces. */
+:where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page
+) :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea,
+  input[type="file"]
+) {
+  border-color: var(--fy-input-border) !important;
+}
+
+:where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page
+) :where(input[type="checkbox"], input[type="radio"]) {
+  border-color: var(--fy-input-border) !important;
+}
+
 .admin-shell,
 .student-shell,
 .portal-shell,
@@ -1783,6 +1809,7 @@ html[data-theme="dark"] {
 /* Keep dashboard content on the dark surface in every authenticated portal.
    Status pills and brand buttons keep their own semantic colors. */
 html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-report__header,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-report-identity span,
 html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-summary,
 html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-report-stats > div,
 html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row,
@@ -1808,6 +1835,7 @@ html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-fri
 }
 
 html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-report__header h2,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-report-identity span,
 html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-summary h2,
 html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-report-stats strong,
 html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row > div > strong,
@@ -1819,6 +1847,7 @@ html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-fin
 }
 
 html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-friendly-summary p,
+html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-report-identity b,
 html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-report-stats > div span,
 html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row > div,
 html[data-theme="dark"] .module3-workspace .module3-friendly-report .module3-priority-row > div > p,

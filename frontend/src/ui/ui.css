@@ -152,6 +152,39 @@
 .fy-btn__label--loading {
   opacity: 0.85;
 }
+.fy-back-button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid var(--fy-border);
+  border-radius: var(--fy-radius-control);
+  background: var(--fy-surface);
+  color: var(--fy-brand);
+  padding: 0.55rem 0.95rem 0.55rem 0.75rem;
+  font-size: var(--fy-text-small);
+  font-weight: var(--fy-weight-semibold);
+  line-height: 1.25;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+.fy-back-button:hover:not(:disabled) {
+  border-color: var(--fy-brand);
+  background: var(--fy-brand-soft);
+  color: var(--fy-brand);
+  transform: translateX(-1px);
+}
+.fy-back-button:focus-visible {
+  outline: none;
+  box-shadow: var(--fy-focus-ring);
+}
+.fy-back-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+.fy-back-button__icon {
+  flex: 0 0 auto;
+}
 @keyframes fy-spin {
   to {
     transform: rotate(360deg);
@@ -604,7 +637,7 @@
   width: 100%;
   min-height: 2.5rem;
   padding: 0.55rem 0.75rem;
-  border: 1px solid var(--fy-border);
+  border: 1px solid var(--fy-input-border);
   border-radius: var(--fy-radius-control);
   background: var(--fy-page);
   color: var(--fy-text);
@@ -648,7 +681,7 @@
 .fy-radio__dot {
   width: 1.1rem;
   height: 1.1rem;
-  border: 1px solid var(--fy-border-strong);
+  border: 1px solid var(--fy-input-border);
   border-radius: calc(var(--fy-radius-control) - 2px);
   background: var(--fy-page);
 }
@@ -682,7 +715,7 @@
   height: 1.5rem;
   border-radius: var(--fy-radius-pill);
   background: var(--fy-surface-muted);
-  border: 1px solid var(--fy-border);
+  border: 1px solid var(--fy-input-border);
 }
 .fy-switch__thumb {
   position: absolute;
@@ -692,7 +725,7 @@
   height: 1.1rem;
   border-radius: var(--fy-radius-pill);
   background: var(--fy-surface);
-  border: 1px solid var(--fy-border);
+  border: 1px solid var(--fy-input-border);
   transition: transform 160ms ease;
 }
 .fy-switch__input:checked + .fy-switch__track {
@@ -707,7 +740,7 @@
 
 .fy-file-upload {
   position: relative;
-  border: 1px dashed var(--fy-border-strong);
+  border: 1px dashed var(--fy-input-border);
   border-radius: var(--fy-radius-card);
   background: var(--fy-surface-muted);
   transition: border-color 160ms ease, background 160ms ease;

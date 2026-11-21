@@ -33,7 +33,7 @@ type ApiDetail = {
   code?: string;
   message?: string;
   field?: string;
-  fields?: { path: string }[];
+  fields?: { path: string; code?: string }[];
 };
 type PublicRole = "STUDENT" | "SUPERVISOR" | "PANEL_MEMBER" | "COORDINATOR";
 type LoginRole = PublicRole | "ADMIN";
@@ -106,6 +106,33 @@ const newMember = (): Member => ({
 });
 const registration = (value: string) => value.trim().toUpperCase();
 const memberKey = (id: string, field: keyof Omit<Member, "id">) => `member.${id}.${field}`;
+const validationFieldLabel = (key: string, members: Member[]) => {
+  if (key === "account.cycle") return "Academic Cycle";
+  if (key === "members.configuration") return "Group Members — member count";
+  if (key === "login.email") return "Group Credentials — Email";
+  if (key === "login.password") return "Group Credentials — Password";
+  if (key === "login.confirm") return "Group Credentials — Confirm password";
+  const match = key.match(/^member\.([^.]+)\.(full_name|email|registration)$/);
+  if (!match) return "the highlighted field";
+  const memberIndex = members.findIndex((member) => member.id === match[1]);
+  const label = { full_name: "Full name", email: "Member email", registration: "Registration number" }[match[2]];
+  return memberIndex >= 0 ? `Member ${memberIndex + 1} — ${label}` : `Group Members — ${label}`;
+};
+const validationNotice = (fieldErrors: FieldErrors, members: Member[]) => {
+  const labels = [...new Set(Object.keys(fieldErrors).map((key) => validationFieldLabel(key, members)))];
+  if (!labels.length) return "Please correct the highlighted fields.";
+  return labels.length === 1
+    ? `Please correct ${labels[0]}.`
+    : `Please correct these fields: ${labels.join("; ")}.`;
+};
+const apiFieldErrorMessage = (key: string, fallback?: string, code?: string) => {
+  if (fallback && fallback !== "Request validation failed.") return fallback;
+  if (code === "missing" || code?.includes("empty")) return "This field is required.";
+  if (key.endsWith(".email") || key === "login.email") return "Enter a valid email address.";
+  if (key.endsWith(".registration")) return "Enter a registration number.";
+  if (key.endsWith(".full_name")) return "Enter the member's full name.";
+  return fallback ?? "Check this field.";
+};
 export const dashboardPageForRole = (role: unknown): DashboardPage | null => {
   if (role === "ADMIN") return "admin-portal";
   if (role === "STUDENT" || role === "SUPERVISOR" || role === "PANEL_MEMBER" || role === "COORDINATOR") return "account";
@@ -215,6 +242,7 @@ function Field({
   autoComplete,
   disabled,
   error,
+  required = false,
 }: {
   label: string;
   value: string;
@@ -223,6 +251,7 @@ function Field({
   autoComplete?: string;
   disabled?: boolean;
   error?: string;
+  required?: boolean;
 }) {
   const id = useId();
   const errorId = `${id}-error`;
@@ -230,6 +259,7 @@ function Field({
     <div className="grid gap-2">
       <label htmlFor={id} className="text-sm font-semibold">
         {label}
+        {required && <span className="auth-field__required" aria-hidden="true"> *</span>}
       </label>
       <input
         id={id}
@@ -237,13 +267,15 @@ function Field({
         value={value}
         autoComplete={autoComplete}
         disabled={disabled}
+        required={required}
+        aria-required={required}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? errorId : undefined}
         className={`${INPUT} ${error ? "border-[#a43a33]" : ""}`}
         onChange={(event) => onChange(event.target.value)}
       />
       {error && (
-        <p id={errorId} className="text-sm text-[#a43a33]">
+        <p id={errorId} role="alert" className="auth-field__error text-sm text-[#a43a33]">
           {error}
         </p>
       )}
@@ -275,7 +307,7 @@ export default function App() {
       recover: recoveryView === "reset" ? "FYPHub | Reset Password" : "FYPHub | Forgot Password",
       "admin-portal": "FYPHub | Administrator",
       account: authUser?.role === "STUDENT"
-        ? "FYPHub | Student"
+        ? "FYPHub | Group"
         : authUser?.role === "SUPERVISOR"
           ? "FYPHub | Supervisor"
           : authUser?.role === "COORDINATOR"
@@ -485,15 +517,15 @@ export default function App() {
         else if (name.length < 2 || name.length > 100 || /[0-9]/.test(name)) next[`${prefix}.full_name`] = "Name must be 2–100 letters; numbers are not allowed.";
         const reg = registration(member.registration);
         const emailError = emailValidationMessage(member.email);
-        if (emailError) next[`${prefix}.name`] = "Enter a valid member email address.";
+        if (emailError) next[`${prefix}.email`] = emailError;
         if (!reg)
           next[`${prefix}.registration`] = "Enter a registration number.";
         const normalizedEmail = normalizeEmail(member.email);
         if (normalizedEmail && emails.has(normalizedEmail)) {
-          next[`${prefix}.name`] = "Member emails must be unique in this group.";
+          next[`${prefix}.email`] = "Member emails must be unique in this group.";
           next[emails.get(normalizedEmail)!] = "Member emails must be unique in this group.";
         }
-        if (normalizedEmail) emails.set(normalizedEmail, `${prefix}.name`);
+        if (normalizedEmail) emails.set(normalizedEmail, `${prefix}.email`);
         if (reg && registrations.has(reg)) {
           next[`${prefix}.registration`] =
             "Registration number is already used in this team.";
@@ -542,7 +574,7 @@ export default function App() {
     setPage(next.page);
     setStep(next.step);
     setErrors(nextErrors);
-    setNotice(Object.keys(nextErrors).length ? "Please correct the highlighted fields." : "");
+    setNotice(Object.keys(nextErrors).length ? validationNotice(nextErrors, members) : "");
     const current = readPublicRoute(window.history.state);
     const changed = !current || current.page !== next.page || current.signupRole !== next.signupRole || current.step !== next.step || current.studentMode !== next.studentMode;
     const publicPath =
@@ -623,7 +655,7 @@ export default function App() {
     const next = validate(step);
     setErrors(next);
     if (Object.keys(next).length) {
-      setNotice("Please correct the highlighted fields.");
+      setNotice(validationNotice(next, members));
       return;
     }
     navigatePublic(publicRoute("up", "STUDENT", Math.min(3, step + 1) as 1 | 2 | 3, "group"));
@@ -650,19 +682,22 @@ export default function App() {
     return memberKey(members[Number(match[1])].id, field);
   }
   function applyError(detail: ApiDetail) {
-    const fields = [
-      detail.field,
-      ...(detail.fields?.map((item) => item.path) ?? []),
+    const fields: Array<{ key: string; code?: string }> = [
+      ...(detail.field ? [{ path: detail.field }] : []),
+      ...(detail.fields ?? []),
     ]
-      .map(mapPath)
-      .filter((value): value is string => Boolean(value));
+      .flatMap((item) => {
+        const key = mapPath(item.path);
+        return key ? [{ key, code: item.code }] : [];
+      });
     if (fields.length) {
-      setErrors(
-        Object.fromEntries(
-          fields.map((field) => [field, detail.message ?? "Check this field."]),
-        ),
+      const nextErrors = Object.fromEntries(
+        fields.map(({ key, code }) => [key, apiFieldErrorMessage(key, detail.message, code)]),
       );
-      setStep(Math.min(...fields.map(stepFor)));
+      setErrors(nextErrors);
+      setStep(Math.min(...fields.map(({ key }) => stepFor(key))));
+      setNotice(validationNotice(nextErrors, members));
+      return;
     }
     setNotice(detail.message ?? "Student group account could not be created.");
   }
@@ -678,7 +713,7 @@ export default function App() {
     if (Object.keys(next).length) {
       setErrors(next);
       setStep(stepFor(Object.keys(next)[0]));
-      setNotice("Please correct the highlighted fields.");
+      setNotice(validationNotice(next, members));
       return;
     }
     if (submitting || !cycleId) return;
@@ -1157,6 +1192,7 @@ export default function App() {
                 label="Email"
                 type="email"
                 autoComplete="username"
+                required
                 value={signIn.email}
                 error={signIn.email.includes("@") ? emailValidationMessage(signIn.email) : undefined}
                 disabled={authSubmitting}
@@ -1168,6 +1204,7 @@ export default function App() {
               <PasswordField
                 label="Password"
                 autoComplete="current-password"
+                required
                 value={signIn.password}
                 disabled={authSubmitting}
                 onChange={(value) => {
@@ -1224,6 +1261,9 @@ export default function App() {
           {page === "in" ? (
             <>
               <h1 className="mb-7 text-center text-2xl font-bold">Sign In</h1>
+              <p className="-mt-4 mb-5 text-center text-sm text-[#4f6470]">
+                SZABIST accounts use an <span className="font-semibold">@szabist-isb.pk</span> email address.
+              </p>
               <div className="space-y-5">
                 <Field
                   label="Email"
@@ -1280,7 +1320,7 @@ export default function App() {
               Create Student Group Account
               </h1>
               <p className="mt-2 mb-6 text-center text-sm text-[#4f6470]">
-                Your team will use one email and password.
+                Your team will use one verified <span className="font-semibold">@szabist-isb.pk</span> email and password.
               </p>
               <Stepper
                 className="auth-signup-stepper"
@@ -1288,7 +1328,13 @@ export default function App() {
                 currentStepId={SIGNUP_STEP_IDS[step - 1]}
                 completedStepIds={SIGNUP_STEP_IDS.filter((_, index) => index < step - 1)}
               />
-              <h2 className="auth-signup-step-title fy-sr-only">{STEPS[step - 1]}</h2>
+              <div className="auth-signup-section-heading">
+                <div>
+                  <p className="auth-signup-section-kicker">Step {step} of {STEPS.length}</p>
+                  <h2 className="auth-signup-section-title">{STEPS[step - 1]}</h2>
+                </div>
+                <p className="auth-signup-required-note"><span aria-hidden="true">*</span> Required fields</p>
+              </div>
               {step === 1 && (
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="sm:col-span-2 grid gap-2">
@@ -1296,13 +1342,15 @@ export default function App() {
                       htmlFor="academic-cycle"
                       className="text-sm font-semibold"
                     >
-                      Academic cycle
+                      Academic cycle <span className="auth-field__required" aria-hidden="true">*</span>
                     </label>
                     <select
                       id="academic-cycle"
                       value={cycleId}
                       disabled={submitting || cyclesState === "loading"}
                       aria-invalid={Boolean(errors["account.cycle"])}
+                      aria-required="true"
+                      required
                       className={`${INPUT} ${errors["account.cycle"] ? "border-[#a43a33]" : ""}`}
                       onChange={(event) => {
                         setCycleId(event.target.value);
@@ -1363,9 +1411,9 @@ export default function App() {
                         </button>
                       </div>
                       <div className="auth-member-card__grid">
-                        <Field label="Full name" value={member.full_name} disabled={submitting} error={errors[memberKey(member.id, "full_name")]} onChange={(value) => updateMember(member.id, "full_name", value)} />
-                        <Field label="Member email" type="email" value={member.email} disabled={submitting} error={errors[memberKey(member.id, "email")]} onChange={(value) => updateMember(member.id, "email", value)} />
-                        <Field label="Registration number" value={member.registration} disabled={submitting} error={errors[memberKey(member.id, "registration")]} onChange={(value) => updateMember(member.id, "registration", value)} />
+                         <Field label="Full name" required value={member.full_name} disabled={submitting} error={errors[memberKey(member.id, "full_name")]} onChange={(value) => updateMember(member.id, "full_name", value)} />
+                         <Field label="Member email" type="email" required value={member.email} disabled={submitting} error={errors[memberKey(member.id, "email")]} onChange={(value) => updateMember(member.id, "email", value)} />
+                         <Field label="Registration number" required value={member.registration} disabled={submitting} error={errors[memberKey(member.id, "registration")]} onChange={(value) => updateMember(member.id, "registration", value)} />
                       </div>
                     </Card>
                   ))}
@@ -1373,15 +1421,17 @@ export default function App() {
               )}
               {step === 3 && (
                 <div className="space-y-4">
-                  <Field label="Email" type="email" autoComplete="username" value={login.email} disabled={submitting} error={errors["login.email"]} onChange={(value) => updateLogin("email", value)} />
-                  <PasswordField label="Password" value={login.password} disabled={submitting} error={errors["login.password"]} onChange={(value) => updateLogin("password", value)} />
-                  <PasswordField label="Confirm password" value={login.confirm} disabled={submitting} error={errors["login.confirm"]} onChange={(value) => updateLogin("confirm", value)} />
+                   <p className="text-sm text-[#4f6470]">Only exact SZABIST university email addresses ending in <span className="font-semibold">@szabist-isb.pk</span> are accepted.</p>
+                   <Field label="Email" type="email" required autoComplete="username" value={login.email} disabled={submitting} error={errors["login.email"]} onChange={(value) => updateLogin("email", value)} />
+                   <PasswordField label="Password" required value={login.password} disabled={submitting} error={errors["login.password"]} onChange={(value) => updateLogin("password", value)} />
+                   <PasswordField label="Confirm password" required value={login.confirm} disabled={submitting} error={errors["login.confirm"]} onChange={(value) => updateLogin("confirm", value)} />
                 </div>
               )}
               {notice && (
                 <p
                   role="alert"
-                  className="mt-5 rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]"
+                  aria-live="assertive"
+                  className="auth-signup-notice mt-5 rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]"
                 >
                   {notice}
                 </p>

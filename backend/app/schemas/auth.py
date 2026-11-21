@@ -89,6 +89,9 @@ class CurrentUserResponse(BaseModel):
     registration_number: str | None
     role: UserRole
     is_active: bool
+    institution_id: int | None = None
+    email_verified: bool = False
+    access_approved: bool = False
     group_id: int | None = None
     group_email: str | None = None
     principal_type: str = "ACCOUNT"

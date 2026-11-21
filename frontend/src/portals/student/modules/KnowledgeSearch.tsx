@@ -1,10 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArchivedProjectDetail } from "./ArchivedProjectDetail";
+import "./knowledge-search-layout.css";
 
-type Result = { rank: number; id: number; title: string; short_summary: string; academic_year: string; session?: string; group_name?: string | null; supervisor_name?: string | null; domain?: string | null; technologies_used?: string | null; completion_percentage?: number | null; project_status?: string | null; project_scope: string; completion_stage: string; implemented_scope: string; remaining_gaps: string; available_documents_count: number; match_reason: string };
-type Filters = { academic_year: string; session_name: string; department: string; supervisor: string; technology: string };
+type Result = {
+  rank: number;
+  id: number;
+  title: string;
+  short_summary: string;
+  academic_year: string;
+  session?: string;
+  group_name?: string | null;
+  supervisor_name?: string | null;
+  domain?: string | null;
+  technologies_used?: string | null;
+  completion_percentage?: number | null;
+  project_status?: string | null;
+  project_scope: string;
+  completion_stage: string;
+  implemented_scope: string;
+  remaining_gaps: string;
+  available_documents_count: number;
+  match_reason: string;
+};
+
+type Filters = {
+  academic_year: string;
+  session_name: string;
+  department: string;
+  supervisor: string;
+  technology: string;
+};
 
 const yearValid = (value: string) => !value.trim() || /^\d{4}$/.test(value.trim());
+const displayValue = (value: string | null | undefined) => value?.trim() || "Not available";
 
 export function KnowledgeSearch({ api }: { api: string }) {
   const [query, setQuery] = useState("");
@@ -49,5 +77,94 @@ export function KnowledgeSearch({ api }: { api: string }) {
   }, [search, searchNonce]);
 
   if (selected !== null) return <ArchivedProjectDetail api={api} projectId={selected} onBack={() => setSelected(null)} />;
-  return <section className="student-phase-page archive-knowledge-page" aria-labelledby="knowledge-search-heading"><div className="student-page-heading"><p className="student-overview__eyebrow">Student research phase</p><h1 id="knowledge-search-heading">FYP Knowledge Search &amp; Analytics</h1><p>Search visible archived projects by title, keywords, year, session, department, supervisor, or technology.</p></div><div className="student-request-card"><form className="student-request-actions" onSubmit={(event) => { event.preventDefault(); setSearchNonce((value) => value + 1); }}><input className="student-request-input" aria-label="Search archived projects" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, keyword, or research area" /><button type="submit" disabled={loading}>{loading ? "Searching…" : "Search"}</button></form><div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">{([["academic_year", "Academic year"], ["department", "Department"], ["supervisor", "Supervisor"], ["technology", "Technology"]] as const).map(([key, label]) => <input key={key} aria-label={label} className="student-request-input" placeholder={label} value={filters[key]} onChange={(event) => setFilters({ ...filters, [key]: event.target.value })} />)}<select aria-label="Session" className="student-request-input" value={filters.session_name} onChange={(event) => setFilters({ ...filters, session_name: event.target.value })}><option value="">All sessions</option><option value="FALL">Fall</option><option value="SPRING">Spring</option></select></div>{!yearValid(filters.academic_year) && <p className="student-request-alert" role="alert">Academic year must be a four-digit year.</p>}</div>{message && <p className="student-request-alert" role="alert">{message}</p>}{!loading && !results.length ? <div className="student-placeholder">No active archived projects matched this search.</div> : <div className="archive-search-results">{results.map((result) => <article className="student-request-card archive-result-card" key={result.id}><span className="archive-result-rank">#{result.rank}</span><div><h2>{result.title}</h2><p>{result.short_summary}</p><small>{result.academic_year} · {result.session ?? ""} · {result.project_scope} · {result.completion_stage} · {result.available_documents_count} documents</small><p><strong>Match:</strong> {result.match_reason}</p><p><strong>Implemented:</strong> {result.implemented_scope}</p><p><strong>Remaining gaps:</strong> {result.remaining_gaps}</p><button type="button" onClick={() => setSelected(result.id)}>Open project details</button></div></article>)}</div>}</section>;
+
+  return (
+    <section className="student-phase-page archive-knowledge-page" aria-labelledby="knowledge-search-heading">
+      <div className="student-page-heading archive-knowledge-heading">
+        <p className="student-overview__eyebrow">Student research phase</p>
+        <h1 id="knowledge-search-heading">FYP Knowledge Search &amp; Analytics</h1>
+        <p>Search visible archived projects by title, keywords, year, session, department, supervisor, or technology.</p>
+      </div>
+
+      <div className="student-request-card archive-search-panel">
+        <form
+          className="student-request-actions archive-search-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setSearchNonce((value) => value + 1);
+          }}
+        >
+          <label className="archive-search-field">
+            <span className="archive-search-label">Search projects</span>
+            <input
+              className="student-request-input"
+              aria-label="Search archived projects"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search title, keyword, or research area"
+            />
+          </label>
+          <button type="submit" disabled={loading}>{loading ? "Searching…" : "Search"}</button>
+        </form>
+
+        <div className="archive-search-filters">
+          {([['academic_year', 'Academic year'], ['department', 'Department'], ['supervisor', 'Supervisor'], ['technology', 'Technology']] as const).map(([key, label]) => (
+            <label className="archive-search-field" key={key}>
+              <span className="archive-search-label">{label}</span>
+              <input
+                aria-label={label}
+                className="student-request-input"
+                placeholder={label}
+                value={filters[key]}
+                onChange={(event) => setFilters({ ...filters, [key]: event.target.value })}
+              />
+            </label>
+          ))}
+          <label className="archive-search-field">
+            <span className="archive-search-label">Session</span>
+            <select aria-label="Session" className="student-request-input" value={filters.session_name} onChange={(event) => setFilters({ ...filters, session_name: event.target.value })}>
+              <option value="">All sessions</option>
+              <option value="FALL">Fall</option>
+              <option value="SPRING">Spring</option>
+            </select>
+          </label>
+        </div>
+
+        {!yearValid(filters.academic_year) && <p className="student-request-alert archive-search-alert" role="alert">Academic year must be a four-digit year.</p>}
+      </div>
+
+      {message && <p className="student-request-alert archive-search-alert" role="alert">{message}</p>}
+
+      {!loading && !results.length ? (
+        <div className="student-placeholder archive-search-empty">No active archived projects matched this search.</div>
+      ) : (
+        <div className="archive-search-results">
+          {results.map((result) => {
+            const metadata = [result.academic_year, result.session, result.project_scope, result.completion_stage].filter((value): value is string => Boolean(value?.trim()));
+            const documentLabel = `${result.available_documents_count} ${result.available_documents_count === 1 ? "document" : "documents"}`;
+
+            return (
+              <article className="student-request-card archive-result-card" key={result.id}>
+                <span className="archive-result-rank">#{result.rank}</span>
+                <div className="archive-result-card__content">
+                  <h2>{result.title}</h2>
+                  <p className="archive-result-summary">{displayValue(result.short_summary)}</p>
+                  <div className="archive-result-meta" aria-label="Project metadata">
+                    {metadata.map((item) => <span key={item}>{item}</span>)}
+                    <span>{documentLabel}</span>
+                  </div>
+                  <dl className="archive-result-facts">
+                    <div><dt>Match</dt><dd>{displayValue(result.match_reason)}</dd></div>
+                    <div><dt>Implemented</dt><dd>{displayValue(result.implemented_scope)}</dd></div>
+                    <div><dt>Remaining gaps</dt><dd>{displayValue(result.remaining_gaps)}</dd></div>
+                  </dl>
+                  <button className="archive-result-card__button" type="button" onClick={() => setSelected(result.id)}>Open project details</button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
 }

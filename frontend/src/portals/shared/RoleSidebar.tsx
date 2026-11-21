@@ -41,7 +41,7 @@ type Props = {
   onClose: () => void;
   className?: string;
   expandedSections?: Readonly<Record<string, boolean>>;
-  onToggleSection?: (section: string) => void;
+  onToggleSection?: (section: string, open?: boolean) => void;
 };
 
 const paths: Record<RoleSidebarIcon, ReactNode> = {
@@ -70,15 +70,30 @@ export function SidebarIcon({ name }: { name: RoleSidebarIcon }) {
 
 export function RoleSidebar({ ariaLabel, workspaceLabel, items, active, collapsed, mobileOpen, onSelect, onToggle, onClose, expandedSections, onToggleSection, className = "" }: Props) {
   const sections = [...new Set(items.map((item) => item.section ?? ""))];
-  const [internalExpanded, setInternalExpanded] = useState<Record<string, boolean>>(() => Object.fromEntries(sections.map((section) => [section, true])));
+  const activeSection = items.find((item) => item.id === active)?.section ?? sections[0] ?? "";
+  const [selectedSection, setSelectedSection] = useState(activeSection);
+  const [internalExpanded, setInternalExpanded] = useState<Record<string, boolean>>(() => Object.fromEntries(sections.map((section) => [section, section === activeSection])));
   const isSectionOpen = (section: string) => expandedSections?.[section] ?? internalExpanded[section] ?? true;
   const toggleSection = (section: string) => {
+    const open = !isSectionOpen(section);
     if (onToggleSection) {
-      onToggleSection(section);
+      onToggleSection(section, open);
       return;
     }
-    setInternalExpanded((current) => ({ ...current, [section]: !isSectionOpen(section) }));
+    setInternalExpanded(() => Object.fromEntries(sections.map((item) => [item, item === section ? open : false])));
   };
+  const selectSection = (section: string) => {
+    setSelectedSection(section);
+    if (!isSectionOpen(section)) {
+      if (onToggleSection) onToggleSection(section, true);
+      else setInternalExpanded((current) => ({ ...current, [section]: true }));
+    }
+    if (collapsed) onToggle();
+  };
+
+  useEffect(() => {
+    if (activeSection) setSelectedSection(activeSection);
+  }, [active, activeSection]);
 
   useEffect(() => {
     if (onToggleSection) return;
@@ -88,31 +103,55 @@ export function RoleSidebar({ ariaLabel, workspaceLabel, items, active, collapse
     setInternalExpanded((current) => (current[section] ? current : { ...current, [section]: true }));
   }, [active, items, onToggleSection]);
 
+  const railSections = sections.filter(Boolean);
+
   return <>
     <aside className={`student-sidebar role-sidebar ${className} ${mobileOpen ? "student-sidebar--open" : ""} ${collapsed ? "student-sidebar--collapsed" : ""}`}>
-      <div className="student-sidebar__mobile-head">
-        <span className="student-sidebar__section-label">{workspaceLabel}</span>
-        <button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onClose}><X strokeWidth={1.75} size={18} aria-hidden /></button>
-      </div>
-      <button type="button" className="student-sidebar__collapse" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={onToggle}>
+      <button type="button" className="student-sidebar__collapse role-sidebar__collapse" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={onToggle}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={collapsed ? "m9 6 6 6-6 6" : "m15 6-6 6 6 6"}/></svg>
       </button>
-      <nav className="student-sidebar__nav" aria-label={ariaLabel}>
-        {sections.map((section) => {
-          const open = isSectionOpen(section);
-          const sectionItems = items.filter((item) => (item.section ?? "") === section);
-          return <div className="role-sidebar__section" key={section || "ungrouped"}>
-            {section && <button type="button" className="role-sidebar__section-heading" aria-expanded={open} onClick={() => toggleSection(section)}>
-              <span className="role-sidebar__section-title">{section}</span>
-              <span className="role-sidebar__section-chevron" aria-hidden="true">{open ? <ChevronDown strokeWidth={1.75} size={16} /> : <ChevronRight strokeWidth={1.75} size={16} />}</span>
-            </button>}
-            {open && sectionItems.map((item) => <button key={item.id} type="button" className="student-sidebar__item" disabled={item.disabled} aria-current={active === item.id ? "page" : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={() => { onSelect(item.id); onClose(); }}>
-              <span className="student-sidebar__icon" aria-hidden="true">{item.icon}</span>
-              <span className="student-sidebar__label">{item.label}</span>
-            </button>)}
-          </div>;
-        })}
-      </nav>
+      <div className="role-sidebar__rail">
+        <div className="role-sidebar__rail-list" aria-label={`${workspaceLabel} menu sections`}>
+          {railSections.map((section) => {
+            const firstItem = items.find((item) => item.section === section);
+            const selected = selectedSection === section;
+            return <button key={section} type="button" className="role-sidebar__rail-item" aria-label={`Open ${section}`} aria-pressed={selected} title={section} onClick={() => selectSection(section)}>
+              <span className="role-sidebar__rail-icon" aria-hidden="true">{firstItem?.icon}</span>
+            </button>;
+          })}
+        </div>
+      </div>
+      <div className="role-sidebar__panel">
+        <div className="student-sidebar__mobile-head">
+          <button type="button" className="student-sidebar__close" aria-label="Close navigation" onClick={onClose}><X strokeWidth={1.75} size={18} aria-hidden /></button>
+        </div>
+        <nav className="student-sidebar__nav" aria-label={ariaLabel}>
+          <div className="role-sidebar__menu-list">
+            {railSections.map((section) => {
+              const sectionItems = items.filter((item) => item.section === section);
+              const selected = selectedSection === section;
+              const sectionOpen = selected && isSectionOpen(section);
+              return <section className={`role-sidebar__menu-section ${selected ? "is-selected" : ""}`} key={section}>
+                <button type="button" className="role-sidebar__menu-section-head" aria-expanded={sectionOpen} aria-label={`${sectionOpen ? "Collapse" : "Expand"} ${section}`} onClick={() => {
+                  setSelectedSection(section);
+                  if (selected) toggleSection(section);
+                  else if (!isSectionOpen(section)) {
+                    if (onToggleSection) onToggleSection(section, true);
+                    else setInternalExpanded((current) => Object.fromEntries(sections.map((item) => [item, item === section])));
+                  }
+                }}>
+                  <span className="role-sidebar__menu-section-name"><span className="role-sidebar__menu-section-icon" aria-hidden="true">{sectionItems[0]?.icon}</span><span>{section}</span></span>
+                  {sectionOpen ? <ChevronDown strokeWidth={1.8} size={16} aria-hidden="true" /> : <ChevronRight strokeWidth={1.8} size={16} aria-hidden="true" />}
+                </button>
+                {sectionOpen && <div className="role-sidebar__section-items">{sectionItems.map((item) => <button key={item.id} type="button" className="student-sidebar__item" disabled={item.disabled} aria-current={active === item.id ? "page" : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={() => { onSelect(item.id); onClose(); }}>
+                    <span className="student-sidebar__icon" aria-hidden="true">{item.icon}</span>
+                    <span className="student-sidebar__label">{item.label}</span>
+                  </button>)}</div>}
+              </section>;
+            })}
+          </div>
+        </nav>
+      </div>
     </aside>
     <button type="button" aria-label="Close navigation" className={`student-sidebar__overlay ${mobileOpen ? "student-sidebar__overlay--open" : ""}`} onClick={onClose}/>
   </>;

@@ -34,6 +34,29 @@ def _user(user: User | None) -> dict | None:
     return {"id": user.id, "name": user.full_name, "full_name": user.full_name, "email": user.email, "registration_number": user.registration_number}
 
 
+_REQUEST_STATUS_PRIORITY = {
+    "ACCEPTED": 5,
+    "SUBMITTED": 4,
+    "CHANGES_REQUESTED": 3,
+    "DRAFT": 2,
+    "REJECTED": 1,
+    "WITHDRAWN": 0,
+}
+
+
+def _canonical_requests(rows: list[SupervisorRequest]) -> list[SupervisorRequest]:
+    """Return one project record per group/owner, preferring the accepted request."""
+    canonical: dict[tuple[str, int], SupervisorRequest] = {}
+    for row in rows:
+        key = ("team", row.team_id) if row.team_id is not None else ("owner", row.requester_user_id)
+        current = canonical.get(key)
+        row_rank = (_REQUEST_STATUS_PRIORITY.get(row.status, -1), row.updated_at or row.created_at, row.id)
+        current_rank = (_REQUEST_STATUS_PRIORITY.get(current.status, -1), current.updated_at or current.created_at, current.id) if current else None
+        if current is None or row_rank > current_rank:
+            canonical[key] = row
+    return sorted(canonical.values(), key=lambda row: (row.updated_at or row.created_at, row.id), reverse=True)
+
+
 @router.get("/{cycle_id}/overview")
 def cycle_overview(cycle_id: int, _: User = Depends(require_roles(*COORDINATOR_ROLES)), db: Session = Depends(get_db)) -> dict:
     cycle = db.get(AcademicCycle, cycle_id)
@@ -42,6 +65,7 @@ def cycle_overview(cycle_id: int, _: User = Depends(require_roles(*COORDINATOR_R
         raise HTTPException(status_code=404, detail="Academic cycle not found.")
 
     users = {user.id: user for user in db.scalars(select(User)).all()}
+    coordinators = db.scalars(select(User).where(User.role == UserRole.COORDINATOR, User.is_active.is_(True)).order_by(User.full_name, User.id)).all()
     teams = db.scalars(select(Team).where(Team.academic_cycle_id == cycle_id).order_by(Team.id)).all()
     team_ids = [team.id for team in teams]
     members = db.scalars(select(TeamMember).where(TeamMember.academic_cycle_id == cycle_id, TeamMember.is_active.is_(True)).order_by(TeamMember.team_id, TeamMember.id)).all()
@@ -59,10 +83,8 @@ def cycle_overview(cycle_id: int, _: User = Depends(require_roles(*COORDINATOR_R
     members_by_team: dict[int, list[TeamMember]] = defaultdict(list)
     for member in members:
         members_by_team[member.team_id].append(member)
-    requests_by_team: dict[int, list[SupervisorRequest]] = defaultdict(list)
-    for item in requests:
-        if item.team_id is not None:
-            requests_by_team[item.team_id].append(item)
+    project_requests = _canonical_requests(requests)
+    project_request_by_team = {item.team_id: item for item in project_requests if item.team_id is not None}
     assignment_by_team = {item.team_id: item for item in assignments}
     submission_by_requirement: dict[int, list[DocumentSubmission]] = defaultdict(list)
     for item in submissions:
@@ -77,13 +99,13 @@ def cycle_overview(cycle_id: int, _: User = Depends(require_roles(*COORDINATOR_R
         if supervisor is None:
             continue
         assigned_groups = [item for item in assignments if item.supervisor_id == supervisor_id]
-        accepted_requests = [item for item in requests if item.supervisor_id == supervisor_id and item.status == "ACCEPTED"]
+        accepted_requests = [item for item in project_requests if item.supervisor_id == supervisor_id and item.status == "ACCEPTED"]
         used = len(assigned_groups) + len([item for item in accepted_requests if item.assignment_id is None])
         capacity = policies.get(supervisor_id)
-        supervisor_rows.append({**(_user(supervisor) or {}), "department": None, "assigned_students": len({member.id for item in assigned_groups for member in members_by_team.get(item.team_id, [])}), "assigned_groups": len(assigned_groups), "active_projects": len([item for item in requests if item.supervisor_id == supervisor_id and item.status not in {"REJECTED", "WITHDRAWN"}]), "capacity": capacity.max_group_capacity if capacity else None, "capacity_used": used, "available_capacity": max(capacity.max_group_capacity - used, 0) if capacity else None, "assignment_status": "ASSIGNED" if assigned_groups else "AVAILABLE"})
+        supervisor_rows.append({**(_user(supervisor) or {}), "department": None, "assigned_students": len({member.id for item in assigned_groups for member in members_by_team.get(item.team_id, [])}), "assigned_groups": len(assigned_groups), "active_projects": len([item for item in project_requests if item.supervisor_id == supervisor_id and item.status not in {"REJECTED", "WITHDRAWN"}]), "capacity": capacity.max_group_capacity if capacity else None, "capacity_used": used, "available_capacity": max(capacity.max_group_capacity - used, 0) if capacity else None, "assignment_status": "ASSIGNED" if assigned_groups else "AVAILABLE"})
 
     project_rows = []
-    for item in requests:
+    for item in project_requests:
         team = next((row for row in teams if row.id == item.team_id), None)
         requester = users.get(item.requester_user_id)
         supervisor = users.get(item.supervisor_id)
@@ -92,13 +114,13 @@ def cycle_overview(cycle_id: int, _: User = Depends(require_roles(*COORDINATOR_R
     group_rows = []
     for team in teams:
         assignment = assignment_by_team.get(team.id)
-        project = requests_by_team.get(team.id, [None])[0]
+        project = project_request_by_team.get(team.id)
         group_rows.append({"id": team.id, "group_id": team.id, "group_number": team.group_number, "name": f"Group {team.group_number or '—'}", "leader": _user(users.get(team.shared_user_id)), "members": [{"id": member.id, "name": member.full_name, "registration_number": member.registration_number, "email": member.university_email} for member in members_by_team.get(team.id, [])], "assigned_supervisor": _user(users.get(assignment.supervisor_id)) if assignment else None, "project_title": project.title if project else None, "status": "ACTIVE", "created_at": team.created_at})
 
     active_requirements = [item for item in requirements if item.status != "ARCHIVED"]
     student_rows = []
     for member in members:
-        project = requests_by_team.get(member.team_id, [None])[0]
+        project = project_request_by_team.get(member.team_id)
         assignment = assignment_by_team.get(member.team_id)
         student_id = next((user.id for user in users.values() if user.registration_number == member.registration_number or user.email == member.university_email), None)
         student_submissions = [submission for requirement_id in requirement_ids for submission in submission_by_requirement.get(requirement_id, []) if student_id is not None and submission.student_id == student_id]
@@ -109,7 +131,7 @@ def cycle_overview(cycle_id: int, _: User = Depends(require_roles(*COORDINATOR_R
     for requirement in requirements:
         document_rows.append({"id": requirement.id, "requirement_id": requirement.id, "title": requirement.title, "status": requirement.status, "due_at": requirement.due_at, "allowed_file_types": requirement.allowed_file_types or [], "submissions": [{"id": submission.id, "student_id": submission.student_id, "status": submission.status, "is_late": submission.is_late, "uploaded_at": submission.uploaded_at, "version_count": version_counts.get(submission.id, 0)} for submission in submission_by_requirement.get(requirement.id, [])]})
 
-    active_projects = [item for item in requests if item.status not in {"REJECTED", "WITHDRAWN"}]
-    summary = {"supervisors": len(supervisor_rows), "students": len({member.id for member in members}), "groups": len(teams), "projects": len(project_rows), "active_projects": len(active_projects), "completed_projects": len([item for item in requests if item.status == "ACCEPTED"]), "pending_reviews": len([item for item in requests if item.status in {"SUBMITTED", "CHANGES_REQUESTED"}]), "required_documents": len(active_requirements)}
+    active_projects = [item for item in project_requests if item.status not in {"REJECTED", "WITHDRAWN"}]
+    summary = {"supervisors": len(supervisor_rows), "students": len({member.id for member in members}), "groups": len(teams), "projects": len(project_rows), "active_projects": len(active_projects), "completed_projects": len([item for item in project_requests if item.status == "ACCEPTED"]), "pending_reviews": len([item for item in project_requests if item.status in {"SUBMITTED", "CHANGES_REQUESTED"}]), "required_documents": len(active_requirements)}
     logger.info("academic_cycle_overview cycle_id=%s lookup_status=found response_status=200", cycle_id)
-    return {"cycle": {"id": cycle.id, "code": cycle.code, "display_name": cycle.display_name, "status": "ACTIVE" if cycle.registration_open else "CLOSED", "registration_open": cycle.registration_open, "start_date": None, "end_date": None, "department": None, "created_at": cycle.created_at, "updated_at": cycle.updated_at}, "summary": summary, "supervisors": supervisor_rows, "projects": project_rows, "groups": group_rows, "students": student_rows, "documents": document_rows}
+    return {"cycle": {"id": cycle.id, "code": cycle.code, "display_name": cycle.display_name, "status": "ACTIVE" if cycle.registration_open else "CLOSED", "registration_open": cycle.registration_open, "start_date": None, "end_date": None, "department": None, "created_at": cycle.created_at, "updated_at": cycle.updated_at}, "summary": summary, "coordinators": [_user(coordinator) for coordinator in coordinators], "supervisors": supervisor_rows, "projects": project_rows, "groups": group_rows, "students": student_rows, "documents": document_rows}

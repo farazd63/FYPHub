@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AdminAddButton } from "./ui/AdminAddButton";
 
 type Cycle = { id: number; code: string; display_name: string };
 type Preview = { local_due_at: string; time_zone: string; utc_offset: string; due_at_utc: string };
@@ -18,6 +19,7 @@ export function AdminDeadlines({ api }: { api: string }) {
   const [cycles, setCycles] = useState<Cycle[]>([]), [zones, setZones] = useState<string[]>([]), [deadlines, setDeadlines] = useState<Summary[]>([]);
   const [filterCycle, setFilterCycle] = useState("");
   const [selected, setSelected] = useState<Detail | null>(null), [selectedVersion, setSelectedVersion] = useState<number | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<Form>(emptyForm), [preview, setPreview] = useState<Preview | null>(null), [offsets, setOffsets] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({}), [message, setMessage] = useState(""), [messageIsError, setMessageIsError] = useState(false);
   const [previewing, setPreviewing] = useState(false), [saving, setSaving] = useState(false);
@@ -86,7 +88,7 @@ export function AdminDeadlines({ api }: { api: string }) {
       if (!response.ok) throw new Error(apiDetail(body).message ?? "Deadline history could not be loaded.");
       if (token !== detailRequest.current) return;
       const detail = body as Detail, latest = detail.versions.at(-1);
-      setSelected(detail); setSelectedVersion(latest?.id ?? null);
+      setSelected(detail); setSelectedVersion(latest?.id ?? null); setShowCreate(true);
       if (populate && latest) {
         setForm({ academic_cycle_id: String(detail.academic_cycle_id), name: latest.name, description: latest.description ?? "", local_due_at: latest.local_due_at, time_zone: latest.time_zone, utc_offset: latest.utc_offset });
         setPreview({ local_due_at: latest.local_due_at, time_zone: latest.time_zone, utc_offset: latest.utc_offset, due_at_utc: latest.due_at_utc }); setOffsets([latest.utc_offset]); setErrors({});
@@ -95,7 +97,7 @@ export function AdminDeadlines({ api }: { api: string }) {
   };
 
   const selectFilter = async (value: string) => { setFilterCycle(value); try { await loadDeadlines(value); } catch (error) { setMessageIsError(true); setMessage(error instanceof Error ? error.message : "Deadline configurations could not be loaded."); } };
-  const startNew = () => { detailRequest.current += 1; setSelected(null); setSelectedVersion(null); setForm({ ...emptyForm(), academic_cycle_id: filterCycle }); setPreview(null); setOffsets([]); setErrors({}); setMessage(""); };
+  const startNew = () => { detailRequest.current += 1; setSelected(null); setSelectedVersion(null); setShowCreate(true); setForm({ ...emptyForm(), academic_cycle_id: filterCycle }); setPreview(null); setOffsets([]); setErrors({}); setMessage(""); };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault(); if (saving) return;
     const next: Record<string, string> = {};
@@ -124,7 +126,7 @@ export function AdminDeadlines({ api }: { api: string }) {
 
   const shownVersion = selected?.versions.find((version) => version.id === selectedVersion);
 
-  return <section aria-labelledby="deadlines-heading"><div className="mb-5"><h1 id="deadlines-heading" className="text-2xl font-bold tracking-tight">Academic Deadlines</h1><p className="mt-1 text-sm text-[#60716b]">Configure recorded deadline dates only. This does not enforce submissions, send reminders, or execute escalations.</p></div>
+  return <section aria-labelledby="deadlines-heading"><div className="mb-5 flex flex-wrap items-start justify-between gap-3"><div><h1 id="deadlines-heading" className="text-2xl font-bold tracking-tight">Academic Deadlines</h1><p className="mt-1 text-sm text-[#60716b]">Configure recorded deadline dates only. This does not enforce submissions, send reminders, or execute escalations.</p></div><AdminAddButton open={showCreate} label="deadline" onClick={() => { if (showCreate) setShowCreate(false); else startNew(); }} /></div>
     {message && <p role={messageIsError ? "alert" : "status"} className={`mb-4 rounded-lg px-3 py-2 text-sm ${messageIsError ? "bg-[#fff3f0] text-[#a43a33]" : "bg-[#e4eee7] text-[#176b66]"}`}>{message}</p>}
     {state === "loading" && <div className="rounded-xl border border-[#dce4de] bg-white p-5 text-sm text-[#60716b]">Loading deadline configuration...</div>}
     {state === "error" && <div role="alert" className="rounded-xl border border-[#e6c8c3] bg-[#fff3f0] p-5 text-sm text-[#a43a33]">Deadline configuration could not be loaded. <button type="button" className="underline" onClick={() => void load()}>Try again</button>.</div>}

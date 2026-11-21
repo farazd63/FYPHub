@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.auth import SESSION_COOKIE_NAME, utc_now
 from app.database import engine, get_db
 from app.main import app
-from app.models import AdminAuditEvent, AuthSession, Team, User, UserRole
+from app.models import AdminAuditEvent, AuthSession, InstitutionMembership, Team, User, UserRole
 from app.security import generate_session_token, hash_password, hash_session_token, verify_password
 
 
@@ -222,6 +222,35 @@ class AdminUserTests(unittest.TestCase):
         self.connection.execute(text("UPDATE users SET is_active = false WHERE role = CAST('ADMIN' AS user_role) AND id != :id"), {"id": self.admin_id})
         self.assertEqual(request("PATCH", f"/api/v1/admin/users/{self.admin_id}/status", {"is_active": False}, token=self.token)[0], 409)
         self.assertEqual(request("PATCH", f"/api/v1/admin/users/{self.admin_id}/role", {"role": "COORDINATOR"}, token=self.token)[0], 409)
+
+    def test_admin_activation_restores_access_without_email_workflow(self) -> None:
+        session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        institution_id = self.connection.execute(text("SELECT institution_id FROM institution_domains WHERE domain = 'szabist-isb.pk' LIMIT 1")).scalar_one()
+        suffix = uuid4().hex[:10]
+        target = User(
+            full_name="Direct Reactivation",
+            email=f"reactivation-{suffix}@szabist-isb.pk",
+            registration_number=f"REACT{suffix}".upper(),
+            password_hash=hash_password("Test Password!"),
+            role=UserRole.STUDENT,
+            institution_id=institution_id,
+            is_active=False,
+        )
+        session.add(target)
+        session.flush()
+        session.add(InstitutionMembership(institution_id=institution_id, user_id=target.id, status="DISABLED"))
+        session.commit()
+        target_id = target.id
+        session.close()
+
+        status, body = request("PATCH", f"/api/v1/admin/users/{target_id}/status", {"is_active": True}, token=self.token)
+        self.assertEqual((status, body["is_active"]), (200, True))
+        row = self.connection.execute(text("SELECT is_active, email_verified_at, access_approved_at FROM users WHERE id = :id"), {"id": target_id}).one()
+        self.assertTrue(row.is_active)
+        self.assertIsNotNone(row.email_verified_at)
+        self.assertIsNotNone(row.access_approved_at)
+        self.assertEqual(self.connection.execute(text("SELECT status FROM institution_memberships WHERE user_id = :id"), {"id": target_id}).scalar_one(), "ACTIVE")
+        self.assertEqual(request("POST", "/api/v1/auth/login", {"email": target.email, "password": "Test Password!"})[0], 200)
 
     def test_shared_team_protection_and_append_only_database_trigger(self) -> None:
         cycle_id = self.connection.execute(text("SELECT id FROM academic_cycles ORDER BY id LIMIT 1")).scalar_one()

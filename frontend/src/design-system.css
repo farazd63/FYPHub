@@ -123,7 +123,7 @@ main:has(.admin-sidebar) .admin-enter > section > p {
 input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
-  border-color: var(--fy-border);
+  border-color: var(--fy-input-border);
   border-radius: var(--fy-radius-control);
   background: var(--fy-surface);
   color: var(--fy-text);

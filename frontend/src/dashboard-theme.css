@@ -37,6 +37,31 @@ main:has(.admin-sidebar) > header {
 .student-header__left,
 main:has(.admin-sidebar) > header > div:first-child { gap: 16px; }
 
+.portal-home-button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border: 1px solid var(--dash-line);
+  border-radius: 8px;
+  background: var(--dash-surface);
+  color: var(--dash-blue);
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.portal-home-button:hover {
+  border-color: var(--dash-blue);
+  background: var(--fy-brand-soft, var(--dash-surface-soft));
+  color: var(--dash-blue-dark);
+}
+
+.fyp-hub-brand .portal-home-button svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
 .admin-menu {
   display: grid;
   width: 40px;

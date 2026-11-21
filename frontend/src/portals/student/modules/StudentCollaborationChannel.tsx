@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { COLLABORATION_MESSAGE_LIMIT, mergeCollaborationMessages, sendsOnEnter, validateCollaborationMessage } from "./collaboration-message";
+import { IconButton } from "../../../ui/IconButton";
 import "./student-collaboration.css";
+import "../../shared/conversation-layout.css";
 
 type Member = { id: number; name?: string; full_name?: string; registration_number: string; is_active?: boolean };
 type Group = { id: number; group_name: string; academic_cycle: string | null; members: Member[]; supervisor: { name: string } | null; supervisor_assignment: { id: number } | null };
@@ -105,14 +108,26 @@ export function StudentCollaborationChannel({ api, userId }: { api: string; user
 
   useEffect(() => {
     if (open && history.current && stickToLatest.current) {
-      history.current.scrollTop = history.current.scrollHeight;
+      const frame = window.requestAnimationFrame(() => {
+        if (history.current) history.current.scrollTop = history.current.scrollHeight;
+      });
       const latest = messages.at(-1);
       if (latest) {
         const timer = window.setTimeout(() => void markRead(latest.id), 0);
-        return () => window.clearTimeout(timer);
+        return () => { window.cancelAnimationFrame(frame); window.clearTimeout(timer); };
       }
+      return () => window.cancelAnimationFrame(frame);
     }
   }, [messages, open, markRead]);
+
+  useEffect(() => {
+    if (!open) return;
+    stickToLatest.current = true;
+    const frame = window.requestAnimationFrame(() => {
+      if (history.current) history.current.scrollTop = history.current.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open]);
 
   const send = async () => {
     if (!channelId || sendPending.current) return;
@@ -152,7 +167,7 @@ export function StudentCollaborationChannel({ api, userId }: { api: string; user
         <dl className="student-collab__details"><div><dt>Group</dt><dd>{channel?.group_name ?? group?.group_name ?? "Not available"}</dd></div><div><dt>Academic cycle</dt><dd>{channel?.cycle_name ?? group?.academic_cycle ?? "Not configured"}</dd></div><div><dt>Assigned supervisor</dt><dd>{channel?.supervisor?.name ?? group?.supervisor?.name ?? "Not assigned"}</dd></div><div><dt>Assignment status</dt><dd>{channel?.assignment_status ?? (group?.supervisor_assignment || group?.supervisor ? "Active assignment" : "Awaiting supervisor acceptance")}</dd></div></dl>
         <div className="student-collab__members"><strong>Group members</strong><ul>{members.map(member => <li key={member.id}>{member.name ?? member.full_name} <span>{member.registration_number}</span></li>)}</ul></div>
         {!channel ? <p className="student-collab__notice">{group?.supervisor_assignment || group?.supervisor ? "Your supervisor is assigned, but the collaboration channel could not be opened yet. Ask an administrator to set this cycle's year and session." : "Collaboration channel will be available after a supervisor is assigned."}</p> : <>
-          <div className="student-collab__toolbar"><span>Group conversation</span><button type="button" onClick={() => void refreshMessages()}>Refresh messages</button></div>
+          <div className="student-collab__toolbar"><span>Group conversation</span><IconButton label="Refresh messages" size="sm" variant="secondary" onClick={() => void refreshMessages()}><RefreshCw size={15} strokeWidth={1.8} aria-hidden /></IconButton></div>
           <div ref={history} className="student-collab__history" role="region" aria-label="Collaboration message history" tabIndex={0} onScroll={() => { const element = history.current; if (!element) return; stickToLatest.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; if (stickToLatest.current && messages.at(-1)) void markRead(messages.at(-1)!.id); }}>
             {olderAvailable && <button type="button" disabled={loadingOlder} onClick={() => void loadOlder()}>{loadingOlder ? "Loading…" : "Load earlier messages"}</button>}
             {!messagesReady && !messages.length ? <p role="status">Loading messages…</p> : !messages.length ? <p>No messages yet. Start the conversation with your group.</p> : messages.map(message => <article key={message.id} className={`student-collab__message ${message.sender_user_id === userId ? "student-collab__message--own" : ""}`}><header><strong>{message.sender_name}</strong><span>{message.sender_role === "SUPERVISOR" ? "Supervisor" : "Student group member"}</span><time dateTime={message.created_at}>{new Date(message.created_at).toLocaleString()}</time></header><pre>{message.message_text}</pre></article>)}

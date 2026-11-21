@@ -144,9 +144,19 @@ class TeamRegistrationApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.prefix = f"tr_{uuid4().hex[:12]}"
         self.cycle_index = 0
+        self.registration_domain = self.connection.execute(
+            text(
+                "SELECT domain FROM institution_domains "
+                "WHERE domain = 'szabist-isb.pk' AND is_verified AND is_active"
+            )
+        ).scalar_one()
+        self.institution_id = self.connection.execute(
+            text("SELECT institution_id FROM institution_domains WHERE domain = :domain"),
+            {"domain": self.registration_domain},
+        ).scalar_one()
 
     def email(self, suffix: str) -> str:
-        return f"{self.prefix}_{suffix}@example.com"
+        return f"{self.prefix}_{suffix}@{self.registration_domain}"
 
     def registration(self, suffix: str) -> str:
         return f"{self.prefix}_{suffix}".upper()
@@ -156,8 +166,8 @@ class TeamRegistrationApiTests(unittest.TestCase):
         cycle_id = self.connection.execute(
             text(
                 """
-                INSERT INTO academic_cycles (code, display_name, registration_open)
-                VALUES (:code, :display_name, :registration_open)
+                INSERT INTO academic_cycles (code, display_name, registration_open, institution_id)
+                VALUES (:code, :display_name, :registration_open, :institution_id)
                 RETURNING id
                 """
             ),
@@ -165,17 +175,18 @@ class TeamRegistrationApiTests(unittest.TestCase):
                 "code": self.registration(f"cycle-{self.cycle_index}"),
                 "display_name": f"Team registration {self.prefix} {self.cycle_index}",
                 "registration_open": open_for_registration,
+                "institution_id": self.institution_id,
             },
         ).scalar_one()
         if with_policy:
             self.connection.execute(
                 text(
                     """
-                    INSERT INTO academic_group_policies (academic_cycle_id, max_group_size)
-                    VALUES (:cycle_id, :max_size)
+                    INSERT INTO academic_group_policies (academic_cycle_id, max_group_size, institution_id)
+                    VALUES (:cycle_id, :max_size, :institution_id)
                     """
                 ),
-                {"cycle_id": cycle_id, "max_size": max_size},
+                {"cycle_id": cycle_id, "max_size": max_size, "institution_id": self.institution_id},
             )
         if seed_roster:
             self.seed_roster(cycle_id, [

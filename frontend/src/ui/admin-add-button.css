@@ -1,0 +1,87 @@
+.admin-add-button {
+  position: relative;
+  /* Keep page actions below the sticky shell header while scrolling. */
+  z-index: 1;
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 1px solid #4663ff;
+  border-radius: 0.65rem;
+  padding: 0.55rem 0.85rem;
+  background: #4663ff;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.admin-add-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgb(15 23 42 / 42%);
+  backdrop-filter: blur(2px);
+}
+
+section[aria-labelledby="users-heading"] > div.grid > form:not(:first-child),
+section[aria-labelledby="capacity-heading"] .admin-capacity-layout > form,
+section.academic-cycles .academic-cycles__create,
+section[aria-labelledby="deadlines-heading"] > div.grid > form,
+section[aria-labelledby="rules-heading"] > div.grid > form,
+.admin-announcements .announcement-composer,
+.module3-admin-page .module3-template-upload,
+section[aria-label="Document Submission Archive"] section.mt-6 > div.mt-5.grid.gap-4.border-t,
+.admin-add-modal-form {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  z-index: 60 !important;
+  width: min(calc(100vw - 2rem), 42rem) !important;
+  max-height: calc(100vh - 2rem);
+  margin: 0 !important;
+  overflow-y: auto;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1.5rem 4rem rgb(15 23 42 / 26%);
+}
+
+section[aria-labelledby="users-heading"] > div.grid > form:not(:first-child),
+section[aria-labelledby="capacity-heading"] .admin-capacity-layout > form,
+section[aria-labelledby="deadlines-heading"] > div.grid > form,
+section[aria-labelledby="rules-heading"] > div.grid > form {
+  border: 1px solid var(--fy-border, #dce4de);
+}
+
+.admin-add-button:hover {
+  border-color: #354fe0;
+  background: #354fe0;
+}
+
+.admin-add-button:active {
+  transform: translateY(1px);
+}
+
+.admin-add-button:focus-visible {
+  outline: 3px solid rgb(70 99 255 / 28%);
+  outline-offset: 2px;
+}
+
+section[aria-labelledby="deadlines-heading"]:has(.admin-add-button[aria-expanded="false"]) > div.grid,
+section[aria-labelledby="rules-heading"]:has(.admin-add-button[aria-expanded="false"]) > div.grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+section[aria-labelledby="deadlines-heading"]:has(.admin-add-button[aria-expanded="false"]) > div.grid > form,
+section[aria-labelledby="rules-heading"]:has(.admin-add-button[aria-expanded="false"]) > div.grid > form {
+  display: none;
+}
+
+section[aria-labelledby="users-heading"] > div.grid:has(> form),
+section[aria-labelledby="capacity-heading"] .admin-capacity-layout.has-editor,
+section.academic-cycles > div.grid:has(.academic-cycles__create),
+section[aria-labelledby="deadlines-heading"] > div.grid:has(> form),
+section[aria-labelledby="rules-heading"] > div.grid:has(> form) {
+  grid-template-columns: minmax(0, 1fr) !important;
+}

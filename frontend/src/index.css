@@ -53,7 +53,17 @@ textarea:focus-visible {
 .student-overview__eyebrow,
 .module3-eyebrow,
 .module3-kicker,
-.supervisor-page-heading > p { display: none !important; }
+.fy-page-header__eyebrow,
+.cycle-detail__eyebrow,
+.expertise-eyebrow,
+.matching-eyebrow,
+.group-ai-eyebrow,
+.announcement-section__eyebrow,
+.progress-hero .progress-kicker,
+.supervisor-page-heading > p,
+.admin-replacement-page > div:first-child > p:first-child,
+section[aria-label="Document Submission Archive"] > div:first-child > div:first-child > p:first-child,
+section[aria-labelledby="student-groups-heading"] > div:first-child > div:first-child > p:first-child { display: none !important; }
 
 @keyframes admin-page-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes admin-card-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -337,7 +347,7 @@ main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] .rounded-2xl.bo
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] input:not([type="checkbox"]):not([type="radio"]),
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] select,
 main:has(.admin-sidebar) .admin-enter > section[aria-labelledby] textarea {
-  border-color: var(--fy-border);
+  border-color: var(--fy-input-border);
   background: var(--fy-page);
   color: var(--fy-text);
 }
@@ -495,7 +505,7 @@ main:has(.admin-sidebar) .admin-enter > section:not([aria-labelledby]) table the
   .admin-users-layout {
     grid-template-columns: minmax(0, 1fr) minmax(280px, 300px);
   }
-  .admin-capacity-layout {
+  .admin-capacity-layout.has-editor {
     grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
   }
 }
@@ -554,4 +564,35 @@ section[aria-labelledby="users-heading"] .users-table__actions {
   section[aria-labelledby="users-heading"] .users-table__grid {
     min-width: 560px;
   }
+}
+
+/* Keep replacement-case columns independent when tables and form controls have long content. */
+.admin-replacement-page,
+.admin-replacement-page > article,
+.admin-replacement-page > article > div,
+.admin-replacement-page section,
+.admin-replacement-page section > div {
+  min-width: 0;
+}
+.admin-replacement-page > article:last-child {
+  overflow: hidden;
+}
+.admin-replacement-page table {
+  max-width: 100%;
+}
+.admin-replacement-page select,
+.admin-replacement-page textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.admin-replacement-page h3,
+.admin-replacement-page p,
+.admin-replacement-page strong,
+.admin-replacement-page small {
+  overflow-wrap: anywhere;
+}
+.admin-replacement-page .overflow-x-auto {
+  max-width: 100%;
+  min-width: 0;
 }

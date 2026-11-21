@@ -1,0 +1,104 @@
+.student-supervisor-info {
+  width: 100%;
+  min-width: 0;
+  max-width: 960px;
+}
+
+.student-supervisor-info__heading {
+  width: 100%;
+  min-width: 0;
+  max-width: 760px;
+}
+
+.student-supervisor-info__heading h1,
+.student-supervisor-info__heading p,
+.student-supervisor-info__card,
+.student-supervisor-info__card h2,
+.student-supervisor-info__assignment,
+.student-supervisor-info__identity,
+.student-supervisor-info__identity dd {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.student-supervisor-info__heading p:last-child {
+  width: 100%;
+  max-width: 62ch;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+.student-supervisor-info__cards {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  gap: 16px;
+}
+
+.student-supervisor-info__card {
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: clamp(18px, 2.2vw, 24px);
+}
+
+.student-supervisor-info__card h2 {
+  margin: 0;
+  color: var(--fy-text);
+  font-size: clamp(1rem, 1.6vw, 1.15rem);
+  line-height: 1.3;
+}
+
+.student-supervisor-info__assignment {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.student-supervisor-info__assignment h3 {
+  margin: 0;
+  color: var(--fy-text);
+  font-size: clamp(1.1rem, 2vw, 1.35rem);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.student-supervisor-info__assignment p {
+  margin: 0;
+  color: var(--fy-text-secondary);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.student-supervisor-info__identity {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 16px;
+  margin: 18px 0 0;
+}
+
+.student-supervisor-info__identity div {
+  min-width: 0;
+}
+
+.student-supervisor-info__identity dt {
+  color: var(--fy-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.student-supervisor-info__identity dd {
+  margin: 6px 0 0;
+  color: var(--fy-text);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .student-supervisor-info__identity { gap: 13px; }
+}

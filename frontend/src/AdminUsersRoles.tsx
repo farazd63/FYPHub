@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { KeyRound, Pencil, Power, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import { PasswordField } from "./PasswordField";
 import { passwordPolicyError } from "./passwordPolicy";
 import { emailValidationMessage, normalizeEmail } from "./emailValidation";
+import { AdminAddButton } from "./ui/AdminAddButton";
+import { IconButton } from "./ui/IconButton";
 
 type Role = "STUDENT" | "SUPERVISOR" | "COORDINATOR" | "PANEL_MEMBER" | "ADMIN";
 type User = {
@@ -21,7 +24,7 @@ const roles: Role[] = [
   "ADMIN",
 ];
 const roleLabel: Record<Role, string> = {
-  STUDENT: "Student",
+  STUDENT: "Group",
   SUPERVISOR: "Supervisor",
   COORDINATOR: "Coordinator",
   PANEL_MEMBER: "Evaluator",
@@ -56,7 +59,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
   const [editError, setEditError] = useState("");
   const [confirm, setConfirm] = useState<{
     user: User;
-    type: "status" | "delete";
+    type: "status" | "delete" | "permanent";
     value: string;
   } | null>(null);
   const [form, setForm] = useState({
@@ -67,6 +70,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
     registration_number: "",
   });
   const [fieldError, setFieldError] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
   const emailError = emailTouched && form.email.trim()
     ? emailValidationMessage(form.email)
     : undefined;
@@ -141,6 +145,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
         registration_number: "",
       });
       setEmailTouched(false);
+      setShowCreate(false);
       setNotice("Account created.");
       setPage(1);
       await load();
@@ -155,9 +160,16 @@ export function AdminUsersRoles({ api }: { api: string }) {
     setBusy(confirm.user.id);
     setNotice("");
     try {
+      const endpoint = confirm.type === "delete"
+        ? `${api}/api/v1/admin/users/${confirm.user.id}`
+        : confirm.type === "permanent"
+          ? `${api}/api/v1/admin/users/${confirm.user.id}/permanent`
+          : `${api}/api/v1/admin/users/${confirm.user.id}/${confirm.type}`;
       const response = await fetch(
-        confirm.type === "delete" ? `${api}/api/v1/admin/users/${confirm.user.id}` : `${api}/api/v1/admin/users/${confirm.user.id}/${confirm.type}`,
-        confirm.type === "delete" ? { method: "DELETE", credentials: "include" } : { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: confirm.value === "true" }) },
+        endpoint,
+        confirm.type === "status"
+          ? { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: confirm.value === "true" }) }
+          : { method: "DELETE", credentials: "include" },
       );
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -165,7 +177,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
         return;
       }
       setConfirm(null);
-      setNotice(confirm.type === "delete" ? "Portal access removed. Previous records are preserved." : "Account updated.");
+      setNotice(confirm.type === "permanent" ? "Account permanently deleted." : confirm.type === "delete" ? "Portal access removed. Previous records are preserved." : confirm.value === "true" ? "Account activated by administrator. No verification email is required." : "Account deactivated.");
       await load();
     } catch {
       setNotice("The account service is unavailable.");
@@ -259,7 +271,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
   };
   return (
     <section aria-labelledby="users-heading">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 id="users-heading" className="text-2xl font-bold tracking-tight">
             Users &amp; Roles
@@ -268,9 +280,9 @@ export function AdminUsersRoles({ api }: { api: string }) {
             View assigned roles and manage account status.
           </p>
         </div>
-        <p className="text-sm text-[#60716b]">
+        <div className="flex flex-wrap items-center gap-3"><p className="text-sm text-[#60716b]">
           {data.total} account{data.total === 1 ? "" : "s"}
-        </p>
+        </p><AdminAddButton open={showCreate} label="account" onClick={() => setShowCreate((value) => !value)} /></div>
       </div>
       {notice && (
         <p
@@ -280,7 +292,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
           {notice}
         </p>
       )}
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className={`grid gap-5 ${showCreate ? "xl:grid-cols-[minmax(0,1fr)_300px]" : ""}`}>
         <div className="min-w-0">
           <form
             onSubmit={searchSubmit}
@@ -400,23 +412,13 @@ export function AdminUsersRoles({ api }: { api: string }) {
                         </span>
                       </td>
                       <td className="px-3 py-3">
-                        <button
-                          type="button"
-                          disabled={busy === user.id}
-                          onClick={() =>
-                            setConfirm({
-                              user,
-                              type: "status",
-                              value: String(!user.is_active),
-                            })
-                          }
-                          className="w-full rounded-lg border border-[#b8cdc1] px-2 py-1.5 text-xs font-semibold text-[#176b66] transition duration-200 hover:bg-[#e4eee7] disabled:opacity-60"
-                        >
-                          {user.is_active ? "Deactivate" : "Activate"}
-                        </button>
-                        <button type="button" disabled={busy === user.id || !user.is_active} onClick={() => setConfirm({ user, type: "delete", value: "delete" })} className="mt-2 w-full rounded-lg border border-[#d38b83] px-2 py-1.5 text-xs font-semibold text-[#a43a33] transition duration-200 hover:bg-[#fff3f0] disabled:opacity-60">Remove access</button>
-                        <button type="button" disabled={busy === user.id} onClick={() => { setPasswordUser(user); setPasswordForm({ new_password: "", confirm_password: "" }); setPasswordError(""); }} className="mt-2 w-full rounded-lg border border-[#cbd6d0] px-2 py-1.5 text-xs font-semibold text-[#243746] transition duration-200 hover:bg-[#f5f8f6] disabled:opacity-60">Change password</button>
-                        <button type="button" disabled={busy === user.id} onClick={() => { setEditUser(user); setEditForm({ full_name: user.full_name, email: user.email, registration_number: user.registration_number ?? "", role: user.role }); setEditError(""); }} className="mt-2 w-full rounded-lg border border-[#cbd6d0] px-2 py-1.5 text-xs font-semibold text-[#243746] transition duration-200 hover:bg-[#f5f8f6] disabled:opacity-60">Edit account</button>
+                        <div className="flex flex-wrap gap-1.5" aria-label={`Actions for ${user.full_name}`}>
+                          <IconButton label={user.is_active ? "Deactivate account" : "Activate account"} size="sm" variant="secondary" disabled={busy === user.id} onClick={() => setConfirm({ user, type: "status", value: String(!user.is_active) })}><Power size={15} strokeWidth={1.8} aria-hidden /></IconButton>
+                          <IconButton label={user.is_active ? "Remove portal access" : "Allow portal access"} size="sm" variant={user.is_active ? "danger" : "secondary"} disabled={busy === user.id} onClick={() => user.is_active ? setConfirm({ user, type: "delete", value: "delete" }) : setConfirm({ user, type: "status", value: "true" })}>{user.is_active ? <ShieldOff size={15} strokeWidth={1.8} aria-hidden /> : <ShieldCheck size={15} strokeWidth={1.8} aria-hidden />}</IconButton>
+                          <IconButton label="Change password" size="sm" variant="secondary" disabled={busy === user.id} onClick={() => { setPasswordUser(user); setPasswordForm({ new_password: "", confirm_password: "" }); setPasswordError(""); }}><KeyRound size={15} strokeWidth={1.8} aria-hidden /></IconButton>
+                          <IconButton label="Edit account" size="sm" variant="secondary" disabled={busy === user.id} onClick={() => { setEditUser(user); setEditForm({ full_name: user.full_name, email: user.email, registration_number: user.registration_number ?? "", role: user.role }); setEditError(""); }}><Pencil size={15} strokeWidth={1.8} aria-hidden /></IconButton>
+                          <IconButton label="Delete permanently" size="sm" variant="danger" disabled={busy === user.id} onClick={() => setConfirm({ user, type: "permanent", value: "delete" })}><Trash2 size={15} strokeWidth={1.8} aria-hidden /></IconButton>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -446,7 +448,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
             </button>
           </div>
         </div>
-        <form
+        {showCreate && <form
           onSubmit={create}
           className="h-fit rounded-xl border border-[#dce4de] bg-white p-5 shadow-[0_2px_12px_rgba(36,55,70,0.035)]"
         >
@@ -504,7 +506,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                   });
                 }}
               >
-                {roles.map((item) => (
+                {roles.filter((item) => item !== "STUDENT").map((item) => (
                   <option key={item} value={item}>{roleLabel[item]}</option>
                 ))}
               </select>
@@ -534,7 +536,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
               {busy === "create" ? "Creating…" : "Create account"}
             </button>
           </div>
-        </form>
+        </form>}
       </div>
       {confirm && (
         <div
@@ -545,10 +547,10 @@ export function AdminUsersRoles({ api }: { api: string }) {
         >
           <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
             <h2 id="confirm-heading" className="text-lg font-bold">
-              {confirm.type === "delete" ? "Confirm access removal" : "Confirm account change"}
+              {confirm.type === "permanent" ? "Confirm permanent deletion" : confirm.type === "delete" ? "Confirm access removal" : confirm.value === "true" ? "Confirm portal access" : "Confirm account change"}
             </h2>
             <p className="mt-2 text-sm text-[#60716b]">
-              {confirm.type === "delete" ? `Remove portal access for ${confirm.user.full_name}? They will be signed out and unable to sign in. All previous records and audit history will be preserved.` : `${confirm.value === "true" ? "Activate" : "Deactivate"} ${confirm.user.full_name}?`}
+              {confirm.type === "permanent" ? `Permanently delete ${confirm.user.full_name}? This cannot be undone. Accounts with linked academic or audit history must use Remove access instead.` : confirm.type === "delete" ? `Remove portal access for ${confirm.user.full_name}? They will be signed out and unable to sign in. All previous records and audit history will be preserved.` : confirm.value === "true" ? `Allow portal access for ${confirm.user.full_name}? They will be able to sign in again.` : `Deactivate ${confirm.user.full_name}?`}
             </p>
             <div className="mt-5 flex justify-end gap-3">
               <button
@@ -563,9 +565,9 @@ export function AdminUsersRoles({ api }: { api: string }) {
                 type="button"
                 disabled={busy !== null}
                 onClick={() => void mutate()}
-                className="rounded-lg bg-[#176b66] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${confirm.type === "permanent" ? "bg-[#a43a33]" : "bg-[#176b66]"}`}
               >
-                {busy ? "Saving…" : confirm.type === "delete" ? "Remove access" : "Confirm"}
+                {busy ? "Saving…" : confirm.type === "permanent" ? "Delete permanently" : confirm.type === "delete" ? "Remove access" : "Confirm"}
               </button>
             </div>
           </div>
@@ -596,8 +598,8 @@ export function AdminUsersRoles({ api }: { api: string }) {
             <div className="mt-4 grid gap-3">
               <label className="grid gap-1 text-sm font-semibold">Full name<input required className={input} value={editForm.full_name} onChange={(event) => setEditForm({ ...editForm, full_name: event.target.value })} /></label>
               <label className="grid gap-1 text-sm font-semibold">Email<input required type="email" className={input} value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} /></label>
-              <label className="grid gap-1 text-sm font-semibold">Registration number<input className={input} value={editForm.registration_number} onChange={(event) => setEditForm({ ...editForm, registration_number: event.target.value })} placeholder={editForm.role === "STUDENT" ? "Required for students" : "Optional"} /></label>
-              <label className="grid gap-1 text-sm font-semibold">Role<select className={input} value={editForm.role} onChange={(event) => setEditForm({ ...editForm, role: event.target.value as Role })}>{roles.map((item) => <option key={item} value={item}>{roleLabel[item]}</option>)}</select></label>
+              <label className="grid gap-1 text-sm font-semibold">Registration number<input className={input} value={editForm.registration_number} onChange={(event) => setEditForm({ ...editForm, registration_number: event.target.value })} placeholder={editForm.role === "STUDENT" ? "Required for group account" : "Optional"} /></label>
+              <label className="grid gap-1 text-sm font-semibold">Role<select className={input} value={editForm.role} onChange={(event) => setEditForm({ ...editForm, role: event.target.value as Role })}>{(editForm.role === "STUDENT" ? ["STUDENT"] : roles.filter((item) => item !== "STUDENT")).map((item) => <option key={item} value={item}>{roleLabel[item as Role]}</option>)}</select></label>
               {editError && <p role="alert" className="text-sm text-[#a43a33]">{editError}</p>}
             </div>
             <div className="mt-5 flex justify-end gap-3">

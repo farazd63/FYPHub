@@ -1,6 +1,8 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./group-ai.css";
+import { sendsOnEnter } from "./portals/student/modules/collaboration-message";
+import "./portals/shared/conversation-layout.css";
 
 type Message = { id: number; author_kind: string; body: string; created_at: string };
 
@@ -25,6 +27,8 @@ export function GroupAIChat({ api }: { api: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const history = useRef<HTMLDivElement>(null);
+  const stickToLatest = useRef(true);
   const temporaryIdRef = useRef(-1);
   const chatUrl = `${api}/api/v1/group-ai`;
 
@@ -44,6 +48,14 @@ export function GroupAIChat({ api }: { api: string }) {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (loading || !stickToLatest.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (history.current) history.current.scrollTop = history.current.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading, messages]);
+
   const send = async (question = draft) => {
     const body = question.trim();
     if (!body || busy) return;
@@ -54,6 +66,7 @@ export function GroupAIChat({ api }: { api: string }) {
     setBusy(true);
     setError("");
     setDraft("");
+    stickToLatest.current = true;
     setMessages((current) => [...current,
       { id: temporaryUserId, author_kind: "USER", body, created_at: now },
       { id: temporaryAssistantId, author_kind: "AI", body: "", created_at: now },
@@ -118,7 +131,11 @@ export function GroupAIChat({ api }: { api: string }) {
         <div><h2>Chat with Llama 3.1 8B</h2><p>Recent chatbot messages may be used to keep the conversation coherent.</p></div>
         <span className="group-ai-status">Online assistant</span>
       </div>
-      <div className="group-ai-messages" aria-live="polite">
+      <div ref={history} className="group-ai-messages" aria-live="polite" onScroll={() => {
+        const element = history.current;
+        if (!element) return;
+        stickToLatest.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+      }}>
         {loading && <p className="group-ai-empty">Loading chat history…</p>}
         {!loading && !messages.length && <div className="group-ai-empty"><strong>Start a conversation</strong><p>Ask a question below to get a direct answer.</p></div>}
         {messages.map((message) => <article key={message.id} className={`group-ai-message group-ai-message--${message.author_kind === "AI" ? "assistant" : "user"}`}>
@@ -127,7 +144,7 @@ export function GroupAIChat({ api }: { api: string }) {
         </article>)}
       </div>
       <div className="group-ai-prompts">{suggestedQuestions.map((question) => <button key={question} type="button" onClick={() => void send(question)} disabled={busy}>{question}</button>)}</div>
-      <form className="group-ai-composer" onSubmit={(event) => { event.preventDefault(); void send(); }}><textarea aria-label="Ask the AI chatbot" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={4000} placeholder="Ask a question…" rows={3} /><div><span>{draft.length}/4000</span><button type="submit" disabled={busy || !draft.trim()}>{busy ? "Streaming…" : "Ask chatbot"}</button></div></form>
+      <form className="group-ai-composer" onSubmit={(event) => { event.preventDefault(); void send(); }}><textarea aria-label="Ask the AI chatbot" value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (!busy && sendsOnEnter({ key: event.key, shiftKey: event.shiftKey, isComposing: event.nativeEvent.isComposing })) { event.preventDefault(); void send(); } }} maxLength={4000} placeholder="Ask a question…" rows={3} /><div><span>{draft.length}/4000</span><button type="submit" disabled={busy || !draft.trim()}>{busy ? "Streaming…" : "Ask chatbot"}</button></div></form>
     </div>
   </section>;
 }

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { PageHeader, StatCard, StatusBadge } from "../../ui";
+import { IconButton } from "../../ui/IconButton";
+import { AnnouncementSection } from "../../announcements/AnnouncementSection";
 
 type History = { id: number; to_status: string; comment: string | null; actor_name: string; created_at: string };
 type RequestRecord = { id: number; title: string | null; status: string; academic_cycle_name: string; requester_name: string; updated_at: string; status_history: History[] };
@@ -44,12 +47,13 @@ export function SupervisorOverview({ api, onOpenRequest }: { api: string; onOpen
   return (
     <section className="supervisor-page" aria-labelledby="supervisor-overview-heading">
       <PageHeader className="supervisor-page-heading" eyebrow="Supervisor workspace" title="Overview" description="Live request activity and decisions for your supervisor account." />
-      {error && <div className="supervisor-alert" role="alert">{error} <button type="button" onClick={() => void load()} className="underline">Refresh</button></div>}
+      <AnnouncementSection api={api} />
+      {error && <div className="supervisor-alert" role="alert">{error} <IconButton label="Refresh supervisor activity" size="sm" variant="secondary" onClick={() => void load()}><RefreshCw size={15} strokeWidth={1.8} aria-hidden /></IconButton></div>}
       {loading ? <div className="supervisor-card supervisor-empty">Loading supervisor activity…</div> : !rows.length ? (
         <div className="supervisor-card supervisor-empty">
           <h2>No assigned request activity yet</h2>
           <p className="mt-2">New requests assigned to you will appear here after a student submits a proposal.</p>
-          <button type="button" className="fy-btn fy-btn--primary fy-btn--sm mt-4" onClick={() => void load()}>Refresh</button>
+          <IconButton label="Refresh supervisor activity" size="sm" variant="primary" className="mt-4" onClick={() => void load()}><RefreshCw size={15} strokeWidth={1.8} aria-hidden /></IconButton>
         </div>
       ) : (
         <>

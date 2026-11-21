@@ -48,6 +48,14 @@ ACTIVE_REQUEST_STATUSES = (
     SupervisorRequestStatus.CHANGES_REQUESTED.value,
     SupervisorRequestStatus.ACCEPTED.value,
 )
+REQUEST_STATUS_PRIORITY = {
+    SupervisorRequestStatus.ACCEPTED.value: 5,
+    SupervisorRequestStatus.SUBMITTED.value: 4,
+    SupervisorRequestStatus.CHANGES_REQUESTED.value: 3,
+    SupervisorRequestStatus.DRAFT.value: 2,
+    SupervisorRequestStatus.REJECTED.value: 1,
+    SupervisorRequestStatus.WITHDRAWN.value: 0,
+}
 DECISION_STATUSES = (
     SupervisorRequestStatus.SUBMITTED.value,
     SupervisorRequestStatus.CHANGES_REQUESTED.value,
@@ -185,7 +193,7 @@ def _ai_out(run: ProposalAIReviewRun) -> dict[str, object]:
     return response
 
 
-def _team_for_student(session: Session, actor: User) -> Team | None:
+def _team_for_student(session: Session, actor: User, *, lock: bool = False) -> Team | None:
     """Resolve the existing shared group for either its login or an active member."""
     member_match = select(TeamMember.id).where(
         TeamMember.team_id == Team.id,
@@ -196,7 +204,42 @@ def _team_for_student(session: Session, actor: User) -> Team | None:
     conditions = [Team.shared_user_id == actor.id]
     if member_match is not None:
         conditions.append(member_match)
-    return session.execute(select(Team).where(or_(*conditions), Team.status != "dissolved").order_by(Team.id)).scalars().first()
+    statement = select(Team).where(or_(*conditions), Team.status != "dissolved").order_by(Team.id)
+    if lock:
+        statement = statement.with_for_update()
+    return session.execute(statement).scalars().first()
+
+
+def _active_request_for_owner(
+    session: Session,
+    *,
+    academic_cycle_id: int,
+    team_id: int | None,
+    requester_user_id: int,
+    exclude_request_id: int | None = None,
+) -> SupervisorRequest | None:
+    owner = SupervisorRequest.team_id == team_id if team_id is not None else SupervisorRequest.requester_user_id == requester_user_id
+    statement = select(SupervisorRequest).where(
+        SupervisorRequest.academic_cycle_id == academic_cycle_id,
+        owner,
+        SupervisorRequest.status.in_(ACTIVE_REQUEST_STATUSES),
+    ).order_by(SupervisorRequest.updated_at.desc(), SupervisorRequest.id.desc())
+    if exclude_request_id is not None:
+        statement = statement.where(SupervisorRequest.id != exclude_request_id)
+    return session.execute(statement).scalars().first()
+
+
+def canonical_request_rows(rows: list[SupervisorRequest]) -> list[SupervisorRequest]:
+    """Collapse request history to one current project per group or owner."""
+    canonical: dict[tuple[str, int], SupervisorRequest] = {}
+    for row in rows:
+        key = ("team", row.team_id) if row.team_id is not None else ("owner", row.requester_user_id)
+        current = canonical.get(key)
+        row_rank = (REQUEST_STATUS_PRIORITY.get(row.status, -1), row.updated_at or row.created_at, row.id)
+        current_rank = (REQUEST_STATUS_PRIORITY.get(current.status, -1), current.updated_at or current.created_at, current.id) if current else None
+        if current is None or row_rank > current_rank:
+            canonical[key] = row
+    return sorted(canonical.values(), key=lambda row: (row.updated_at or row.created_at, row.id), reverse=True)
 
 
 def _actor_has_team_access(session: Session, team: Team, actor: User) -> bool:
@@ -463,6 +506,12 @@ def _out(session: Session, row: SupervisorRequest, *, include_history: bool = Tr
         "capacity_remaining": max(capacity_limit - capacity_used, 0) if capacity_limit is not None else None,
         "capacity_warning": capacity_limit is not None and capacity_used >= capacity_limit,
         "extraction_status": row.extraction_status,
+        "proposal_submission_id": row.proposal_submission_id,
+        "proposal_version_number": row.proposal_version_number,
+        "match_result_id": row.match_result_id,
+        "match_score": row.match_score,
+        "match_explanation": row.match_explanation,
+        "matching_algorithm_version": row.matching_algorithm_version,
         "document": _document_out(session, row),
     }
     if include_history:
@@ -538,7 +587,7 @@ def my_requests(actor: User = Depends(require_roles(UserRole.STUDENT)), session:
         team_ids = team_ids.where(Team.shared_user_id == actor.id)
     statement = select(SupervisorRequest).where(or_(SupervisorRequest.requester_user_id == actor.id, SupervisorRequest.team_id.in_(team_ids)))
     rows = session.scalars(statement.order_by(SupervisorRequest.updated_at.desc(), SupervisorRequest.id.desc())).all()
-    return [_out(session, row) for row in rows]
+    return [_out(session, row) for row in canonical_request_rows(rows)]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -563,16 +612,19 @@ async def create_request(
         _reject_text_for_supervisor_selection(request, proposal_file.filename, proposal_file.content_type)
         extraction = extract_proposal_document(data, proposal_file.content_type, proposal_file.filename)
         cycle = _cycle_for_request(session, academic_cycle_id, lock=True)
-        team = _team_for_student(session, actor)
+        team = _team_for_student(session, actor, lock=True)
         if team is not None and team.academic_cycle_id != cycle.id:
             raise failure("cycle_mismatch", "The student team does not belong to the selected cycle.")
+        duplicate = _active_request_for_owner(
+            session,
+            academic_cycle_id=cycle.id,
+            team_id=team.id if team else None,
+            requester_user_id=actor.id,
+        )
+        if duplicate is not None:
+            raise failure("duplicate_active_request", "This group already has an active supervisor request for this cycle. Resolve it before sending another request.")
         supervisor, policy = _lock_capacity(session, supervisor_id, cycle.id)
         _ensure_capacity(session, supervisor.id, cycle.id, policy)
-        duplicate_filters = [SupervisorRequest.academic_cycle_id == cycle.id, SupervisorRequest.supervisor_id == supervisor.id, SupervisorRequest.status.in_(ACTIVE_REQUEST_STATUSES)]
-        duplicate_filters.append(SupervisorRequest.team_id == team.id if team is not None else SupervisorRequest.requester_user_id == actor.id)
-        duplicate = session.scalar(select(SupervisorRequest.id).where(*duplicate_filters))
-        if duplicate is not None:
-            raise failure("duplicate_active_request", "An active request already exists for this supervisor and cycle.")
         proposal_type = proposal_type.strip().upper()
         if proposal_type not in {"SHORT", "LONG"}:
             raise failure("invalid_proposal_type", "Proposal type must be SHORT or LONG.", status.HTTP_422_UNPROCESSABLE_CONTENT)
@@ -755,19 +807,25 @@ def submit_request(
         if row.extraction_status != SupervisorRequestExtractionStatus.CONFIRMED.value:
             raise failure("extraction_not_confirmed", "Review and confirm the extracted proposal preview before submitting.", status.HTTP_422_UNPROCESSABLE_CONTENT)
         _cycle_for_request(session, row.academic_cycle_id, lock=True)
+        if row.team_id is not None:
+            session.execute(
+                select(Team)
+                .where(Team.id == row.team_id, Team.academic_cycle_id == row.academic_cycle_id)
+                .with_for_update()
+            ).scalar_one_or_none()
+        else:
+            session.execute(select(User).where(User.id == row.requester_user_id).with_for_update()).scalar_one()
         supervisor, policy = _lock_capacity(session, row.supervisor_id, row.academic_cycle_id)
         _ensure_capacity(session, supervisor.id, row.academic_cycle_id, policy)
-        duplicate = session.scalar(
-            select(SupervisorRequest.id).where(
-                SupervisorRequest.academic_cycle_id == row.academic_cycle_id,
-                SupervisorRequest.requester_user_id == row.requester_user_id,
-                SupervisorRequest.supervisor_id == row.supervisor_id,
-                SupervisorRequest.status.in_(ACTIVE_REQUEST_STATUSES),
-                SupervisorRequest.id != row.id,
-            )
+        duplicate = _active_request_for_owner(
+            session,
+            academic_cycle_id=row.academic_cycle_id,
+            team_id=row.team_id,
+            requester_user_id=row.requester_user_id,
+            exclude_request_id=row.id,
         )
         if duplicate is not None:
-            raise failure("duplicate_active_request", "An active request already exists for this supervisor and cycle.")
+            raise failure("duplicate_active_request", "This group already has an active supervisor request for this cycle. Resolve it before submitting another request.")
         previous = row.status
         if row.submission_note:
             note_version = _next_note_version(session, row.id)
@@ -847,6 +905,16 @@ def supervisor_queue(
     else:
         statement = statement.where(SupervisorRequest.status.in_(DECISION_STATUSES))
     rows = session.scalars(statement.order_by(SupervisorRequest.updated_at, SupervisorRequest.id)).all()
+    accepted_team_ids = {
+        row.team_id
+        for row in session.scalars(
+            select(SupervisorRequest).where(
+                SupervisorRequest.team_id.is_not(None),
+                SupervisorRequest.status == SupervisorRequestStatus.ACCEPTED.value,
+            )
+        ).all()
+    }
+    rows = [row for row in rows if row.status not in {SupervisorRequestStatus.SUBMITTED.value, SupervisorRequestStatus.CHANGES_REQUESTED.value} or row.team_id not in accepted_team_ids]
     return [_out(session, row) for row in rows]
 
 
@@ -887,9 +955,28 @@ def decide_request(
                 raise failure("team_already_assigned", "This team already has an active supervisor assignment.")
             assignment = SupervisorAssignment(team_id=team.id, academic_cycle_id=cycle.id, supervisor_id=actor.id, assigned_by_id=actor.id, academic_year=cycle.academic_year, session=cycle.session)
             session.add(assignment)
+            team.supervision_status = "ACTIVE"
             session.flush()
             ensure_collaboration_channel(session, assignment, team)
             row.assignment_id = assignment.id
+            other_requests = session.scalars(
+                select(SupervisorRequest)
+                .where(
+                    SupervisorRequest.team_id == team.id,
+                    SupervisorRequest.academic_cycle_id == cycle.id,
+                    SupervisorRequest.status.in_(ACTIVE_REQUEST_STATUSES),
+                    SupervisorRequest.id != row.id,
+                )
+                .with_for_update()
+            ).all()
+            for other in other_requests:
+                previous_other_status = other.status
+                other.status = SupervisorRequestStatus.WITHDRAWN.value
+                other.reviewed_at = utc_now()
+                other.reviewer_id = actor.id
+                other.revision += 1
+                _append_history(session, other, actor, SupervisorRequestStatus.WITHDRAWN.value, "Automatically closed because another request for this group was accepted.")
+                _audit(session, actor, other, "supervisor_request_auto_closed_after_assignment", previous_status=previous_other_status, accepted_request_id=row.id)
             _audit(
                 session,
                 actor,

@@ -1,0 +1,138 @@
+/* Keep conversation tools readable and usable inside the dashboard content pane. */
+.group-ai-page,
+.student-collab {
+  width: min(100%, 1180px);
+  min-width: 0;
+  margin-inline: auto;
+}
+
+/* These views own their scrolling area. Prevent the dashboard document from
+   becoming a second, competing scrollbar around the conversation panel. */
+html:has(.group-ai-page),
+html:has(.student-collab),
+body:has(.group-ai-page),
+body:has(.student-collab),
+#root:has(.group-ai-page),
+#root:has(.student-collab) {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.student-shell:has(.group-ai-page),
+.student-shell:has(.student-collab) {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.student-shell:has(.group-ai-page) > .student-body,
+.student-shell:has(.student-collab) > .student-body {
+  height: calc(100dvh - 4rem);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.student-shell:has(.group-ai-page) .student-content,
+.student-shell:has(.student-collab) .student-content {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden !important;
+}
+
+.student-shell:has(.group-ai-page) .student-content__inner,
+.student-shell:has(.student-collab) .student-content__inner {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.group-ai-page {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.group-ai-conversation {
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.student-collab:has(.student-collab__history) {
+  display: flex;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.student-collab:has(.student-collab__history) > #student-collab-content {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+@media (min-width: 768px) {
+  .group-ai-conversation {
+    display: flex;
+    height: clamp(460px, calc(100dvh - 190px), 700px);
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .group-ai-messages {
+    min-height: 0;
+    max-height: none;
+    flex: 1 1 auto;
+  }
+
+  .group-ai-prompts {
+    max-height: 104px;
+    flex: 0 0 auto;
+    overflow-y: auto;
+  }
+
+  .group-ai-composer {
+    flex: 0 0 auto;
+  }
+
+  .group-ai-composer textarea {
+    max-height: 132px;
+  }
+
+  .student-collab__history {
+    height: clamp(240px, 34dvh, 380px);
+    max-height: 380px;
+  }
+
+  .student-collab__composer textarea {
+    max-height: 150px;
+  }
+}
+
+@media (max-width: 767px) {
+  .group-ai-page,
+  .student-collab {
+    width: 100%;
+  }
+
+  .group-ai-messages {
+    height: clamp(300px, 52dvh, 520px);
+  }
+
+  .student-collab__history {
+    height: clamp(240px, 48dvh, 420px);
+  }
+}
+
+@media (min-width: 768px) {
+  .student-shell:has(.group-ai-page) .group-ai-conversation {
+    height: auto;
+    max-height: none;
+  }
+}

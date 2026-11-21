@@ -46,7 +46,8 @@ test("component source renders cycle cards before a cycle is selected", () => {
   assert.match(source, /aria-label="FYP cycles"/);
   assert.match(source, /selectedCycleId === null && cycles\.length > 0/);
   assert.match(source, /View relevant groups/);
-  assert.match(source, /← Back to FYP cycles/);
+  assert.match(source, /BackButton onClick=\{\(\) => selectCycle\(null\)\}>Back to FYP cycles/);
+  assert.doesNotMatch(source, /← Back to FYP cycles/);
   assert.match(source, /onClick=\{\(\) => selectCycle\(null\)\}/);
   assert.match(source, /new URLSearchParams\(\{ cycle_id: String\(selectedCycleId\) \}\)/);
   assert.match(source, /readPositiveId\("cycle_id"\)/);

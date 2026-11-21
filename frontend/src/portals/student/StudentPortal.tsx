@@ -4,15 +4,16 @@ import { StudentOverviewWithDocuments as StudentOverview } from "./StudentOvervi
 import { StudentSidebar, type StudentPhase } from "./StudentSidebar";
 import { StudentPhasePlaceholder } from "./modules/StudentPhasePlaceholder";
 import { StudentRequiredDocumentsDashboard } from "./modules/StudentRequiredDocumentsDashboard";
-import { StudentSupervisorSelection } from "./modules/supervisor-selection/StudentSupervisorSelection";
 import { KnowledgeSearch } from "./modules/knowledge-search/KnowledgeSearch";
 import { ProposalComplianceWorkspace } from "../../modules/module-3/ProposalComplianceWorkspace";
 import { GroupMembers } from "./components/GroupMembers";
 import { StudentSupervisorInfo } from "./modules/StudentSupervisorInfo";
 import { FypHubBrand } from "../shared/FypHubBrand";
 import { GroupAIChat } from "../../GroupAIChat";
+import { SupervisorMatching } from "./modules/SupervisorMatching";
 import { Menu } from "lucide-react";
 import { ThemeToggle } from "../../ui/ThemeToggle";
+import { AnnouncementBell } from "../../announcements/AnnouncementBell";
 import "./student.css";
 import "./student-content.css";
 import "./student-admin-theme.css";
@@ -40,24 +41,34 @@ const icon = (kind: "team" | "proposal" | "search" | "supervisor" | "review" | "
 
 export const STUDENT_PHASES: readonly StudentPhase[] = [
   { id: "documents", name: "Required Documents & Uploads", route: "/student/documents", status: "Implemented", icon: icon("proposal") },
-  { id: "proposal", name: "Proposal Compliance Check", route: "/student/proposal", status: "Implemented", icon: icon("compliance") },
+  { id: "proposal", name: "Proposal Template Comparison", route: "/student/proposal", status: "Implemented", icon: icon("compliance") },
   { id: "supervisor-info", name: "Supervisor Information", route: "/student/supervisor-info", status: "Implemented", icon: icon("supervisor") },
-  { id: "supervisors", name: "Supervisor Selection & Proposal Requests", route: "/student/supervisors", status: "Partial", icon: icon("supervisor") },
+  { id: "supervisor-matching", name: "Supervisor Request", route: "/student/supervisor-matching", status: "Implemented", icon: icon("ai") },
+  { id: "collaboration", name: "Collaboration Channel", route: "/student/collaboration", status: "Implemented", icon: icon("team") },
   { id: "progress", name: "Project Progress & Supervision Dashboard", route: "/student/progress", status: "Partial", icon: icon("progress") },
   { id: "search", name: "FYP Archive & Knowledge Search", route: "/student/search", status: "Implemented", icon: icon("knowledge") },
   { id: "group-ai", name: "AI Chatbot", route: "/student/group-ai", status: "Implemented", icon: icon("ai") },
 ];
 
+function initialStudentPage() {
+  const path = window.location.pathname;
+  if (path.startsWith("/student/search")) return "search";
+  if (path.startsWith("/student/group-ai")) return "group-ai";
+  if (path.startsWith("/student/supervisor-matching") || path.startsWith("/student/supervisors")) return "supervisor-matching";
+  if (path.startsWith("/student/collaboration")) return "collaboration";
+  return STUDENT_PHASES.find((item) => path === item.route)?.id ?? "overview";
+}
+
 export function StudentPortal({ api, user, onLogout }: { api: string; user: StudentUser; onLogout: () => void }) {
-  const [activeId, setActiveId] = useState(() => window.location.pathname.startsWith("/student/group-ai") ? "group-ai" : "overview");
+  const [activeId, setActiveId] = useState(initialStudentPage);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   useEffect(() => { const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); }; window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, []);
   const phase = STUDENT_PHASES.find((item) => item.id === activeId);
-  const groupName = user.group_name || "Student Group";
+  const groupName = user.group_name || "Group";
   const groupLabel = user.group_email || groupName;
   const initials = groupName.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "G";
-  const content = activeId === "overview" ? <div className="student-overview-stack grid min-w-0 gap-5"><StudentOverview api={api} /><GroupMembers members={user.members ?? []} /><StudentCollaborationChannel api={api} userId={user.id} /></div> : phase?.id === "documents" ? <StudentRequiredDocumentsDashboard api={api} /> : phase?.id === "proposal" ? <ProposalComplianceWorkspace api={api} /> : phase?.id === "supervisor-info" ? <StudentSupervisorInfo api={api} /> : phase?.id === "supervisors" ? <StudentSupervisorSelection api={api} userId={user.id} /> : phase?.id === "search" || phase?.id === "archive" ? <KnowledgeSearch api={api} /> : phase?.id === "group-ai" ? <GroupAIChat api={api} /> : phase ? <StudentPhasePlaceholder phase={phase} api={api} /> : null;
+  const content = activeId === "overview" ? <div className="student-overview-stack grid min-w-0 gap-5"><StudentOverview api={api} /><GroupMembers members={user.members ?? []} /></div> : phase?.id === "documents" ? <StudentRequiredDocumentsDashboard api={api} /> : phase?.id === "proposal" ? <ProposalComplianceWorkspace api={api} /> : phase?.id === "supervisor-info" ? <StudentSupervisorInfo api={api} /> : phase?.id === "supervisor-matching" ? <SupervisorMatching api={api} /> : phase?.id === "collaboration" ? <StudentCollaborationChannel api={api} userId={user.id} /> : phase?.id === "search" || phase?.id === "archive" ? <KnowledgeSearch api={api} /> : phase?.id === "group-ai" ? <GroupAIChat api={api} /> : phase ? <StudentPhasePlaceholder phase={phase} api={api} /> : null;
   const selectPage = (id: string) => { setActiveId(id); const target = STUDENT_PHASES.find((item) => item.id === id); window.history.pushState(window.history.state, "", target?.route || "/student"); };
-  return <main className="student-shell"><header className="student-header"><div className="student-header__left"><button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}><Menu aria-hidden="true" strokeWidth={1.75} size={20} /></button><FypHubBrand className="student-brand" /><span className="student-role">Student group</span></div><div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name student-account__name--clamp" title={groupLabel}>{groupLabel}{user.academic_cycle ? ` · ${user.academic_cycle}` : ""}</span><ThemeToggle /><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div></header><div className="student-body"><StudentSidebar phases={STUDENT_PHASES} activeId={activeId} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={(item) => selectPage(item.id)} onOverview={() => { setActiveId("overview"); window.history.pushState(window.history.state, "", "/student"); }} onToggleCollapse={() => setCollapsed((value) => !value)} onCloseMobile={() => setMobileOpen(false)} /><section className="student-content"><div className="student-content__inner">{content}</div></section></div></main>;
+  return <main className="student-shell"><header className="student-header"><div className="student-header__left"><button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}><Menu aria-hidden="true" strokeWidth={1.75} size={20} /></button><FypHubBrand className="student-brand" /><span className="student-role">Group portal</span></div><div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name student-account__name--clamp" title={groupLabel}>{groupLabel}{user.academic_cycle ? ` · ${user.academic_cycle}` : ""}</span><AnnouncementBell api={api} /><ThemeToggle /><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div></header><div className="student-body"><StudentSidebar phases={STUDENT_PHASES} activeId={activeId} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={(item) => selectPage(item.id)} onOverview={() => { setActiveId("overview"); window.history.pushState(window.history.state, "", "/student"); }} onToggleCollapse={() => setCollapsed((value) => !value)} onCloseMobile={() => setMobileOpen(false)} /><section className="student-content"><div className="student-content__inner">{content}</div></section></div></main>;
 }

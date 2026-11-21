@@ -15,6 +15,7 @@ class UserRole(str, Enum):
     COORDINATOR = "COORDINATOR"
     PANEL_MEMBER = "PANEL_MEMBER"
     ADMIN = "ADMIN"
+    PLATFORM_ADMIN = "PLATFORM_ADMIN"
 
 
 class User(Base):
@@ -58,6 +59,8 @@ class User(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    access_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     @validates("email")
     def normalize_email(self, _: str, value: str) -> str:

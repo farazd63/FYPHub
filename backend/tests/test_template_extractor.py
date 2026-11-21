@@ -15,6 +15,7 @@ class TemplateExtractorTests(unittest.TestCase):
         page = document.new_page(width=595.28, height=841.89)
         page.insert_text((72, 72), "1. Introduction", fontsize=14, fontname="Times-Bold")
         page.insert_text((72, 110), "This is the official body text for the template.", fontsize=12, fontname="Times-Roman")
+        page.insert_text((72, 122), "This second body line verifies PDF line spacing extraction.", fontsize=12, fontname="Times-Roman")
         page.insert_text((72, 145), "2. Methodology", fontsize=14, fontname="Times-Bold")
         page.insert_text((72, 183), "Method details belong here.", fontsize=12, fontname="Times-Roman")
         page.insert_text((72, 220), "References", fontsize=14, fontname="Times-Bold")
@@ -24,6 +25,7 @@ class TemplateExtractorTests(unittest.TestCase):
 
         rules = extract_template_rules(data, "application/pdf", "official.pdf")
         self.assertEqual(rules["page_size"], "A4")
+        self.assertEqual(rules["line_spacing"], 1.0)
         self.assertIn("Introduction", "\n".join(rules["required_sections"]))
         self.assertEqual(rules["required_references"], 1)
         self.assertTrue(rules["page_numbering"])

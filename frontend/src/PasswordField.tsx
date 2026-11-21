@@ -1,5 +1,7 @@
 import { useId, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { getPasswordGuidance } from "./passwordPolicy";
+import { IconButton } from "./ui/IconButton";
 
 export { getPasswordGuidance } from "./passwordPolicy";
 export type { PasswordCriterion, PasswordStrength } from "./passwordPolicy";
@@ -22,9 +24,9 @@ function PasswordGuidance({ value, id }: { value: string; id: string }) {
   );
 }
 
-type PasswordFieldProps = { label: string; value: string; onChange: (value: string) => void; autoComplete?: string; disabled?: boolean; error?: string; guidance?: boolean; confirm?: boolean; compact?: boolean };
+type PasswordFieldProps = { label: string; value: string; onChange: (value: string) => void; autoComplete?: string; disabled?: boolean; error?: string; guidance?: boolean; confirm?: boolean; compact?: boolean; required?: boolean };
 
-export function PasswordField({ label, value, onChange, autoComplete = "new-password", disabled, error, guidance, confirm, compact = false }: PasswordFieldProps) {
+export function PasswordField({ label, value, onChange, autoComplete = "new-password", disabled, error, guidance, confirm, compact = false, required = false }: PasswordFieldProps) {
   const id = useId();
   const errorId = `${id}-error`;
   const guidanceId = `${id}-guidance`;
@@ -35,10 +37,10 @@ export function PasswordField({ label, value, onChange, autoComplete = "new-pass
   const fieldClass = compact ? "w-full rounded-lg border border-fy-border bg-fy-page px-3 py-2 text-sm text-fy-text focus:border-fy-brand" : inputClass;
   return (
     <div className="grid gap-2">
-      <label htmlFor={id} className="text-sm font-semibold">{label}</label>
+      <label htmlFor={id} className="text-sm font-semibold">{label}{required && <span className="auth-field__required" aria-hidden="true"> *</span>}</label>
       <div className="relative">
-        <input id={id} className={`${fieldClass} pr-16 ${error ? "border-fy-danger" : ""}`} type={visible ? "text" : "password"} value={value} autoComplete={autoComplete} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={describedBy} onChange={(event) => onChange(event.target.value)} />
-        <button type="button" disabled={disabled} aria-controls={id} aria-pressed={visible} aria-label={`${visible ? "Hide" : "Show"} ${label.toLowerCase()}`} onClick={() => setVisible((current) => !current)} className="password-field__toggle fy-btn fy-btn--ghost fy-btn--sm">{visible ? "Hide" : "Show"}</button>
+        <input id={id} className={`${fieldClass} pr-16 ${error ? "border-fy-danger" : ""}`} type={visible ? "text" : "password"} value={value} autoComplete={autoComplete} disabled={disabled} required={required} aria-required={required} aria-invalid={Boolean(error)} aria-describedby={describedBy} onChange={(event) => onChange(event.target.value)} />
+        <IconButton disabled={disabled} aria-controls={id} aria-pressed={visible} label={`${visible ? "Hide" : "Show"} ${label.toLowerCase()}`} onClick={() => setVisible((current) => !current)} className="password-field__toggle" size="sm" variant="ghost">{visible ? <EyeOff size={16} strokeWidth={1.8} aria-hidden /> : <Eye size={16} strokeWidth={1.8} aria-hidden />}</IconButton>
       </div>
       {showGuidance && <PasswordGuidance value={value} id={guidanceId} />}
       {isConfirmation && value && <p id={error ? errorId : undefined} className={error ? "text-sm text-fy-danger" : "text-sm text-fy-success"}>{error ? "Passwords do not match." : "Passwords match."}</p>}

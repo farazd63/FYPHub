@@ -19,6 +19,15 @@ test("student group signup remains available and preserves its success state", (
   assert.match(app, /Your entered details were kept/);
 });
 
+test("group member validation identifies required fields and maps email errors to the email control", () => {
+  assert.match(app, /required = false/);
+  assert.match(app, /className="auth-field__required"/);
+  assert.match(app, /next\[`\$\{prefix\}\.email`\] = emailError/);
+  assert.doesNotMatch(app, /next\[`\$\{prefix\}\.name`\]/);
+  assert.match(app, /Member \$\{memberIndex \+ 1\} — \$\{label\}/);
+  assert.match(app, /validationNotice\(next, members\)/);
+});
+
 test("role-specific accounts are created through the Admin endpoint with fixed role values", () => {
   for (const role of ["SUPERVISOR", "COORDINATOR", "PANEL_MEMBER", "ADMIN"]) {
     assert.match(admin, new RegExp(`\\\"${role}\\\"`));

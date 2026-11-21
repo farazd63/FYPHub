@@ -60,6 +60,7 @@ def assign(payload: AssignmentWrite, request: Request, actor: User = Depends(req
         if count >= policy.max_group_capacity:
             year = cycle.academic_year or payload.academic_year or "this year"
             raise failure("capacity_full", f"This supervisor has no remaining annual capacity for {year}. Fall and Spring assignments share the same yearly limit.")
+        team.supervision_status = "ACTIVE"
         assignment = SupervisorAssignment(team_id=payload.team_id, academic_cycle_id=payload.academic_cycle_id, supervisor_id=payload.supervisor_id, academic_year=cycle.academic_year or payload.academic_year, session=cycle.session or payload.session, assigned_by_id=actor.id); session.add(assignment); session.flush(); lock_team(session, team.id, "supervisor_assigned")
         from .collaboration_channels import ensure_collaboration_channel
         try:

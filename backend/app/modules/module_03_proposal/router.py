@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from ...auth import get_current_user, require_roles, utc_now, validate_mutating_origin
 from ...config import settings
 from ...database import get_db
+from ...knowledge_documents import register_knowledge_document
 from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, ProposalVersionComparison, SupervisorAssignment, Team, TeamMember, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
 from ...pdf_extraction import PdfExtractionError, extract_proposal_document
 from ...document_preview import DocumentPreviewError, render_document_preview
@@ -526,6 +527,34 @@ async def submit_proposal(
     row = ProposalComplianceSubmission(proposal_key=key, owner_user_id=actor.id, team_id=team.id if team else None, proposal_type=proposal_type, title=title_value, version=version_number, status="DRAFT" if is_draft else ("RESUBMITTED" if previous else "SUBMITTED"), processing_status="PENDING" if is_draft else "COMPLETED", filename=proposal_file.filename or "proposal", content_type=extracted.content_type, file_size=extracted.file_size, sha256=extracted.sha256, page_count=extracted.page_count, storage_key=str(path.relative_to(settings.document_storage_root)), extracted_text=extracted.extracted_text, extracted_fields=fields, template_reference_version_id=template_version.id)
     session.add(row)
     session.flush()
+    active_supervisor_id = session.scalar(
+        select(SupervisorAssignment.supervisor_id).where(
+            SupervisorAssignment.team_id == team.id if team else False,
+            SupervisorAssignment.academic_cycle_id == team.academic_cycle_id if team else False,
+            SupervisorAssignment.ended_at.is_(None),
+        ).limit(1)
+    ) if team is not None else None
+    register_knowledge_document(
+        session,
+        source_type="PROPOSAL_SUBMISSION",
+        source_id=row.id,
+        storage_key=row.storage_key,
+        academic_cycle_id=team.academic_cycle_id if team else None,
+        team_id=team.id if team else None,
+        student_user_id=actor.id,
+        supervisor_id=active_supervisor_id,
+        project_title=row.title,
+        document_type=f"{row.proposal_type}_PROPOSAL",
+        content_type=row.content_type,
+        file_size=row.file_size,
+        content_hash=row.sha256,
+        access_policy={
+            "student_user_id": actor.id,
+            "team_id": team.id if team else None,
+            "supervisor_id": active_supervisor_id,
+            "roles": ["STUDENT", "SUPERVISOR", "COORDINATOR", "ADMIN"],
+        },
+    )
     if is_draft:
         session.commit()
         return {"submission": _submission_out(session, row), "report": None}

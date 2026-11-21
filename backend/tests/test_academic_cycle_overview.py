@@ -6,6 +6,8 @@ import asyncio
 import json
 import unittest
 from collections.abc import Iterator
+from datetime import timedelta
+from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
 
@@ -13,6 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.auth import SESSION_COOKIE_NAME, utc_now
+from app.academic_cycle_overview import _canonical_requests
 from app.database import engine, get_db
 from app.main import app
 from app.models import AcademicCycle, AuthSession, User, UserRole
@@ -116,6 +119,14 @@ class AcademicCycleOverviewTests(unittest.TestCase):
                 self.assertEqual(body["cycle"]["id"], self.cycle_id)
                 self.assertEqual(body["summary"], {"supervisors": 0, "students": 0, "groups": 0, "projects": 0, "active_projects": 0, "completed_projects": 0, "pending_reviews": 0, "required_documents": 0})
                 self.assertEqual([body[key] for key in ("supervisors", "projects", "groups", "students", "documents")], [[], [], [], [], []])
+
+    def test_project_rows_prefer_the_accepted_request_for_a_group(self) -> None:
+        now = utc_now()
+        accepted = SimpleNamespace(id=1, team_id=10, requester_user_id=20, status="ACCEPTED", updated_at=now - timedelta(days=1), created_at=now - timedelta(days=2))
+        newer_submitted = SimpleNamespace(id=2, team_id=10, requester_user_id=20, status="SUBMITTED", updated_at=now, created_at=now)
+        another_group = SimpleNamespace(id=3, team_id=11, requester_user_id=21, status="SUBMITTED", updated_at=now, created_at=now)
+        result = _canonical_requests([newer_submitted, another_group, accepted])
+        self.assertEqual({row.id for row in result}, {1, 3})
 
     def test_overview_rejects_missing_session_student_and_unknown_cycle(self) -> None:
         self.assertEqual(request("GET", f"/api/v1/academic-cycles/{self.cycle_id}/overview")[0], 401)

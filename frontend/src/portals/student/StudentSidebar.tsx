@@ -23,8 +23,8 @@ export function StudentSidebar({ phases, activeId, collapsed, mobileOpen, onSele
   ];
 
   return <RoleSidebar
-    ariaLabel="Student workspace navigation"
-    workspaceLabel="Student workspace"
+    ariaLabel="Group workspace navigation"
+    workspaceLabel="Group workspace"
     items={items}
     active={activeId}
     collapsed={collapsed}

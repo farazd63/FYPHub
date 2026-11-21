@@ -68,6 +68,7 @@
   --fy-surface-muted: var(--fy-surface-2);
   --fy-border: #dce5f6;
   --fy-border-strong: #bcc9e6;
+  --fy-input-border: var(--fy-border);
 
   --fy-text: #0b1b3f;
   --fy-text-muted: #475671;
@@ -151,7 +152,7 @@
   --app-border: var(--fy-border);
 }
 
-/* DARK = exact prior charcoal + gold values */
+/* DARK = charcoal + gold with high-visibility white control and box borders */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
@@ -161,8 +162,9 @@
   --fy-surface: #151922;
   --fy-surface-2: #1c222e;
   --fy-surface-muted: #1c222e;
-  --fy-border: #2a3140;
-  --fy-border-strong: #3a4254;
+  --fy-border: #ffffff;
+  --fy-border-strong: #ffffff;
+  --fy-input-border: #ffffff;
 
   --fy-text: #f4f6fa;
   --fy-text-muted: #d5dce8;

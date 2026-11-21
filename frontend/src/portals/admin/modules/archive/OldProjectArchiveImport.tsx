@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AdminAddButton } from "../../../../ui/AdminAddButton";
 
 type Cycle = { id: number; academic_year?: number | null; session?: string | null };
 
@@ -7,6 +8,7 @@ export function OldProjectArchiveImport({ api, onImported }: { api: string; onIm
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
 
   useEffect(() => {
     void fetch(`${api}/api/v1/academic-cycles`, { credentials: "include" })
@@ -32,7 +34,7 @@ export function OldProjectArchiveImport({ api, onImported }: { api: string; onIm
       const response = await fetch(`${api}/api/v1/admin/archive/import/confirm`, { method: "POST", credentials: "include", body });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof data.detail?.message === "string" ? data.detail.message : "The Excel file could not be imported.");
-      setFile(null);
+      setFile(null); setShowCreate(false);
       const warning = Array.isArray(data.warnings) && data.warnings.length ? ` Warning: ${data.warnings.join(" ")}` : "";
       setMessage(`Imported ${data.unique_projects_created ?? data.inserted ?? data.imported_count ?? 0} unique projects; ${data.members_attached ?? 0} members attached; duplicates skipped ${data.duplicates_skipped ?? 0}; orphan rows ${data.orphan_rows ?? 0}; invalid rows ${data.invalid_rows ?? 0}; processed ${data.source_rows_processed ?? data.total_rows ?? 0}.${warning} Batch ${data.batch_id ?? "created"}.`);
       onImported?.();
@@ -44,11 +46,13 @@ export function OldProjectArchiveImport({ api, onImported }: { api: string; onIm
   };
 
   return <section className="mb-5 rounded-xl border border-[#dce4de] bg-white p-5" aria-labelledby="archive-import-heading">
-    <h2 id="archive-import-heading" className="font-bold">Upload Excel file</h2>
-    <label className="mt-4 grid gap-1 text-sm font-semibold">Excel file
+    <div className="flex flex-wrap items-center justify-between gap-3"><h2 id="archive-import-heading" className="font-bold">Upload Excel file</h2><AdminAddButton open={showCreate} label="archive import" onClick={() => setShowCreate((value) => !value)} /></div>
+    {showCreate && <div className="admin-add-modal-form rounded-xl border border-[#dce4de] bg-white p-5 shadow-xl">
+    <label className="grid gap-1 text-sm font-semibold">Excel file
       <input type="file" accept=".xls,.xlsx" disabled={!cycleId || busy} className="rounded-lg border border-[#dce4de] px-3 py-2" onChange={(event) => { setFile(event.target.files?.[0] ?? null); }} />
     </label>
     <button type="button" disabled={!file || !cycleId || busy} onClick={() => { if (file) void upload(file); }} className="fy-btn fy-btn--primary mt-4 disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Uploading..." : "Upload Excel file"}</button>
+    </div>}
     {message && <p role="status" className="mt-3 rounded-lg bg-[#eef5ff] px-3 py-2 text-sm text-[#315db4]">{message}</p>}
   </section>;
 }

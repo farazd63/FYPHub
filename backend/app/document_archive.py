@@ -49,8 +49,7 @@ def _group_code(cycle: AcademicCycle, group: Team) -> str:
 
 
 def _group_name(group: Team, members: list[TeamMember]) -> str:
-    leader = next((member for member in members if member.is_creator), members[0] if members else None)
-    return f"{leader.full_name}'s Group" if leader else f"Group {group.group_number or '—'}"
+    return group.group_name or f"Group {group.group_number or '—'}"
 
 
 def _members(db: Session, group_id: int, cycle_id: int) -> list[TeamMember]:

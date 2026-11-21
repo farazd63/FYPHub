@@ -1,4 +1,9 @@
 ﻿/* Academic cycles screen only. */
+.academic-cycles {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
 .academic-cycles__create {
   display: grid;
   gap: 0;
@@ -35,6 +40,8 @@
 }
 .academic-cycles__grid {
   display: grid;
+  width: 100%;
+  min-width: 0;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: 1rem;
 }

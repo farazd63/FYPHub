@@ -37,7 +37,7 @@ services:
         condition: service_healthy
     networks:
       - fyphub-p1-network
-    command: ["alembic", "-c", "alembic.ini", "upgrade", "head"]
+    command: ["alembic", "-c", "alembic.ini", "upgrade", "heads"]
     restart: "no"
 
   ollama:

@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, LargeBinary, String, Text, func, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, LargeBinary, String, Text, Float, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -81,6 +81,12 @@ class SupervisorRequest(Base):
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
+    proposal_submission_id: Mapped[int | None] = mapped_column(ForeignKey("proposal_compliance_submissions.id", ondelete="SET NULL"), nullable=True)
+    proposal_version_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    match_result_id: Mapped[int | None] = mapped_column(ForeignKey("supervisor_match_results.id", ondelete="SET NULL"), nullable=True)
+    match_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    match_explanation: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    matching_algorithm_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class SupervisorRequestDocument(Base):

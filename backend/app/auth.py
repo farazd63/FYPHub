@@ -12,6 +12,7 @@ from .database import get_db
 from .config import settings
 from .models import AuthSession, Team, User, UserRole
 from .security import hash_session_token
+from .tenant import ensure_access_ready, set_tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +161,18 @@ def get_current_user(request: Request, session: Session = Depends(get_db)) -> Us
             reason="inactive user",
         )
         raise authentication_error()
+    set_tenant_context(session, user, request)
+    try:
+        ensure_access_ready(session, user)
+    except HTTPException:
+        log_temporary_auth_diagnostic(
+            request,
+            "session_rejected",
+            **common_metadata,
+            response_status=status.HTTP_403_FORBIDDEN,
+            reason="email verification or institutional approval is incomplete",
+        )
+        raise
     if user.role == UserRole.STUDENT and session.scalar(
         select(Team.id).where(Team.shared_user_id == user.id, Team.status != "dissolved").limit(1)
     ) is None:
@@ -178,7 +191,10 @@ def get_current_user(request: Request, session: Session = Depends(get_db)) -> Us
 def require_roles(*roles: UserRole) -> Callable[[User], User]:
     """Create a dependency that permits only the listed roles after authentication."""
     def role_guard(current_user: User = Depends(get_current_user), request: Request = None) -> User:
-        if current_user.role not in roles:
+        role_allowed = current_user.role in roles or (
+            UserRole.ADMIN in roles and current_user.role == UserRole.PLATFORM_ADMIN
+        )
+        if not role_allowed:
             if request is not None:
                 log_temporary_auth_diagnostic(
                     request,

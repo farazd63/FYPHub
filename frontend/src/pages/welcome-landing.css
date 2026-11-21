@@ -42,14 +42,17 @@ html[data-theme="dark"] .welcome-landing__pattern {
 
 .welcome-landing__nav-wrap {
   position: sticky;
-  top: var(--fy-space-4);
-  z-index: 20;
+  top: 0;
+  z-index: 1000;
   padding: 0 var(--fy-shell-inset-mobile);
+  border-bottom: 1px solid var(--fy-border);
+  background: var(--fy-surface);
+  box-shadow: var(--fy-shadow-sm);
 }
 
 @media (min-width: 768px) {
   .welcome-landing__nav-wrap {
-    padding: 0 var(--fy-shell-inset);
+    padding-inline: var(--fy-shell-inset);
   }
 }
 
@@ -61,14 +64,13 @@ html[data-theme="dark"] .welcome-landing__pattern {
   max-width: var(--fy-container);
   padding: var(--fy-space-2) var(--fy-space-3);
   border: 1px solid color-mix(in srgb, var(--fy-border) 85%, transparent);
-  border-radius: var(--fy-radius-nav);
-  background: color-mix(in srgb, var(--fy-surface) 92%, transparent);
-  box-shadow: var(--fy-shadow-nav);
-  backdrop-filter: blur(14px);
+  border-radius: 1rem;
+  background: var(--fy-surface);
+  box-shadow: var(--fy-shadow-md);
 }
 
 html[data-theme="dark"] .welcome-landing__nav {
-  background: color-mix(in srgb, var(--fy-surface) 88%, transparent);
+  background: var(--fy-surface);
   border-color: color-mix(in srgb, var(--fy-brand) 22%, var(--fy-border));
 }
 

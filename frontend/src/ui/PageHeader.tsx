@@ -13,7 +13,6 @@ type PageHeaderProps = {
 export function PageHeader({
   title,
   description,
-  eyebrow,
   breadcrumbs,
   actions,
   className,
@@ -23,7 +22,6 @@ export function PageHeader({
       {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumb items={breadcrumbs} />}
       <div className="fy-page-header__row">
         <div className="fy-page-header__copy">
-          {eyebrow && <p className="fy-page-header__eyebrow">{eyebrow}</p>}
           <h1 className="fy-page-header__title">{title}</h1>
           {description && <p className="fy-page-header__desc">{description}</p>}
         </div>

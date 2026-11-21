@@ -37,6 +37,7 @@ class TeamRegistrationRequest(BaseModel):
     password: str
     confirm_password: str | None = None
     members: list[TeamMemberInput]
+    invitation_token: str | None = None
 
     @field_validator("shared_login_email", mode="before")
     @classmethod
@@ -90,6 +91,7 @@ class TeamRegistrationResponse(BaseModel):
     team: SafeTeamOut
     cycle: SafeCycleOut
     members: list[SafeTeamMemberOut]
+    verification_token: str | None = None
 
 
 class StudentGroupMemberInput(BaseModel):
@@ -126,6 +128,7 @@ class StudentGroupRegistrationRequest(BaseModel):
     password: str
     confirm_password: str
     members: list[StudentGroupMemberInput]
+    invitation_token: str | None = None
 
     @field_validator("group_email", mode="before")
     @classmethod

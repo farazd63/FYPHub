@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from .database import engine, get_db
 from .config import settings
 from .models import AdminAuditEvent, AuthSession, PasswordResetToken, Team, TeamMember, User, UserRole
+from .models import InstitutionMembership
 from .models import AcademicCycle, AcademicGroupPolicy, SupervisorCapacityPolicy, SupervisorAssignment, SupervisorRequest, SupervisorRequestStatus
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType, ProposalComplianceSubmission
 from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
@@ -30,7 +31,7 @@ from .coordinator_operations import router as coordinator_operations_router
 from .academic_cycle_overview import router as academic_cycle_overview_router
 from .schemas.academic import CycleCreate, CycleOut, CycleUpdate, PolicyOut, PolicyUpdate
 from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
-from .schemas.admin_users import AdminUserCreate, AdminUserPage, AdminUserPasswordChange, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange, AdminUserUpdate
+from .schemas.admin_users import AdminStudentGroupApproval, AdminStudentGroupMemberCreate, AdminUserCreate, AdminUserPage, AdminUserPasswordChange, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange, AdminUserUpdate
 from .schemas.supervisor_capacity import CapacitySession, SupervisorCapacityOut, SupervisorCapacityWrite
 from .schemas.team_registration import StudentGroupRegistrationRequest, TeamMemberInput, TeamRegistrationRequest, TeamRegistrationResponse
 from .security import generate_session_token, hash_password, hash_session_token, validate_password, verify_password
@@ -51,6 +52,8 @@ from .auth import (
     validate_mutating_origin,
     log_temporary_auth_diagnostic,
 )
+from .institutions import router as institutions_router
+from .tenant import ensure_access_ready, is_platform_admin, issue_email_verification_token, resolve_registration_institution, send_email_verification, set_tenant_context
 
 app = FastAPI(title="FYPHub API")
 settings.document_storage_root.mkdir(parents=True, exist_ok=True)
@@ -98,6 +101,7 @@ app.include_router(student_document_requirements_router)
 app.include_router(coordinator_operations_router)
 app.include_router(academic_cycle_overview_router)
 app.include_router(proposal_compliance_router)
+app.include_router(institutions_router)
 
 _DUMMY_PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=4$FkrCX/M1V29q1Jj4yMHSiw$rONBAdg5KlI9DhIbVoDaHB3lM5HJXojJYVeAaLlbGwI"
 
@@ -915,14 +919,34 @@ def login(
         user = None
     password_hash = user.password_hash if user is not None else _DUMMY_PASSWORD_HASH
     password_valid = verify_password(credentials.password, password_hash)
-    group_linked = user is not None and (
-        user.role != UserRole.STUDENT
-        or session.scalar(select(Team.id).where(Team.shared_user_id == user.id, Team.status != "dissolved").limit(1)) is not None
-    )
+    access_ready = False
+    if user is not None:
+        set_tenant_context(session, user, request)
+        try:
+            ensure_access_ready(session, user)
+            access_ready = True
+        except HTTPException:
+            access_ready = False
+    group_linked = False
+    if user is not None:
+        member_link = select(TeamMember.id).where(
+            TeamMember.team_id == Team.id,
+            TeamMember.academic_cycle_id == Team.academic_cycle_id,
+            TeamMember.is_active.is_(True),
+            (TeamMember.registration_number == user.registration_number)
+            | (TeamMember.university_email == user.email),
+        ).exists()
+        group_linked = user.role != UserRole.STUDENT or session.scalar(
+            select(Team.id).where(
+                Team.status != "dissolved",
+                (Team.shared_user_id == user.id) | member_link,
+            ).limit(1)
+        ) is not None
     if (
         user is None
         or not password_valid
         or not user.is_active
+        or not access_ready
         or not group_linked
         or (credentials.requested_role is not None and user.role != credentials.requested_role)
     ):
@@ -989,10 +1013,12 @@ def account_response(session: Session, user: User) -> dict[str, object]:
         .where(TeamMember.team_id == team.id, TeamMember.is_active.is_(True))
         .order_by(TeamMember.is_creator.desc(), TeamMember.id)
     ).scalars().all() if team is not None else []
-    group_name = None
-    if members:
-        leader = next((member for member in members if member.is_creator), members[0])
-        group_name = f"{leader.full_name}'s Group"
+    visible_group_number = cycle_group_number(session, team) if team is not None else None
+    group_name = (
+        team.group_name or f"Group {visible_group_number or '—'}"
+        if team is not None
+        else None
+    )
     return {
         "id": user.id,
         "full_name": user.full_name,
@@ -1000,6 +1026,9 @@ def account_response(session: Session, user: User) -> dict[str, object]:
         "registration_number": user.registration_number,
         "role": user.role,
         "is_active": user.is_active,
+        "institution_id": user.institution_id,
+        "email_verified": user.email_verified_at is not None,
+        "access_approved": user.access_approved_at is not None,
         "principal_type": "GROUP" if user.role == UserRole.STUDENT and team is not None else "ACCOUNT",
         "group_id": group_id if user.role == UserRole.STUDENT else None,
         "group_email": shared_account.email if user.role == UserRole.STUDENT and group_id is not None and shared_account is not None else None,
@@ -1256,29 +1285,59 @@ def create_admin_user(
     session: Session = Depends(get_db),
 ) -> User:
     validate_mutating_origin(request)
+    if payload.role == UserRole.STUDENT:
+        raise admin_user_error(status.HTTP_403_FORBIDDEN, "group_account_workflow", "Group portal accounts must be created through group registration; individual member accounts are not supported.")
+    if payload.role == UserRole.PLATFORM_ADMIN:
+        raise admin_user_error(status.HTTP_403_FORBIDDEN, "platform_account_provisioning", "Platform administrator accounts must be provisioned through the platform control plane.")
+    try:
+        institution, _ = resolve_registration_institution(session, [str(payload.email).strip().lower()])
+    except HTTPException as error:
+        raise admin_user_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "institution_domain_invalid", str(error.detail)) from error
+    if not is_platform_admin(actor) and institution.id != actor.institution_id:
+        raise admin_user_error(status.HTTP_403_FORBIDDEN, "institution_scope", "You can only create accounts in your own institution.")
+    approved_at = utc_now()
     user = User(
         full_name=payload.full_name,
         email=str(payload.email).strip().lower(),
         registration_number=payload.registration_number,
         password_hash=hash_password(payload.password),
         role=payload.role,
+        institution_id=institution.id,
+        is_active=False,
+        access_approved_at=approved_at,
     )
     session.add(user)
     try:
         session.flush()
+        session.add(
+            InstitutionMembership(
+                institution_id=institution.id,
+                user_id=user.id,
+                membership_role="INSTITUTION_ADMIN" if payload.role == UserRole.ADMIN else "MEMBER",
+                status="APPROVED",
+                invited_by_id=actor.id,
+                approved_by_id=actor.id,
+                approved_at=approved_at,
+            )
+        )
+        verification_token = issue_email_verification_token(session, user, institution.id)
         add_admin_audit_event(
             session,
             actor_id=actor.id,
             affected_user_id=user.id,
             action="account_created",
-            changed_values={"email": user.email, "role": user.role.value, "is_active": True},
+            changed_values={"email": user.email, "role": user.role.value, "is_active": False, "institution_id": institution.id},
         )
         session.commit()
         session.refresh(user)
     except IntegrityError as error:
         session.rollback()
         raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_account", "An account with that email or registration number already exists.") from error
-    return user
+    send_email_verification(user.email, verification_token)
+    result = AdminUserResponse.model_validate(user)
+    if settings.app_env in {"dev", "development", "local"}:
+        result.verification_token = verification_token
+    return result
 
 
 @app.patch("/api/v1/admin/users/{user_id}/status", response_model=AdminUserResponse)
@@ -1293,6 +1352,46 @@ def change_admin_user_status(
     user = session.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one_or_none()
     if user is None:
         raise admin_user_error(status.HTTP_404_NOT_FOUND, "account_not_found", "Account was not found.")
+    if payload.is_active and user.role == UserRole.STUDENT and shared_team_account(session, user.id):
+        raise admin_user_error(
+            status.HTTP_409_CONFLICT,
+            "student_group_approval_required",
+            "Approve the group and assign its official name from Student Groups before granting portal access.",
+        )
+    if payload.is_active and not is_platform_admin(user):
+        # An explicit administrator activation is an administrative override.
+        # It must not depend on the user completing an email workflow first.
+        # Keep the tenant guards satisfied by recording the administrator's
+        # activation as the verification/approval event and restoring the
+        # membership when it was disabled or left behind by older data.
+        activation_time = utc_now()
+        if user.institution_id is None:
+            user.institution_id = actor.institution_id
+        if user.institution_id is None:
+            raise admin_user_error(status.HTTP_409_CONFLICT, "institution_required", "The account must belong to an institution before it can be activated.")
+        membership = session.scalar(
+            select(InstitutionMembership).where(
+                InstitutionMembership.user_id == user.id,
+                InstitutionMembership.institution_id == user.institution_id,
+            )
+        )
+        if membership is None:
+            membership = InstitutionMembership(
+                institution_id=user.institution_id,
+                user_id=user.id,
+                membership_role="INSTITUTION_ADMIN" if user.role == UserRole.ADMIN else "MEMBER",
+                status="ACTIVE",
+                invited_by_id=actor.id,
+                approved_by_id=actor.id,
+                approved_at=activation_time,
+            )
+            session.add(membership)
+        else:
+            membership.status = "ACTIVE"
+            membership.approved_by_id = actor.id
+            membership.approved_at = activation_time
+        user.email_verified_at = user.email_verified_at or activation_time
+        user.access_approved_at = user.access_approved_at or activation_time
     if user.is_active == payload.is_active:
         return user
     lock_and_protect_last_active_admin(
@@ -1364,6 +1463,8 @@ def update_admin_user(
     user = session.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one_or_none()
     if user is None:
         raise admin_user_error(status.HTTP_404_NOT_FOUND, "account_not_found", "Account was not found.")
+    if payload.role == UserRole.PLATFORM_ADMIN:
+        raise admin_user_error(status.HTTP_403_FORBIDDEN, "platform_account_provisioning", "Platform administrator accounts must be provisioned through the platform control plane.")
     if user.id != actor.id and shared_team_account(session, user.id) and user.role != payload.role:
         raise admin_user_error(status.HTTP_409_CONFLICT, "shared_team_account", "Shared team account roles cannot be changed here.")
     if user.role == UserRole.ADMIN and payload.role != UserRole.ADMIN:
@@ -1374,8 +1475,31 @@ def update_admin_user(
         "registration_number": user.registration_number,
         "role": user.role.value,
     }
+    new_email = str(payload.email).strip().lower()
+    verification_token = None
+    if not is_platform_admin(user):
+        try:
+            institution, _ = resolve_registration_institution(session, [new_email])
+        except HTTPException as error:
+            raise admin_user_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "institution_domain_invalid", str(error.detail)) from error
+        if institution.id != user.institution_id:
+            raise admin_user_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "institution_scope", "The email domain must belong to the account's institution.")
+        if new_email != user.email:
+            user.email_verified_at = None
+            user.access_approved_at = None
+            user.is_active = False
+            membership = session.scalar(
+                select(InstitutionMembership).where(
+                    InstitutionMembership.user_id == user.id,
+                    InstitutionMembership.institution_id == user.institution_id,
+                )
+            )
+            if membership is not None:
+                membership.status = "PENDING"
+                membership.approved_at = None
+            verification_token = issue_email_verification_token(session, user, user.institution_id)
     user.full_name = payload.full_name
-    user.email = str(payload.email).strip().lower()
+    user.email = new_email
     user.registration_number = payload.registration_number
     user.role = payload.role
     current = {
@@ -1404,7 +1528,12 @@ def update_admin_user(
     except SQLAlchemyError:
         session.rollback()
         raise
-    return user
+    if verification_token is not None:
+        send_email_verification(user.email, verification_token)
+    result = AdminUserResponse.model_validate(user)
+    if verification_token is not None and settings.app_env in {"dev", "development", "local"}:
+        result.verification_token = verification_token
+    return result
 
 
 @app.patch("/api/v1/admin/users/{user_id}/role", response_model=AdminUserResponse)
@@ -1474,6 +1603,57 @@ def delete_admin_user(
         if was_active:
             add_admin_audit_event(session, actor_id=actor.id, affected_user_id=user.id, action="account_access_removed", changed_values={"previous_is_active": True, "is_active": False, "historical_records_preserved": True})
         session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.delete("/api/v1/admin/users/{user_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+def permanently_delete_admin_user(
+    user_id: int,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> Response:
+    """Permanently delete an account only when no protected history depends on it."""
+
+    validate_mutating_origin(request)
+    if actor.id == user_id:
+        raise admin_user_error(status.HTTP_409_CONFLICT, "cannot_delete_self", "You cannot delete the account used for this admin session.")
+    user = session.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one_or_none()
+    if user is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "account_not_found", "Account was not found.")
+    if not is_platform_admin(actor) and user.institution_id != actor.institution_id:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "account_not_found", "Account was not found.")
+    if shared_team_account(session, user.id):
+        raise admin_user_error(status.HTTP_409_CONFLICT, "account_has_group", "This account owns a student group. Remove access instead so the group history is preserved.")
+    if session.scalar(select(AdminAuditEvent.id).where(AdminAuditEvent.actor_id == user.id).limit(1)) is not None:
+        raise admin_user_error(status.HTTP_409_CONFLICT, "account_has_audit_history", "This account is referenced as an audit actor and cannot be permanently deleted. Remove access instead.")
+    if user.role == UserRole.ADMIN and user.is_active:
+        lock_and_protect_last_active_admin(session, user, will_remain_active_admin=False)
+
+    # Audit rows keep their immutable target id while detaching the deleted user
+    # from the nullable affected-user reference.
+    add_admin_audit_event(
+        session,
+        actor_id=actor.id,
+        affected_user_id=None,
+        target_type="USER",
+        target_id=user.id,
+        action="account_deleted",
+        changed_values={"email": user.email, "role": user.role.value},
+    )
+    session.delete(user)
+    try:
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise admin_user_error(
+            status.HTTP_409_CONFLICT,
+            "account_has_history",
+            "This account has linked records and cannot be permanently deleted. Remove access instead so its history is preserved.",
+        ) from error
     except SQLAlchemyError:
         session.rollback()
         raise
@@ -1682,7 +1862,7 @@ def register_student(
     """
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Individual student signup is no longer available. Create a student group account instead.",
+        detail="Individual member signup is no longer available. Create a group portal account instead.",
     )
 
 
@@ -1697,7 +1877,7 @@ def register_team(
     *,
     request: Request = None,
 ) -> dict[str, object]:
-    """Atomically create one shared student account, team, and member contacts."""
+    """Atomically create one shared group portal account, team, and member contacts."""
     creator = normalize_team_member(registration.creator, "creator")
     members = [
         normalize_team_member(member, f"members.{index}")
@@ -1705,6 +1885,18 @@ def register_team(
     ]
     all_members = [creator, *members]
     shared_login_email = str(registration.shared_login_email).strip().lower()
+
+    try:
+        institution, invitation = resolve_registration_institution(
+            session,
+            [shared_login_email, *(member["university_email"] for member in all_members if member["university_email"])],
+            registration.invitation_token,
+        )
+    except HTTPException as error:
+        session.rollback()
+        raise registration_error(error.status_code, "institution_domain_invalid", str(error.detail), "shared_login_email") from error
+    session.info["institution_id"] = institution.id
+    session.info["platform_admin"] = False
 
     if len(shared_login_email) > 320:
         raise registration_error(
@@ -1871,12 +2063,30 @@ def register_team(
             registration_number=creator["registration_number"],
             password_hash=hash_password(registration.password),
             role=UserRole.STUDENT,
+            institution_id=institution.id,
+            is_active=False,
         )
         session.add(user)
         session.flush()
 
+        membership = InstitutionMembership(
+            institution_id=institution.id,
+            user_id=user.id,
+            membership_role="MEMBER",
+            status="APPROVED" if invitation is not None else "PENDING",
+            invited_by_id=invitation.invited_by_id if invitation is not None else None,
+            approved_by_id=invitation.invited_by_id if invitation is not None else None,
+            approved_at=utc_now() if invitation is not None else None,
+        )
+        session.add(membership)
+        session.flush()
+        verification_token = issue_email_verification_token(session, user, institution.id)
+        if invitation is not None:
+            invitation.status = "ACCEPTED"
+            invitation.accepted_at = utc_now()
+
         next_group_number = (session.scalar(select(func.max(Team.group_number)).where(Team.academic_cycle_id == cycle.id)) or 0) + 1
-        team = Team(academic_cycle_id=cycle.id, group_number=next_group_number, shared_user_id=user.id)
+        team = Team(academic_cycle_id=cycle.id, group_number=next_group_number, group_name=None, shared_user_id=user.id)
         session.add(team)
         session.flush()
 
@@ -1911,6 +2121,7 @@ def register_team(
         session.commit()
         for record in (user, team, *created_members):
             session.refresh(record)
+        send_email_verification(user.email, verification_token)
     except HTTPException:
         session.rollback()
         raise
@@ -1934,6 +2145,7 @@ def register_team(
         "team": team,
         "cycle": cycle,
         "members": created_members,
+        "verification_token": verification_token if settings.app_env in {"dev", "development", "local"} else None,
     }
 
 
@@ -1972,6 +2184,7 @@ def register_student_group(
         password=registration.password,
         confirm_password=registration.confirm_password,
         members=[TeamMemberInput(full_name=member.full_name or member_name(str(member.email)), registration_number=member.registration_number, university_email=member.email) for member in remaining],
+        invitation_token=registration.invitation_token,
     )
     return register_team(legacy, session, request=request)
 
@@ -1991,7 +2204,22 @@ def cycle_group_number(session: Session, team: Team) -> int | None:
 def student_group_detail(session: Session, team: Team) -> dict[str, object]:
     """Serialize the shared student principal without exposing credentials."""
     account = session.get(User, team.shared_user_id)
+    membership = None
+    if account is not None:
+        membership_statement = select(InstitutionMembership).where(
+            InstitutionMembership.user_id == account.id
+        )
+        if account.institution_id is not None:
+            membership_statement = membership_statement.where(
+                InstitutionMembership.institution_id == account.institution_id
+            )
+        membership = session.scalar(membership_statement)
     cycle = session.get(AcademicCycle, team.academic_cycle_id)
+    policy = session.scalar(
+        select(AcademicGroupPolicy).where(
+            AcademicGroupPolicy.academic_cycle_id == team.academic_cycle_id
+        )
+    )
     members = session.execute(
         select(TeamMember)
         .where(TeamMember.team_id == team.id, TeamMember.academic_cycle_id == team.academic_cycle_id)
@@ -2000,23 +2228,41 @@ def student_group_detail(session: Session, team: Team) -> dict[str, object]:
     assignment = session.scalar(select(SupervisorAssignment).where(SupervisorAssignment.team_id == team.id, SupervisorAssignment.academic_cycle_id == team.academic_cycle_id, SupervisorAssignment.ended_at.is_(None)).order_by(SupervisorAssignment.id.desc()).limit(1))
     supervisor = session.get(User, assignment.supervisor_id) if assignment else None
     latest_request = session.scalar(select(SupervisorRequest).where(SupervisorRequest.team_id == team.id, SupervisorRequest.academic_cycle_id == team.academic_cycle_id, SupervisorRequest.status.not_in(["WITHDRAWN", "REJECTED"])).order_by(SupervisorRequest.updated_at.desc(), SupervisorRequest.id.desc()).limit(1))
-    leader = next((member for member in members if member.is_creator), members[0] if members else None)
     visible_group_number = cycle_group_number(session, team)
+    active_members = [member for member in members if member.is_active]
     return {
         "id": team.id,
         "group_id": team.id,
         "group_number": visible_group_number,
         "group_code": f"{cycle.code}-{visible_group_number}" if cycle and visible_group_number is not None else None,
-        "group_name": f"{leader.full_name}'s Group" if leader else f"Group {visible_group_number or '—'}",
+        "group_name": team.group_name or f"Group {visible_group_number or '—'}",
+        "group_name_assigned": team.group_name is not None,
         "group_email": account.email if account else None,
         "academic_cycle_id": team.academic_cycle_id,
         "academic_cycle": cycle.display_name if cycle else None,
         "status": "ACTIVE" if account and account.is_active and team.status != "dissolved" else "INACTIVE",
+        "approval_status": (
+            "REJECTED"
+            if membership and membership.status == "REJECTED"
+            else "ACTIVE"
+            if account and account.is_active
+            else "DISABLED"
+            if account and account.access_approved_at is not None
+            else "PENDING"
+        ),
+        "supervision_status": team.supervision_status,
         "is_active": bool(account and account.is_active and team.status != "dissolved"),
         "created_at": team.created_at,
         "project": {"title": latest_request.title, "status": latest_request.status, "updated_at": latest_request.updated_at} if latest_request else None,
         "supervisor": {"id": supervisor.id, "name": supervisor.full_name} if supervisor else None,
         "supervisor_assignment": {"id": assignment.id, "academic_cycle_id": assignment.academic_cycle_id, "assigned_at": assignment.created_at} if assignment else None,
+        "member_count": len(active_members),
+        "group_policy": {
+            "min_group_size": policy.min_group_size,
+            "max_group_size": policy.max_group_size,
+        } if policy else None,
+        "min_group_size": policy.min_group_size if policy else None,
+        "max_group_size": policy.max_group_size if policy else None,
         "members": [
             {
                 "id": member.id,
@@ -2085,7 +2331,7 @@ def list_student_groups(
     )
     if search and search.strip():
         needle = f"%{search.strip()}%"
-        statement = statement.where(or_(User.email.ilike(needle), User.full_name.ilike(needle)))
+        statement = statement.where(or_(Team.group_name.ilike(needle), User.email.ilike(needle), User.full_name.ilike(needle)))
     if is_active is not None:
         statement = statement.where(User.is_active.is_(is_active))
     groups = session.execute(statement.order_by(Team.id.desc())).scalars().all()
@@ -2108,35 +2354,218 @@ def get_student_group(
     return student_group_detail(session, group)
 
 
+@app.post("/api/v1/admin/student-groups/{group_id}/members", status_code=status.HTTP_201_CREATED)
+def add_student_group_member(
+    group_id: int,
+    payload: AdminStudentGroupMemberCreate,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Add one student to a group without creating a second login account."""
+    validate_mutating_origin(request)
+    email = str(payload.email).strip().lower()
+    registration_number = payload.registration_number.strip().upper()
+
+    try:
+        group = session.execute(
+            select(Team).where(Team.id == group_id).with_for_update()
+        ).scalar_one_or_none()
+        if group is None or group.status == "dissolved":
+            raise admin_user_error(status.HTTP_404_NOT_FOUND, "group_not_found", "Student group was not found.")
+
+        account = session.execute(
+            select(User).where(User.id == group.shared_user_id).with_for_update()
+        ).scalar_one_or_none()
+        if account is None or not account.is_active:
+            raise admin_user_error(status.HTTP_409_CONFLICT, "group_inactive", "Activate the student group before adding a member.")
+
+        cycle = session.execute(
+            select(AcademicCycle).where(AcademicCycle.id == group.academic_cycle_id).with_for_update()
+        ).scalar_one_or_none()
+        if cycle is None:
+            raise admin_user_error(status.HTTP_404_NOT_FOUND, "cycle_not_found", "Academic cycle was not found.")
+        policy = session.execute(
+            select(AcademicGroupPolicy)
+            .where(AcademicGroupPolicy.academic_cycle_id == cycle.id)
+            .with_for_update()
+        ).scalar_one_or_none()
+        if policy is None:
+            raise admin_user_error(status.HTTP_409_CONFLICT, "academic_group_policy_missing", "A group-size policy is not configured for this cycle.")
+
+        members = session.execute(
+            select(TeamMember)
+            .where(
+                TeamMember.team_id == group.id,
+                TeamMember.academic_cycle_id == group.academic_cycle_id,
+                TeamMember.is_active.is_(True),
+            )
+            .with_for_update()
+        ).scalars().all()
+        if len(members) >= policy.max_group_size:
+            raise admin_user_error(status.HTTP_409_CONFLICT, "group_at_capacity", f"This group already has the maximum {policy.max_group_size} active members.")
+
+        try:
+            institution, _ = resolve_registration_institution(session, [email])
+        except HTTPException as error:
+            raise admin_user_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "institution_domain_invalid", str(error.detail), "email") from error
+        if not is_platform_admin(actor) and institution.id != actor.institution_id:
+            raise admin_user_error(status.HTTP_403_FORBIDDEN, "institution_scope", "You can only add students in your own institution.")
+
+        existing_user = session.scalar(
+            select(User).where(or_(User.email == email, User.registration_number == registration_number))
+        )
+        if existing_user is not None:
+            raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_account", "An account with that email or registration number already exists.")
+
+        existing_member = session.scalar(
+            select(TeamMember).where(
+                TeamMember.is_active.is_(True),
+                or_(TeamMember.registration_number == registration_number, TeamMember.university_email == email),
+            )
+        )
+        if existing_member is not None:
+            raise admin_user_error(status.HTTP_409_CONFLICT, "member_already_assigned", "That student is already an active member of a group.")
+
+        member = TeamMember(
+            team_id=group.id,
+            academic_cycle_id=group.academic_cycle_id,
+            full_name=payload.full_name,
+            registration_number=registration_number,
+            university_email=email,
+            is_creator=False,
+            is_active=True,
+        )
+        session.add(member)
+        session.flush()
+        add_admin_audit_event(
+            session,
+            actor_id=actor.id,
+            affected_user_id=account.id,
+            target_type="TEAM_MEMBER",
+            target_id=member.id,
+            action="student_group_member_added",
+            changed_values={
+                "team_id": group.id,
+                "academic_cycle_id": group.academic_cycle_id,
+                "registration_number": registration_number,
+                "email": email,
+                "access_mode": "GROUP_SHARED_LOGIN",
+            },
+        )
+        session.commit()
+        session.refresh(member)
+    except HTTPException:
+        session.rollback()
+        raise
+    except IntegrityError as error:
+        session.rollback()
+        raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_conflict", "A conflicting account or active team member already exists.") from error
+    except SQLAlchemyError as error:
+        session.rollback()
+        raise admin_user_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "member_add_failed", "The group member could not be added.") from error
+
+    return {
+        "member": {
+            "id": member.id,
+            "full_name": member.full_name,
+            "registration_number": member.registration_number,
+            "email": member.university_email,
+            "designation": "MEMBER",
+            "is_creator": False,
+            "is_active": True,
+        },
+        "account": {
+            "id": account.id,
+            "full_name": account.full_name,
+            "email": account.email,
+            "registration_number": account.registration_number,
+            "role": account.role.value,
+            "is_active": account.is_active,
+            "access_mode": "GROUP_SHARED_LOGIN",
+        },
+        "group_id": group.id,
+        "member_count": len(members) + 1,
+        "max_group_size": policy.max_group_size,
+    }
+
+
 def set_student_group_status(
     group_id: int,
     active: bool,
     request: Request,
     actor: User,
     session: Session,
+    group_name: str | None = None,
 ) -> dict[str, object]:
     validate_mutating_origin(request)
     group = session.execute(select(Team).where(Team.id == group_id).with_for_update()).scalar_one_or_none()
     if group is None or group.status == "dissolved":
         raise admin_user_error(status.HTTP_404_NOT_FOUND, "group_not_found", "Student group was not found.")
     account = session.execute(select(User).where(User.id == group.shared_user_id).with_for_update()).scalar_one()
+    membership = session.scalar(
+        select(InstitutionMembership).where(
+            InstitutionMembership.user_id == account.id,
+            InstitutionMembership.institution_id == account.institution_id,
+        )
+    ) if account.institution_id is not None else None
+    if active:
+        if not group_name:
+            raise admin_user_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "group_name_required", "Assign an official group name before approving this signup.", "group_name")
+        group.group_name = group_name
+        approval_time = utc_now()
+        account.email_verified_at = account.email_verified_at or approval_time
+        account.access_approved_at = approval_time
+        if membership is not None:
+            membership.status = "ACTIVE"
+            membership.approved_by_id = actor.id
+            membership.approved_at = approval_time
+    elif membership is not None and membership.status != "REJECTED":
+        membership.status = "DISABLED"
+        membership.approved_at = None
     account.is_active = active
     if not active:
         revoke_user_sessions(session, account.id)
-    add_admin_audit_event(session, actor_id=actor.id, affected_user_id=account.id, target_type="STUDENT_GROUP", target_id=group.id, action="student_group_activated" if active else "student_group_deactivated", changed_values={"is_active": active})
+    add_admin_audit_event(session, actor_id=actor.id, affected_user_id=account.id, target_type="STUDENT_GROUP", target_id=group.id, action="student_group_approved" if active else "student_group_deactivated", changed_values={"is_active": active, "group_name": group.group_name})
     session.commit()
     session.refresh(group)
     return student_group_detail(session, group)
 
 
 @app.patch("/api/v1/admin/student-groups/{group_id}/activate")
-def activate_student_group(group_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> dict[str, object]:
-    return set_student_group_status(group_id, True, request, actor, session)
+def activate_student_group(group_id: int, payload: AdminStudentGroupApproval, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> dict[str, object]:
+    return set_student_group_status(group_id, True, request, actor, session, payload.group_name)
 
 
 @app.patch("/api/v1/admin/student-groups/{group_id}/deactivate")
 def deactivate_student_group(group_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> dict[str, object]:
     return set_student_group_status(group_id, False, request, actor, session)
+
+
+@app.patch("/api/v1/admin/student-groups/{group_id}/reject")
+def reject_student_group(group_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> dict[str, object]:
+    validate_mutating_origin(request)
+    group = session.execute(select(Team).where(Team.id == group_id, Team.status != "dissolved").with_for_update()).scalar_one_or_none()
+    if group is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "group_not_found", "Student group was not found.")
+    account = session.execute(select(User).where(User.id == group.shared_user_id).with_for_update()).scalar_one()
+    membership = session.scalar(
+        select(InstitutionMembership).where(
+            InstitutionMembership.user_id == account.id,
+            InstitutionMembership.institution_id == account.institution_id,
+        )
+    ) if account.institution_id is not None else None
+    account.is_active = False
+    account.access_approved_at = None
+    if membership is not None:
+        membership.status = "REJECTED"
+        membership.approved_by_id = actor.id
+        membership.approved_at = None
+    revoke_user_sessions(session, account.id)
+    add_admin_audit_event(session, actor_id=actor.id, affected_user_id=account.id, target_type="STUDENT_GROUP", target_id=group.id, action="student_group_rejected", changed_values={"is_active": False, "group_name": group.group_name})
+    session.commit()
+    session.refresh(group)
+    return student_group_detail(session, group)
 
 
 def _delete_student_group_records(session: Session, group_id: int, account_id: int, replacement_user_id: int) -> None:
@@ -2219,6 +2648,7 @@ def _delete_student_group_records(session: Session, group_id: int, account_id: i
 
     # Assignments, projects, schedules, and proposals have their own child
     # rows and therefore must be cleared in dependency order.
+    session.execute(text("DELETE FROM supervisor_replacement_cases WHERE team_id = :group_id"), params)
     session.execute(text("DELETE FROM supervisor_assignments WHERE team_id = :group_id"), params)
     session.execute(text("DELETE FROM project_tasks WHERE team_id = :group_id"), params)
     session.execute(text("DELETE FROM project_milestones WHERE team_id = :group_id"), params)
@@ -2251,11 +2681,26 @@ def _delete_student_group_records(session: Session, group_id: int, account_id: i
     session.execute(text("DELETE FROM dashboard_requirements WHERE assigned_group_id = :group_id OR assigned_user_id = :account_id"), params)
     session.execute(text("DELETE FROM document_upload_requirements WHERE assigned_group_id = :group_id"), params)
 
+    # These foreign keys intentionally protect announcements, so remove
+    # announcements targeted at the group or its proposals first.
+    session.execute(text("""
+        DELETE FROM announcement_reads
+        WHERE announcement_id IN (
+            SELECT id FROM announcements
+            WHERE group_id = :group_id
+               OR project_id IN (SELECT id FROM proposals WHERE team_id = :group_id)
+        )
+    """), params)
+    session.execute(text("""
+        DELETE FROM announcements
+        WHERE group_id = :group_id
+           OR project_id IN (SELECT id FROM proposals WHERE team_id = :group_id)
+    """), params)
+
     # Remove the group membership and account-owned global rows that still
     # hold non-null references to the shared student account.
     session.execute(text("DELETE FROM team_members WHERE team_id = :group_id"), params)
     session.execute(text("DELETE FROM auth_sessions WHERE user_id = :account_id"), params)
-    session.execute(text("DELETE FROM admin_audit_events WHERE actor_id = :account_id OR affected_user_id = :account_id"), params)
     session.execute(text("UPDATE document_submissions SET reviewed_by_id = NULL WHERE reviewed_by_id = :account_id"), params)
     session.execute(text("UPDATE document_upload_requirements SET assigned_user_id = NULL, created_by_id = :replacement_user_id WHERE assigned_user_id = :account_id OR created_by_id = :account_id"), {**params, "replacement_user_id": replacement_user_id})
     session.execute(text("UPDATE dashboard_requirements SET assigned_user_id = NULL, created_by_id = :replacement_user_id WHERE assigned_user_id = :account_id OR created_by_id = :account_id"), {**params, "replacement_user_id": replacement_user_id})
@@ -2275,12 +2720,38 @@ def delete_student_group(group_id: int, request: Request, actor: User = Depends(
         raise admin_user_error(status.HTTP_404_NOT_FOUND, "group_account_not_found", "The shared group account was not found.")
     try:
         _delete_student_group_records(session, group.id, account.id, actor.id)
+        # Audit rows are append-only and retain the account as their actor.
+        # Keep an inactive account tombstone while removing the group itself.
+        account.is_active = False
+        account.email_verified_at = None
+        account.access_approved_at = None
+        membership = session.scalar(
+            select(InstitutionMembership).where(
+                InstitutionMembership.user_id == account.id,
+                InstitutionMembership.institution_id == account.institution_id,
+            )
+        )
+        if membership is not None:
+            membership.status = "DISABLED"
+            membership.approved_at = None
+        add_admin_audit_event(
+            session,
+            actor_id=actor.id,
+            affected_user_id=account.id,
+            target_type="STUDENT_GROUP",
+            target_id=group.id,
+            action="student_group_deleted",
+            changed_values={"access_revoked": True, "account_retained_for_audit": True},
+        )
         session.delete(group)
-        session.delete(account)
         session.commit()
     except IntegrityError as error:
         session.rollback()
         raise admin_user_error(status.HTTP_409_CONFLICT, "group_delete_failed", "The group could not be deleted. No group data was changed.") from error
+    except SQLAlchemyError as error:
+        session.rollback()
+        logger.exception("student group deletion failed", extra={"group_id": group_id})
+        raise admin_user_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "group_delete_failed", "The group could not be deleted. No group data was changed.") from error
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -2439,10 +2910,17 @@ app.include_router(group_ai_router)
 
 from .notifications import router as notifications_router
 app.include_router(notifications_router)
+from .announcements import router as announcements_router
+app.include_router(announcements_router)
 
 from .supervisor_requests import proposal_router, router as supervisor_requests_router
 app.include_router(supervisor_requests_router)
 app.include_router(proposal_router)
+
+from .supervisor_matching import router as supervisor_matching_router
+app.include_router(supervisor_matching_router)
+from .supervisor_replacements import router as supervisor_replacements_router
+app.include_router(supervisor_replacements_router)
 
 from .proposal_reference import router as proposal_reference_router
 app.include_router(proposal_reference_router)

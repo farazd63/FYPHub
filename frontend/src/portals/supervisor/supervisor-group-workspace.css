@@ -1,0 +1,366 @@
+.supervisor-group-card {
+  overflow: hidden;
+  padding: 0;
+}
+
+.supervisor-group-hero,
+.supervisor-assignment-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--fy-border, #dce5f2);
+  background: linear-gradient(135deg, var(--fy-brand-soft, #eef1ff), var(--fy-surface, #fff) 65%);
+  padding: 25px 28px 22px;
+}
+
+.supervisor-section-kicker {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--fy-brand, #315db4);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.supervisor-group-hero h2,
+.supervisor-assignment-card__header h2 {
+  margin: 0;
+  color: var(--fy-text, #172b4d);
+  font-size: clamp(1.35rem, 2.2vw, 1.8rem);
+  letter-spacing: -.025em;
+}
+
+.supervisor-group-hero p,
+.supervisor-assignment-card__header p {
+  margin: 7px 0 0;
+  color: var(--fy-text-secondary, #607087);
+  font-size: 14px;
+}
+
+.supervisor-group-hero__status,
+.supervisor-assignment-card__status,
+.supervisor-status-stack {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.supervisor-status-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: var(--fy-text-secondary, #536985);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .035em;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.supervisor-status-pill--neutral {
+  border-color: var(--fy-border, #d5e0ef);
+  background: var(--fy-surface-muted, #f4f7fb);
+}
+
+.supervisor-status-pill--blue {
+  border-color: color-mix(in srgb, var(--fy-brand, #315db4) 28%, var(--fy-border, #d5e0ef));
+  background: var(--fy-brand-soft, #eef1ff);
+  color: var(--fy-brand, #315db4);
+}
+
+.supervisor-group-workspace {
+  padding: 0 28px 28px;
+}
+
+.supervisor-group-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 0 -28px 25px;
+  border-bottom: 1px solid var(--fy-border, #dce5f2);
+  padding: 14px 28px 0;
+  scrollbar-width: thin;
+}
+
+.supervisor-group-tab {
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--fy-text-secondary, #607087);
+  padding: 10px 13px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.supervisor-group-tab:hover {
+  color: var(--fy-brand, #315db4);
+  background: var(--fy-brand-soft, #eef1ff);
+}
+
+.supervisor-group-tab--active {
+  border-bottom-color: var(--fy-brand, #315db4);
+  color: var(--fy-brand, #315db4);
+}
+
+.supervisor-overview-panel {
+  display: grid;
+  gap: 20px;
+}
+
+.supervisor-overview-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.supervisor-overview-intro h3 {
+  margin: 0;
+  color: var(--fy-text, #183047);
+  font-size: 1.1rem;
+}
+
+.supervisor-overview-intro p {
+  margin: 5px 0 0;
+  color: var(--fy-text-secondary, #607087);
+  font-size: 13px;
+}
+
+.supervisor-overview-spotlight,
+.supervisor-assignment-highlights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.supervisor-overview-spotlight > div,
+.supervisor-assignment-highlights > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid var(--fy-border, #dce5f2);
+  border-radius: 13px;
+  background: var(--fy-surface-muted, #f7f9fd);
+  padding: 15px;
+}
+
+.supervisor-overview-spotlight span,
+.supervisor-assignment-highlights span {
+  color: var(--fy-text-secondary, #607087);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.supervisor-overview-spotlight strong,
+.supervisor-assignment-highlights strong {
+  overflow-wrap: anywhere;
+  color: var(--fy-text, #183047);
+  font-size: 15px;
+}
+
+.supervisor-overview-spotlight small {
+  overflow-wrap: anywhere;
+  color: var(--fy-text-secondary, #607087);
+  font-size: 12px;
+}
+
+.supervisor-data-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 0;
+}
+
+.supervisor-data-field {
+  min-width: 0;
+  border-left: 3px solid var(--fy-brand, #315db4);
+  border-radius: 0 10px 10px 0;
+  background: var(--fy-surface-muted, #f7f9fd);
+  padding: 12px 14px;
+}
+
+.supervisor-data-field dt,
+.supervisor-assignment-details dt {
+  color: var(--fy-text-secondary, #607087);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.supervisor-data-field dd,
+.supervisor-assignment-details dd {
+  overflow-wrap: anywhere;
+  margin: 5px 0 0;
+  color: var(--fy-text, #183047);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.supervisor-assignment-list {
+  display: grid;
+  gap: 17px;
+}
+
+.supervisor-assignment-card {
+  overflow: hidden;
+  padding: 0;
+}
+
+.supervisor-assignment-card__header {
+  padding: 22px 24px 19px;
+}
+
+.supervisor-assignment-card__header h2 {
+  font-size: 1.35rem;
+}
+
+.supervisor-assignment-card__status {
+  max-width: 290px;
+}
+
+.supervisor-assignment-highlights,
+.supervisor-assignment-details,
+.supervisor-assignment-actions {
+  margin: 20px 24px 0;
+}
+
+.supervisor-assignment-highlights > div {
+  background: var(--fy-brand-soft, #f3f6ff);
+}
+
+.supervisor-assignment-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--fy-border, #e0e8f3);
+  border-bottom: 1px solid var(--fy-border, #e0e8f3);
+  padding: 5px 0;
+}
+
+.supervisor-assignment-details > div {
+  min-width: 0;
+  padding: 12px 14px 12px 0;
+}
+
+.supervisor-assignment-details > div:not(:nth-child(3n + 1)) {
+  border-left: 1px solid var(--fy-border, #e0e8f3);
+  padding-left: 14px;
+}
+
+.supervisor-assignment-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+
+.supervisor-assignment-primary {
+  flex: 0 0 auto;
+  border: 1px solid var(--fy-brand, #315db4);
+  border-radius: 10px;
+  background: var(--fy-brand, #315db4);
+  color: var(--fy-text-on-brand, #fff);
+  padding: 11px 15px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.supervisor-assignment-primary:hover {
+  filter: brightness(.94);
+}
+
+.supervisor-assignment-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.supervisor-assignment-secondary button {
+  border: 1px solid var(--fy-border, #d6e1ef);
+  border-radius: 9px;
+  background: var(--fy-surface, #fff);
+  color: var(--fy-text, #183047);
+  padding: 9px 11px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.supervisor-assignment-secondary button:hover {
+  border-color: var(--fy-brand, #315db4);
+  background: var(--fy-brand-soft, #eef1ff);
+  color: var(--fy-brand, #315db4);
+}
+
+@media (max-width: 760px) {
+  .supervisor-group-hero,
+  .supervisor-assignment-card__header,
+  .supervisor-overview-intro,
+  .supervisor-assignment-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .supervisor-group-hero__status,
+  .supervisor-assignment-card__status,
+  .supervisor-status-stack,
+  .supervisor-assignment-secondary {
+    justify-content: flex-start;
+  }
+
+  .supervisor-overview-spotlight,
+  .supervisor-assignment-highlights {
+    grid-template-columns: 1fr;
+  }
+
+  .supervisor-data-grid,
+  .supervisor-assignment-details {
+    grid-template-columns: 1fr;
+  }
+
+  .supervisor-assignment-details > div:not(:nth-child(3n + 1)) {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .supervisor-assignment-details > div + div {
+    border-top: 1px solid var(--fy-border, #e0e8f3);
+  }
+}
+
+@media (max-width: 520px) {
+  .supervisor-group-hero,
+  .supervisor-assignment-card__header {
+    padding: 20px;
+  }
+
+  .supervisor-group-workspace {
+    padding: 0 20px 22px;
+  }
+
+  .supervisor-group-tabs {
+    margin-inline: -20px;
+    padding-inline: 20px;
+  }
+
+  .supervisor-assignment-highlights,
+  .supervisor-assignment-details,
+  .supervisor-assignment-actions {
+    margin-inline: 20px;
+  }
+
+  .supervisor-assignment-primary {
+    width: 100%;
+  }
+}

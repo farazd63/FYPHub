@@ -5,12 +5,14 @@ from ..database import Base
 
 class Team(Base):
  __tablename__="teams"
- __table_args__=(UniqueConstraint("id","academic_cycle_id",name="uq_teams_id_cycle"),UniqueConstraint("academic_cycle_id","group_number",name="uq_teams_cycle_group_number"),CheckConstraint("status IN ('forming','complete','locked','dissolved')",name="ck_teams_status"),CheckConstraint("group_number IS NULL OR group_number > 0",name="ck_teams_group_number_positive"))
+ __table_args__=(UniqueConstraint("id","academic_cycle_id",name="uq_teams_id_cycle"),UniqueConstraint("academic_cycle_id","group_number",name="uq_teams_cycle_group_number"),CheckConstraint("status IN ('forming','complete','locked','dissolved')",name="ck_teams_status"),CheckConstraint("supervision_status IN ('ACTIVE','UNSUPERVISED','REPLACEMENT_PENDING','REASSIGNED','COMPLETED')",name="ck_teams_supervision_status"),CheckConstraint("group_number IS NULL OR group_number > 0",name="ck_teams_group_number_positive"))
  id:Mapped[int]=mapped_column(primary_key=True)
  academic_cycle_id:Mapped[int]=mapped_column(ForeignKey("academic_cycles.id"),nullable=False)
  group_number:Mapped[int | None]=mapped_column(Integer,nullable=True)
+ group_name:Mapped[str | None]=mapped_column(String(255),nullable=True)
  shared_user_id:Mapped[int]=mapped_column(ForeignKey("users.id"),nullable=False,unique=True)
  status:Mapped[str]=mapped_column(String(16),nullable=False,default="forming",server_default="forming")
+ supervision_status:Mapped[str]=mapped_column(String(24),nullable=False,default="ACTIVE",server_default="ACTIVE")
  locked_at:Mapped[datetime | None]=mapped_column(DateTime(timezone=True),nullable=True)
  lock_reason:Mapped[str | None]=mapped_column(String(64),nullable=True)
  created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False,server_default=func.now())

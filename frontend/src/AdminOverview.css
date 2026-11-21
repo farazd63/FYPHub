@@ -66,6 +66,58 @@
 .cycle-overview__policy div { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
 .cycle-overview__policy span { color: var(--fy-text-muted); font-size: .78rem; }
 .cycle-overview__policy strong { color: var(--fy-text); font-size: .8rem; }
+.cycle-overview__card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+  border-top: 1px solid #e6edf7;
+  padding-top: 12px;
+}
+.cycle-overview__detail-button,
+.cycle-detail__close {
+  border: 1px solid color-mix(in srgb, var(--fy-brand, #4663ff) 35%, #dce5f2);
+  border-radius: 9px;
+  background: var(--fy-brand-soft, #eef1ff);
+  color: var(--fy-brand, #315db4);
+  padding: 8px 11px;
+  font-size: .78rem;
+  font-weight: 800;
+}
+.cycle-overview__detail-button:hover,
+.cycle-detail__close:hover { background: color-mix(in srgb, var(--fy-brand-soft, #eef1ff) 72%, #fff); }
+.cycle-detail {
+  width: 100%;
+  min-width: 0;
+  margin-top: 24px;
+  border: 1px solid var(--fy-border, #d8e2ef);
+  border-radius: 20px;
+  background: var(--fy-surface, #fff);
+  box-shadow: var(--fy-shadow, 0 8px 24px rgb(24 56 112 / .07));
+  padding: clamp(18px, 2vw, 28px);
+}
+.cycle-detail--loading,
+.cycle-detail--error { color: var(--fy-text-secondary); }
+.cycle-detail--error { border-color: color-mix(in srgb, var(--fy-danger, #a43a33) 32%, var(--fy-border)); color: var(--fy-danger, #a43a33); }
+.cycle-detail__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--fy-border, #d8e2ef); padding-bottom: 18px; }
+.cycle-detail__eyebrow { margin: 0 0 5px; color: var(--fy-brand, #4663ff); font-size: .7rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.cycle-detail__header h2 { margin: 0; color: var(--fy-text, #183047); font-size: clamp(1.25rem, 2vw, 1.7rem); }
+.cycle-detail__header p:last-child { margin: 5px 0 0; color: var(--fy-text-secondary, #607087); font-size: .85rem; }
+.cycle-detail__summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 18px 0; }
+.cycle-detail__summary div { display: grid; gap: 4px; border: 1px solid var(--fy-border, #d8e2ef); border-radius: 12px; background: var(--fy-surface-muted, #f5f8fd); padding: 13px; }
+.cycle-detail__summary strong { color: var(--fy-text, #183047); font-size: 1.35rem; }
+.cycle-detail__summary span { color: var(--fy-text-secondary, #607087); font-size: .72rem; font-weight: 700; }
+.cycle-detail__columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; }
+.cycle-detail__columns--lower { margin-top: 16px; }
+.cycle-detail__section { min-width: 0; border: 1px solid var(--fy-border, #d8e2ef); border-radius: 14px; background: var(--fy-surface, #fff); padding: 16px; }
+.cycle-detail__section h3 { margin: 0; color: var(--fy-text, #183047); font-size: 1rem; }
+.cycle-detail__list { display: grid; gap: 8px; margin-top: 13px; }
+.cycle-detail__list-item { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 12px; border: 1px solid var(--fy-border, #d8e2ef); border-radius: 10px; background: var(--fy-surface-muted, #f8faff); padding: 10px 11px; }
+.cycle-detail__list-item > div { display: grid; min-width: 0; gap: 3px; }
+.cycle-detail__list-item strong { overflow-wrap: anywhere; color: var(--fy-text, #183047); font-size: .82rem; }
+.cycle-detail__list-item span,
+.cycle-detail__list-item small { overflow-wrap: anywhere; color: var(--fy-text-secondary, #607087); font-size: .72rem; line-height: 1.4; }
+.cycle-detail__list-item em { flex: 0 0 auto; border-radius: 999px; background: var(--fy-brand-soft, #eef1ff); color: var(--fy-brand, #315db4); padding: 4px 7px; font-size: .65rem; font-style: normal; font-weight: 800; text-align: right; }
+.cycle-detail__empty { margin: 13px 0 0; color: var(--fy-text-secondary, #607087); font-size: .8rem; }
 .cycle-overview__message, .cycle-overview__error, .cycle-overview__empty { margin-top: 22px; padding: 28px; border: 1px solid #dfe8f6; border-radius: 16px; background: #fff; }
 .cycle-overview__error { color: #a12835; }
 .cycle-overview__retry { margin-left: 12px; color: #2855a7; font-weight: 700; text-decoration: underline; }
@@ -140,3 +192,167 @@ main:has(.admin-sidebar) .admin-enter:has(> .cycle-overview) { max-width: none; 
 .cycle-overview__hero::after { right: 12%; top: -180px; border-color: rgba(207, 222, 255, .25); background: radial-gradient(circle, rgba(151, 189, 255, .17), transparent 65%); box-shadow: 0 0 0 42px rgba(195, 200, 255, .055), 0 0 0 90px rgba(183, 198, 255, .035); }
 @keyframes cycle-overview-shape { from { transform: rotate(35deg) translateY(0); } to { transform: rotate(48deg) translateY(-12px); } }
 @media (prefers-reduced-motion: reduce) { .cycle-overview__hero::before { animation: none; } }
+
+/* Dedicated cycle detail page. */
+.cycle-detail-page {
+  width: 100%;
+  min-width: 0;
+  min-height: calc(100vh - 5rem);
+  padding: clamp(18px, 2.4vw, 34px);
+  border: 1px solid #e1e9f6;
+  border-radius: 24px;
+  background: linear-gradient(145deg, #f8fbff, #f1f5fc);
+  color: #172b4d;
+}
+.cycle-detail-page__topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.cycle-detail-page__back { transition: background .2s ease, border-color .2s ease; }
+.cycle-detail-page__back:hover { border-color: #91aaf0; background: #eef3ff; }
+.cycle-detail-page__heading { margin-top: 28px; padding-bottom: 24px; border-bottom: 1px solid #dfe7f2; }
+.cycle-detail-page__heading h1 { margin: 0; color: #183047; font-size: clamp(1.8rem, 3vw, 2.65rem); letter-spacing: -.035em; line-height: 1.15; }
+.cycle-detail-page__heading p:last-child { max-width: 760px; margin: 10px 0 0; color: #607087; line-height: 1.55; }
+.cycle-detail-page > .cycle-detail__summary { margin-top: 24px; }
+.cycle-detail-page > .cycle-detail__columns { margin-top: 18px; }
+.cycle-detail-page .cycle-detail__section h2 { margin: 0; color: var(--fy-text, #183047); font-size: 1.05rem; }
+.cycle-detail-page__retry { margin-left: 14px; color: #315db4; font-weight: 800; text-decoration: underline; }
+.cycle-detail-page .cycle-detail--loading,
+.cycle-detail-page .cycle-detail--error { margin-top: 24px; }
+@media (max-width: 640px) {
+  .cycle-detail-page { padding: 16px; border-radius: 18px; }
+  .cycle-detail-page__topbar { align-items: flex-start; }
+  .cycle-detail-page__heading { margin-top: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { .cycle-detail-page__back { transition: none; } }
+
+/* Comfortable desktop reading scale for the admin overview. */
+main:has(.cycle-overview) .cycle-overview {
+  padding: clamp(24px, 2.8vw, 44px);
+}
+main:has(.cycle-overview) .cycle-overview__hero {
+  padding: clamp(30px, 3.5vw, 52px) clamp(30px, 4vw, 64px);
+  border-radius: 24px;
+}
+main:has(.cycle-overview) .cycle-overview__hero h1 {
+  font-size: clamp(2.25rem, 3.2vw, 3.5rem);
+  line-height: 1.12;
+}
+main:has(.cycle-overview) .cycle-overview__hero .fy-page-header__desc {
+  max-width: 760px;
+  margin-top: 16px;
+  font-size: 1.08rem;
+  line-height: 1.65;
+}
+main:has(.cycle-overview) .announcement-section {
+  margin-top: 32px;
+  padding: clamp(28px, 2.6vw, 40px);
+  border-radius: 22px;
+}
+main:has(.cycle-overview) .announcement-section__eyebrow {
+  margin-bottom: 8px;
+  font-size: .78rem;
+}
+main:has(.cycle-overview) .announcement-section h2 {
+  font-size: 1.6rem;
+  line-height: 1.25;
+}
+main:has(.cycle-overview) .announcement-section__heading p:last-child {
+  margin-top: 10px;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+main:has(.cycle-overview) .announcement-button {
+  min-height: 46px;
+  padding: 11px 18px;
+  border-radius: 11px;
+  font-size: .9rem;
+}
+main:has(.cycle-overview) .announcement-section__empty {
+  margin-top: 24px;
+  gap: 7px;
+  padding: 23px;
+  border-radius: 14px;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+main:has(.cycle-overview) .cycle-overview__list-heading {
+  margin-top: 38px;
+  margin-bottom: 20px;
+}
+main:has(.cycle-overview) .cycle-overview__list-heading h2 {
+  font-size: 1.55rem;
+  line-height: 1.25;
+}
+main:has(.cycle-overview) .cycle-overview__list-heading p {
+  margin-top: 8px;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+main:has(.cycle-overview) .cycle-overview__grid {
+  gap: 22px;
+}
+main:has(.cycle-overview) .cycle-overview__card {
+  min-height: 300px;
+  padding: 28px 28px 24px;
+  border-radius: 20px;
+}
+main:has(.cycle-overview) .cycle-overview__calendar {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+}
+main:has(.cycle-overview) .cycle-overview__calendar svg {
+  width: 24px;
+  height: 24px;
+}
+main:has(.cycle-overview) .cycle-overview__status {
+  padding: 8px 13px;
+  font-size: .84rem;
+}
+main:has(.cycle-overview) .cycle-overview__card-title {
+  margin: 24px 0 28px;
+}
+main:has(.cycle-overview) .cycle-overview__card-title p {
+  margin-bottom: 8px;
+  font-size: .78rem;
+  letter-spacing: .1em;
+}
+main:has(.cycle-overview) .cycle-overview__card-title h3 {
+  font-size: 1.5rem;
+  line-height: 1.3;
+}
+main:has(.cycle-overview) .cycle-overview__card-title > span {
+  margin-top: 9px;
+  font-size: 1rem;
+}
+main:has(.cycle-overview) .cycle-overview__policy {
+  gap: 13px;
+  padding-top: 18px;
+}
+main:has(.cycle-overview) .cycle-overview__policy svg {
+  width: 24px;
+  height: 24px;
+}
+main:has(.cycle-overview) .cycle-overview__policy div {
+  gap: 3px 10px;
+}
+main:has(.cycle-overview) .cycle-overview__policy span {
+  font-size: .9rem;
+}
+main:has(.cycle-overview) .cycle-overview__policy strong {
+  font-size: .95rem;
+}
+main:has(.cycle-overview) .cycle-overview__card-actions {
+  margin-top: 18px;
+  padding-top: 16px;
+}
+main:has(.cycle-overview) .cycle-overview__detail-button {
+  min-height: 46px;
+  padding: 11px 17px;
+  border-radius: 11px;
+  font-size: .9rem;
+}
+@media (max-width: 760px) {
+  main:has(.cycle-overview) .cycle-overview { padding: 18px; }
+  main:has(.cycle-overview) .cycle-overview__hero { padding: 28px 24px; }
+  main:has(.cycle-overview) .cycle-overview__hero h1 { font-size: 2.25rem; }
+  main:has(.cycle-overview) .cycle-overview__card { min-height: 270px; }
+}

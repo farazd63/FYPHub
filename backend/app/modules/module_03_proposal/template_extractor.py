@@ -221,6 +221,38 @@ def _pdf_headings(lines: list[dict[str, Any]], body_size: float | str) -> list[d
     return _dedupe_headings(headings)
 
 
+def _pdf_line_spacing_values(lines: list[dict[str, Any]]) -> list[float]:
+    """Estimate line-spacing ratios from consecutive PDF text lines.
+
+    PyMuPDF may expose every visual line as its own text block. Comparing only
+    lines inside one block therefore returns no result for many exported PDFs.
+    Consecutive lines on the same page are reliable enough when large paragraph
+    or section gaps are excluded.
+    """
+    by_page: dict[int, list[tuple[float, float]]] = {}
+    for line in lines:
+        bbox = line.get("bbox")
+        sizes = [float(span.get("size")) for span in line.get("spans", []) if span.get("size")]
+        if not bbox or not sizes:
+            continue
+        by_page.setdefault(int(line.get("page") or 1), []).append((float(bbox[1]), median(sizes)))
+
+    values: list[float] = []
+    for page_lines in by_page.values():
+        ordered = sorted(page_lines)
+        for previous, current in zip(ordered, ordered[1:]):
+            gap = current[0] - previous[0]
+            reference_size = max(1.0, median((previous[1], current[1])))
+            if abs(previous[1] - current[1]) > reference_size * 0.1:
+                continue
+            if gap <= 0 or gap > reference_size * 1.8:
+                continue
+            ratio = gap / reference_size
+            if 0.8 <= ratio <= 3.0:
+                values.append(ratio)
+    return values
+
+
 def _pdf_alignment(lines: list[dict[str, Any]], left_edge: float, right_edge: float) -> str:
     values: list[tuple[str, int]] = []
     width = max(1.0, right_edge - left_edge)
@@ -285,17 +317,7 @@ def _extract_pdf(data: bytes, filename: str | None, content_type: str | None) ->
             if re.search(r"\bpage\s+\d+\b", page_text, re.IGNORECASE):
                 page_numbering = True
                 page_numbering_page = page_numbering_page or page_number
-            for block in page.get_text("dict", textpage=None).get("blocks", []):
-                if block.get("type") != 0:
-                    continue
-                previous_line_top: float | None = None
-                for line in block.get("lines", []):
-                    bbox = line.get("bbox")
-                    sizes_for_line = [float(span.get("size")) for span in line.get("spans", []) if span.get("size")]
-                    if bbox and sizes_for_line and previous_line_top is not None and bbox[1] >= previous_line_top:
-                        line_spacings.append((float(bbox[1]) - previous_line_top) / max(1.0, median(sizes_for_line)))
-                    if bbox:
-                        previous_line_top = float(bbox[1])
+        line_spacings = _pdf_line_spacing_values(all_lines)
         text = "\n".join(all_text).strip()
         if not text:
             warnings.append("No readable template text was detected.")
@@ -333,7 +355,7 @@ def _extract_pdf(data: bytes, filename: str | None, content_type: str | None) ->
         if line_spacings:
             rules["line_spacing"] = _consistent_number([round(value, 2) for value in line_spacings], tolerance=0.15)
             if rules["line_spacing"] != NOT_DETECTED:
-                _source_field(source, "line_spacing", page=None, method="PDF line-box spacing ratio")
+                _source_field(source, "line_spacing", page=None, method="PDF consecutive text-line spacing ratio")
         if page_margins and sizes and all(size == sizes[0] for size in sizes):
             rules["alignment"] = _pdf_alignment(all_lines, min(item[0] for item in page_margins), max(sizes[0][0] - item[1] for item in page_margins))
             if rules["alignment"] != NOT_DETECTED:
@@ -354,6 +376,10 @@ def _extract_pdf(data: bytes, filename: str | None, content_type: str | None) ->
             _source_field(source, "page_numbering", page=page_numbering_page, method="PDF footer/page-number text")
         if not headings:
             source["warnings"].append("No clearly formatted template headings were detected; required sections were not inferred.")
+        if rules["line_spacing"] == NOT_DETECTED:
+            source["warnings"].append("Line spacing could not be measured from the PDF text geometry; confirm it manually if required.")
+        if not page_numbering:
+            source["warnings"].append("No page-number text or PDF page-number field was detected; confirm page numbering manually if required.")
         return rules
     finally:
         document.close()
@@ -467,6 +493,10 @@ def _extract_docx(data: bytes, filename: str | None, content_type: str | None) -
         _source_field(source, "page_numbering", page=None, method="DOCX PAGE field in document XML")
     if not headings:
         source["warnings"].append("No DOCX Heading styles were detected; required sections were not inferred.")
+    if rules["line_spacing"] == NOT_DETECTED:
+        source["warnings"].append("Line spacing was not explicitly available in the DOCX paragraphs; confirm it manually if required.")
+    if rules["page_numbering"] != True:
+        source["warnings"].append("No DOCX PAGE field was detected; confirm page numbering manually if required.")
     return rules
 
 

@@ -8,8 +8,8 @@ test("student group members table shows cycle-scoped project and supervisor valu
   for (const column of ["Member", "Registration", "Email", "Role", "Project Title", "Supervisor"]) {
     assert.match(source, new RegExp(`>${column}<`));
   }
-  assert.match(source, /group\.project\?\.title\?\.trim\(\) \|\| "Not assigned"/);
-  assert.match(source, /group\.supervisor\?\.name\?\.trim\(\) \|\| "Not assigned"/);
+  assert.match(source, /group\.project\?\.title\?\.\s*trim\(\)\s*\|\|\s*"Not assigned"/);
+  assert.match(source, /group\.supervisor\?\.name\?\.\s*trim\(\)\s*\|\|\s*"Not assigned"/);
   assert.match(source, /group\.group_number/);
   assert.match(source, /min-w-\[900px\]/);
 });
@@ -21,4 +21,13 @@ test("admin group navigation is cycle-first and keeps the selected state in the 
   assert.match(source, /writeSelection\(selectedCycleId, groupId\)/);
   assert.match(source, /document-archive\/cycles\/\$\{selectedCycleId\}\/groups\/\$\{selectedGroupId\}/);
   assert.match(source, /setSelectedGroupId\(null\)/);
+});
+
+test("group signup names are assigned during admin approval", () => {
+  assert.match(source, /group_name_assigned/);
+  assert.match(source, /Approve group access/);
+  assert.match(source, /official-group-name/);
+  assert.match(source, /group_name: name/);
+  assert.match(source, /Reject group signup/);
+  assert.match(source, /The group will not be able to log in/);
 });

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { FeatureChip, PageHeader } from "../../ui";
+import { AnnouncementSection } from "../../announcements/AnnouncementSection";
 
 type FeatureKey = "queue" | "proposal" | "schedule" | "criteria" | "scoring" | "history";
 type EvaluatorOverviewProps = { api: string; onSelect: (key: FeatureKey) => void };
@@ -61,6 +62,7 @@ export function EvaluatorOverview({ api, onSelect }: EvaluatorOverviewProps) {
         title="Evaluation workspace"
         description="Review assigned defenses, proposals, and evaluation history for work assigned to you."
       />
+      <AnnouncementSection api={api} />
       <div className="student-overview__summary" aria-label="Evaluator workspace summary">
         <div><strong>{assigned}</strong><span>assigned evaluations</span></div>
         <div><strong>{pending}</strong><span>pending actions</span></div>

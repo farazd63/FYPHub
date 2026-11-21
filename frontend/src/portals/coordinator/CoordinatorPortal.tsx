@@ -9,14 +9,16 @@ import "../supervisor/modules/supervisor-requests/supervisor-requests.css";
 import "./modules/supervisor-requests/coordinator-requests.css";
 import { Menu } from "lucide-react";
 import { ThemeToggle } from "../../ui/ThemeToggle";
+import { AnnouncementBell } from "../../announcements/AnnouncementBell";
 import { FypHubBrand } from "../shared/FypHubBrand";
+import { AnnouncementSection } from "../../announcements/AnnouncementSection";
 
-type Page = "requests" | "scheduling";
+type Page = "overview" | "requests" | "scheduling";
 
 export function CoordinatorPortal({ api, user, onLogout }: { api: string; user: { full_name: string }; onLogout: () => void }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [page, setPage] = useState<Page>("requests");
+  const [page, setPage] = useState<Page>("overview");
   useEffect(() => {
     const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); };
     window.addEventListener("keydown", close);
@@ -25,6 +27,6 @@ export function CoordinatorPortal({ api, user, onLogout }: { api: string; user: 
   const initials = user.full_name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "C";
   const content = page === "scheduling"
     ? <PanelScheduling api={api} />
-    : <div className="coordinator-requests-stack"><CoordinatorRequestsPdf api={api} /><ProposalComplianceWorkspace api={api} reviewerMode /></div>;
-  return <main className="student-shell"><header className="student-header"><div className="student-header__left"><button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}><Menu aria-hidden="true" strokeWidth={1.75} size={20} /></button><FypHubBrand className="student-brand" /><span className="student-role">Coordinator</span></div><div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name">{user.full_name}</span><ThemeToggle /><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div></header><div className="student-body"><CoordinatorSidebar active={page} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={(id) => setPage(id as Page)} onToggle={() => setCollapsed((value) => !value)} onClose={() => setMobileOpen(false)} /><section className="student-content"><div className="student-content__inner">{content}</div></section></div></main>;
+    : <div className="coordinator-requests-stack"><AnnouncementSection api={api} /><CoordinatorRequestsPdf api={api} /><ProposalComplianceWorkspace api={api} reviewerMode /></div>;
+  return <main className="student-shell"><header className="student-header"><div className="student-header__left"><button type="button" className="student-menu" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}><Menu aria-hidden="true" strokeWidth={1.75} size={20} /></button><FypHubBrand className="student-brand" /><span className="student-role">Coordinator</span></div><div className="student-account"><span className="student-avatar" aria-hidden="true">{initials}</span><span className="student-account__name">{user.full_name}</span><AnnouncementBell api={api} /><ThemeToggle /><button type="button" className="student-logout" onClick={onLogout}>Logout</button></div></header><div className="student-body"><CoordinatorSidebar active={page} collapsed={collapsed} mobileOpen={mobileOpen} onSelect={(id) => setPage(id as Page)} onToggle={() => setCollapsed((value) => !value)} onClose={() => setMobileOpen(false)} /><section className="student-content"><div className="student-content__inner">{content}</div></section></div></main>;
 }

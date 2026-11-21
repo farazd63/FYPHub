@@ -20,3 +20,5 @@ class SupervisorAssignment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ended_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
+    end_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    end_notes: Mapped[str | None] = mapped_column(String(2000), nullable=True)

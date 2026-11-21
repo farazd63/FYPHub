@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { Alert } from "../../ui";
+import { IconButton } from "../../ui/IconButton";
 import { SupervisorGroupDetails, type GroupWorkspace, type GroupTab, date } from "./SupervisorGroupDetails";
 
 const projectStatusLabel = (value?: string | null) => ({
@@ -35,18 +37,18 @@ export function SupervisorAssignedTeams({ api }: { api: string }) {
     {error && (
       <Alert tone="danger" title="Assigned groups unavailable" role="alert">
         <p className="m-0">{error}</p>
-        <button type="button" className="fy-btn fy-btn--secondary fy-btn--sm mt-3" onClick={() => void load()}>Retry</button>
+        <IconButton label="Retry assigned groups" size="sm" variant="secondary" className="mt-3" onClick={() => void load()}><RefreshCw size={15} strokeWidth={1.8} aria-hidden /></IconButton>
       </Alert>
     )}
-    {loading ? <div className="supervisor-card">Loading assigned groups…</div> : error ? null : !groups.length ? <div className="supervisor-card">No active assignments. Accepted groups will appear here.</div> : <div className="grid gap-4">{groups.map(data => <article key={data.group.id} className="supervisor-card">
-      <h2>{data.group.name}</h2><p>{data.group.email}</p><p>{data.group.academic_cycle.name} · {data.group.academic_cycle.year} · {data.group.academic_cycle.session}</p>
-      <dl className="my-4 grid gap-3 sm:grid-cols-3">{[
-        ["Group status", data.group.status], ["Assignment", data.assignment?.status], ["Assigned", date(data.assignment?.assigned_at)],
-        ["Supervisor", data.supervisor.name], ["Members", data.members.length], ["Project title", projectTitleLabel(data)],
+    {loading ? <div className="supervisor-card">Loading assigned groups…</div> : error ? null : !groups.length ? <div className="supervisor-card">No active assignments. Accepted groups will appear here.</div> : <div className="supervisor-assignment-list">{groups.map(data => <article key={data.group.id} className="supervisor-card supervisor-assignment-card">
+      <div className="supervisor-assignment-card__header"><div><span className="supervisor-section-kicker">ACTIVE ASSIGNMENT</span><h2>{data.group.name}</h2><p>{data.group.email} <span aria-hidden="true">·</span> {data.group.academic_cycle.name}</p></div><div className="supervisor-assignment-card__status"><span className="supervisor-status-pill supervisor-status-pill--neutral">{data.group.status.replaceAll("_", " ")}</span><span className="supervisor-status-pill supervisor-status-pill--blue">{data.assignment?.status?.replaceAll("_", " ") || "Awaiting decision"}</span></div></div>
+      <div className="supervisor-assignment-highlights"><div><span>Supervisor</span><strong>{data.supervisor.name}</strong></div><div><span>Members</span><strong>{data.members.length} member{data.members.length === 1 ? "" : "s"}</strong></div><div><span>Completion</span><strong>{data.project?.completion_percentage == null ? "Not started" : `${data.project.completion_percentage}%`}</strong></div></div>
+      <dl className="supervisor-assignment-details">{[
+        ["Academic cycle", `${data.group.academic_cycle.name} · ${data.group.academic_cycle.year || "Year not set"} · ${data.group.academic_cycle.session || "Session not set"}`], ["Project title", projectTitleLabel(data)],
         ["Proposal", data.proposal?.status || "Not submitted yet"], ["Project", projectStatusLabel(data.project?.status)],
-        ["Completion", data.project?.completion_percentage == null ? "No progress recorded" : `${data.project.completion_percentage}%`], ["Last activity", date(data.group.last_activity_at)]
-      ].map(([label, value]) => <div key={label}><dt className="text-xs font-semibold uppercase text-slate-500">{label}</dt><dd className="text-sm">{value}</dd></div>)}</dl>
-      <div className="flex flex-wrap gap-2">{([["overview", "View full details"], ["proposal", "Open proposal"], ["project", "Open project"], ["members", "View members"], ["documents", "View documents"], ["discussion", "Open group discussion"]] as [GroupTab, string][]).map(([tab, label]) => <button key={tab} type="button" onClick={() => open(data.group.id, tab)} className="rounded-lg border px-3 py-2 text-sm">{label}</button>)}</div>
+        ["Assigned", date(data.assignment?.assigned_at)], ["Last activity", date(data.group.last_activity_at)]
+      ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      <div className="supervisor-assignment-actions"><button type="button" onClick={() => open(data.group.id, "overview")} className="supervisor-assignment-primary">Open group workspace <span aria-hidden="true">→</span></button><div className="supervisor-assignment-secondary">{([["proposal", "Proposal"], ["project", "Project"], ["members", "Members"], ["documents", "Documents"], ["discussion", "Discussion"]] as [GroupTab, string][]).map(([tab, label]) => <button key={tab} type="button" onClick={() => open(data.group.id, tab)}>{label}</button>)}</div></div>
     </article>)}</div>}
   </section>;
 }

@@ -1,7 +1,7 @@
 import { RoleSidebar, SidebarIcon, type RoleSidebarItem } from "./RoleSidebar";
 
 type AdminNavGroup = { id: string; label: string; items: readonly { label: string; page: string }[] };
-type Props = { groups: readonly AdminNavGroup[]; active: string; collapsed: boolean; mobileOpen: boolean; permitted: boolean; expanded: Readonly<Record<string, boolean>>; onSelect: (page: string) => void; onToggle: () => void; onClose: () => void; onToggleSection: (section: string) => void };
+type Props = { groups: readonly AdminNavGroup[]; active: string; collapsed: boolean; mobileOpen: boolean; permitted: boolean; expanded: Readonly<Record<string, boolean>>; onSelect: (page: string) => void; onToggle: () => void; onClose: () => void; onToggleSection: (section: string, open?: boolean) => void };
 
 function iconFor(page: string) {
   if (page === "overview") return <SidebarIcon name="overview" />;

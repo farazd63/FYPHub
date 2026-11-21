@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { PageHeader, StatCard } from "../../ui";
+import { AnnouncementSection } from "../../announcements/AnnouncementSection";
 
 type Notification = {
   id: number;
@@ -45,6 +46,7 @@ export function StudentOverview({ api }: Props) {
 
   return <section className="student-overview min-w-0" aria-labelledby="student-overview-heading">
     <PageHeader className="student-overview__hero" eyebrow="Student workspace" title="Your FYP workspace" description="Important updates for your group appear here." />
+    <AnnouncementSection api={api} />
     {group && <section className="student-overview__context mt-6 grid min-w-0 gap-3 sm:grid-cols-3" aria-label="Group project overview"><StatCard label="Project" value={<span className="student-stat-value-clamp" title={group.project?.title || group.group_name}>{group.project?.title || group.group_name}</span>} /><StatCard label="Supervisor" value={group.supervisor?.name || "Pending"} /><StatCard label="Academic cycle" value={group.academic_cycle || "Not set"} /></section>}
     {state === "loading" && <p className="mt-6 text-sm text-fy-text-secondary">Loading notifications…</p>}
     {state === "error" && <p role="alert" className="mt-6 rounded-xl border border-fy-danger bg-fy-danger-soft p-4 text-sm text-fy-danger">Notifications could not be loaded.</p>}

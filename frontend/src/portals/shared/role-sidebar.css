@@ -14,7 +14,7 @@
   margin: var(--fy-shell-pad, 1.5rem) 0 var(--fy-shell-pad, 1.5rem) var(--fy-shell-pad, 1.5rem);
   padding: 12px;
   overflow: hidden;
-  border: 1px solid var(--fy-border, #d8dee6);
+  border: 1px solid var(--fy-border-strong, #c8d2e1);
   border-radius: var(--fy-radius-card, 0.75rem);
   background: var(--fy-surface, #ffffff);
   box-shadow: var(--fy-shadow, 0 1px 2px rgb(26 36 51 / 0.04), 0 8px 24px rgb(26 36 51 / 0.06));
@@ -48,6 +48,10 @@
   flex: 0 0 auto;
   flex-direction: column;
   gap: 5px;
+  border: 1px solid var(--fy-border, #d8dee6);
+  border-radius: var(--fy-radius-card, 0.75rem);
+  background: var(--fy-surface, #ffffff);
+  padding: 6px;
 }
 
 .role-sidebar .role-sidebar__section + .role-sidebar__section { margin-top: 10px; }
@@ -59,7 +63,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 7px 8px;
   border: 0;
   border-radius: var(--fy-radius-control, 0.5rem);
   background: transparent;
@@ -235,6 +239,206 @@
 .student-sidebar.role-sidebar.student-sidebar--collapsed .student-sidebar__item { justify-content: center; padding-inline: 6px; }
 .student-sidebar.role-sidebar.student-sidebar--collapsed .student-sidebar__collapse { right: 50%; transform: translateX(50%); }
 
+@media (min-width: 768px) {
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .student-sidebar__nav {
+    gap: 8px;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__section {
+    gap: 4px;
+    padding: 4px;
+  }
+
+  /* The section label is hidden in collapsed mode; remove its empty button row
+     so the icon groups do not gain a large blank gap above them. */
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__section-heading {
+    display: none;
+  }
+}
+
+/* Final two-state layout. The desktop sidebar is either a complete menu or a
+   compact rail; it never renders both navigation surfaces at once. */
+@media (min-width: 768px) {
+  .student-sidebar.role-sidebar {
+    position: relative;
+    width: 348px !important;
+    flex: 0 0 348px !important;
+    flex-direction: column;
+    gap: 0;
+    padding: 0 !important;
+    overflow: hidden;
+    border: 1px solid #d8e2f2;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 16px 34px rgb(41 72 128 / 0.10);
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__collapse {
+    position: absolute !important;
+    top: 14px;
+    left: 14px;
+    right: auto !important;
+    z-index: 3;
+    width: 48px !important;
+    height: 48px !important;
+    flex: 0 0 48px;
+    border: 1px solid #d8e2f2 !important;
+    border-radius: 14px !important;
+    background: #fff !important;
+    color: #315de0 !important;
+    box-shadow: 0 4px 12px rgb(41 72 128 / 0.08) !important;
+    transform: none !important;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__collapse:hover {
+    background: #eef3ff !important;
+    box-shadow: 0 7px 16px rgb(47 110 234 / 0.14) !important;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__collapse svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__rail {
+    display: none;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__panel {
+    display: flex !important;
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    background: #fff;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .student-sidebar__nav {
+    padding: 76px 14px 16px !important;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__menu-list {
+    gap: 10px;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__menu-section-head {
+    min-height: 52px;
+    padding: 10px 13px;
+    font-size: 13px;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__menu-section-icon {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+    border-radius: 9px;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__menu-section-icon svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__section-items {
+    gap: 4px;
+    padding: 7px;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .student-sidebar__item {
+    min-height: 44px;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    font-size: 13px;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .student-sidebar__icon {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+    border-radius: 8px;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .student-sidebar__icon svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed {
+    width: 96px !important;
+    flex-basis: 96px !important;
+    padding: 0 !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__collapse {
+    left: 50%;
+    transform: translateX(-50%) !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 76px 12px 14px;
+    border: 0;
+    background: #f7f9fc;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-list {
+    display: flex;
+    width: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-item {
+    width: 54px;
+    height: 54px;
+    flex: 0 0 54px;
+    border-radius: 16px;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke-width: 1.9;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__panel {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .student-sidebar.role-sidebar .role-sidebar__collapse,
+  .student-sidebar.role-sidebar .role-sidebar__rail {
+    display: none !important;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__panel {
+    display: flex !important;
+    width: 100%;
+    flex: 1 1 auto;
+  }
+}
+
 @media (max-width: 1024px) and (min-width: 768px) {
   .student-shell .student-sidebar.role-sidebar { width: 228px; flex-basis: 228px; }
 }
@@ -338,4 +542,576 @@
 @media (prefers-reduced-motion: reduce) {
   .student-sidebar.role-sidebar,
   .student-sidebar.role-sidebar * { transition-duration: 0.01ms !important; }
+}
+
+/* Reference navigation: a compact section rail controls a quiet contextual
+   menu panel. The rail stays visible while the panel can be collapsed. */
+.student-sidebar.role-sidebar {
+  width: 332px !important;
+  flex: 0 0 332px !important;
+  flex-direction: row;
+  gap: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 1px solid #e3e7eb;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgb(31 41 55 / 0.08);
+}
+
+.role-sidebar__rail {
+  display: flex;
+  width: 50px;
+  min-width: 50px;
+  flex: 0 0 50px;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 8px;
+  border-right: 1px solid #e8ebee;
+  background: #f3f5f7;
+}
+
+.role-sidebar__collapse {
+  position: static !important;
+  width: 32px !important;
+  height: 32px !important;
+  flex: 0 0 32px;
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  color: #84909b !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.role-sidebar__collapse:hover { background: #e4e8ec !important; color: #315de0 !important; }
+
+.role-sidebar__rail-list {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.role-sidebar__rail-item {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #71808d;
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.role-sidebar__rail-item:hover { background: #e4e8ec; color: #315de0; transform: translateY(-1px); }
+.role-sidebar__rail-item[aria-pressed="false"] { background: transparent !important; color: #71808d !important; box-shadow: none !important; }
+.role-sidebar__rail-item[aria-pressed="true"] { background: #2f6eea; color: #fff; box-shadow: 0 5px 12px rgb(47 110 234 / 0.22); }
+.role-sidebar__rail-icon { display: grid; width: 18px; height: 18px; place-items: center; }
+.role-sidebar__rail-icon svg { width: 17px; height: 17px; }
+
+.role-sidebar__panel {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  background: #fff;
+}
+
+.role-sidebar__panel-head {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 14px;
+  border-bottom: 1px solid #eef0f2;
+  color: #74808c;
+}
+
+.role-sidebar__panel-title {
+  min-width: 0;
+  overflow: hidden;
+  color: #5f6d79;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role-sidebar__panel-count {
+  flex: 0 0 auto;
+  color: #9aa4ad;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.role-sidebar__panel-toggle {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #8a949d;
+}
+
+.role-sidebar__panel-toggle:hover { background: #f0f2f4; color: #315de0; }
+
+.role-sidebar .student-sidebar__nav {
+  gap: 0;
+  padding: 12px 10px 16px;
+}
+
+.role-sidebar__menu-list { display: grid; gap: 8px; }
+
+.role-sidebar__menu-section {
+  overflow: hidden;
+  border: 1px solid #edf0f3;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.role-sidebar__menu-section.is-selected {
+  border-color: #d6e2fb;
+  box-shadow: 0 3px 10px rgb(47 110 234 / 0.05);
+}
+
+.role-sidebar__menu-section-head {
+  display: flex;
+  width: 100%;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 11px;
+  border: 0;
+  background: #f8fafc;
+  color: #53606c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: left;
+}
+
+.role-sidebar__menu-section-head:hover,
+.role-sidebar__menu-section-head:focus-visible {
+  background: #f0f4fa;
+  color: #2f6eea;
+  outline: none;
+}
+
+.role-sidebar__menu-section.is-selected .role-sidebar__menu-section-head {
+  color: #315de0;
+}
+
+.role-sidebar__menu-section-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.role-sidebar__menu-section-name > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role-sidebar__menu-section-icon {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  border: 1px solid #dce5ef;
+  border-radius: 6px;
+  background: #fff;
+  color: #778694;
+}
+
+.role-sidebar__menu-section-icon svg { width: 14px; height: 14px; }
+
+.role-sidebar__section-items {
+  display: grid;
+  gap: 2px;
+  padding: 5px;
+  border-top: 1px solid #edf0f3;
+  background: #fff;
+}
+
+.role-sidebar .student-sidebar__item {
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 5px;
+  color: #687681;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.role-sidebar .student-sidebar__item:hover:not(:disabled):not([aria-current="page"]) {
+  border: 0;
+  background: #f1f3f5;
+  color: #25323d;
+  transform: none;
+}
+
+.role-sidebar .student-sidebar__item[aria-current="page"],
+.role-sidebar .student-sidebar__item[aria-current="page"]:hover,
+.role-sidebar .student-sidebar__item[aria-current="page"]:focus-visible {
+  border: 0;
+  background: #2f6eea;
+  color: #fff;
+  box-shadow: none;
+}
+
+.role-sidebar .student-sidebar__item[aria-current="page"]::before { display: none; }
+.role-sidebar .student-sidebar__icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  margin-top: 0;
+  flex: 0 0 26px;
+  place-items: center;
+  border: 1px solid #edf0f3;
+  border-radius: 6px;
+  background: #fafbfc;
+  color: #83909b;
+}
+.role-sidebar .student-sidebar__icon svg { width: 14px; height: 14px; }
+.role-sidebar .student-sidebar__label { padding-top: 0; }
+.role-sidebar .student-sidebar__item:disabled { opacity: 0.45; }
+
+.student-sidebar.role-sidebar.student-sidebar--collapsed {
+  width: 50px !important;
+  flex-basis: 50px !important;
+}
+
+.student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__panel { display: none; }
+
+@media (max-width: 767px) {
+  .student-sidebar.role-sidebar,
+  .student-sidebar.role-sidebar.student-sidebar--collapsed {
+    width: min(88vw, 320px) !important;
+    max-width: min(88vw, 320px) !important;
+    flex-basis: 0 !important;
+    border-radius: 10px;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__panel { display: flex; }
+  .role-sidebar .role-sidebar__collapse { display: none; }
+  .role-sidebar .student-sidebar__mobile-head { display: flex; }
+  .role-sidebar .student-sidebar__mobile-head { justify-content: flex-end; }
+}
+
+/* Desktop collapsed rail: keep the navigation compact, but large enough to
+   read and use comfortably at normal browser zoom. */
+@media (min-width: 768px) {
+  .student-sidebar.role-sidebar {
+    transition: width 220ms ease, flex-basis 220ms ease, box-shadow 220ms ease;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__panel {
+    display: flex !important;
+    min-width: 0;
+    overflow: hidden;
+    transition: opacity 160ms ease, transform 220ms ease, flex-basis 220ms ease;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__panel {
+    flex: 0 0 0;
+    width: 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-10px);
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__panel {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__rail {
+    width: 68px;
+    min-width: 68px;
+    flex-basis: 68px;
+    gap: 14px;
+    padding: 12px 8px;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__collapse {
+    width: 46px !important;
+    height: 46px !important;
+    flex-basis: 46px;
+    border: 1px solid #d8e2f2 !important;
+    border-radius: 14px !important;
+    background: #fff !important;
+    color: #315de0 !important;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__collapse svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__rail-item {
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
+    border-radius: 14px;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__rail-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__rail-icon svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed {
+    width: 96px !important;
+    flex-basis: 96px !important;
+    padding-inline: 12px !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail {
+    width: 100%;
+    min-width: 0;
+    flex-basis: auto;
+    gap: 16px;
+    padding: 12px 0;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__collapse {
+    width: 48px !important;
+    height: 48px !important;
+    flex-basis: 48px;
+    border: 1px solid #d8e2f2 !important;
+    border-radius: 14px !important;
+    background: #fff !important;
+    color: #315de0 !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__collapse:hover {
+    background: #eef3ff !important;
+    box-shadow: 0 5px 12px rgb(47 110 234 / 0.12) !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__collapse svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-list {
+    gap: 12px;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-item {
+    width: 54px;
+    height: 54px;
+    flex-basis: 54px;
+    border-radius: 16px;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-item:hover {
+    box-shadow: 0 5px 12px rgb(47 110 234 / 0.10);
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke-width: 1.9;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__rail-item[aria-pressed="false"] {
+    background: transparent !important;
+    color: #71808d !important;
+    box-shadow: none !important;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__rail-item[aria-pressed="true"] {
+    background: #2f6eea !important;
+    color: #fff !important;
+    box-shadow: 0 7px 16px rgb(47 110 234 / 0.22) !important;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__menu-list {
+    gap: 10px;
+    padding-bottom: 8px;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__menu-section {
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__menu-section:not(.is-selected) .role-sidebar__menu-section-head {
+    background: #f8fafc;
+    color: #5f6d79;
+  }
+}
+
+/* Last in the cascade: the sidebar must have one predictable desktop shape. */
+@media (min-width: 768px) {
+  .student-sidebar.role-sidebar {
+    width: 348px !important;
+    flex: 0 0 348px !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid #d8e2f2 !important;
+    border-radius: 18px !important;
+    background: #fff !important;
+    box-shadow: 0 16px 34px rgb(41 72 128 / 0.10) !important;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__collapse {
+    position: absolute !important;
+    top: 14px !important;
+    left: 14px !important;
+    right: auto !important;
+    z-index: 3;
+    display: grid !important;
+    width: 48px !important;
+    height: 48px !important;
+    flex: 0 0 48px !important;
+    place-items: center;
+    border: 1px solid #d8e2f2 !important;
+    border-radius: 14px !important;
+    background: #fff !important;
+    color: #315de0 !important;
+    box-shadow: 0 4px 12px rgb(41 72 128 / 0.08) !important;
+    transform: none !important;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__collapse svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__rail {
+    display: none !important;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__panel {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    background: #fff !important;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .student-sidebar__nav {
+    padding: 76px 14px 16px !important;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__menu-list {
+    gap: 10px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__menu-section-head {
+    min-height: 52px !important;
+    padding: 10px 13px !important;
+    font-size: 13px !important;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .student-sidebar__item {
+    min-height: 44px !important;
+    padding: 7px 10px !important;
+    font-size: 13px !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed {
+    width: 96px !important;
+    flex: 0 0 96px !important;
+    padding: 0 !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__collapse {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 76px 12px 14px !important;
+    border: 0 !important;
+    background: #f7f9fc !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-list {
+    display: flex !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 12px !important;
+    overflow-y: auto !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-item {
+    width: 54px !important;
+    height: 54px !important;
+    flex: 0 0 54px !important;
+    border-radius: 16px !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-icon svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__panel {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .student-sidebar.role-sidebar .role-sidebar__collapse,
+  .student-sidebar.role-sidebar .role-sidebar__rail {
+    display: none !important;
+  }
+
+  .student-sidebar.role-sidebar .role-sidebar__panel {
+    display: flex !important;
+    width: 100% !important;
+    flex: 1 1 auto !important;
+  }
 }
