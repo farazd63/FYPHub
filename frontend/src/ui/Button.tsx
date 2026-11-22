@@ -1,7 +1,7 @@
 import { Loader2 } from "lucide-react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "success" | "warning" | "info";
 export type ButtonSize = "sm" | "md" | "lg";
 
 function join(...parts: Array<string | false | undefined>) {

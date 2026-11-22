@@ -1,6 +1,9 @@
 export const EMAIL_DOMAIN_MESSAGE =
   "Email must include a valid domain, for example name@example.com.";
 export const EMAIL_FORMAT_MESSAGE = "Enter a valid email address.";
+export const SZABIST_EMAIL_DOMAIN = "szabist-isb.pk";
+export const SZABIST_EMAIL_DOMAIN_MESSAGE =
+  "Use a SZABIST email ending in @szabist-isb.pk.";
 
 const LOCAL_PART = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
 const DOMAIN = /^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+(?:[A-Za-z]{1,63}|xn--[A-Za-z0-9-]{2,59})$/;
@@ -33,6 +36,14 @@ export function emailValidationMessage(value: string): string | undefined {
     return EMAIL_DOMAIN_MESSAGE;
   }
   return undefined;
+}
+
+/** Return the shared email error plus the single institution-domain rule. */
+export function szabistEmailValidationMessage(value: string): string | undefined {
+  const formatError = emailValidationMessage(value);
+  if (formatError) return formatError;
+  const domain = normalizeEmail(value).split("@")[1];
+  return domain === SZABIST_EMAIL_DOMAIN ? undefined : SZABIST_EMAIL_DOMAIN_MESSAGE;
 }
 
 export function isValidEmail(value: string): boolean {

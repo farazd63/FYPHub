@@ -9,7 +9,8 @@ from argon2.exceptions import InvalidHashError, VerificationError
 from argon2.low_level import Type
 
 _password_hasher = PasswordHasher(type=Type.ID)
-_FULL_NAME_PATTERN = re.compile(r"^[\w]+(?:[ '\u2019-][\w]+)*$", re.UNICODE)
+_FULL_NAME_PATTERN = re.compile(r"^[^\W\d_]+(?:\s+[^\W\d_]+)*$", re.UNICODE)
+_REGISTRATION_NUMBER_PATTERN = re.compile(r"^[0-9]+$")
 
 
 def normalize_full_name(value: str) -> str:
@@ -19,7 +20,15 @@ def normalize_full_name(value: str) -> str:
 def validate_full_name(value: str) -> str:
     normalized = normalize_full_name(value)
     if not 2 <= len(normalized) <= 100 or not _FULL_NAME_PATTERN.fullmatch(normalized) or any(char.isdigit() for char in normalized):
-        raise ValueError("Full name must contain 2 to 100 letters with optional spaces, apostrophes, or hyphens.")
+        raise ValueError("Full name must contain 2 to 100 letters separated by spaces only.")
+    return normalized
+
+
+def validate_registration_number(value: str) -> str:
+    """Accept registration identifiers made of ASCII digits only."""
+    normalized = value.strip()
+    if not 1 <= len(normalized) <= 100 or not _REGISTRATION_NUMBER_PATTERN.fullmatch(normalized):
+        raise ValueError("Registration number must contain 1 to 100 digits only.")
     return normalized
 
 PASSWORD_MIN_LENGTH = 8

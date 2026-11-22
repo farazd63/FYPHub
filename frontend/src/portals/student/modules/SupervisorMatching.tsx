@@ -39,11 +39,13 @@ export function SupervisorMatching({ api }: { api: string }) {
       setProposalKey(current[0]?.proposal_key ?? null);
       setSelected(current[0]?.id ?? null);
       setAnalysis(current[0]?.analysis ?? null);
+      setError("");
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Proposals could not be loaded."); }
   };
   const loadLock = async () => {
     try { setLock(await readJson<MatchingLock>(await fetch(`${api}/api/v1/supervisor-matching/lock-status`, { credentials: "include" })));
+      setError("");
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Supervisor matching status could not be loaded."); }
   };
@@ -105,7 +107,7 @@ export function SupervisorMatching({ api }: { api: string }) {
   return <section className="matching-page">
     <div className="matching-hero"><div><p className="matching-eyebrow">PROPOSAL TO SUPERVISOR</p><h1>Find a supervisor who fits the work</h1><p>Upload one proposal, let the system extract its signals, compare eligible supervisors, and send a request to your preferred match.</p></div><div className="matching-hero__mark" role="img" aria-label="AI fit"><span className="matching-hero__mark-main">AI</span><span className="matching-hero__mark-rule" aria-hidden="true" /><span className="matching-hero__mark-sub">FIT</span></div></div>
     {locked && <div className="matching-lock" role="status"><span className="matching-lock__icon" aria-hidden="true">✓</span><div><strong>Supervisor assignment confirmed</strong><p>Your request was accepted{lock.supervisor_name ? ` by ${lock.supervisor_name}` : ""}. Supervisor matching is now locked for this group.</p></div><span className="matching-lock__badge">LOCKED</span></div>}
-    {error && <p className="matching-alert matching-alert--error" role="alert">{error}</p>}{notice && <p className="matching-alert" role="status">{notice}</p>}
+    {error && <div className="matching-alert matching-alert--error" role="alert"><span>{error}</span><button type="button" className="matching-alert__retry" onClick={() => { void load(); void loadLock(); }}>Retry</button></div>}{notice && <p className="matching-alert" role="status">{notice}</p>}
     <div className="matching-layout">
       <article className="matching-card matching-card--proposals">
         <div className="matching-card__heading"><div><h2>Your project proposal</h2></div><IconButton label="Refresh current proposal" size="sm" variant="secondary" disabled={loading || locked} onClick={() => void load()}><RefreshCw size={15} strokeWidth={1.8} aria-hidden /></IconButton></div>

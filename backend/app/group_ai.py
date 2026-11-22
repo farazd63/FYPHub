@@ -3,20 +3,22 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request as UrlRequest, build_opener
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from .auth import get_current_user, validate_mutating_origin
 from .config import settings
 from .database import SessionLocal, get_db
 from .group_channels import MessageWrite
-from .models import StudentAIMessage, User, UserRole
+from .models import StudentAIConversation, StudentAIMessage, User, UserRole
 
 router = APIRouter(prefix="/api/v1/group-ai", tags=["student-ai"])
 
@@ -25,6 +27,12 @@ MAX_HISTORY_MESSAGES = 12
 MAX_GENERATION_TOKENS = 256
 CHAT_TIMEOUT_SECONDS = 180
 MODEL_KEEP_ALIVE = "24h"
+
+
+class ConversationWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, max_length=200)
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -50,10 +58,53 @@ def _message_out(message: StudentAIMessage) -> dict:
     }
 
 
-def _recent_rows(session: Session, actor: User) -> list[StudentAIMessage]:
+def _conversation_out(conversation: StudentAIConversation, message_count: int | None = None) -> dict:
+    result = {
+        "id": conversation.id,
+        "title": conversation.title,
+        "created_at": conversation.created_at,
+        "updated_at": conversation.updated_at,
+    }
+    if message_count is not None:
+        result["message_count"] = message_count
+    return result
+
+
+def _conversation_for_actor(session: Session, actor: User, conversation_id: int) -> StudentAIConversation:
+    conversation = session.scalar(
+        select(StudentAIConversation).where(
+            StudentAIConversation.id == conversation_id,
+            StudentAIConversation.user_id == actor.id,
+        )
+    )
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Chat not found.")
+    return conversation
+
+
+def _latest_conversation(session: Session, actor: User) -> StudentAIConversation | None:
+    return session.scalar(
+        select(StudentAIConversation)
+        .where(StudentAIConversation.user_id == actor.id)
+        .order_by(StudentAIConversation.updated_at.desc(), StudentAIConversation.id.desc())
+        .limit(1)
+    )
+
+
+def _conversation_messages(session: Session, conversation_id: int) -> list[StudentAIMessage]:
+    return list(
+        session.scalars(
+            select(StudentAIMessage)
+            .where(StudentAIMessage.conversation_id == conversation_id)
+            .order_by(StudentAIMessage.id.asc())
+        ).all()
+    )
+
+
+def _recent_rows(session: Session, conversation_id: int) -> list[StudentAIMessage]:
     rows = session.scalars(
         select(StudentAIMessage)
-        .where(StudentAIMessage.user_id == actor.id)
+        .where(StudentAIMessage.conversation_id == conversation_id)
         .order_by(StudentAIMessage.id.desc())
         .limit(MAX_HISTORY_MESSAGES)
     ).all()
@@ -71,6 +122,13 @@ def _model_messages(rows: list[StudentAIMessage], question: str) -> list[dict[st
     ]
     messages.append({"role": "user", "content": question})
     return messages
+
+
+def _title_from_question(question: str) -> str:
+    title = " ".join(question.split()).strip()
+    if len(title) > 64:
+        return f"{title[:61].rstrip()}..."
+    return title or "New chat"
 
 
 def _request(question: str, recent_messages: list[StudentAIMessage] | None = None) -> UrlRequest:
@@ -132,24 +190,22 @@ def generate(question: str, recent_messages: list[StudentAIMessage] | None = Non
         raise unavailable() from None
 
 
-@router.get("")
-def history(actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
-    _require_student(actor)
-    return [_message_out(row) for row in _recent_rows(session, actor)]
+def _create_conversation(session: Session, actor: User, title: str | None = None) -> StudentAIConversation:
+    conversation = StudentAIConversation(user_id=actor.id, title=(title or "New chat").strip() or "New chat")
+    session.add(conversation)
+    session.commit()
+    session.refresh(conversation)
+    return conversation
 
 
-@router.post("", status_code=200)
-def chat(
-    payload: MessageWrite,
-    request: Request,
-    actor: User = Depends(get_current_user),
-    session: Session = Depends(get_db),
-):
-    _require_student(actor)
-    validate_mutating_origin(request)
-    recent = _recent_rows(session, actor)
+def _stream_chat(payload: MessageWrite, actor: User, conversation: StudentAIConversation, recent: list[StudentAIMessage]):
     def events():
-        question = StudentAIMessage(user_id=actor.id, author_kind="USER", body=payload.body)
+        question = StudentAIMessage(
+            user_id=actor.id,
+            conversation_id=conversation.id,
+            author_kind="USER",
+            body=payload.body,
+        )
         answer_parts: list[str] = []
         try:
             request_to_ollama = _request(payload.body, recent)
@@ -169,26 +225,39 @@ def chat(
             answer_text = "".join(answer_parts).strip()
             if not answer_text:
                 raise ValueError("invalid response")
-            response = StudentAIMessage(user_id=actor.id, author_kind="AI", body=answer_text)
+            response = StudentAIMessage(
+                user_id=actor.id,
+                conversation_id=conversation.id,
+                author_kind="AI",
+                body=answer_text,
+            )
             persistence_session = SessionLocal()
             try:
+                persisted_conversation = _conversation_for_actor(persistence_session, actor, conversation.id)
+                if persisted_conversation.title == "New chat":
+                    persisted_conversation.title = _title_from_question(payload.body)
+                persisted_conversation.updated_at = datetime.now(timezone.utc)
                 persistence_session.add_all([question, response])
                 persistence_session.commit()
                 persistence_session.refresh(question)
                 persistence_session.refresh(response)
+                persistence_session.refresh(persisted_conversation)
+                message_count = persistence_session.scalar(
+                    select(func.count(StudentAIMessage.id)).where(
+                        StudentAIMessage.conversation_id == persisted_conversation.id
+                    )
+                )
+                conversation_out = _conversation_out(persisted_conversation, int(message_count or 0))
             except Exception:
                 persistence_session.rollback()
                 raise
             finally:
                 persistence_session.close()
-            yield f"data: {json.dumps({'type': 'done', 'model': CHAT_MODEL, 'question': _message_out(question), 'answer': _message_out(response)}, ensure_ascii=False, default=str)}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'model': CHAT_MODEL, 'question': _message_out(question), 'answer': _message_out(response), 'conversation': conversation_out}, ensure_ascii=False, default=str)}\n\n"
         except HTTPException as error:
             yield f"data: {json.dumps({'type': 'error', 'message': error.detail}, ensure_ascii=False, default=str)}\n\n"
-        except (ValueError, KeyError, TypeError, UnicodeError, URLError, HTTPError, TimeoutError, OSError) as error:
-            detail = "Llama 3.1 8B is unavailable. Check the local Ollama service."
-            if isinstance(error, HTTPException):
-                detail = str(error.detail)
-            yield f"data: {json.dumps({'type': 'error', 'message': detail}, ensure_ascii=False)}\n\n"
+        except (ValueError, KeyError, TypeError, UnicodeError, URLError, HTTPError, TimeoutError, OSError):
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Llama 3.1 8B is unavailable. Check the local Ollama service.'}, ensure_ascii=False)}\n\n"
         except Exception:
             yield f"data: {json.dumps({'type': 'error', 'message': 'The chatbot response could not be saved.'}, ensure_ascii=False)}\n\n"
 
@@ -197,3 +266,97 @@ def chat(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )
+
+
+@router.get("/conversations")
+def conversations(actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    _require_student(actor)
+    rows = session.scalars(
+        select(StudentAIConversation)
+        .where(StudentAIConversation.user_id == actor.id)
+        .order_by(StudentAIConversation.updated_at.desc(), StudentAIConversation.id.desc())
+    ).all()
+    result = []
+    for conversation in rows:
+        count = session.scalar(
+            select(func.count(StudentAIMessage.id)).where(StudentAIMessage.conversation_id == conversation.id)
+        )
+        result.append(_conversation_out(conversation, int(count or 0)))
+    return result
+
+
+@router.post("/conversations", status_code=201)
+def create_conversation(
+    payload: ConversationWrite,
+    request: Request,
+    actor: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    _require_student(actor)
+    validate_mutating_origin(request)
+    return _conversation_out(_create_conversation(session, actor, payload.title))
+
+
+@router.get("/conversations/{conversation_id}")
+def conversation_detail(
+    conversation_id: int,
+    actor: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    _require_student(actor)
+    conversation = _conversation_for_actor(session, actor, conversation_id)
+    return {
+        "conversation": _conversation_out(conversation),
+        "messages": [_message_out(row) for row in _conversation_messages(session, conversation.id)],
+    }
+
+
+@router.delete("/conversations/{conversation_id}", status_code=204)
+def delete_conversation(
+    conversation_id: int,
+    request: Request,
+    actor: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+) -> None:
+    _require_student(actor)
+    validate_mutating_origin(request)
+    conversation = _conversation_for_actor(session, actor, conversation_id)
+    session.execute(delete(StudentAIMessage).where(StudentAIMessage.conversation_id == conversation.id))
+    session.delete(conversation)
+    session.commit()
+
+
+@router.post("/conversations/{conversation_id}/messages", status_code=200)
+def conversation_chat(
+    conversation_id: int,
+    payload: MessageWrite,
+    request: Request,
+    actor: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    _require_student(actor)
+    validate_mutating_origin(request)
+    conversation = _conversation_for_actor(session, actor, conversation_id)
+    return _stream_chat(payload, actor, conversation, _recent_rows(session, conversation.id))
+
+
+@router.get("")
+def history(actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    _require_student(actor)
+    conversation = _latest_conversation(session, actor)
+    if conversation is None:
+        return []
+    return [_message_out(row) for row in _conversation_messages(session, conversation.id)]
+
+
+@router.post("", status_code=200)
+def chat(
+    payload: MessageWrite,
+    request: Request,
+    actor: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    _require_student(actor)
+    validate_mutating_origin(request)
+    conversation = _latest_conversation(session, actor) or _create_conversation(session, actor)
+    return _stream_chat(payload, actor, conversation, _recent_rows(session, conversation.id))

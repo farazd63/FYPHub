@@ -1,0 +1,970 @@
+/* Keep the quick assistant independent from the dashboard flex row. */
+.student-body > .group-ai-floating-panel {
+  position: fixed !important;
+  top: max(4.75rem, env(safe-area-inset-top)) !important;
+  right: max(1rem, env(safe-area-inset-right)) !important;
+  bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+  left: auto !important;
+  z-index: 90;
+  flex: none !important;
+  width: min(520px, calc(100vw - 2rem)) !important;
+  height: auto !important;
+  max-height: calc(100dvh - 5.75rem) !important;
+  min-width: 0;
+  margin: 0 !important;
+}
+
+.group-ai-floating-panel .group-ai-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.group-ai-floating-panel .group-ai-history,
+.group-ai-floating-panel .group-ai-conversation {
+  min-width: 0;
+}
+
+.group-ai-floating-panel .group-ai-alert {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.group-ai-floating-panel .group-ai-alert button {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* The dedicated page is a viewport workspace: only messages should scroll. */
+.student-shell:has(.group-ai-page) .student-content {
+  min-width: 0;
+  overflow: hidden !important;
+}
+
+.student-shell:has(.group-ai-page) .student-content__inner {
+  min-width: 0;
+  min-height: 0;
+}
+
+.group-ai-page {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.group-ai-page > .group-ai-heading,
+.group-ai-page > .group-ai-alert {
+  flex: 0 0 auto;
+}
+
+.group-ai-page > .group-ai-heading {
+  margin-bottom: 0.75rem;
+}
+
+.group-ai-page > .group-ai-alert {
+  margin-bottom: 0.75rem;
+}
+
+.group-ai-page > .group-ai-workspace {
+  display: grid;
+  grid-template-columns: minmax(190px, 14.75rem) minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.group-ai-page .group-ai-history,
+.group-ai-page .group-ai-conversation {
+  height: 100%;
+  min-height: 0;
+}
+
+.group-ai-page .group-ai-conversation {
+  display: flex;
+  max-height: none;
+  flex-direction: column;
+}
+
+.group-ai-page .group-ai-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.group-ai-page .group-ai-prompts,
+.group-ai-page .group-ai-composer {
+  flex: 0 0 auto;
+}
+
+.group-ai-page .group-ai-prompts {
+  max-height: 6.5rem;
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .student-body > .group-ai-floating-panel {
+    right: 0.75rem !important;
+    width: min(480px, calc(100vw - 1.5rem)) !important;
+  }
+
+  .group-ai-floating-panel .group-ai-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .student-body > .group-ai-floating-panel {
+    top: 4rem !important;
+    right: 0.5rem !important;
+    bottom: 0.5rem !important;
+    width: calc(100vw - 1rem) !important;
+    max-height: calc(100dvh - 4.5rem) !important;
+    border-radius: 14px;
+  }
+
+  .group-ai-floating-panel .group-ai-workspace {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .group-ai-floating-panel .group-ai-history {
+    flex: 0 0 auto;
+    max-height: 10.5rem;
+    border-right: 0;
+    border-bottom: 1px solid #e7edf5;
+  }
+
+  .group-ai-floating-panel .group-ai-history__list {
+    max-height: 5.25rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 767px) {
+  .student-shell:has(.group-ai-page) .student-content {
+    padding: 0.75rem !important;
+  }
+
+  .group-ai-page > .group-ai-workspace {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .group-ai-page .group-ai-history {
+    height: auto;
+    max-height: 10rem;
+    flex: 0 0 auto;
+  }
+
+  .group-ai-page .group-ai-history__list {
+    max-height: 5rem;
+    overflow-y: auto;
+  }
+
+  .group-ai-page .group-ai-conversation {
+    flex: 1 1 auto;
+  }
+}
+
+/* Dense conversation treatment: keep the message canvas dominant and make
+   the surrounding chrome compact, closer to a focused chat workspace. */
+.group-ai-page .group-ai-card__header,
+.group-ai-floating-panel .group-ai-card__header {
+  min-height: 54px;
+  padding: 8px 14px;
+}
+
+.group-ai-page .group-ai-card__identity,
+.group-ai-floating-panel .group-ai-card__identity {
+  gap: 9px;
+}
+
+.group-ai-page .group-ai-card__avatar,
+.group-ai-floating-panel .group-ai-card__avatar {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+  font-size: 10px;
+}
+
+.group-ai-page .group-ai-card__header h2,
+.group-ai-floating-panel .group-ai-card__header h2 {
+  font-size: 14px;
+}
+
+.group-ai-page .group-ai-card__header p,
+.group-ai-floating-panel .group-ai-card__header p {
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.group-ai-page .group-ai-messages,
+.group-ai-floating-panel .group-ai-messages {
+  align-content: start;
+  gap: 6px;
+  padding: 12px 14px;
+  scrollbar-width: thin;
+}
+
+.group-ai-page .group-ai-message,
+.group-ai-floating-panel .group-ai-message {
+  max-width: min(82%, 680px);
+  border-radius: 12px 12px 12px 4px;
+  padding: 8px 10px;
+  box-shadow: none;
+}
+
+.group-ai-page .group-ai-message--user,
+.group-ai-floating-panel .group-ai-message--user {
+  border-radius: 12px 12px 4px 12px;
+}
+
+.group-ai-page .group-ai-message__meta,
+.group-ai-floating-panel .group-ai-message__meta {
+  gap: 7px;
+  font-size: 10px;
+}
+
+.group-ai-page .group-ai-message__meta time,
+.group-ai-floating-panel .group-ai-message__meta time {
+  font-size: 9px;
+}
+
+.group-ai-page .group-ai-message p,
+.group-ai-floating-panel .group-ai-message p {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.group-ai-page .group-ai-prompts,
+.group-ai-floating-panel .group-ai-prompts {
+  max-height: 58px;
+  gap: 5px;
+  padding: 7px 12px;
+}
+
+.group-ai-page .group-ai-prompts button,
+.group-ai-floating-panel .group-ai-prompts button {
+  padding: 5px 8px;
+  font-size: 10px;
+}
+
+.group-ai-page .group-ai-composer,
+.group-ai-floating-panel .group-ai-composer {
+  padding: 8px 12px 10px;
+}
+
+.group-ai-page .group-ai-composer textarea,
+.group-ai-floating-panel .group-ai-composer textarea {
+  min-height: 48px;
+  max-height: 88px;
+  border-radius: 11px;
+  padding: 9px 11px;
+  font-size: 12px;
+}
+
+.group-ai-page .group-ai-composer > div,
+.group-ai-floating-panel .group-ai-composer > div {
+  margin-top: 6px;
+}
+
+.group-ai-page .group-ai-composer span,
+.group-ai-floating-panel .group-ai-composer span {
+  font-size: 10px;
+}
+
+.group-ai-page .group-ai-composer button,
+.group-ai-floating-panel .group-ai-composer button {
+  min-height: 32px;
+  padding: 7px 11px;
+  font-size: 11px;
+}
+
+.group-ai-page .group-ai-stop-button,
+.group-ai-floating-panel .group-ai-stop-button {
+  min-width: 76px;
+}
+
+.group-ai-floating-panel__header {
+  min-height: 60px;
+  padding: 8px 14px;
+}
+
+.group-ai-floating-panel__avatar {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  font-size: 10px;
+}
+
+@media (max-width: 767px) {
+  .group-ai-page .group-ai-messages,
+  .group-ai-floating-panel .group-ai-messages {
+    padding: 10px;
+  }
+
+  .group-ai-page .group-ai-message,
+  .group-ai-floating-panel .group-ai-message {
+    max-width: 94%;
+  }
+}
+
+/* Compact history rail: the collapsed state is an icon rail, not a clipped panel. */
+.group-ai-history--collapsed {
+  align-items: center !important;
+  flex-basis: 60px !important;
+  width: 60px !important;
+  min-width: 60px !important;
+  border-right: 1px solid #e7edf5 !important;
+  border-radius: 0 !important;
+  background: var(--fy-surface-2) !important;
+}
+
+.group-ai-history--collapsed .group-ai-history__header {
+  width: 100%;
+  min-height: 60px;
+  justify-content: center !important;
+  border-bottom: 0 !important;
+  padding: 8px !important;
+}
+
+.group-ai-history--collapsed .group-ai-history__header > div:first-child {
+  display: none;
+}
+
+.group-ai-history--collapsed .group-ai-history__actions {
+  width: 100%;
+  justify-content: center;
+}
+
+.group-ai-history--collapsed .group-ai-history__toggle {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--fy-border);
+  border-radius: 11px;
+  background: var(--fy-surface);
+  color: var(--fy-brand);
+  box-shadow: var(--fy-shadow-sm);
+  transform: none;
+}
+
+.group-ai-history__rail {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 14px 8px;
+}
+
+.group-ai-history__rail-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--fy-border);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--fy-text-secondary);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.group-ai-history__rail-button svg {
+  width: 19px;
+  height: 19px;
+}
+
+.group-ai-history__rail-button:hover {
+  border-color: var(--fy-brand);
+  background: var(--fy-brand-soft);
+  color: var(--fy-brand);
+  transform: translateY(-1px);
+}
+
+.group-ai-history__rail-button.is-active {
+  border-color: var(--fy-brand);
+  background: var(--fy-brand);
+  color: var(--fy-text-on-brand);
+  box-shadow: var(--fy-shadow-sm);
+}
+
+.group-ai-workspace:has(.group-ai-history--collapsed),
+.group-ai-page > .group-ai-workspace:has(.group-ai-history--collapsed) {
+  grid-template-columns: 60px minmax(0, 1fr) !important;
+}
+
+/* Full chat workspace: match the collaboration screen with a real header,
+   an expanded message canvas, and a composer anchored to the bottom. */
+.group-ai-page {
+  box-sizing: border-box;
+  border: 1px solid #d8e2ee;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgb(35 63 103 / 0.08);
+}
+
+.group-ai-heading {
+  min-height: 76px;
+  align-items: center;
+  margin: -1px -1px 0 !important;
+  border-bottom: 1px solid #e2e9f2;
+  background: #fff;
+  padding: 13px 20px;
+}
+
+.group-ai-heading__identity,
+.group-ai-card__identity,
+.group-ai-floating-panel__identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.group-ai-heading__identity > div,
+.group-ai-card__identity > div,
+.group-ai-floating-panel__identity > div {
+  min-width: 0;
+}
+
+.group-ai-heading__avatar,
+.group-ai-card__avatar,
+.group-ai-floating-panel__avatar {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  place-items: center;
+  border: 1px solid #cbdcf5;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #eaf3ff, #dce9ff);
+  color: #315d9f;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.group-ai-heading h1 {
+  overflow: hidden;
+  color: #183047;
+  font-size: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-ai-heading p:last-child {
+  margin: 2px 0 0;
+  color: #6c8099;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.group-ai-page > .group-ai-workspace {
+  display: grid;
+  grid-template-columns: minmax(220px, 248px) minmax(0, 1fr);
+  height: auto;
+  flex: 1 1 0%;
+  min-height: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.group-ai-page .group-ai-history,
+.group-ai-page .group-ai-conversation {
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.group-ai-page .group-ai-history {
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0 0 0 16px;
+  background: #fbfcff;
+}
+
+.group-ai-page .group-ai-conversation {
+  border: 0;
+}
+
+.group-ai-page .group-ai-card__header {
+  min-height: 70px;
+  align-items: center;
+  padding: 12px 20px;
+}
+
+.group-ai-page .group-ai-card__header h2 {
+  color: #183047;
+  font-size: 17px;
+}
+
+.group-ai-page .group-ai-messages {
+  flex: 1 1 0%;
+  min-height: 0;
+  max-height: none;
+  background: #f8fbff;
+  padding: 24px;
+}
+
+.group-ai-page .group-ai-message {
+  border-color: #d8e2ee;
+  border-radius: 16px 16px 16px 5px;
+  box-shadow: 0 3px 12px rgb(35 63 103 / 0.06);
+}
+
+.group-ai-page .group-ai-message--user {
+  border-color: #c9daf7;
+  border-radius: 16px 16px 5px 16px;
+  background: #edf5ff;
+}
+
+.group-ai-page .group-ai-prompts {
+  max-height: 104px;
+  overflow-y: auto;
+  background: #fff;
+  padding: 12px 20px;
+}
+
+.group-ai-page .group-ai-composer {
+  background: #fff;
+  padding: 12px 20px 14px;
+}
+
+.group-ai-page .group-ai-composer textarea {
+  min-height: 62px;
+  max-height: 118px;
+  resize: none;
+  border-color: #d8e2ee;
+  border-radius: 15px;
+  background: #f8fbff;
+  padding: 13px 15px;
+}
+
+.group-ai-composer .group-ai-stop-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 94px;
+  border: 1px solid color-mix(in srgb, var(--fy-danger) 50%, var(--fy-border));
+  background: var(--fy-danger-soft);
+  color: var(--fy-danger);
+  box-shadow: none;
+}
+
+.group-ai-composer .group-ai-stop-button:hover {
+  border-color: var(--fy-danger);
+  background: color-mix(in srgb, var(--fy-danger) 16%, var(--fy-danger-soft));
+  color: var(--fy-danger);
+}
+
+.group-ai-composer .group-ai-stop-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fy-danger) 25%, transparent);
+}
+
+/* The quick assistant opens as the same full workspace on every student
+   portal page, instead of a narrow floating card on the right. */
+.student-body > .group-ai-floating-panel {
+  position: fixed !important;
+  inset: 4rem 0 0 !important;
+  width: auto !important;
+  height: auto !important;
+  max-height: none !important;
+  border: 0;
+  border-radius: 0;
+  box-shadow: 0 14px 40px rgb(35 63 103 / 0.14);
+}
+
+.group-ai-floating-panel__header {
+  min-height: 76px;
+  align-items: center;
+  padding: 13px 20px;
+}
+
+.group-ai-floating-panel__avatar {
+  width: 46px;
+  height: 46px;
+  flex-basis: 46px;
+}
+
+.group-ai-floating-panel .group-ai-workspace {
+  display: grid;
+  grid-template-columns: minmax(220px, 248px) minmax(0, 1fr);
+  height: auto;
+  min-height: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.group-ai-floating-panel .group-ai-history,
+.group-ai-floating-panel .group-ai-conversation {
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.group-ai-floating-panel .group-ai-history {
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-right: 1px solid #e2e9f2;
+  background: #fbfcff;
+}
+
+.group-ai-floating-panel .group-ai-conversation {
+  border: 0;
+}
+
+.group-ai-floating-panel .group-ai-messages {
+  flex: 1 1 0%;
+  min-height: 0;
+  max-height: none;
+  background: #f8fbff;
+  padding: 24px;
+}
+
+.group-ai-floating-panel .group-ai-composer {
+  padding: 12px 20px 14px;
+}
+
+@media (max-width: 767px) {
+  .group-ai-heading,
+  .group-ai-floating-panel__header {
+    padding-inline: 14px;
+  }
+
+  .group-ai-page > .group-ai-workspace,
+  .group-ai-floating-panel .group-ai-workspace {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .group-ai-page .group-ai-history,
+  .group-ai-floating-panel .group-ai-history {
+    height: auto;
+    max-height: 10rem;
+    flex: 0 0 auto;
+    border-right: 0;
+    border-bottom: 1px solid #e2e9f2;
+    border-radius: 0;
+  }
+
+  .group-ai-page .group-ai-conversation,
+  .group-ai-floating-panel .group-ai-conversation {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .group-ai-page .group-ai-messages,
+  .group-ai-floating-panel .group-ai-messages {
+    padding: 14px;
+  }
+}
+
+/* Final density pass: this follows the legacy visual overrides above so the
+   chat canvas stays large while its chrome and bubbles remain compact. */
+.group-ai-page .group-ai-card__header,
+.group-ai-floating-panel .group-ai-card__header {
+  min-height: 54px;
+  padding: 8px 14px;
+}
+
+.group-ai-page .group-ai-card__avatar,
+.group-ai-floating-panel .group-ai-card__avatar {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+  font-size: 10px;
+}
+
+.group-ai-page .group-ai-card__header h2,
+.group-ai-floating-panel .group-ai-card__header h2 {
+  font-size: 14px;
+}
+
+.group-ai-page .group-ai-card__header p,
+.group-ai-floating-panel .group-ai-card__header p {
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.group-ai-page .group-ai-messages,
+.group-ai-floating-panel .group-ai-messages {
+  align-content: start;
+  gap: 6px;
+  padding: 12px 14px;
+  scrollbar-width: thin;
+}
+
+.group-ai-page .group-ai-message,
+.group-ai-floating-panel .group-ai-message {
+  max-width: min(82%, 680px);
+  border-radius: 12px 12px 12px 4px;
+  padding: 8px 10px;
+  box-shadow: none;
+}
+
+.group-ai-page .group-ai-message--user,
+.group-ai-floating-panel .group-ai-message--user {
+  border-radius: 12px 12px 4px 12px;
+}
+
+.group-ai-page .group-ai-message__meta,
+.group-ai-floating-panel .group-ai-message__meta {
+  gap: 7px;
+  font-size: 10px;
+}
+
+.group-ai-page .group-ai-message__meta time,
+.group-ai-floating-panel .group-ai-message__meta time {
+  font-size: 9px;
+}
+
+.group-ai-page .group-ai-message p,
+.group-ai-floating-panel .group-ai-message p {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.group-ai-page .group-ai-prompts,
+.group-ai-floating-panel .group-ai-prompts {
+  max-height: 58px;
+  gap: 5px;
+  padding: 7px 12px;
+}
+
+.group-ai-page .group-ai-prompts button,
+.group-ai-floating-panel .group-ai-prompts button {
+  padding: 5px 8px;
+  font-size: 10px;
+}
+
+.group-ai-page .group-ai-composer,
+.group-ai-floating-panel .group-ai-composer {
+  padding: 8px 12px 10px;
+}
+
+.group-ai-page .group-ai-composer textarea,
+.group-ai-floating-panel .group-ai-composer textarea {
+  min-height: 48px;
+  max-height: 88px;
+  border-radius: 11px;
+  padding: 9px 11px;
+  font-size: 12px;
+}
+
+.group-ai-page .group-ai-composer > div,
+.group-ai-floating-panel .group-ai-composer > div {
+  margin-top: 6px;
+}
+
+.group-ai-page .group-ai-composer span,
+.group-ai-floating-panel .group-ai-composer span {
+  font-size: 10px;
+}
+
+.group-ai-page .group-ai-composer button,
+.group-ai-floating-panel .group-ai-composer button {
+  min-height: 32px;
+  padding: 7px 11px;
+  font-size: 11px;
+}
+
+.group-ai-page .group-ai-stop-button,
+.group-ai-floating-panel .group-ai-stop-button {
+  min-width: 76px;
+}
+
+.group-ai-floating-panel__header {
+  min-height: 60px;
+  padding: 8px 14px;
+}
+
+.group-ai-floating-panel__avatar {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  font-size: 10px;
+}
+
+@media (max-width: 767px) {
+  .group-ai-page .group-ai-messages,
+  .group-ai-floating-panel .group-ai-messages {
+    padding: 10px;
+  }
+
+  .group-ai-page .group-ai-message,
+  .group-ai-floating-panel .group-ai-message {
+    max-width: 94%;
+  }
+}
+
+/* Compact bottom composer: keep the input usable without consuming the page. */
+.student-shell:has(.group-ai-page) .student-content__inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.group-ai-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.group-ai-page > .group-ai-workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.group-ai-page .group-ai-prompts {
+  max-height: 52px;
+  min-height: 0;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 7px 12px;
+}
+
+.group-ai-page .group-ai-prompts button {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.group-ai-page .group-ai-composer {
+  flex: 0 0 auto;
+  padding: 8px 12px 9px;
+}
+
+.group-ai-page .group-ai-composer textarea {
+  height: 48px;
+  min-height: 48px;
+  max-height: 48px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.group-ai-page .group-ai-composer > div {
+  margin-top: 5px;
+}
+
+.group-ai-page .group-ai-composer span {
+  font-size: 10px;
+}
+
+.group-ai-page .group-ai-composer button {
+  padding: 7px 11px;
+  font-size: 11px;
+}
+
+/* Keep the minimized history rail compact after the full-workspace rules. */
+.group-ai-history--collapsed {
+  flex-basis: 88px !important;
+  width: 88px !important;
+  min-width: 88px !important;
+  border-right: 1px solid #e7edf5 !important;
+  border-radius: 0 !important;
+}
+
+.group-ai-history--collapsed .group-ai-history__header {
+  min-height: 88px;
+  padding: 12px !important;
+}
+
+.group-ai-history--collapsed .group-ai-history__toggle {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  transform: none;
+}
+
+.group-ai-workspace:has(.group-ai-history--collapsed),
+.group-ai-page > .group-ai-workspace:has(.group-ai-history--collapsed) {
+  grid-template-columns: 88px minmax(0, 1fr) !important;
+}
+
+/* Each saved chat keeps its own delete action without nesting buttons. */
+.group-ai-history__item-row {
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.group-ai-history__item-row .group-ai-history__item {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.group-ai-history__delete {
+  display: grid;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  align-self: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #8291a5;
+  padding: 0;
+}
+
+.group-ai-history__delete:hover:not(:disabled),
+.group-ai-history__delete:focus-visible {
+  border-color: #f0c5c5;
+  background: #fff1f1;
+  color: #bd4141;
+}
+
+.group-ai-history__delete:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+/* Keep the floating assistant header on the active theme surface. The base
+   chatbot stylesheet uses a white header, which leaked into the dark portal. */
+html[data-theme="dark"] .group-ai-floating-panel__header {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel__header h2 {
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel__header p,
+html[data-theme="dark"] .group-ai-floating-panel__eyebrow {
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel__avatar {
+  border-color: var(--noir-border-strong) !important;
+  background: var(--noir-surface-hover) !important;
+  color: var(--noir-accent) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel__close {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface) !important;
+  color: var(--noir-text-secondary) !important;
+}

@@ -341,46 +341,277 @@ html[data-theme="dark"] :where(
   color-scheme: dark;
 }
 
-/* Buttons: neutral controls are charcoal; primary actions use the brand only. */
+/* Buttons: every action has a visible base, semantic color, hover lift, and
+   keyboard focus ring. Legacy buttons are classified by their existing
+   utility classes or accessible labels, so routes keep their behavior. */
 html[data-theme="dark"] :where(
-  .admin-shell,
-  .student-shell,
-  .portal-shell,
-  .module3-workspace,
-  .module3-admin-page
-) button:not(.fy-btn--primary):not(.module3-primary-button):not([type="submit"]):not([class*="bg-[#466"]):not([class*="bg-[#176"]):not([class*="bg-[#315"]):not([class*="bg-[#2f"]):not([class*="bg-slate-7"]):not([class*="bg-slate-8"]):not([class*="bg-red-"]) {
-  border-color: var(--noir-border) !important;
+  .admin-shell button,
+  .student-shell button,
+  .portal-shell button,
+  .module3-workspace button,
+  .module3-admin-page button,
+  .auth-stage button,
+  .welcome-landing button,
+  .fy-btn,
+  .fy-icon-btn
+) {
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell button,
+  .student-shell button,
+  .portal-shell button,
+  .module3-workspace button,
+  .module3-admin-page button
+):not(.fy-btn):not(.fy-icon-btn):not(.student-sidebar__overlay):not(.student-sidebar__item):not(.role-sidebar__menu-section-head):not(.role-sidebar__rail-item):not(.role-sidebar__collapse):not(.admin-sidebar-toggle):not(.student-sidebar__collapse):not(.student-sidebar__close):not(.admin-drawer-close):not(.fy-theme-toggle):not([type="submit"]):not([class*="bg-"]):not([class*="module3-"]) {
+  border: 1px solid var(--noir-border) !important;
+  border-radius: var(--fy-radius-control) !important;
   background: var(--noir-surface-raised) !important;
   color: var(--noir-text-primary) !important;
 }
 
 html[data-theme="dark"] :where(
+  .admin-shell button,
+  .student-shell button,
+  .portal-shell button,
+  .module3-workspace button,
+  .module3-admin-page button,
+  .fy-btn,
+  .fy-icon-btn
+):not(:disabled):not(.student-sidebar__overlay):not(.student-sidebar__item):not(.role-sidebar__menu-section-head):not(.role-sidebar__rail-item):not(.role-sidebar__collapse):not(.admin-sidebar-toggle):not(.student-sidebar__collapse):not(.student-sidebar__close):not(.admin-drawer-close):not(.fy-theme-toggle):hover {
+  border-color: color-mix(in srgb, var(--noir-accent) 60%, var(--noir-border)) !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--noir-accent) 13%, transparent) !important;
+  transform: translateY(-1px);
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell button,
+  .student-shell button,
+  .portal-shell button,
+  .module3-workspace button,
+  .module3-admin-page button,
+  .fy-btn,
+  .fy-icon-btn
+):not(:disabled):active {
+  transform: translateY(0) !important;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--noir-accent) 12%, transparent) !important;
+}
+
+/* Neutral and secondary actions. Icon buttons stay visibly circular and no
+   longer get flattened by the generic legacy-button rule. */
+html[data-theme="dark"] :where(
+  .fy-btn--secondary,
+  .fy-icon-btn--secondary,
+  .fy-icon-btn--ghost,
+  .module3-secondary-button,
+  .module3-close-button,
+  .coordinator-document-button
+) {
+  border: 1px solid var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] .fy-btn--ghost {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-btn--secondary:hover:not(:disabled),
+  .fy-btn--ghost:hover:not(:disabled),
+  .fy-icon-btn--secondary:hover:not(:disabled),
+  .fy-icon-btn--ghost:hover:not(:disabled),
+  .module3-secondary-button:hover:not(:disabled),
+  .module3-close-button:hover:not(:disabled),
+  .coordinator-document-button:hover:not(:disabled)
+) {
+  border-color: var(--noir-accent) !important;
+  background: var(--noir-surface-hover) !important;
+  color: var(--noir-accent) !important;
+}
+
+/* Primary actions use the restrained Noir amber accent. */
+html[data-theme="dark"] :where(
   .fy-btn--primary,
+  .fy-icon-btn--primary,
   button[type="submit"],
   .module3-primary-button,
-  [class*="bg-[#466"],
-  [class*="bg-[#176"],
-  [class*="bg-[#315"],
-  [class*="bg-[#2f"],
-  [class*="bg-slate-7"],
-  [class*="bg-slate-8"]
+  button[class*="bg-fy-brand"],
+  button[class*="bg-[#466"],
+  button[class*="bg-[#176"],
+  button[class*="bg-[#315"],
+  button[class*="bg-[#2f"],
+  button[class*="bg-slate-7"],
+  button[class*="bg-slate-8"],
+  button[class*="bg-[#0077b6"]
 ) {
   border-color: transparent !important;
   background: var(--noir-accent) !important;
   color: var(--fy-text-on-brand) !important;
-  box-shadow: none !important;
 }
 
 html[data-theme="dark"] :where(
   .fy-btn--primary:hover:not(:disabled),
+  .fy-icon-btn--primary:hover:not(:disabled),
   button[type="submit"]:hover:not(:disabled),
   .module3-primary-button:hover:not(:disabled),
-  [class*="bg-[#466"]:hover:not(:disabled),
-  [class*="bg-[#176"]:hover:not(:disabled),
-  [class*="bg-[#315"]:hover:not(:disabled)
+  button[class*="bg-fy-brand"]:hover:not(:disabled),
+  button[class*="bg-[#466"]:hover:not(:disabled),
+  button[class*="bg-[#176"]:hover:not(:disabled),
+  button[class*="bg-[#315"]:hover:not(:disabled),
+  button[class*="bg-[#2f"]:hover:not(:disabled),
+  button[class*="bg-slate-7"]:hover:not(:disabled),
+  button[class*="bg-slate-8"]:hover:not(:disabled),
+  button[class*="bg-[#0077b6"]:hover:not(:disabled)
 ) {
+  border-color: transparent !important;
   background: var(--noir-accent-hover) !important;
   color: var(--fy-text-on-brand) !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--noir-accent) 22%, transparent) !important;
+}
+
+/* Semantic action colors for explicit variants and existing utility classes. */
+html[data-theme="dark"] :where(
+  .fy-btn--danger,
+  .fy-icon-btn--danger,
+  button[class*="bg-red-"],
+  button[aria-label*="delete" i],
+  button[aria-label*="remove" i],
+  button[aria-label*="reject" i],
+  button[aria-label*="revoke" i]
+) {
+  border-color: color-mix(in srgb, var(--noir-danger) 45%, var(--noir-border)) !important;
+  background: var(--fy-danger-soft) !important;
+  color: var(--noir-danger) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-btn--danger:hover:not(:disabled),
+  .fy-icon-btn--danger:hover:not(:disabled),
+  button[class*="bg-red-"]:hover:not(:disabled),
+  button[aria-label*="delete" i]:hover:not(:disabled),
+  button[aria-label*="remove" i]:hover:not(:disabled),
+  button[aria-label*="reject" i]:hover:not(:disabled),
+  button[aria-label*="revoke" i]:hover:not(:disabled)
+) {
+  border-color: var(--noir-danger) !important;
+  background: color-mix(in srgb, var(--noir-danger) 18%, var(--noir-danger-soft)) !important;
+  color: var(--noir-danger) !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--noir-danger) 18%, transparent) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-btn--success,
+  .fy-icon-btn--success,
+  button[class*="bg-emerald-"],
+  button[class*="bg-green-"],
+  button[aria-label*="approve" i],
+  button[aria-label*="accept" i],
+  button[aria-label*="verify" i],
+  button[aria-label*="publish" i],
+  button[aria-label*="confirm" i]
+) {
+  border-color: color-mix(in srgb, var(--noir-success) 45%, var(--noir-border)) !important;
+  background: var(--fy-success-soft) !important;
+  color: var(--noir-success) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-btn--success:hover:not(:disabled),
+  .fy-icon-btn--success:hover:not(:disabled),
+  button[class*="bg-emerald-"]:hover:not(:disabled),
+  button[class*="bg-green-"]:hover:not(:disabled),
+  button[aria-label*="approve" i]:hover:not(:disabled),
+  button[aria-label*="accept" i]:hover:not(:disabled),
+  button[aria-label*="verify" i]:hover:not(:disabled),
+  button[aria-label*="publish" i]:hover:not(:disabled),
+  button[aria-label*="confirm" i]:hover:not(:disabled)
+) {
+  border-color: var(--noir-success) !important;
+  background: color-mix(in srgb, var(--noir-success) 18%, var(--noir-success-soft)) !important;
+  color: var(--noir-success) !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--noir-success) 17%, transparent) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-btn--warning,
+  .fy-icon-btn--warning,
+  button[class*="bg-amber-"],
+  button[class*="bg-yellow-"],
+  button[aria-label*="archive" i],
+  button[aria-label*="changes" i],
+  button[aria-label*="replace" i],
+  button[aria-label*="resubmit" i]
+) {
+  border-color: color-mix(in srgb, var(--noir-warning) 45%, var(--noir-border)) !important;
+  background: var(--fy-warning-soft) !important;
+  color: var(--noir-warning) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-btn--warning:hover:not(:disabled),
+  .fy-icon-btn--warning:hover:not(:disabled),
+  button[class*="bg-amber-"]:hover:not(:disabled),
+  button[class*="bg-yellow-"]:hover:not(:disabled),
+  button[aria-label*="archive" i]:hover:not(:disabled),
+  button[aria-label*="changes" i]:hover:not(:disabled),
+  button[aria-label*="replace" i]:hover:not(:disabled),
+  button[aria-label*="resubmit" i]:hover:not(:disabled)
+) {
+  border-color: var(--noir-warning) !important;
+  background: color-mix(in srgb, var(--noir-warning) 18%, var(--noir-warning-soft)) !important;
+  color: var(--noir-warning) !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--noir-warning) 18%, transparent) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-btn--info,
+  .fy-icon-btn--info,
+  button[class*="bg-blue-"],
+  button[class*="bg-violet-"],
+  button[class*="bg-cyan-"],
+  button[aria-label*="edit" i],
+  button[aria-label*="view" i],
+  button[aria-label*="open" i],
+  button[aria-label*="refresh" i]
+) {
+  border-color: color-mix(in srgb, var(--noir-info) 45%, var(--noir-border)) !important;
+  background: var(--fy-info-soft) !important;
+  color: var(--noir-info) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-btn--info:hover:not(:disabled),
+  .fy-icon-btn--info:hover:not(:disabled),
+  button[class*="bg-blue-"]:hover:not(:disabled),
+  button[class*="bg-violet-"]:hover:not(:disabled),
+  button[class*="bg-cyan-"]:hover:not(:disabled),
+  button[aria-label*="edit" i]:hover:not(:disabled),
+  button[aria-label*="view" i]:hover:not(:disabled),
+  button[aria-label*="open" i]:hover:not(:disabled),
+  button[aria-label*="refresh" i]:hover:not(:disabled)
+) {
+  border-color: var(--noir-info) !important;
+  background: color-mix(in srgb, var(--noir-info) 18%, var(--noir-info-soft)) !important;
+  color: var(--noir-info) !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--noir-info) 17%, transparent) !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell button:focus-visible,
+  .student-shell button:focus-visible,
+  .portal-shell button:focus-visible,
+  .module3-workspace button:focus-visible,
+  .module3-admin-page button:focus-visible,
+  .auth-stage button:focus-visible,
+  .welcome-landing button:focus-visible
+) {
+  outline: none !important;
+  border-color: var(--noir-accent) !important;
+  box-shadow: var(--fy-focus-ring) !important;
 }
 
 html[data-theme="dark"] :where(
@@ -745,9 +976,455 @@ html[data-theme="dark"] :where(
   scrollbar-color: var(--noir-border) transparent;
 }
 
+/* Compact document upload control: keep it beside details on wide cards and
+   move it below them on narrow cards so it never overlaps the copy. */
+html[data-theme="dark"] .student-document-row {
+  align-items: flex-start;
+}
+
+html[data-theme="dark"] .student-document-upload {
+  width: min(100%, 12rem);
+  min-width: 0;
+  flex: 0 1 12rem;
+}
+
+html[data-theme="dark"] .student-document-upload .fy-file-upload__trigger {
+  min-height: 6rem;
+  box-sizing: border-box;
+  gap: 0.4rem;
+  padding: 0.75rem 0.65rem;
+}
+
+html[data-theme="dark"] .student-document-upload .fy-file-upload__label {
+  max-width: 100%;
+  font-size: 0.82rem;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+html[data-theme="dark"] .student-document-upload .fy-file-upload__hint {
+  font-size: 0.7rem;
+}
+
+@media (max-width: 720px) {
+  html[data-theme="dark"] .student-document-row {
+    flex-direction: column;
+  }
+
+  html[data-theme="dark"] .student-document-upload {
+    align-self: flex-start;
+    width: min(100%, 12rem);
+    flex-basis: auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html[data-theme="dark"] * {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Chat stays beside the current student page instead of turning the page into
+   an inaccessible blurred modal backdrop. Keep the companion panel in the
+   same layered Noir surfaces as the rest of the portal. */
+html[data-theme="dark"] .group-ai-floating-panel {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface) !important;
+  box-shadow: var(--fy-shadow-nav) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel__header,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-history {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+}
+
+html[data-theme="dark"] .group-ai-history__toggle {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] .group-ai-history__toggle:hover {
+  border-color: var(--noir-accent) !important;
+  background: var(--noir-surface-hover) !important;
+  color: var(--noir-accent) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel__header h2,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-card h2,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-history__header strong,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-history__item strong {
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel__header p,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-card__header p,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-history__item span {
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-messages {
+  background: var(--noir-bg) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-message {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-message--user {
+  border-color: color-mix(in srgb, var(--noir-accent) 42%, var(--noir-border)) !important;
+  background: color-mix(in srgb, var(--noir-accent) 12%, var(--noir-surface-raised)) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-message__meta,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-message p {
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-message__meta time,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-empty,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-composer span {
+  color: var(--noir-text-muted) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-prompts,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-composer {
+  border-color: var(--noir-border) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-prompts button,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-history__new,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-history__item,
+html[data-theme="dark"] .group-ai-floating-panel__close {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-prompts button:hover,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-history__new:hover,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-history__new.is-active,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-history__item:hover,
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-history__item.is-active,
+html[data-theme="dark"] .group-ai-floating-panel__close:hover {
+  border-color: var(--noir-accent) !important;
+  background: var(--noir-surface-hover) !important;
+  color: var(--noir-accent) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-composer textarea {
+  border-color: var(--noir-input-border) !important;
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] .group-ai-floating-panel .group-ai-composer textarea::placeholder {
+  color: var(--noir-text-muted) !important;
+}
+
+/* The full-page assistant uses the same workspace primitives as the floating
+   assistant. Keep its history rail on the Noir surface stack as well. */
+html[data-theme="dark"] :where(
+  .group-ai-page .group-ai-history,
+  .group-ai-page .group-ai-conversation,
+  .group-ai-page .group-ai-sources
+) {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface) !important;
+  color: var(--noir-text-primary) !important;
+  box-shadow: var(--fy-shadow-md) !important;
+}
+
+html[data-theme="dark"] .group-ai-page .group-ai-history__header,
+html[data-theme="dark"] .group-ai-page .group-ai-card__header {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+}
+
+html[data-theme="dark"] .group-ai-page .group-ai-history__header span,
+html[data-theme="dark"] .group-ai-page .group-ai-history__empty,
+html[data-theme="dark"] .group-ai-page .group-ai-history__item span,
+html[data-theme="dark"] .group-ai-page .group-ai-card__header p,
+html[data-theme="dark"] .group-ai-page .group-ai-sources > p {
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] .group-ai-page .group-ai-history__header strong,
+html[data-theme="dark"] .group-ai-page .group-ai-history__item strong,
+html[data-theme="dark"] .group-ai-page .group-ai-card h2 {
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] .group-ai-page .group-ai-history__new,
+html[data-theme="dark"] .group-ai-page .group-ai-history__item,
+html[data-theme="dark"] .group-ai-page .group-ai-history__toggle {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] .group-ai-page .group-ai-history__new:hover,
+html[data-theme="dark"] .group-ai-page .group-ai-history__new.is-active,
+html[data-theme="dark"] .group-ai-page .group-ai-history__item:hover,
+html[data-theme="dark"] .group-ai-page .group-ai-history__item.is-active,
+html[data-theme="dark"] .group-ai-page .group-ai-history__toggle:hover {
+  border-color: var(--noir-accent) !important;
+  background: var(--noir-surface-hover) !important;
+  color: var(--noir-accent) !important;
+}
+
+/* Required-documents workspace: keep each submission card compact, calm, and
+   scannable. The upload action is a deliberate secondary column instead of
+   competing with the document metadata. */
+.student-documents-dashboard {
+  border-radius: 1.25rem !important;
+  box-shadow: var(--fy-shadow) !important;
+}
+
+.student-documents-dashboard > .mt-4.grid.gap-2 {
+  gap: 0 !important;
+  overflow: hidden;
+  border: 1px solid var(--fy-border) !important;
+  border-radius: 0.9rem;
+  background: var(--fy-surface-2) !important;
+  padding: 0 !important;
+}
+
+.student-documents-dashboard > .mt-4.grid.gap-2 > div {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.9rem 1rem;
+}
+
+.student-documents-dashboard > .mt-4.grid.gap-2 > div + div {
+  border-left: 1px solid var(--fy-border);
+}
+
+.student-documents-dashboard > .mt-4.grid.gap-2 strong {
+  overflow: hidden;
+  color: var(--fy-text) !important;
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-documents-dashboard > .mt-5.grid.gap-5 {
+  gap: 1.5rem !important;
+}
+
+.student-documents-dashboard > .mt-5.grid.gap-5 > section > h3 {
+  margin-bottom: 0.6rem !important;
+  color: var(--fy-text-secondary) !important;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.11em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.student-documents-dashboard > .mt-5.grid.gap-5 > section > div.grid.gap-3 {
+  gap: 0.75rem !important;
+}
+
+.student-documents-dashboard > .mt-5.grid.gap-5 > section > div.grid.gap-3 > article.rounded-xl.border {
+  overflow: hidden;
+  border-color: var(--fy-border) !important;
+  border-radius: 1rem !important;
+  background: var(--fy-surface-2) !important;
+  box-shadow: var(--fy-shadow-sm) !important;
+  padding: 0 !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.student-documents-dashboard > .mt-5.grid.gap-5 > section > div.grid.gap-3 > article.rounded-xl.border:hover {
+  border-color: color-mix(in srgb, var(--fy-brand) 42%, var(--fy-border)) !important;
+  box-shadow: var(--fy-shadow) !important;
+  transform: translateY(-1px);
+}
+
+.student-documents-dashboard .student-document-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(11rem, 13rem);
+  align-items: stretch !important;
+  gap: 0 !important;
+}
+
+.student-documents-dashboard .student-document-row > div.min-w-0 {
+  min-width: 0;
+  padding: 1.15rem 1.25rem;
+}
+
+.student-documents-dashboard .student-document-row h4 {
+  margin: 0;
+  color: var(--fy-text) !important;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.student-documents-dashboard .student-document-row h4 + p {
+  max-width: 58rem;
+  margin-top: 0.4rem !important;
+  color: var(--fy-text-secondary) !important;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.student-documents-dashboard .student-document-row > div.min-w-0 > p.mt-2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 1rem !important;
+  color: var(--fy-text-secondary) !important;
+  font-size: 0.75rem;
+  font-weight: 550;
+}
+
+.student-documents-dashboard .student-document-row > div.min-w-0 > p.mt-1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--fy-text-secondary) !important;
+  font-size: 0.78rem;
+}
+
+.student-documents-dashboard .student-document-row > div.min-w-0 > p.mt-1:last-of-type {
+  color: var(--fy-text-muted) !important;
+  font-size: 0.72rem;
+}
+
+.student-documents-dashboard .student-document-row p.border-l-2 {
+  border-radius: 0.35rem;
+  border-left-width: 3px !important;
+  border-color: var(--fy-warning) !important;
+  background: var(--fy-warning-soft) !important;
+  color: var(--fy-text-secondary) !important;
+  line-height: 1.45;
+}
+
+.student-documents-dashboard .student-document-upload {
+  display: flex;
+  width: auto !important;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0 !important;
+  border-left: 1px solid var(--fy-border) !important;
+  border-radius: 0 !important;
+  background: var(--fy-surface) !important;
+  padding: 0.9rem;
+}
+
+.student-documents-dashboard .student-document-upload .fy-file-upload__trigger {
+  min-height: 7.25rem !important;
+  max-width: 12rem;
+  gap: 0.45rem;
+  border: 1px dashed color-mix(in srgb, var(--fy-brand) 38%, var(--fy-border)) !important;
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--fy-brand) 7%, var(--fy-surface-2)) !important;
+  padding: 1rem 0.75rem !important;
+  color: var(--fy-brand) !important;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.student-documents-dashboard .student-document-upload .fy-file-upload__trigger:hover:not(:disabled),
+.student-documents-dashboard .student-document-upload.fy-file-upload--active .fy-file-upload__trigger {
+  border-color: var(--fy-brand) !important;
+  background: var(--fy-brand-soft) !important;
+  color: var(--fy-brand-hover) !important;
+}
+
+.student-documents-dashboard .student-document-upload .fy-file-upload__label {
+  max-width: 100%;
+  color: inherit !important;
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.student-documents-dashboard .student-document-upload .fy-file-upload__hint {
+  color: var(--fy-text-secondary) !important;
+  font-size: 0.68rem;
+}
+
+.student-documents-dashboard .student-document-row .mt-3.rounded-lg.bg-fy-surface-muted {
+  margin-top: 1rem !important;
+  border: 1px solid var(--fy-border) !important;
+  border-radius: 0.75rem !important;
+  background: var(--fy-surface) !important;
+  padding: 0.75rem !important;
+}
+
+.student-documents-dashboard .student-document-row .mt-3.rounded-lg.bg-fy-surface-muted > p {
+  margin: 0;
+  color: var(--fy-text-secondary) !important;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.student-documents-dashboard .student-document-row .mt-3.rounded-lg.bg-fy-surface-muted > div.mt-2 > div {
+  border-color: var(--fy-border) !important;
+  border-radius: 0.65rem;
+  background: var(--fy-surface-2) !important;
+  padding: 0.65rem 0.75rem;
+}
+
+.student-documents-dashboard .student-document-row .mt-3.rounded-lg.bg-fy-surface-muted > div.mt-2 > div > span:first-child {
+  min-width: 0;
+  flex: 1 1 12rem;
+  color: var(--fy-text) !important;
+  overflow-wrap: anywhere;
+}
+
+.student-documents-dashboard > section.mt-6.rounded-xl {
+  border-color: var(--fy-border) !important;
+  border-radius: 1rem !important;
+  background: var(--fy-surface-2) !important;
+  box-shadow: var(--fy-shadow-sm) !important;
+}
+
+.student-documents-dashboard > section.mt-6.rounded-xl > h3 {
+  color: var(--fy-text) !important;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.student-documents-dashboard > section.mt-6.rounded-xl article {
+  border-color: var(--fy-border) !important;
+  border-radius: 0.75rem;
+  background: var(--fy-surface) !important;
+}
+
+@media (max-width: 760px) {
+  .student-documents-dashboard .student-document-row {
+    grid-template-columns: 1fr;
+  }
+
+  .student-documents-dashboard .student-document-upload {
+    border-top: 1px solid var(--fy-border) !important;
+    border-left: 0 !important;
+    padding: 0.85rem;
+  }
+
+  .student-documents-dashboard .student-document-upload .fy-file-upload__trigger {
+    min-height: 5.5rem !important;
+    max-width: none;
+  }
+
+  .student-documents-dashboard > .mt-4.grid.gap-2 > div + div {
+    border-top: 1px solid var(--fy-border);
+    border-left: 0;
   }
 }

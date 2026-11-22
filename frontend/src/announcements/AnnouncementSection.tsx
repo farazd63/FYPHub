@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./announcements.css";
 
 export type Announcement = {
@@ -54,6 +54,7 @@ const targetLabel = (row: Announcement) => {
 };
 
 const dateLabel = (value: string | null) => value ? new Date(value).toLocaleString() : "Not published";
+const mostRecentUnreadId = (rows: Announcement[]) => rows.filter((row) => !row.is_read).sort((a, b) => new Date(b.published_at ?? b.created_at).getTime() - new Date(a.published_at ?? a.created_at).getTime())[0]?.id ?? null;
 
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) throw new Error("Request failed");
@@ -62,6 +63,8 @@ async function readJson<T>(response: Response): Promise<T> {
 
 export function AnnouncementSection({ api, onManage, showComposer = true, limit = 1 }: Props) {
   const [rows, setRows] = useState<Announcement[]>([]);
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
+  const highlightInitialized = useRef(false);
   const [permissions, setPermissions] = useState<AnnouncementPermissions | null>(null);
   const [selected, setSelected] = useState<Announcement | null>(null);
   const [showAll, setShowAll] = useState(false);
@@ -72,15 +75,22 @@ export function AnnouncementSection({ api, onManage, showComposer = true, limit 
     setState("loading");
     try {
       const [announcementResponse, permissionResponse] = await Promise.all([
-        fetch(`${api}/api/v1/announcements/latest?limit=${Math.max(1, limit)}`, { credentials: "include" }),
+        fetch(`${api}/api/v1/announcements/latest?limit=1`, { credentials: "include" }),
         fetch(`${api}/api/v1/announcements/permissions`, { credentials: "include" }),
       ]);
       const [announcementRows, permissionData] = await Promise.all([
         readJson<Announcement[]>(announcementResponse),
         readJson<AnnouncementPermissions>(permissionResponse),
       ]);
-      setRows(Array.isArray(announcementRows) ? announcementRows : []);
+      const nextRows = Array.isArray(announcementRows) ? announcementRows.slice(0, 1) : [];
+      setRows(nextRows);
+      setHighlightedId((current) => {
+        if (highlightInitialized.current) return current;
+        highlightInitialized.current = true;
+        return mostRecentUnreadId(nextRows);
+      });
       setPermissions(permissionData);
+      setShowAll(false);
       setState("ready");
     } catch {
       setState("error");
@@ -92,6 +102,7 @@ export function AnnouncementSection({ api, onManage, showComposer = true, limit 
   const open = async (row: Announcement) => {
     setSelected(row);
     if (!row.is_read) {
+      setHighlightedId((current) => current === row.id ? null : current);
       try {
         await fetch(`${api}/api/v1/announcements/${row.id}/read`, { method: "POST", credentials: "include" });
         setRows((current) => current.map((item) => item.id === row.id ? { ...item, is_read: true, read_at: new Date().toISOString() } : item));
@@ -103,7 +114,7 @@ export function AnnouncementSection({ api, onManage, showComposer = true, limit 
   };
 
   const toggleAll = async () => {
-    if (showAll) { setShowAll(false); return; }
+    if (showAll) { await load(); return; }
     try {
       const all = await readJson<Announcement[]>(await fetch(`${api}/api/v1/announcements?limit=100`, { credentials: "include" }));
       setRows(Array.isArray(all) ? all : []);
@@ -124,13 +135,22 @@ export function AnnouncementSection({ api, onManage, showComposer = true, limit 
     {state === "loading" && <p className="announcement-section__message">Loading announcements…</p>}
     {state === "error" && <div className="announcement-section__error" role="alert">Announcements could not be loaded. <button type="button" onClick={() => void load()}>Retry</button></div>}
     {state === "ready" && !rows.length && <div className="announcement-section__empty"><strong>No announcements yet.</strong><span>New updates for this dashboard will appear here.</span></div>}
-    {state === "ready" && rows.length > 0 && <div className="announcement-list">{rows.map((row) => <article key={row.id} className={`announcement-card ${row.is_read ? "" : "announcement-card--unread"}`}>
-      <div className="announcement-card__top"><span className={`announcement-priority announcement-priority--${row.priority.toLowerCase()}`}>{roleLabel(row.priority)}</span>{!row.is_read && <span className="announcement-unread">Unread</span>}</div>
-      <h3>{row.title}</h3><p className="announcement-card__preview">{row.message}</p>
-      <div className="announcement-card__meta"><span>{row.author_name} · {roleLabel(row.author_role)}</span><time dateTime={row.published_at ?? row.created_at}>{dateLabel(row.published_at ?? row.created_at)}</time><span>{targetLabel(row)}</span></div>
-      <button type="button" className="announcement-link" onClick={() => void open(row)}>View details <span aria-hidden="true">→</span></button>
-    </article>)}</div>}
-    {selected && <div className="announcement-detail" role="dialog" aria-modal="true" aria-labelledby="announcement-detail-title"><div className="announcement-detail__header"><div><span className={`announcement-priority announcement-priority--${selected.priority.toLowerCase()}`}>{roleLabel(selected.priority)}</span><h3 id="announcement-detail-title">{selected.title}</h3></div><button type="button" className="announcement-detail__close" aria-label="Close announcement details" onClick={() => setSelected(null)}>×</button></div><p className="announcement-detail__message">{selected.message}</p><dl><div><dt>Published by</dt><dd>{selected.author_name} · {roleLabel(selected.author_role)}</dd></div><div><dt>Published</dt><dd>{dateLabel(selected.published_at ?? selected.created_at)}</dd></div><div><dt>Audience</dt><dd>{targetLabel(selected)}</dd></div></dl></div>}
+    {state === "ready" && rows.length > 0 && <div className="announcement-list">{rows.map((row) => {
+      const expanded = selected?.id === row.id;
+      const detailId = `announcement-detail-${row.id}`;
+      return <article key={row.id} className={`announcement-card ${highlightedId === row.id && !row.is_read ? "announcement-card--unread" : ""} ${expanded ? "announcement-card--expanded" : ""}`}>
+        <div className="announcement-card__top"><span className={`announcement-priority announcement-priority--${row.priority.toLowerCase()}`}>{roleLabel(row.priority)}</span>{!row.is_read && <span className="announcement-unread">Unread</span>}</div>
+        <h3>{row.title}</h3>
+        {!expanded && <p className="announcement-card__preview">{row.message}</p>}
+        <div className="announcement-card__meta"><span>{row.author_name} · {roleLabel(row.author_role)}</span><time dateTime={row.published_at ?? row.created_at}>{dateLabel(row.published_at ?? row.created_at)}</time><span>{targetLabel(row)}</span></div>
+        <button type="button" className="announcement-link" aria-expanded={expanded} aria-controls={detailId} onClick={() => void open(row)}>{expanded ? "Hide details" : "View details"} <span aria-hidden="true">{expanded ? "−" : "→"}</span></button>
+        {expanded && <div id={detailId} className="announcement-detail" role="region" aria-labelledby={`announcement-detail-title-${row.id}`}>
+          <div className="announcement-detail__header"><strong id={`announcement-detail-title-${row.id}`}>Announcement details</strong><button type="button" className="announcement-detail__close" aria-label="Close announcement details" onClick={() => setSelected(null)}>×</button></div>
+          <p className="announcement-detail__message">{row.message}</p>
+          <dl><div><dt>Published by</dt><dd>{row.author_name} · {roleLabel(row.author_role)}</dd></div><div><dt>Published</dt><dd>{dateLabel(row.published_at ?? row.created_at)}</dd></div><div><dt>Audience</dt><dd>{targetLabel(row)}</dd></div></dl>
+        </div>}
+      </article>;
+    })}</div>}
   </section>;
 }
 

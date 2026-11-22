@@ -24,8 +24,8 @@ __all__.extend(["SupervisorDeparture", "SupervisorReplacementCase"])
 
 from .group_message import GroupMessage
 from .group_ai import GroupAIDocumentChunk, GroupAIResponse
-from .student_ai import StudentAIMessage
-__all__.extend(["GroupMessage", "GroupAIDocumentChunk", "GroupAIResponse", "StudentAIMessage"])
+from .student_ai import StudentAIConversation, StudentAIMessage
+__all__.extend(["GroupMessage", "GroupAIDocumentChunk", "GroupAIResponse", "StudentAIConversation", "StudentAIMessage"])
 from .announcement import Announcement, AnnouncementRead
 __all__.extend(["Announcement", "AnnouncementRead"])
 

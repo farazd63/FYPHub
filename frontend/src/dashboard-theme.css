@@ -56,6 +56,43 @@ main:has(.admin-sidebar) > header > div:first-child { gap: 16px; }
   color: var(--dash-blue-dark);
 }
 
+.portal-history-controls {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.portal-history-controls button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--dash-line);
+  border-radius: 7px;
+  background: var(--dash-surface);
+  color: var(--dash-blue);
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.portal-history-controls button:hover {
+  border-color: var(--dash-blue);
+  background: var(--fy-brand-soft, var(--dash-surface-soft));
+  color: var(--dash-blue-dark);
+}
+
+.portal-history-controls button:focus-visible {
+  outline: none;
+  box-shadow: var(--fy-focus-ring, 0 0 0 3px rgb(29 78 216 / 0.28));
+}
+
+.portal-history-controls button svg {
+  width: 15px;
+  height: 15px;
+}
+
 .fyp-hub-brand .portal-home-button svg {
   width: 16px;
   height: 16px;

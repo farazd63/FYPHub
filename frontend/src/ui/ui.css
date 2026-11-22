@@ -102,6 +102,18 @@
 }
 
 /* Buttons — extends global .fy-btn where present */
+.fy-btn,
+.fy-icon-btn {
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+.fy-btn:hover:not(:disabled),
+.fy-icon-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.fy-btn:active:not(:disabled),
+.fy-icon-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
 .fy-btn--sm {
   min-height: 2rem;
   padding: 0.35rem 0.75rem;
@@ -129,6 +141,33 @@
 .fy-btn--danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--fy-danger) 12%, var(--fy-danger-soft));
   border-color: color-mix(in srgb, var(--fy-danger) 45%, var(--fy-border));
+}
+.fy-btn--success {
+  background: var(--fy-success-soft);
+  border-color: color-mix(in srgb, var(--fy-success) 35%, var(--fy-border));
+  color: var(--fy-success);
+}
+.fy-btn--success:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--fy-success) 14%, var(--fy-success-soft));
+  border-color: color-mix(in srgb, var(--fy-success) 50%, var(--fy-border));
+}
+.fy-btn--warning {
+  background: var(--fy-warning-soft);
+  border-color: color-mix(in srgb, var(--fy-warning) 35%, var(--fy-border));
+  color: var(--fy-warning);
+}
+.fy-btn--warning:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--fy-warning) 14%, var(--fy-warning-soft));
+  border-color: color-mix(in srgb, var(--fy-warning) 50%, var(--fy-border));
+}
+.fy-btn--info {
+  background: var(--fy-info-soft);
+  border-color: color-mix(in srgb, var(--fy-info) 35%, var(--fy-border));
+  color: var(--fy-info);
+}
+.fy-btn--info:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--fy-info) 14%, var(--fy-info-soft));
+  border-color: color-mix(in srgb, var(--fy-info) 50%, var(--fy-border));
 }
 .fy-btn--disabled,
 .fy-btn:disabled,
@@ -229,6 +268,21 @@
   background: var(--fy-danger-soft);
   color: var(--fy-danger);
   border-color: color-mix(in srgb, var(--fy-danger) 30%, var(--fy-border));
+}
+.fy-icon-btn--success {
+  background: var(--fy-success-soft);
+  color: var(--fy-success);
+  border-color: color-mix(in srgb, var(--fy-success) 30%, var(--fy-border));
+}
+.fy-icon-btn--warning {
+  background: var(--fy-warning-soft);
+  color: var(--fy-warning);
+  border-color: color-mix(in srgb, var(--fy-warning) 30%, var(--fy-border));
+}
+.fy-icon-btn--info {
+  background: var(--fy-info-soft);
+  color: var(--fy-info);
+  border-color: color-mix(in srgb, var(--fy-info) 30%, var(--fy-border));
 }
 .fy-icon-btn--disabled,
 .fy-icon-btn:disabled {

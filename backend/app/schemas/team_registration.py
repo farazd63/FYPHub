@@ -5,8 +5,8 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 from ..models import UserRole
-from ..security import validate_full_name
-from .email import normalize_email
+from ..security import validate_full_name, validate_registration_number
+from .email import normalize_szabist_email
 
 
 class TeamMemberInput(BaseModel):
@@ -18,12 +18,22 @@ class TeamMemberInput(BaseModel):
     registration_number: str
     university_email: EmailStr | None = None
 
+    @field_validator("full_name")
+    @classmethod
+    def normalized_name(cls, value: str) -> str:
+        return validate_full_name(value)
+
+    @field_validator("registration_number")
+    @classmethod
+    def normalized_registration(cls, value: str) -> str:
+        return validate_registration_number(value)
+
     @field_validator("university_email", mode="before")
     @classmethod
     def normalized_email(cls, value: object) -> object:
         if value is None or value == "":
             return None
-        return normalize_email(value)
+        return normalize_szabist_email(value)
 
 
 class TeamRegistrationRequest(BaseModel):
@@ -42,7 +52,7 @@ class TeamRegistrationRequest(BaseModel):
     @field_validator("shared_login_email", mode="before")
     @classmethod
     def normalized_shared_email(cls, value: object) -> object:
-        return normalize_email(value)
+        return normalize_szabist_email(value)
 
 
 class SafeAccountOut(BaseModel):
@@ -104,15 +114,12 @@ class StudentGroupMemberInput(BaseModel):
     @field_validator("email", mode="before")
     @classmethod
     def normalized_member_email(cls, value: object) -> object:
-        return normalize_email(value)
+        return normalize_szabist_email(value)
 
     @field_validator("registration_number")
     @classmethod
     def normalized_registration(cls, value: str) -> str:
-        normalized = value.strip().upper()
-        if not normalized or len(normalized) > 100:
-            raise ValueError("registration_number must be between 1 and 100 characters.")
-        return normalized
+        return validate_registration_number(value)
 
     @field_validator("full_name")
     @classmethod
@@ -133,7 +140,7 @@ class StudentGroupRegistrationRequest(BaseModel):
     @field_validator("group_email", mode="before")
     @classmethod
     def normalized_group_email(cls, value: object) -> object:
-        return normalize_email(value)
+        return normalize_szabist_email(value)
 
     @field_validator("group_name")
     @classmethod

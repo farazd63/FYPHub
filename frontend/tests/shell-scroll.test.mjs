@@ -40,10 +40,14 @@ test("portal shells unlock document scroll when content is taller than the viewp
   assert.match(student, /\.student-content\{[^}]*overflow:\s*auto/);
   assert.match(design, /overflow:\s*visible\s*!important/);
 
-  // Sticky chrome keeps header/sidebar in place while the document scrolls.
-  assert.match(index, /\.admin-shell\s*>\s*header[\s\S]*position:\s*sticky/);
+  // Fixed headers and sidebars keep dashboard chrome in place while the
+  // document scrolls.
+  assert.match(index, /\.admin-shell\s*>\s*header[\s\S]*position:\s*fixed/);
   assert.match(tokens, /--fy-shell-sidebar-top:/);
-  assert.match(design, /position:\s*sticky\s*!important/);
+  assert.match(design, /position:\s*fixed\s*!important/);
+  assert.doesNotMatch(design, /margin-left:\s*calc\(var\(--fy-shell-pad\)\s*\+\s*var\(--fy-shell-sidebar-width\)\s*\+\s*var\(--fy-shell-pad\)/);
+  assert.doesNotMatch(design, /margin-left:\s*calc\(var\(--fy-shell-pad\)\s*\+\s*var\(--fy-shell-sidebar-collapsed-width\)\s*\+\s*var\(--fy-shell-pad\)/);
+  assert.match(design, /Final shell geometry[\s\S]*left:\s*0\s*!important[\s\S]*border-radius:\s*0\s*!important/);
 });
 
 test("mobile collapsed sidebar does not reserve layout width", () => {
@@ -66,4 +70,17 @@ test("sidebar uses one shared top offset with content padding", () => {
   assert.match(tokens, /--fy-shell-sidebar-top:\s*calc\(var\(--fy-shell-header\) \+ var\(--fy-shell-pad\)\)/);
   assert.match(role, /top:\s*var\(--fy-shell-sidebar-top/);
   assert.match(design, /top:\s*var\(--fy-shell-sidebar-top\)\s*!important/);
+  assert.match(design, /\.student-shell \.student-sidebar\.role-sidebar\s*\{[\s\S]*position:\s*fixed\s*!important/);
+  assert.match(design, /margin-left:\s*calc\(var\(--fy-shell-pad\) \+ var\(--fy-shell-sidebar-width\)/);
+  assert.match(tokens, /--fy-shell-sidebar-width:\s*348px/);
+});
+
+test("conversation and supervisor workspaces fill the available pane", () => {
+  const layout = read("portals/shared/conversation-layout.css");
+  const supervisor = read("portals/supervisor/supervisor-group-workspace.css");
+
+  assert.match(layout, /\.group-ai-page,\s*\.student-collab\s*\{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*none/);
+  assert.match(layout, /:has\(\.group-ai-page\) > \.student-body[\s\S]*height:\s*100dvh\s*!important/);
+  assert.match(layout, /:has\(\.supervisor-page\) \.student-content__inner[\s\S]*max-width:\s*none/);
+  assert.match(supervisor, /:has\(\.supervisor-page\) \.supervisor-page[\s\S]*width:\s*100%/);
 });

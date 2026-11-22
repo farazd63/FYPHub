@@ -96,6 +96,24 @@ class CollaborationChannelAccessTests(unittest.TestCase):
         self.assertEqual(existing_view.status_code, 200, existing_view.text)
         self.assertEqual(existing_view.json()["messages"][0]["message_text"], "Please review the proposal.")
 
+    def test_message_owner_can_edit_and_soft_delete(self):
+        created = self.call("POST", self.path("/messages"), json={"message_text": "Draft update"}).json()
+        edited = self.call("PATCH", self.path(f"/messages/{created['id']}"), json={"message_text": "Final update"})
+        self.assertEqual(edited.status_code, 200, edited.text)
+        self.assertEqual(edited.json()["message_text"], "Final update")
+
+        deleted = self.call("DELETE", self.path(f"/messages/{created['id']}"))
+        self.assertEqual(deleted.status_code, 200, deleted.text)
+        self.assertEqual(deleted.json()["id"], created["id"])
+        self.assertEqual(self.call("GET", self.path("/messages")).json(), [])
+
+    def test_message_changes_are_limited_to_the_sender(self):
+        created = self.call("POST", self.path("/messages"), json={"message_text": "Private note"}).json()
+        edit = self.call("PATCH", self.path(f"/messages/{created['id']}"), "supervisor", json={"message_text": "Changed by another user"})
+        delete = self.call("DELETE", self.path(f"/messages/{created['id']}"), "supervisor")
+        self.assertEqual(edit.status_code, 403, edit.text)
+        self.assertEqual(delete.status_code, 403, delete.text)
+
     def test_other_group_supervisor_and_admin_are_rejected(self):
         for name in ("outsider", "other_supervisor", "admin"):
             self.assertEqual(self.call("GET", self.path(), name).status_code, 403)

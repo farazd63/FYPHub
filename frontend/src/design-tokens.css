@@ -51,6 +51,8 @@
   --fy-shell-header: 4rem;
   --fy-shell-pad: 1.5rem;
   --fy-shell-sidebar-top: calc(var(--fy-shell-header) + var(--fy-shell-pad));
+  --fy-shell-sidebar-width: 348px;
+  --fy-shell-sidebar-collapsed-width: 96px;
   --fy-shell-inset: 1rem;
   --fy-shell-inset-mobile: 0.5rem;
 }
@@ -83,6 +85,7 @@
   --fy-page: #0B0D0F;
   --fy-surface: #121518;
   --fy-surface-2: #181C20;
+  --fy-surface-raised: var(--fy-surface-2);
   --fy-surface-muted: #181C20;
   --fy-surface-hover: #20252A;
   --fy-border: #2A3036;
@@ -90,6 +93,7 @@
   --fy-input-border: #384149;
 
   --fy-text: #F2F4F5;
+  --fy-text-primary: var(--fy-text);
   --fy-text-muted: #A7AFB7;
   --fy-text-subtle: #707982;
   --fy-text-secondary: #A7AFB7;
@@ -177,6 +181,7 @@
   --fy-page: var(--fy-bg);
   --fy-surface: #ffffff;
   --fy-surface-2: #f7f9fe;
+  --fy-surface-raised: var(--fy-surface-2);
   --fy-surface-muted: var(--fy-surface-2);
   --fy-surface-hover: #eef2fa;
   --fy-border: #dce5f6;
@@ -184,6 +189,7 @@
   --fy-input-border: var(--fy-border);
 
   --fy-text: #0b1b3f;
+  --fy-text-primary: var(--fy-text);
   --fy-text-muted: #475671;
   --fy-text-subtle: #5b6b8c;
   --fy-text-secondary: var(--fy-text-muted);

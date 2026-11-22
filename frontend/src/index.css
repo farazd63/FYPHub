@@ -214,21 +214,25 @@ section[aria-labelledby="users-heading"] form.h-fit > div > * { min-width: 0; }
   .auth-sign-in-card details { margin-top: .55rem; }
 }
 
-/* Admin / portal shells: document scrolls; header + sidebar stay sticky. */
+/* Admin / portal shells: document scrolls while the header stays fixed. */
 html:has(.admin-shell),
 html:has(.student-shell),
+html:has(.portal-shell),
 body:has(.admin-shell),
 body:has(.student-shell),
+body:has(.portal-shell),
 #root:has(.admin-shell),
-#root:has(.student-shell) {
+#root:has(.student-shell),
+#root:has(.portal-shell) {
   height: auto;
   min-height: 100%;
-  /* Keep overflow visible so position:sticky sidebar/header keep working. */
+  /* Keep overflow visible so the document and fixed sidebars keep working. */
   overflow: visible;
 }
 
 .admin-shell,
 .student-shell,
+.portal-shell,
 main:has(.admin-sidebar) {
   min-height: 100dvh;
   height: auto;
@@ -238,8 +242,8 @@ main:has(.admin-sidebar) {
 .admin-shell > header,
 .student-shell > .student-header,
 main:has(.admin-sidebar) > header {
-  position: sticky;
-  top: 0;
+  position: fixed;
+  inset: 0 0 auto;
   z-index: 30;
   height: 4rem;
   min-height: 4rem;

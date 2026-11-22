@@ -5,6 +5,7 @@ import { passwordPolicyError } from "./passwordPolicy";
 import {
   emailValidationMessage,
   normalizeEmail,
+  szabistEmailValidationMessage,
 } from "./emailValidation";
 import { StudentPortal } from "./portals/student/StudentPortal";
 import { SupervisorPortal } from "./portals/supervisor/SupervisorPortal";
@@ -104,7 +105,12 @@ const newMember = (): Member => ({
   email: "",
   registration: "",
 });
-const registration = (value: string) => value.trim().toUpperCase();
+const registration = (value: string) => value.trim();
+const sanitizeMemberValue = (field: keyof Omit<Member, "id">, value: string) => {
+  if (field === "full_name") return value.replace(/[^\p{L} ]/gu, "").replace(/ {2,}/g, " ");
+  if (field === "registration") return value.replace(/[^0-9]/g, "");
+  return value;
+};
 const memberKey = (id: string, field: keyof Omit<Member, "id">) => `member.${id}.${field}`;
 const validationFieldLabel = (key: string, members: Member[]) => {
   if (key === "account.cycle") return "Academic Cycle";
@@ -219,6 +225,14 @@ function AuthLayout({ children, actions, compact = false }: { children: ReactNod
                 One calm place for proposals, milestones, feedback, and the day you present.
               </p>
             </div>
+            <div className="auth-stage__credits" aria-label="FYPHub development team">
+              <span className="auth-stage__credits-label">Designed &amp; developed by</span>
+              <div className="auth-stage__credits-names">
+                <span className="auth-stage__credits-name">Danish Faraz</span>
+                <span className="auth-stage__credits-name">Muhammad Maaz</span>
+                <span className="auth-stage__credits-name">Zain Ali Kiani</span>
+              </div>
+            </div>
           </section>
           <section className={`auth-card ${compact ? "auth-card--compact" : ""}`}>
             <div className="auth-card__shine" aria-hidden="true" />
@@ -239,6 +253,9 @@ function Field({
   value,
   onChange,
   type = "text",
+  inputMode,
+  pattern,
+  maxLength,
   autoComplete,
   disabled,
   error,
@@ -248,6 +265,9 @@ function Field({
   value: string;
   onChange: (value: string) => void;
   type?: "text" | "email";
+  inputMode?: "text" | "numeric";
+  pattern?: string;
+  maxLength?: number;
   autoComplete?: string;
   disabled?: boolean;
   error?: string;
@@ -264,6 +284,9 @@ function Field({
       <input
         id={id}
         type={type}
+        inputMode={inputMode}
+        pattern={pattern}
+        maxLength={maxLength}
         value={value}
         autoComplete={autoComplete}
         disabled={disabled}
@@ -488,7 +511,7 @@ export default function App() {
   const updateMember = (id: string, field: keyof Omit<Member, "id">, value: string) => {
     setMembers((current) =>
       current.map((member) =>
-        member.id === id ? { ...member, [field]: value } : member,
+        member.id === id ? { ...member, [field]: sanitizeMemberValue(field, value) } : member,
       ),
     );
     clear(memberKey(id, field));
@@ -515,11 +538,13 @@ export default function App() {
         const name = member.full_name.trim();
         if (!name) next[`${prefix}.full_name`] = "Enter the member's full name.";
         else if (name.length < 2 || name.length > 100 || /[0-9]/.test(name)) next[`${prefix}.full_name`] = "Name must be 2–100 letters; numbers are not allowed.";
+        if (name && !/^\p{L}+(?: +\p{L}+)*$/u.test(name)) next[`${prefix}.full_name`] = "Name must be 2–100 letters and spaces only.";
         const reg = registration(member.registration);
-        const emailError = emailValidationMessage(member.email);
+        const emailError = szabistEmailValidationMessage(member.email);
         if (emailError) next[`${prefix}.email`] = emailError;
         if (!reg)
           next[`${prefix}.registration`] = "Enter a registration number.";
+        else if (!/^\d+$/.test(reg)) next[`${prefix}.registration`] = "Registration number must contain digits only.";
         const normalizedEmail = normalizeEmail(member.email);
         if (normalizedEmail && emails.has(normalizedEmail)) {
           next[`${prefix}.email`] = "Member emails must be unique in this group.";
@@ -545,8 +570,8 @@ export default function App() {
           `This team has ${teamSize} members; the selected cycle allows ${maximum}. Remove members before submitting.`;
     }
     if (target === 3 || target === 0) {
-      const sharedEmailError = emailValidationMessage(login.email);
-      if (sharedEmailError) next["login.email"] = "Enter a valid group email address.";
+      const sharedEmailError = szabistEmailValidationMessage(login.email);
+      if (sharedEmailError) next["login.email"] = sharedEmailError;
       const groupPasswordError = passwordPolicyError(login.password);
       if (groupPasswordError) next["login.password"] = groupPasswordError;
       if (login.password !== login.confirm) next["login.confirm"] = "Passwords do not match.";
@@ -1411,9 +1436,9 @@ export default function App() {
                         </button>
                       </div>
                       <div className="auth-member-card__grid">
-                         <Field label="Full name" required value={member.full_name} disabled={submitting} error={errors[memberKey(member.id, "full_name")]} onChange={(value) => updateMember(member.id, "full_name", value)} />
+                         <Field label="Full name" required value={member.full_name} inputMode="text" maxLength={100} disabled={submitting} error={errors[memberKey(member.id, "full_name")]} onChange={(value) => updateMember(member.id, "full_name", value)} />
                          <Field label="Member email" type="email" required value={member.email} disabled={submitting} error={errors[memberKey(member.id, "email")]} onChange={(value) => updateMember(member.id, "email", value)} />
-                         <Field label="Registration number" required value={member.registration} disabled={submitting} error={errors[memberKey(member.id, "registration")]} onChange={(value) => updateMember(member.id, "registration", value)} />
+                         <Field label="Registration number" required value={member.registration} inputMode="numeric" pattern="[0-9]*" maxLength={100} disabled={submitting} error={errors[memberKey(member.id, "registration")]} onChange={(value) => updateMember(member.id, "registration", value)} />
                       </div>
                     </Card>
                   ))}

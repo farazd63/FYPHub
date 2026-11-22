@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import unittest
@@ -159,7 +160,7 @@ class TeamRegistrationApiTests(unittest.TestCase):
         return f"{self.prefix}_{suffix}@{self.registration_domain}"
 
     def registration(self, suffix: str) -> str:
-        return f"{self.prefix}_{suffix}".upper()
+        return str(int(hashlib.sha256(f"{self.prefix}_{suffix}".encode()).hexdigest(), 16))
 
     def create_cycle(self, *, open_for_registration: bool, with_policy: bool = True, max_size: int = 3, seed_roster: bool = False) -> int:
         self.cycle_index += 1
@@ -564,8 +565,8 @@ class TeamEligibilityTests(TeamRegistrationApiTests):
         cycle = self.create_cycle(open_for_registration=True, seed_roster=False)
         payload = self.payload(cycle)
         self.seed_roster(cycle, [("001abc", payload["creator"]["university_email"]), ("002abc", payload["members"][0]["university_email"])])
-        payload["creator"]["registration_number"] = " 001ABC "
-        payload["members"][0]["registration_number"] = "002AbC"
+        payload["creator"]["registration_number"] = " 001234 "
+        payload["members"][0]["registration_number"] = "002345"
         payload["creator"]["university_email"] = payload["creator"]["university_email"].upper()
         self.assertNotEqual(payload["shared_login_email"], payload["creator"]["university_email"].lower())
         self.assertEqual(request_json(payload)[0], 201)

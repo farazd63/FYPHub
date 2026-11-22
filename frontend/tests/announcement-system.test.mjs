@@ -4,6 +4,7 @@ import test from "node:test";
 
 const root = new URL("../src/", import.meta.url);
 const section = readFileSync(new URL("announcements/AnnouncementSection.tsx", root), "utf8");
+const bell = readFileSync(new URL("announcements/AnnouncementBell.tsx", root), "utf8");
 const backend = readFileSync(new URL("../../backend/app/announcements.py", import.meta.url), "utf8");
 const schema = readFileSync(new URL("../../backend/app/schemas/announcements.py", import.meta.url), "utf8");
 const model = readFileSync(new URL("../../backend/app/models/announcement.py", import.meta.url), "utf8");
@@ -11,6 +12,17 @@ const migration = readFileSync(new URL("../../backend/alembic/versions/y6n7o8p9q
 
 test("announcement dashboard UI supports latest, detail, read, and scoped creation", () => {
   for (const value of ["/api/v1/announcements/latest", "/api/v1/announcements/permissions", "/read`, { method: \"POST\"", "cycles: AnnouncementScopeOption[]", "groups: AnnouncementScopeOption[]", "projects: AnnouncementScopeOption[]", "View details", "View all", "Create announcement"]) assert.match(section, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(section, /latest\?limit=1/);
+  assert.match(section, /announcementRows\.slice\(0, 1\)/);
+  assert.match(section, /announcement-card--expanded/);
+  assert.match(section, /mostRecentUnreadId/);
+  assert.match(section, /highlightedId/);
+  assert.match(bell, /mostRecentUnreadId/);
+  assert.match(bell, /announcement-bell__item--unread/);
+  assert.match(bell, /row\.author_name/);
+  assert.match(bell, /row\.author_role/);
+  assert.match(section, /aria-expanded=\{expanded\}/);
+  assert.doesNotMatch(section, /role=\"dialog\"/);
 });
 
 test("announcement backend exposes lifecycle endpoints and central visibility checks", () => {

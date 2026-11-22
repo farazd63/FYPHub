@@ -39,6 +39,54 @@
   font-size: 14px;
 }
 
+/* Keep the group identity compact on wide screens: label, name, metadata, and
+   status sit in one calm header row instead of creating a tall hero block. */
+.supervisor-group-hero {
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+}
+
+.supervisor-group-hero > div:first-child {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+}
+
+.supervisor-group-hero .supervisor-section-kicker {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 9px;
+}
+
+.supervisor-group-hero h2 {
+  flex: 0 1 auto;
+  font-size: clamp(1.05rem, 1.7vw, 1.35rem);
+  white-space: nowrap;
+}
+
+.supervisor-group-hero p {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.supervisor-group-hero__status {
+  flex: 0 0 auto;
+  gap: 5px;
+}
+
+.supervisor-group-hero .supervisor-status-pill {
+  padding: 5px 8px;
+  font-size: 10px;
+}
+
 .supervisor-group-hero__status,
 .supervisor-assignment-card__status,
 .supervisor-status-stack {
@@ -363,4 +411,178 @@
   .supervisor-assignment-primary {
     width: 100%;
   }
+}
+
+/* Keep the supervisor discussion tab visually identical to the student
+   collaboration channel. The API and permission boundary remain supervisor
+   specific; only the conversation surface is shared. */
+.supervisor-discussion {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--student-surface, var(--fy-surface, #fff));
+}
+
+.supervisor-discussion #student-collab-content {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.supervisor-discussion .student-collab__details {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 8px;
+}
+
+.supervisor-discussion .student-collab__members {
+  flex: 0 0 auto;
+  max-height: 58px;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.supervisor-discussion .student-collab__members ul {
+  gap: 5px;
+  margin: 5px 0 7px;
+}
+
+.supervisor-discussion .student-collab__members li {
+  overflow: hidden;
+  padding: 4px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.supervisor-discussion .student-collab__history {
+  min-height: 120px;
+  margin: 6px 0;
+}
+
+.supervisor-discussion .student-collab__composer label {
+  margin: 5px 0 4px;
+  font-size: 12px;
+}
+
+.supervisor-discussion .student-collab__composer textarea {
+  min-height: 58px;
+  height: 64px;
+  max-height: 78px;
+  resize: none;
+  padding: 9px 11px;
+  font-size: 13px;
+}
+
+.supervisor-discussion .student-collab__composer-bottom {
+  margin-top: 5px;
+}
+
+.supervisor-discussion .student-collab__composer-bottom small {
+  font-size: 10px;
+}
+
+.student-shell:has(.supervisor-discussion) .supervisor-page {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+.student-shell:has(.supervisor-discussion) .supervisor-group-card,
+.student-shell:has(.supervisor-discussion) .supervisor-group-workspace {
+  min-height: 0;
+}
+
+.student-shell:has(.supervisor-discussion) .supervisor-group-card {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.student-shell:has(.supervisor-discussion) .supervisor-group-workspace {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.student-shell:has(.supervisor-discussion) .supervisor-group-tabs {
+  flex: 0 0 auto;
+}
+
+.student-shell:has(.supervisor-discussion) .supervisor-discussion {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .supervisor-discussion .student-collab__details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Supervisor workspaces use the complete content pane on every tab. */
+.student-shell:has(.supervisor-page) .student-content__inner {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+.student-shell:has(.supervisor-page) .supervisor-page {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+.student-shell:has(.supervisor-page) .supervisor-group-card {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.student-shell:has(.supervisor-page) .supervisor-group-workspace {
+  min-width: 0;
+}
+
+/* Discussion is a dedicated chat view. Remove the section tabs and the
+   informational card padding so the conversation begins directly below the
+   group header. The tabs remain available on every other section. */
+.supervisor-group-workspace--discussion {
+  padding: 0;
+}
+
+.supervisor-group-workspace--discussion .supervisor-discussion {
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0 0 16px 16px;
+  padding: 0 !important;
+}
+
+.student-shell:has(.supervisor-page--discussion) .supervisor-page--discussion {
+  min-height: 0;
+}
+
+.student-shell:has(.supervisor-page--discussion) .supervisor-group-card--discussion {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.student-shell:has(.supervisor-page--discussion) .supervisor-group-workspace--discussion,
+.student-shell:has(.supervisor-page--discussion) .supervisor-discussion {
+  min-height: 0;
+  flex: 1 1 auto;
 }

@@ -4,3 +4,4 @@
 .student-brand svg{width:30px;height:30px;flex:0 0 30px}
 .student-brand{gap:10px;font-size:17px;font-weight:750}
 @media (prefers-reduced-motion:reduce){.student-sidebar,.student-sidebar__item,.student-phase-card,.student-overview,.student-phase-page,.student-sidebar__overlay{transition:none;animation:none}.student-sidebar__item:hover,.student-phase-card:hover{transform:none}}
+.student-chatbot-toggle{display:inline-flex;align-items:center;gap:6px;border:1px solid #c7d5f5;border-radius:9px;background:#eef4ff;color:#315db4;padding:7px 10px;font-size:12px;font-weight:800;white-space:nowrap}.student-chatbot-toggle:hover{border-color:#8eaaf0;background:#e2ecff}.student-chatbot-toggle[aria-expanded=true]{border-color:#315fc4;background:#315fc4;color:#fff}@media (max-width:767px){.student-chatbot-toggle{padding:7px}.student-chatbot-toggle span{display:none}}

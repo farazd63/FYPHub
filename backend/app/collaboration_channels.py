@@ -1,14 +1,19 @@
 """Private assignment-scoped Module 2 collaboration channels."""
 
-from typing import Annotated
+import mimetypes
+from pathlib import Path
+from typing import Annotated, Literal
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from .auth import get_current_user, require_roles, validate_mutating_origin
+from .auth import get_current_user, require_roles, utc_now, validate_mutating_origin
+from .config import settings
 from .database import get_db
 from .models import AcademicCycle, CollaborationChannel, CollaborationMessage, CollaborationParticipant, SupervisorAssignment, SupervisorRequest, Team, TeamMember, User, UserRole
 
@@ -18,6 +23,8 @@ router = APIRouter(prefix="/api/v1", tags=["module-2-private-collaboration"])
 class MessageWrite(BaseModel):
     model_config = ConfigDict(extra="forbid")
     message_text: str = Field(min_length=1, max_length=4000)
+    message_kind: Literal["TEXT", "DOCUMENT", "MEDIA", "AUDIO", "CONTACT", "POLL", "EVENT", "STICKER", "CATALOGUE", "QUICK_REPLY"] = "TEXT"
+    message_payload: dict[str, object] = Field(default_factory=dict)
     attachment_reference: str | None = Field(default=None, max_length=500)
 
     @field_validator("message_text")
@@ -26,6 +33,18 @@ class MessageWrite(BaseModel):
         if not value.strip():
             raise ValueError("Message cannot be blank.")
         # Keep indentation and line breaks in scripts/code; trim only for validation.
+        return value
+
+
+class MessageEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message_text: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("message_text")
+    @classmethod
+    def non_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Message cannot be blank.")
         return value
 
 
@@ -140,7 +159,25 @@ def _channel_out(session: Session, channel: CollaborationChannel, actor: User) -
 
 def _message_out(session: Session, message: CollaborationMessage) -> dict:
     sender = session.get(User, message.sender_user_id)
-    return {"id": message.id, "channel_id": message.channel_id, "sender_user_id": message.sender_user_id, "sender_name": sender.full_name if sender else "Unknown user", "sender_role": sender.role.value if sender else "UNKNOWN", "message_text": message.message_text, "attachment_reference": message.attachment_reference, "created_at": message.created_at, "updated_at": message.updated_at, "deleted_at": message.deleted_at}
+    return {"id": message.id, "channel_id": message.channel_id, "sender_user_id": message.sender_user_id, "sender_name": sender.full_name if sender else "Unknown user", "sender_role": sender.role.value if sender else "UNKNOWN", "message_text": message.message_text, "message_kind": message.message_kind, "message_payload": message.message_payload or {}, "attachment_reference": message.attachment_reference, "created_at": message.created_at, "updated_at": message.updated_at, "deleted_at": message.deleted_at}
+
+
+FILE_MESSAGE_KINDS = {"DOCUMENT", "MEDIA", "AUDIO", "STICKER"}
+
+
+def _collaboration_file_path(channel_id: int, stored_name: str) -> Path:
+    return settings.document_storage_root / "module-2" / "collaboration" / str(channel_id) / Path(stored_name).name
+
+
+def _attachment_kind(kind: str, content_type: str | None) -> str:
+    normalized = kind.upper()
+    if normalized not in FILE_MESSAGE_KINDS:
+        raise HTTPException(422, "This action requires a document, media, audio, or sticker file.")
+    if normalized == "AUDIO" and not (content_type or "").startswith("audio/"):
+        raise HTTPException(422, "Choose an audio file for the Audio action.")
+    if normalized in {"MEDIA", "STICKER"} and not (content_type or "").startswith("image/") and not (normalized == "MEDIA" and (content_type or "").startswith("video/")):
+        raise HTTPException(422, "Choose an image or video for the media action.")
+    return normalized
 
 
 def _list_channels(session: Session, actor: User) -> list[dict]:
@@ -200,9 +237,96 @@ def collaboration_messages(channel_id: int, actor: User = Depends(get_current_us
 def send_collaboration_message(channel_id: int, payload: MessageWrite, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     validate_mutating_origin(request)
     channel = _active_channel(session, channel_id); _authorize(session, channel, actor, write=True)
-    message = CollaborationMessage(channel_id=channel.id, sender_user_id=actor.id, message_text=payload.message_text, attachment_reference=payload.attachment_reference)
+    message = CollaborationMessage(channel_id=channel.id, sender_user_id=actor.id, message_text=payload.message_text, message_kind=payload.message_kind, message_payload=payload.message_payload, attachment_reference=payload.attachment_reference)
     session.add(message); channel.updated_at = func.now(); session.commit(); session.refresh(message)
     return _message_out(session, message)
+
+
+def _owned_message(session: Session, channel: CollaborationChannel, message_id: int, actor: User) -> CollaborationMessage:
+    message = session.scalar(select(CollaborationMessage).where(CollaborationMessage.id == message_id, CollaborationMessage.channel_id == channel.id, CollaborationMessage.deleted_at.is_(None)))
+    if message is None:
+        raise HTTPException(404, "Message was not found in this channel.")
+    if message.sender_user_id != actor.id:
+        raise HTTPException(403, "You can only change your own messages.")
+    return message
+
+
+@router.patch("/student/collaboration/channels/{channel_id}/messages/{message_id}")
+@router.patch("/supervisor/collaboration/channels/{channel_id}/messages/{message_id}")
+def edit_collaboration_message(channel_id: int, message_id: int, payload: MessageEdit, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    channel = _active_channel(session, channel_id); _authorize(session, channel, actor, write=True)
+    message = _owned_message(session, channel, message_id, actor)
+    message.message_text = payload.message_text
+    channel.updated_at = func.now()
+    session.commit(); session.refresh(message)
+    return _message_out(session, message)
+
+
+@router.delete("/student/collaboration/channels/{channel_id}/messages/{message_id}")
+@router.delete("/supervisor/collaboration/channels/{channel_id}/messages/{message_id}")
+def delete_collaboration_message(channel_id: int, message_id: int, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    channel = _active_channel(session, channel_id); _authorize(session, channel, actor, write=True)
+    message = _owned_message(session, channel, message_id, actor)
+    message.deleted_at = utc_now()
+    channel.updated_at = func.now()
+    session.commit()
+    return {"id": message.id, "deleted_at": message.deleted_at}
+
+
+@router.post("/student/collaboration/channels/{channel_id}/files", status_code=201)
+@router.post("/supervisor/collaboration/channels/{channel_id}/files", status_code=201)
+async def upload_collaboration_file(
+    channel_id: int,
+    request: Request,
+    upload: UploadFile = File(...),
+    message_kind: str = Form("DOCUMENT"),
+    caption: str = Form(""),
+    actor: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    validate_mutating_origin(request)
+    channel = _active_channel(session, channel_id); _authorize(session, channel, actor, write=True)
+    kind = _attachment_kind(message_kind, upload.content_type)
+    data = await upload.read()
+    if not data or len(data) > 25 * 1024 * 1024:
+        raise HTTPException(422, "The shared file must be non-empty and 25 MiB or smaller.")
+    original = Path(upload.filename or "shared-file").name[:180]
+    stored = f"{uuid4().hex}-{original}"
+    path = _collaboration_file_path(channel.id, stored)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        path.write_bytes(data)
+        message = CollaborationMessage(
+            channel_id=channel.id,
+            sender_user_id=actor.id,
+            message_text=caption.strip() or original,
+            message_kind=kind,
+            message_payload={"name": original, "mime_type": upload.content_type or "application/octet-stream", "size": len(data)},
+            attachment_reference=f"/api/v1/collaboration/channels/{channel.id}/files/{stored}",
+        )
+        session.add(message); channel.updated_at = func.now(); session.commit(); session.refresh(message)
+        return _message_out(session, message)
+    except HTTPException:
+        session.rollback()
+        path.unlink(missing_ok=True)
+        raise
+    except Exception as error:
+        session.rollback()
+        path.unlink(missing_ok=True)
+        raise HTTPException(500, "The shared file could not be saved.") from error
+
+
+@router.get("/collaboration/channels/{channel_id}/files/{stored_name}")
+def download_collaboration_file(channel_id: int, stored_name: str, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    channel = _active_channel(session, channel_id); _authorize(session, channel, actor)
+    path = _collaboration_file_path(channel.id, stored_name)
+    if not path.is_file():
+        raise HTTPException(404, "The shared file was not found.")
+    filename = path.name.split("-", 1)[-1].replace('"', "")
+    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return FileResponse(path, media_type=media_type, filename=filename, headers={"Content-Disposition": f'inline; filename="{filename}"'})
 
 
 @router.post("/student/collaboration/channels/{channel_id}/read")

@@ -9,6 +9,8 @@ RUN npm config set fetch-retries 5 \
     && npm config set fetch-timeout 600000 \
     && npm ci
 
+ARG SOURCE_VERSION=local
+RUN echo "Building frontend source revision ${SOURCE_VERSION}"
 COPY . .
 
 ARG VITE_API_BASE_URL=http://localhost:8010

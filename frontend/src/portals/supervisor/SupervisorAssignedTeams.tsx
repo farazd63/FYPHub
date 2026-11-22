@@ -3,6 +3,7 @@ import { RefreshCw } from "lucide-react";
 import { Alert } from "../../ui";
 import { IconButton } from "../../ui/IconButton";
 import { SupervisorGroupDetails, type GroupWorkspace, type GroupTab, date } from "./SupervisorGroupDetails";
+import { pushPortalRoute, replacePortalRoute } from "../shared/portal-history";
 
 const projectStatusLabel = (value?: string | null) => ({
   IN_PROGRESS: "In progress",
@@ -30,8 +31,9 @@ export function SupervisorAssignedTeams({ api }: { api: string }) {
     finally { setLoading(false); }
   }, [api]);
   useEffect(() => { const initial = window.setTimeout(() => void load(), 0); const timer = window.setInterval(() => void load(), 10000); const focus = () => void load(); window.addEventListener("focus", focus); return () => { window.clearTimeout(initial); window.clearInterval(timer); window.removeEventListener("focus", focus); }; }, [load]);
-  const open = (id: number, tab: GroupTab) => { setSelected({ id, tab }); window.history.replaceState(window.history.state, "", `/supervisor/groups/${id}`); };
-  if (selected) return <SupervisorGroupDetails key={selected.id} api={api} groupId={selected.id} initialTab={selected.tab} onBack={() => { setSelected(null); window.history.replaceState(window.history.state, "", "/supervisor/assigned-groups"); void load(); }} />;
+  useEffect(() => { const syncFromHistory = () => { const match = window.location.pathname.match(/\/supervisor\/groups\/(\d+)/); setSelected(match ? { id: Number(match[1]), tab: "overview" } : null); if (!match) void load(); }; window.addEventListener("popstate", syncFromHistory); return () => window.removeEventListener("popstate", syncFromHistory); }, [load]);
+  const open = (id: number, tab: GroupTab) => { setSelected({ id, tab }); pushPortalRoute(`/supervisor/groups/${id}`); };
+  if (selected) return <SupervisorGroupDetails key={selected.id} api={api} groupId={selected.id} initialTab={selected.tab} onBack={() => { setSelected(null); replacePortalRoute("/supervisor/assigned-groups"); void load(); }} />;
   return <section className="supervisor-page" aria-labelledby="supervisor-assigned-heading">
     <div className="supervisor-page-heading"><h1 id="supervisor-assigned-heading">Assigned Students &amp; Teams</h1><span>Group members, proposals, documents and project progress for your active assignments.</span></div>
     {error && (

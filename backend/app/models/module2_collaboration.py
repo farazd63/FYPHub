@@ -79,6 +79,8 @@ class CollaborationMessage(Base):
     channel_id: Mapped[int] = mapped_column(ForeignKey("collaboration_channels.id", ondelete="RESTRICT"), nullable=False)
     sender_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     message_text: Mapped[str] = mapped_column(Text, nullable=False)
+    message_kind: Mapped[str] = mapped_column(String(24), nullable=False, default="TEXT", server_default="TEXT")
+    message_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
     attachment_reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

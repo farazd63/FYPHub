@@ -16,6 +16,11 @@ test("shared email validator covers the required address rules and messages", ()
   assert.match(helper, /Enter a valid email address\./);
   assert.match(helper, /Email must include a valid domain, for example name@example\.com\./);
   assert.match(helper, /trim\(\)\.toLowerCase\(\)/);
+  assert.match(helper, /SZABIST_EMAIL_DOMAIN = "szabist-isb\.pk"/);
+  assert.match(helper, /function szabistEmailValidationMessage/);
+  assert.match(helper, /domain === SZABIST_EMAIL_DOMAIN/);
+  assert.match(app, /szabistEmailValidationMessage\(member\.email\)/);
+  assert.match(app, /szabistEmailValidationMessage\(login\.email\)/);
 });
 
 test("login accepts only a group email identifier", () => {
@@ -30,7 +35,7 @@ test("login accepts only a group email identifier", () => {
 
 test("student group and Admin account creation share the same validation", () => {
   assert.doesNotMatch(app, /emailValidationMessage\(account\.email\)/);
-  assert.match(app, /emailValidationMessage\(login\.email\)/);
+  assert.match(app, /szabistEmailValidationMessage\(login\.email\)/);
   assert.doesNotMatch(app, /emailValidationMessage\(address\)/);
   assert.match(admin, /emailValidationMessage\(form\.email\)/);
   assert.match(admin, /normalizeEmail\(form\.email\)/);

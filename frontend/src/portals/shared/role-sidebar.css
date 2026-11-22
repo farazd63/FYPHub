@@ -1115,3 +1115,17 @@
     flex: 1 1 auto !important;
   }
 }
+
+/* Give submenu entries a clear, modest hierarchy beneath their section heading. */
+.student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__section-items {
+  margin: 0 4px 0 10px;
+  padding: 6px 6px 6px 9px;
+  border-top: 0;
+  border-left: 2px solid color-mix(in srgb, var(--fy-brand, #1d4ed8) 18%, var(--fy-border, #d8dee6));
+  border-radius: 0 0 8px 8px;
+  background: var(--fy-surface-muted, #f7f9fc);
+}
+
+.student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__section-items .student-sidebar__item {
+  padding-inline: 8px;
+}

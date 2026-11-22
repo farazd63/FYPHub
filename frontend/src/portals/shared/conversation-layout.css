@@ -1,9 +1,10 @@
 /* Keep conversation tools readable and usable inside the dashboard content pane. */
 .group-ai-page,
 .student-collab {
-  width: min(100%, 1180px);
+  width: 100%;
+  max-width: none;
   min-width: 0;
-  margin-inline: auto;
+  margin-inline: 0;
 }
 
 /* These views own their scrolling area. Prevent the dashboard document from
@@ -135,4 +136,416 @@ body:has(.student-collab),
     height: auto;
     max-height: none;
   }
+}
+
+/* Collaboration keeps the shell fixed; only the message history scrolls. */
+html:has(.student-shell .student-collab),
+body:has(.student-shell .student-collab),
+#root:has(.student-shell .student-collab) {
+  height: 100dvh !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.student-shell:has(.student-collab) {
+  display: flex;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  flex-direction: column;
+  overflow: hidden !important;
+}
+
+.student-shell:has(.student-collab) > .student-body {
+  height: calc(100dvh - 64px) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.student-shell:has(.student-collab) .student-content {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 14px 20px !important;
+}
+
+.student-shell:has(.student-collab) .student-content__inner {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.student-shell:has(.student-collab) .student-collab {
+  display: flex;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px 20px;
+}
+
+.student-shell:has(.student-collab) #student-collab-content {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.student-shell:has(.student-collab) .student-collab__heading {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.student-shell:has(.student-collab) .student-collab__heading h2 {
+  font-size: clamp(1.05rem, 1.5vw, 1.3rem);
+  line-height: 1.15;
+}
+
+.student-shell:has(.student-collab) .student-collab__heading p {
+  max-width: min(70vw, 680px);
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--student-muted, var(--fy-text-secondary));
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-shell:has(.student-collab) .student-collab__heading button {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.student-shell:has(.student-collab) .student-collab__details {
+  flex: 0 0 auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.student-shell:has(.student-collab) .student-collab__details dt {
+  font-size: 10px;
+}
+
+.student-shell:has(.student-collab) .student-collab__details dd {
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-shell:has(.student-collab) .student-collab__members {
+  flex: 0 0 auto;
+  max-height: 58px;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.student-shell:has(.student-collab) .student-collab__members ul {
+  gap: 5px;
+  margin: 5px 0 7px;
+}
+
+.student-shell:has(.student-collab) .student-collab__members li {
+  overflow: hidden;
+  padding: 4px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-shell:has(.student-collab) .student-collab__toolbar {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.student-shell:has(.student-collab) .student-collab__history {
+  height: auto;
+  max-height: none;
+  min-height: 120px;
+  flex: 1 1 auto;
+  margin: 6px 0;
+  overflow-y: auto;
+}
+
+.student-shell:has(.student-collab) .student-collab__composer {
+  flex: 0 0 auto;
+}
+
+.student-shell:has(.student-collab) .student-collab {
+  width: 100%;
+  height: 100%;
+  padding: 0 !important;
+  border-radius: 16px;
+}
+
+.student-shell:has(.student-collab) .student-collab__composer label {
+  margin: 5px 0 4px;
+  font-size: 12px;
+}
+
+.student-shell:has(.student-collab) .student-collab__composer textarea {
+  min-height: 58px;
+  height: 64px;
+  max-height: 78px;
+  resize: none;
+  padding: 9px 11px;
+  font-size: 13px;
+}
+
+.student-shell:has(.student-collab) .student-collab__composer > div {
+  margin-top: 5px;
+}
+
+.student-shell:has(.student-collab) .student-collab__composer small {
+  font-size: 10px;
+}
+
+@media (max-width: 767px) {
+  .student-shell:has(.student-collab) .student-content {
+    padding: 8px !important;
+  }
+
+  .student-shell:has(.student-collab) .student-collab {
+    padding: 12px;
+  }
+
+  .student-shell:has(.student-collab) .student-collab__heading p {
+    max-width: 52vw;
+  }
+
+  .student-shell:has(.student-collab) .student-collab__details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 10px;
+  }
+
+  .student-shell:has(.student-collab) .student-collab__history {
+    min-height: 100px;
+    padding: 9px;
+  }
+}
+
+/* Full-width, full-height workspaces share the same viewport as the shell.
+   The header and fixed sidebar provide the chrome; the active page uses all
+   remaining space instead of leaving a centered max-width dead band. */
+.student-shell:has(.group-ai-page) > .student-body,
+.student-shell:has(.student-collab) > .student-body,
+.student-shell:has(.supervisor-page) > .student-body {
+  height: calc(100dvh - var(--fy-shell-header, 4rem)) !important;
+  min-height: 0 !important;
+}
+
+.student-shell:has(.group-ai-page) .student-content,
+.student-shell:has(.student-collab) .student-content,
+.student-shell:has(.supervisor-page) .student-content {
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0;
+  min-height: 0;
+}
+
+.student-shell:has(.group-ai-page) .student-content__inner,
+.student-shell:has(.student-collab) .student-content__inner,
+.student-shell:has(.supervisor-page) .student-content__inner {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  min-height: 0;
+}
+
+.student-shell:has(.group-ai-page) .group-ai-page,
+.student-shell:has(.student-collab) .student-collab,
+.student-shell:has(.supervisor-page) .supervisor-page {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+/* Keep the collaboration composer pinned below the history. The history owns
+   the remaining space and is the only region that scrolls vertically. */
+.student-shell:has(.student-collab) #student-collab-content {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.student-shell:has(.student-collab) .student-collab__history {
+  flex: 1 1 0%;
+  min-height: 0;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.student-shell:has(.student-collab) .student-collab__composer {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+/* The collaboration route is a chat workspace: the message history should
+   consume every pixel left by the shell, while the composer stays pinned to
+   the bottom of the white panel. This also covers supervisor group details,
+   where the channel is nested below the group tabs. */
+.student-shell:has(.student-collab) .student-content__inner,
+.student-shell:has(.student-collab) .supervisor-page,
+.student-shell:has(.student-collab) .supervisor-group-card,
+.student-shell:has(.student-collab) .supervisor-group-workspace,
+.student-shell:has(.student-collab) .supervisor-discussion,
+.student-shell:has(.student-collab) .student-collab,
+.student-shell:has(.student-collab) #student-collab-content {
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+.student-shell:has(.student-collab) .student-content__inner {
+  height: 100%;
+  min-height: calc(100dvh - 4rem - 28px) !important;
+}
+
+.student-shell:has(.student-collab) .supervisor-page,
+.student-shell:has(.student-collab) .supervisor-group-card,
+.student-shell:has(.student-collab) .supervisor-group-workspace,
+.student-shell:has(.student-collab) .supervisor-discussion,
+.student-shell:has(.student-collab) .student-collab,
+.student-shell:has(.student-collab) #student-collab-content {
+  height: 100%;
+}
+
+.student-shell:has(.student-collab) .supervisor-page,
+.student-shell:has(.student-collab) .supervisor-group-card,
+.student-shell:has(.student-collab) .supervisor-group-workspace,
+.student-shell:has(.student-collab) .supervisor-discussion,
+.student-shell:has(.student-collab) .student-collab,
+.student-shell:has(.student-collab) #student-collab-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.student-shell:has(.student-collab) .supervisor-page {
+  flex: 1 1 auto;
+  min-height: 100% !important;
+}
+
+.student-shell:has(.student-collab) .supervisor-group-card,
+.student-shell:has(.student-collab) .supervisor-group-workspace,
+.student-shell:has(.student-collab) .supervisor-discussion,
+.student-shell:has(.student-collab) .student-collab,
+.student-shell:has(.student-collab) #student-collab-content {
+  flex: 1 1 auto;
+}
+
+.student-shell:has(.student-collab) .supervisor-group-workspace,
+.student-shell:has(.student-collab) .supervisor-discussion,
+.student-shell:has(.student-collab) #student-collab-content {
+  overflow: hidden;
+}
+
+.student-shell:has(.student-collab) .student-collab__history {
+  flex: 1 1 0%;
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.student-shell:has(.student-collab) .student-collab__composer {
+  flex: 0 0 auto;
+}
+
+/* This must be last: the shell reserves the fixed header with top padding, so
+   subtracting the header from the body height would create a blank bottom
+   strip and clip the composer. */
+.student-shell:has(.group-ai-page) > .student-body,
+.student-shell:has(.student-collab) > .student-body {
+  height: 100dvh !important;
+}
+
+@media (min-width: 768px) {
+  .student-shell:has(.student-collab) .student-content {
+    margin-left: var(--fy-shell-sidebar-width) !important;
+    padding: 0 !important;
+    border-left: 1px solid var(--fy-border) !important;
+  }
+
+  .student-shell:has(.student-sidebar.role-sidebar.student-sidebar--collapsed):has(.student-collab) .student-content {
+    margin-left: var(--fy-shell-sidebar-collapsed-width) !important;
+  }
+
+  .student-shell:has(.student-collab) .student-content__inner {
+    padding: 0 !important;
+  }
+}
+
+/* Keep the collaboration actions outside the history scroller. Some of the
+   full-height workspace rules above intentionally clip their panel children;
+   that is correct for the history itself, but it can hide the composer row
+   when the panel also has a fixed-height ancestor. */
+.student-shell:has(.student-collab) .student-content,
+.student-shell:has(.student-collab) .student-content__inner,
+.student-shell:has(.student-collab) .student-collab,
+.student-shell:has(.student-collab) #student-collab-content {
+  box-sizing: border-box;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.student-shell:has(.student-collab) .student-collab {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.student-shell:has(.student-collab) #student-collab-content {
+  display: flex !important;
+  height: auto !important;
+  min-height: 0 !important;
+  flex: 1 1 0% !important;
+  flex-direction: column !important;
+}
+
+.student-shell:has(.student-collab) .student-collab__history {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.student-shell:has(.student-collab) .student-collab__composer {
+  display: block !important;
+  height: auto !important;
+  min-height: 104px !important;
+  max-height: none !important;
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+}
+
+.student-shell:has(.student-collab) .student-collab__composer-bottom {
+  display: flex !important;
+  min-height: 34px !important;
+  flex: 0 0 auto !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.student-shell:has(.student-collab) .student-collab__composer-bottom > *,
+.student-shell:has(.student-collab) .student-collab__composer-tools > * {
+  visibility: visible !important;
+}
+
+.student-shell:has(.supervisor-discussion) .supervisor-group-workspace,
+.student-shell:has(.supervisor-discussion) .supervisor-discussion {
+  overflow: visible !important;
 }
