@@ -5,6 +5,7 @@
   --color-fy-page: var(--fy-page);
   --color-fy-surface: var(--fy-surface);
   --color-fy-surface-muted: var(--fy-surface-muted);
+  --color-fy-surface-hover: var(--fy-surface-hover);
   --color-fy-border: var(--fy-border);
   --color-fy-text: var(--fy-text);
   --color-fy-text-secondary: var(--fy-text-secondary);
@@ -102,7 +103,7 @@ main:has(.admin-sidebar) .text-\[\#176b66\], main:has(.admin-sidebar) .text-\[\#
 main:has(.admin-sidebar) .bg-\[\#e4eee7\], main:has(.admin-sidebar) .bg-\[\#eef0ff\] { background-color: var(--admin-selected); }
 main:has(.admin-sidebar) .border-\[\#dce4de\], main:has(.admin-sidebar) .border-\[\#cbd6d0\], main:has(.admin-sidebar) .border-\[\#b8cdc1\] { border-color: var(--admin-border); }
 main:has(.admin-sidebar) .text-\[\#243746\] { color: var(--admin-text); }
-main:has(.admin-sidebar) .text-\[\var(--fy-text-secondary)\] { color: var(--admin-muted); }
+main:has(.admin-sidebar) [class*="text-[var(--fy-text-secondary)]"] { color: var(--admin-muted); }
 main:has(.admin-sidebar) input:focus, main:has(.admin-sidebar) select:focus, main:has(.admin-sidebar) textarea:focus { border-color: var(--admin-primary); box-shadow: var(--fy-focus-ring, 0 0 0 3px rgb(29 78 216 / .28)); }
 main:has(.admin-sidebar) > header > div:last-child { align-items: center; gap: .75rem; }
 main:has(.admin-sidebar) > header > div:last-child > span,

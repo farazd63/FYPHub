@@ -16,7 +16,7 @@ const STORAGE_KEY = "fyphub-theme";
 /** Meta theme-color values (allowed outside CSS token file). */
 const THEME_COLOR: Record<Theme, string> = {
   light: "#F4F7FE",
-  dark: "#0c0e12",
+  dark: "#0B0D0F",
 };
 
 export function readStoredTheme(): Theme {
@@ -26,7 +26,7 @@ export function readStoredTheme(): Theme {
   } catch {
     /* ignore */
   }
-  return "light";
+  return "dark";
 }
 
 /** Apply theme via data-theme only — colours come from design-tokens.css. */

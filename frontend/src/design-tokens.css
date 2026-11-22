@@ -55,8 +55,120 @@
   --fy-shell-inset-mobile: 0.5rem;
 }
 
-/* DEFAULT = light (even when OS prefers dark) */
+/* DEFAULT = Noir. Light remains available through the existing theme toggle. */
 :root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Noir palette — layered graphite surfaces with a restrained amber accent. */
+  --noir-bg: #0B0D0F;
+  --noir-surface: #121518;
+  --noir-surface-raised: #181C20;
+  --noir-surface-hover: #20252A;
+  --noir-border: #2A3036;
+  --noir-border-strong: #3A424A;
+  --noir-input-border: #384149;
+  --noir-text-primary: #F2F4F5;
+  --noir-text-secondary: #A7AFB7;
+  --noir-text-muted: #707982;
+  --noir-accent: #D7A25F;
+  --noir-accent-hover: #E2B777;
+  --noir-success: #3FB984;
+  --noir-warning: #D9A441;
+  --noir-danger: #D66B6B;
+  --noir-info: #6C9FE8;
+
+  --fy-bg: #0B0D0F;
+  --fy-bg-subtle: #121518;
+  --fy-page: #0B0D0F;
+  --fy-surface: #121518;
+  --fy-surface-2: #181C20;
+  --fy-surface-muted: #181C20;
+  --fy-surface-hover: #20252A;
+  --fy-border: #2A3036;
+  --fy-border-strong: #3A424A;
+  --fy-input-border: #384149;
+
+  --fy-text: #F2F4F5;
+  --fy-text-muted: #A7AFB7;
+  --fy-text-subtle: #707982;
+  --fy-text-secondary: #A7AFB7;
+  --fy-text-inverse: #0B0D0F;
+  --fy-on-primary: #16100A;
+  --fy-text-on-brand: #16100A;
+
+  --fy-primary: #D7A25F;
+  --fy-primary-hover: #E2B777;
+  --fy-primary-soft: #2A2118;
+  --fy-brand: #D7A25F;
+  --fy-brand-hover: #E2B777;
+  --fy-brand-soft: #2A2118;
+  --fy-brand-ring: rgb(215 162 95 / 0.38);
+
+  --fy-success: #3FB984;
+  --fy-success-soft: #15362B;
+  --fy-warning: #D9A441;
+  --fy-warning-soft: #352816;
+  --fy-danger: #D66B6B;
+  --fy-danger-soft: #351B1E;
+  --fy-info: #6C9FE8;
+  --fy-info-soft: #182A45;
+  --fy-neutral: #A7AFB7;
+  --fy-neutral-soft: #20252A;
+
+  --fy-disabled-bg: #20252A;
+  --fy-disabled-fg: #A7AFB7;
+  --fy-disabled-border: #444D55;
+
+  --fy-badge-success-bg: #15362B;
+  --fy-badge-success-fg: #3FB984;
+  --fy-badge-warning-bg: #352816;
+  --fy-badge-warning-fg: #D9A441;
+  --fy-badge-danger-bg: #351B1E;
+  --fy-badge-danger-fg: #D66B6B;
+  --fy-badge-info-bg: #182A45;
+  --fy-badge-info-fg: #6C9FE8;
+  --fy-badge-neutral-bg: #20252A;
+  --fy-badge-neutral-fg: #A7AFB7;
+
+  --fy-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.25);
+  --fy-shadow-md: 0 1px 0 rgb(255 255 255 / 0.025), 0 12px 30px rgb(0 0 0 / 0.28);
+  --fy-shadow-nav: 0 12px 32px rgb(0 0 0 / 0.32);
+  --fy-shadow: var(--fy-shadow-md);
+  --fy-focus-ring: 0 0 0 2px var(--fy-surface), 0 0 0 4px var(--fy-brand-ring);
+
+  --fy-scrim: rgb(0 0 0 / 0.72);
+  --fy-hero-grad-start: #181C20;
+  --fy-hero-grad-end: #0B0D0F;
+  --fy-footer-bg: #121518;
+  --fy-footer-text: #F2F4F5;
+  --fy-theme-color: #0B0D0F;
+
+  /* Legacy aliases */
+  --ds-page: var(--fy-page);
+  --ds-surface: var(--fy-surface);
+  --ds-ink: var(--fy-text);
+  --ds-muted: var(--fy-text-secondary);
+  --ds-border: var(--fy-border);
+  --ds-purple: var(--fy-brand);
+  --ds-purple-dark: var(--fy-brand-hover);
+  --ds-purple-soft: var(--fy-brand-soft);
+  --ds-mint: var(--fy-success);
+  --ds-mint-soft: var(--fy-success-soft);
+  --ds-orange: var(--fy-warning);
+  --ds-orange-soft: var(--fy-warning-soft);
+  --ds-shadow: var(--fy-shadow);
+  --brand-blue: var(--fy-brand);
+  --app-primary: var(--fy-brand);
+  --app-primary-hover: var(--fy-brand-hover);
+  --app-selected: var(--fy-brand-soft);
+  --app-text: var(--fy-text);
+  --app-muted: var(--fy-text-secondary);
+  --app-page: var(--fy-page);
+  --app-surface: var(--fy-surface);
+  --app-border: var(--fy-border);
+}
+
 :root[data-theme="light"] {
   color-scheme: light;
 
@@ -66,6 +178,7 @@
   --fy-surface: #ffffff;
   --fy-surface-2: #f7f9fe;
   --fy-surface-muted: var(--fy-surface-2);
+  --fy-surface-hover: #eef2fa;
   --fy-border: #dce5f6;
   --fy-border-strong: #bcc9e6;
   --fy-input-border: var(--fy-border);
@@ -128,99 +241,6 @@
   --fy-theme-color: #f4f7fe;
 
   /* Legacy aliases */
-  --ds-page: var(--fy-page);
-  --ds-surface: var(--fy-surface);
-  --ds-ink: var(--fy-text);
-  --ds-muted: var(--fy-text-secondary);
-  --ds-border: var(--fy-border);
-  --ds-purple: var(--fy-brand);
-  --ds-purple-dark: var(--fy-brand-hover);
-  --ds-purple-soft: var(--fy-brand-soft);
-  --ds-mint: var(--fy-success);
-  --ds-mint-soft: var(--fy-success-soft);
-  --ds-orange: var(--fy-warning);
-  --ds-orange-soft: var(--fy-warning-soft);
-  --ds-shadow: var(--fy-shadow);
-  --brand-blue: var(--fy-brand);
-  --app-primary: var(--fy-brand);
-  --app-primary-hover: var(--fy-brand-hover);
-  --app-selected: var(--fy-brand-soft);
-  --app-text: var(--fy-text);
-  --app-muted: var(--fy-text-secondary);
-  --app-page: var(--fy-page);
-  --app-surface: var(--fy-surface);
-  --app-border: var(--fy-border);
-}
-
-/* DARK = charcoal + gold with high-visibility white control and box borders */
-:root[data-theme="dark"] {
-  color-scheme: dark;
-
-  --fy-bg: #0c0e12;
-  --fy-bg-subtle: #10141c;
-  --fy-page: #0c0e12;
-  --fy-surface: #151922;
-  --fy-surface-2: #1c222e;
-  --fy-surface-muted: #1c222e;
-  --fy-border: #ffffff;
-  --fy-border-strong: #ffffff;
-  --fy-input-border: #ffffff;
-
-  --fy-text: #f4f6fa;
-  --fy-text-muted: #d5dce8;
-  --fy-text-subtle: #d5dce8;
-  --fy-text-secondary: #d5dce8;
-  --fy-text-inverse: #0c0e12;
-  --fy-on-primary: #1a1208;
-  --fy-text-on-brand: #1a1208;
-
-  --fy-primary: #e0a85c;
-  --fy-primary-hover: #f0bc74;
-  --fy-primary-soft: #2a2116;
-  --fy-brand: #e0a85c;
-  --fy-brand-hover: #f0bc74;
-  --fy-brand-soft: #2a2116;
-  --fy-brand-ring: rgb(224 168 92 / 0.38);
-
-  --fy-success: #7ddea0;
-  --fy-success-soft: #132a1c;
-  --fy-warning: #e0a85c;
-  --fy-warning-soft: #2a2116;
-  --fy-danger: #f07178;
-  --fy-danger-soft: #2a1518;
-  --fy-info: #7eb8c9;
-  --fy-info-soft: #152228;
-  --fy-neutral: #d5dce8;
-  --fy-neutral-soft: #1c222e;
-
-  --fy-disabled-bg: #222833;
-  --fy-disabled-fg: #c5cddc;
-  --fy-disabled-border: #3a4254;
-
-  --fy-badge-success-bg: #132a1c;
-  --fy-badge-success-fg: #7ddea0;
-  --fy-badge-warning-bg: #2a2116;
-  --fy-badge-warning-fg: #e0a85c;
-  --fy-badge-danger-bg: #2a1518;
-  --fy-badge-danger-fg: #f07178;
-  --fy-badge-info-bg: #152228;
-  --fy-badge-info-fg: #7eb8c9;
-  --fy-badge-neutral-bg: #1c222e;
-  --fy-badge-neutral-fg: #d5dce8;
-
-  --fy-shadow-sm: 0 1px 0 rgb(255 255 255 / 0.04);
-  --fy-shadow-md: 0 1px 0 rgb(255 255 255 / 0.04), 0 18px 40px rgb(0 0 0 / 0.35);
-  --fy-shadow-nav: 0 10px 30px rgb(0 0 0 / 0.45);
-  --fy-shadow: var(--fy-shadow-md);
-  --fy-focus-ring: 0 0 0 2px var(--fy-surface), 0 0 0 4px var(--fy-brand-ring);
-
-  --fy-scrim: rgb(0 0 0 / 0.65);
-  --fy-hero-grad-start: #1a1f2a;
-  --fy-hero-grad-end: #0c0e12;
-  --fy-footer-bg: #151922;
-  --fy-footer-text: #f4f6fa;
-  --fy-theme-color: #0c0e12;
-
   --ds-page: var(--fy-page);
   --ds-surface: var(--fy-surface);
   --ds-ink: var(--fy-text);

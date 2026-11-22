@@ -269,7 +269,7 @@
     overflow: hidden;
     border: 1px solid #d8e2f2;
     border-radius: 18px;
-    background: #fff;
+    background: var(--fy-surface);
     box-shadow: 0 16px 34px rgb(41 72 128 / 0.10);
   }
 
@@ -284,7 +284,7 @@
     flex: 0 0 48px;
     border: 1px solid #d8e2f2 !important;
     border-radius: 14px !important;
-    background: #fff !important;
+    background: var(--fy-surface-raised) !important;
     color: #315de0 !important;
     box-shadow: 0 4px 12px rgb(41 72 128 / 0.08) !important;
     transform: none !important;
@@ -310,7 +310,7 @@
     min-width: 0;
     flex: 1 1 auto;
     overflow: hidden;
-    background: #fff;
+    background: var(--fy-surface);
     opacity: 1;
     pointer-events: auto;
     transform: none;
@@ -388,7 +388,7 @@
     gap: 12px;
     padding: 76px 12px 14px;
     border: 0;
-    background: #f7f9fc;
+    background: var(--fy-surface-raised);
   }
 
   .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-list {
@@ -555,7 +555,7 @@
   overflow: hidden;
   border: 1px solid #e3e7eb;
   border-radius: 12px;
-  background: #fff;
+  background: var(--fy-surface);
   box-shadow: 0 12px 28px rgb(31 41 55 / 0.08);
 }
 
@@ -569,7 +569,7 @@
   gap: 14px;
   padding: 10px 8px;
   border-right: 1px solid #e8ebee;
-  background: #f3f5f7;
+  background: var(--fy-surface-raised);
 }
 
 .role-sidebar__collapse {
@@ -585,7 +585,7 @@
   transform: none !important;
 }
 
-.role-sidebar__collapse:hover { background: #e4e8ec !important; color: #315de0 !important; }
+.role-sidebar__collapse:hover { background: var(--fy-surface-hover) !important; color: var(--fy-brand) !important; }
 
 .role-sidebar__rail-list {
   display: flex;
@@ -611,7 +611,7 @@
   transition: background 150ms ease, color 150ms ease, transform 150ms ease;
 }
 
-.role-sidebar__rail-item:hover { background: #e4e8ec; color: #315de0; transform: translateY(-1px); }
+.role-sidebar__rail-item:hover { background: var(--fy-surface-hover); color: var(--fy-brand); transform: translateY(-1px); }
 .role-sidebar__rail-item[aria-pressed="false"] { background: transparent !important; color: #71808d !important; box-shadow: none !important; }
 .role-sidebar__rail-item[aria-pressed="true"] { background: #2f6eea; color: #fff; box-shadow: 0 5px 12px rgb(47 110 234 / 0.22); }
 .role-sidebar__rail-icon { display: grid; width: 18px; height: 18px; place-items: center; }
@@ -622,7 +622,7 @@
   min-width: 0;
   flex: 1 1 auto;
   flex-direction: column;
-  background: #fff;
+  background: var(--fy-surface);
 }
 
 .role-sidebar__panel-head {
@@ -669,7 +669,7 @@
   color: #8a949d;
 }
 
-.role-sidebar__panel-toggle:hover { background: #f0f2f4; color: #315de0; }
+.role-sidebar__panel-toggle:hover { background: var(--fy-surface-hover); color: var(--fy-brand); }
 
 .role-sidebar .student-sidebar__nav {
   gap: 0;
@@ -682,7 +682,7 @@
   overflow: hidden;
   border: 1px solid #edf0f3;
   border-radius: 9px;
-  background: #fff;
+  background: var(--fy-surface);
 }
 
 .role-sidebar__menu-section.is-selected {
@@ -699,7 +699,7 @@
   gap: 10px;
   padding: 8px 11px;
   border: 0;
-  background: #f8fafc;
+  background: var(--fy-surface-raised);
   color: #53606c;
   font-size: 11px;
   font-weight: 700;
@@ -709,7 +709,7 @@
 
 .role-sidebar__menu-section-head:hover,
 .role-sidebar__menu-section-head:focus-visible {
-  background: #f0f4fa;
+  background: var(--fy-surface-hover);
   color: #2f6eea;
   outline: none;
 }
@@ -739,7 +739,7 @@
   place-items: center;
   border: 1px solid #dce5ef;
   border-radius: 6px;
-  background: #fff;
+  background: var(--fy-surface-raised);
   color: #778694;
 }
 
@@ -750,7 +750,7 @@
   gap: 2px;
   padding: 5px;
   border-top: 1px solid #edf0f3;
-  background: #fff;
+  background: var(--fy-surface);
 }
 
 .role-sidebar .student-sidebar__item {
@@ -769,7 +769,7 @@
 
 .role-sidebar .student-sidebar__item:hover:not(:disabled):not([aria-current="page"]) {
   border: 0;
-  background: #f1f3f5;
+  background: var(--fy-surface-hover);
   color: #25323d;
   transform: none;
 }
@@ -793,7 +793,7 @@
   place-items: center;
   border: 1px solid #edf0f3;
   border-radius: 6px;
-  background: #fafbfc;
+  background: var(--fy-surface-raised);
   color: #83909b;
 }
 .role-sidebar .student-sidebar__icon svg { width: 14px; height: 14px; }
@@ -864,7 +864,7 @@
     flex-basis: 46px;
     border: 1px solid #d8e2f2 !important;
     border-radius: 14px !important;
-    background: #fff !important;
+    background: var(--fy-surface-raised) !important;
     color: #315de0 !important;
   }
 
@@ -910,12 +910,12 @@
     flex-basis: 48px;
     border: 1px solid #d8e2f2 !important;
     border-radius: 14px !important;
-    background: #fff !important;
+    background: var(--fy-surface-raised) !important;
     color: #315de0 !important;
   }
 
   .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__collapse:hover {
-    background: #eef3ff !important;
+    background: var(--fy-surface-hover) !important;
     box-shadow: 0 5px 12px rgb(47 110 234 / 0.12) !important;
   }
 
@@ -972,7 +972,7 @@
   }
 
   .student-sidebar.role-sidebar .role-sidebar__menu-section:not(.is-selected) .role-sidebar__menu-section-head {
-    background: #f8fafc;
+    background: var(--fy-surface-raised);
     color: #5f6d79;
   }
 }
@@ -988,7 +988,7 @@
     overflow: hidden !important;
     border: 1px solid #d8e2f2 !important;
     border-radius: 18px !important;
-    background: #fff !important;
+    background: var(--fy-surface) !important;
     box-shadow: 0 16px 34px rgb(41 72 128 / 0.10) !important;
   }
 
@@ -1005,7 +1005,7 @@
     place-items: center;
     border: 1px solid #d8e2f2 !important;
     border-radius: 14px !important;
-    background: #fff !important;
+    background: var(--fy-surface) !important;
     color: #315de0 !important;
     box-shadow: 0 4px 12px rgb(41 72 128 / 0.08) !important;
     transform: none !important;
@@ -1027,7 +1027,7 @@
     flex: 1 1 auto !important;
     flex-direction: column !important;
     overflow: hidden !important;
-    background: #fff !important;
+    background: var(--fy-surface) !important;
   }
 
   .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .student-sidebar__nav {
@@ -1072,7 +1072,7 @@
     gap: 12px !important;
     padding: 76px 12px 14px !important;
     border: 0 !important;
-    background: #f7f9fc !important;
+    background: var(--fy-surface-raised) !important;
   }
 
   .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-list {

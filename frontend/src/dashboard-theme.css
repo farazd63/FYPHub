@@ -226,7 +226,7 @@ main:has(.admin-sidebar) .admin-enter .rounded-3xl.border {
 .student-shell button[type="submit"] {
   border-radius: 10px;
   background: var(--fy-brand, var(--dash-blue));
-  color: var(--fy-text-on-brand, #1a1208);
+  color: var(--fy-text-on-brand);
   box-shadow: var(--fy-shadow, none);
 }
 
@@ -236,7 +236,7 @@ main:has(.admin-sidebar) .admin-enter .rounded-3xl.border {
 .admin-shell button[class*="bg-[#176B66]"]:hover:not(:disabled),
 .student-shell button[type="submit"]:hover:not(:disabled) {
   background: var(--fy-brand-hover, var(--dash-blue-dark));
-  color: var(--fy-text-on-brand, #1a1208);
+  color: var(--fy-text-on-brand);
 }
 
 @media (max-width: 767px) {

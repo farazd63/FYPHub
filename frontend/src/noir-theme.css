@@ -1,0 +1,753 @@
+/* FYPHub Noir — final presentation layer for legacy route styles.
+   Components keep their existing structure and behavior; this file only
+   reconciles older light/black declarations with the shared token system. */
+
+html[data-theme="dark"],
+html[data-theme="dark"] body,
+html[data-theme="dark"] #root {
+  background: var(--noir-bg);
+  color: var(--noir-text-primary);
+}
+
+html[data-theme="dark"] ::selection {
+  background: color-mix(in srgb, var(--noir-accent) 35%, transparent);
+  color: var(--noir-text-primary);
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page,
+  .student-content,
+  .portal-content,
+  .admin-shell__content
+) {
+  background: var(--noir-bg) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+/* Shared graphite chrome: header, sidebar, cards and contextual panels. */
+html[data-theme="dark"] :where(
+  .admin-shell > header,
+  .admin-shell__header,
+  .student-header,
+  .portal-header,
+  .admin-sidebar,
+  .student-sidebar,
+  .student-sidebar.role-sidebar,
+  .role-sidebar,
+  .role-sidebar__panel,
+  .role-sidebar__menu-section,
+  .role-sidebar__section-items,
+  .admin-shell .fy-card,
+  .student-shell .fy-card,
+  .portal-shell .fy-card,
+  .student-request-card,
+  .student-placeholder,
+  .supervisor-card,
+  .progress-card,
+  .progress-board,
+  .progress-summary__card,
+  .academic-cycle-dashboard__card,
+  .academic-cycle-dashboard__table-wrap,
+  .cycle-overview,
+  .cycle-overview__card,
+  .module3-panel,
+  .group-ai-card,
+  .student-collab,
+  .student-collab__history,
+  .supervisor-monitor-table
+) {
+  background: var(--noir-surface) !important;
+  background-image: none !important;
+  border-color: var(--noir-border) !important;
+  color: var(--noir-text-primary) !important;
+  box-shadow: var(--fy-shadow-sm) !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-sidebar,
+  .student-sidebar.role-sidebar,
+  .role-sidebar
+) {
+  border-radius: 1rem !important;
+  box-shadow: var(--fy-shadow-nav) !important;
+}
+
+html[data-theme="dark"] :where(
+  .role-sidebar__rail,
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail,
+  .role-sidebar__menu-section-head,
+  .admin-sidebar nav button:hover:not([aria-current="page"])
+) {
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .role-sidebar__panel-head,
+  .role-sidebar__panel-toggle,
+  .role-sidebar__panel-title,
+  .role-sidebar__panel-count,
+  .role-sidebar__section-heading,
+  .student-sidebar__section-label
+) {
+  color: var(--noir-text-secondary) !important;
+  border-color: var(--noir-border) !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-sidebar nav button,
+  .student-sidebar__item,
+  .role-sidebar .student-sidebar__item,
+  .role-sidebar__rail-item
+) {
+  color: var(--noir-text-secondary) !important;
+  border-color: transparent !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-sidebar nav button:hover:not([aria-current="page"]),
+  .student-sidebar__item:hover:not(:disabled):not([aria-current="page"]),
+  .role-sidebar .student-sidebar__item:hover:not(:disabled):not([aria-current="page"]),
+  .role-sidebar__rail-item:hover,
+  .role-sidebar__panel-toggle:hover
+) {
+  background: var(--noir-surface-hover) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-sidebar nav button[aria-current="page"],
+  .admin-sidebar nav button[aria-current="page"]:hover,
+  .student-sidebar__item[aria-current="page"],
+  .student-sidebar__item[aria-current="page"]:hover,
+  .role-sidebar .student-sidebar__item[aria-current="page"],
+  .role-sidebar .student-sidebar__item[aria-current="page"]:hover,
+  .role-sidebar__rail-item[aria-pressed="true"]
+) {
+  background: var(--fy-brand-soft) !important;
+  color: var(--noir-accent) !important;
+  border-color: color-mix(in srgb, var(--noir-accent) 28%, var(--noir-border)) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-sidebar .admin-nav-icon,
+  .admin-sidebar .student-sidebar__icon,
+  .role-sidebar__menu-section-icon,
+  .role-sidebar .student-sidebar__icon,
+  .admin-sidebar-toggle,
+  .admin-sidebar .student-sidebar__collapse,
+  .role-sidebar__collapse,
+  .admin-drawer-close
+) {
+  background: var(--noir-surface-raised) !important;
+  border-color: var(--noir-border) !important;
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-sidebar nav button[aria-current="page"] .admin-nav-icon,
+  .admin-sidebar nav button[aria-current="page"] .student-sidebar__icon,
+  .student-sidebar__item[aria-current="page"] .student-sidebar__icon
+) {
+  background: var(--noir-surface-hover) !important;
+  color: var(--noir-accent) !important;
+  border-color: color-mix(in srgb, var(--noir-accent) 30%, var(--noir-border)) !important;
+}
+
+/* Text hierarchy and legacy utility color classes. */
+html[data-theme="dark"] :where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page,
+  .auth-stage,
+  .welcome-landing
+) :where(h1, h2, h3, h4, h5, h6, strong, b, dt, label) {
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page
+) :where(
+  p,
+  small,
+  li,
+  dd,
+  .text-slate-400,
+  .text-slate-500,
+  .text-slate-600,
+  .text-slate-700,
+  [class*="text-[#"]
+) {
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page
+) :where(
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-bold[class*="text-[#"],
+  .font-semibold[class*="text-[#"]
+) {
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .academic-cycle-dashboard,
+  .supervisor-page,
+  .student-content,
+  .portal-content,
+  .academic-cycle-dashboard__meta,
+  .academic-cycle-dashboard__state,
+  .academic-cycle-dashboard__counts,
+  .academic-cycle-dashboard__dates,
+  .supervisor-detail-summary,
+  .supervisor-history,
+  .student-request-list article p
+) {
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .academic-cycle-dashboard h1,
+  .academic-cycle-dashboard h2,
+  .academic-cycle-dashboard strong,
+  .supervisor-page h1,
+  .supervisor-page h2,
+  .supervisor-card h2,
+  .student-page-heading h1,
+  .portal-content h1,
+  .portal-content h2,
+  .portal-content h3,
+  .student-content h1,
+  .student-content h2,
+  .student-content h3
+) {
+  color: var(--noir-text-primary) !important;
+}
+
+/* Legacy white and pastel utility surfaces inside authenticated routes. */
+html[data-theme="dark"] :where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page
+) :where(
+  .bg-white,
+  [class*="bg-white"],
+  .bg-slate-50,
+  .bg-slate-100,
+  [class*="bg-[#f"],
+  [class*="bg-[#e"],
+  [class*="bg-[#d"]
+) {
+  background: var(--noir-surface) !important;
+  background-color: var(--noir-surface) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page
+) :where(
+  .admin-enter .rounded-xl.border,
+  .admin-enter .rounded-2xl.border,
+  .admin-enter .rounded-3xl.border,
+  .student-content .rounded-xl.border,
+  .student-content .rounded-2xl.border,
+  .portal-content .rounded-xl.border,
+  .portal-content .rounded-2xl.border,
+  article[class*="rounded-"],
+  section[class*="rounded-"]
+) {
+  background: var(--noir-surface) !important;
+  border-color: var(--noir-border) !important;
+  color: var(--noir-text-primary) !important;
+  box-shadow: var(--fy-shadow-sm) !important;
+}
+
+/* Controls share one quiet raised layer and a single accessible focus ring. */
+html[data-theme="dark"] :where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page
+) :where(
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea,
+  input[type="file"]
+) {
+  border: 1px solid var(--noir-input-border) !important;
+  border-radius: var(--fy-radius-control) !important;
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-primary) !important;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page
+) :where(input, select, textarea)::placeholder {
+  color: var(--noir-text-muted) !important;
+  opacity: 1;
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page
+) :where(input, select, textarea):focus {
+  border-color: var(--noir-accent) !important;
+  box-shadow: var(--fy-focus-ring) !important;
+  outline: 0 !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page
+) :where(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--noir-accent);
+  color-scheme: dark;
+}
+
+/* Buttons: neutral controls are charcoal; primary actions use the brand only. */
+html[data-theme="dark"] :where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace,
+  .module3-admin-page
+) button:not(.fy-btn--primary):not(.module3-primary-button):not([type="submit"]):not([class*="bg-[#466"]):not([class*="bg-[#176"]):not([class*="bg-[#315"]):not([class*="bg-[#2f"]):not([class*="bg-slate-7"]):not([class*="bg-slate-8"]):not([class*="bg-red-"]) {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-btn--primary,
+  button[type="submit"],
+  .module3-primary-button,
+  [class*="bg-[#466"],
+  [class*="bg-[#176"],
+  [class*="bg-[#315"],
+  [class*="bg-[#2f"],
+  [class*="bg-slate-7"],
+  [class*="bg-slate-8"]
+) {
+  border-color: transparent !important;
+  background: var(--noir-accent) !important;
+  color: var(--fy-text-on-brand) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-btn--primary:hover:not(:disabled),
+  button[type="submit"]:hover:not(:disabled),
+  .module3-primary-button:hover:not(:disabled),
+  [class*="bg-[#466"]:hover:not(:disabled),
+  [class*="bg-[#176"]:hover:not(:disabled),
+  [class*="bg-[#315"]:hover:not(:disabled)
+) {
+  background: var(--noir-accent-hover) !important;
+  color: var(--fy-text-on-brand) !important;
+}
+
+html[data-theme="dark"] :where(
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  textarea:disabled
+) {
+  background: var(--fy-disabled-bg) !important;
+  border-color: var(--fy-disabled-border) !important;
+  color: var(--fy-disabled-fg) !important;
+  opacity: 1 !important;
+}
+
+/* Tables and data visualizations. */
+html[data-theme="dark"] :where(
+  .admin-shell table,
+  .student-shell table,
+  .portal-shell table,
+  .module3-workspace table,
+  .academic-cycle-dashboard table,
+  .fy-table
+) {
+  color: var(--noir-text-primary) !important;
+  background: transparent !important;
+  border-color: var(--noir-border) !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell thead,
+  .student-shell thead,
+  .portal-shell thead,
+  .module3-workspace thead,
+  .academic-cycle-dashboard th,
+  .fy-table__head
+) {
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell th,
+  .admin-shell td,
+  .student-shell th,
+  .student-shell td,
+  .portal-shell th,
+  .portal-shell td,
+  .module3-workspace th,
+  .module3-workspace td,
+  .academic-cycle-dashboard th,
+  .academic-cycle-dashboard td,
+  .fy-table__th,
+  .fy-table__td
+) {
+  border-color: var(--noir-border) !important;
+  color: var(--noir-text-secondary) !important;
+  background: transparent !important;
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell tbody tr:hover,
+  .student-shell tbody tr:hover,
+  .portal-shell tbody tr:hover,
+  .fy-table__row:hover .fy-table__td
+) {
+  background: var(--noir-surface-hover) !important;
+}
+
+/* Semantic states, badges, notifications and focus. */
+html[data-theme="dark"] :where(
+  .fy-status-badge,
+  .student-status,
+  .student-role,
+  .admin-role,
+  .portal-role,
+  .cycle-overview__status,
+  .academic-cycle-dashboard__status
+) {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-status-badge--brand
+) {
+  border-color: color-mix(in srgb, var(--noir-accent) 35%, var(--noir-border)) !important;
+  background: var(--fy-brand-soft) !important;
+  color: var(--noir-accent) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-status-badge--info
+) {
+  border-color: color-mix(in srgb, var(--noir-info) 35%, var(--noir-border)) !important;
+  background: var(--noir-info-soft) !important;
+  color: var(--noir-info) !important;
+}
+
+html[data-theme="dark"] :where(
+  .student-status--accepted,
+  .student-status--implemented,
+  [data-status="ACCEPTED"],
+  .cycle-overview__status--open
+) {
+  border-color: color-mix(in srgb, var(--noir-success) 35%, var(--noir-border)) !important;
+  background: var(--noir-success-soft) !important;
+  color: var(--noir-success) !important;
+}
+
+html[data-theme="dark"] [data-status="SUBMITTED"] {
+  border-color: color-mix(in srgb, var(--noir-info) 35%, var(--noir-border)) !important;
+  background: var(--noir-info-soft) !important;
+  color: var(--noir-info) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-status-badge--warning,
+  .student-status--partial,
+  [data-status="CHANGES_REQUESTED"],
+  [data-status="PARTIAL"]
+) {
+  border-color: color-mix(in srgb, var(--noir-warning) 35%, var(--noir-border)) !important;
+  background: var(--noir-warning-soft) !important;
+  color: var(--noir-warning) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-status-badge--danger,
+  .student-status--rejected,
+  [data-status="REJECTED"],
+  [data-status="FAILED"],
+  [role="alert"]
+) {
+  border-color: color-mix(in srgb, var(--noir-danger) 35%, var(--noir-border)) !important;
+  background: var(--noir-danger-soft) !important;
+  color: var(--noir-danger) !important;
+}
+
+html[data-theme="dark"] :where(
+  .progress-hero,
+  .student-overview__hero,
+  .cycle-overview__hero,
+  .module3-hero
+) {
+  background: var(--noir-surface-raised) !important;
+  background-image: none !important;
+  border-color: var(--noir-border) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-toast,
+  .fy-alert,
+  .progress-toast,
+  .student-request-alert,
+  .supervisor-alert,
+  .group-ai-error,
+  .cycle-overview__message,
+  .cycle-overview__error
+) {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-empty,
+  .fy-error-state,
+  .fy-skeleton,
+  .module3-empty,
+  .module3-loading
+) {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-link,
+  .academic-cycle-dashboard__view,
+  .academic-cycle-dashboard__back,
+  .supervisor-page-heading > p,
+  .student-overview__eyebrow,
+  .progress-kicker,
+  .module3-eyebrow,
+  .module3-kicker
+) {
+  color: var(--noir-accent) !important;
+}
+
+/* Dialogs, dropdowns and toasts remain on the same surface stack. */
+html[data-theme="dark"] :where(
+  .fy-modal,
+  [role="dialog"].fixed,
+  .auth-stage__panel [role="dialog"]
+) {
+  background: var(--fy-scrim) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-modal__panel,
+  [role="dialog"].fixed > div,
+  [role="menu"],
+  .admin-shell [role="listbox"]
+) {
+  background: var(--noir-surface-raised) !important;
+  border-color: var(--noir-border) !important;
+  color: var(--noir-text-primary) !important;
+  box-shadow: var(--fy-shadow-nav) !important;
+}
+
+/* Public authentication and welcome surfaces. */
+html[data-theme="dark"] .auth-stage {
+  background: var(--noir-bg) !important;
+  background-image: none !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] .auth-stage__panel {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface) !important;
+  box-shadow: var(--fy-shadow-nav) !important;
+}
+
+html[data-theme="dark"] .auth-stage__media { opacity: 0.18; }
+html[data-theme="dark"] .auth-stage__veil {
+  background: var(--fy-scrim) !important;
+}
+html[data-theme="dark"] .auth-stage__glow { opacity: 0.22 !important; }
+
+html[data-theme="dark"] :where(
+  .auth-card,
+  .auth-member-card,
+  .auth-signup-section,
+  .welcome-landing__preview,
+  .welcome-landing__role-card
+) {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+  background-image: none !important;
+  color: var(--noir-text-primary) !important;
+  box-shadow: var(--fy-shadow-md) !important;
+}
+
+html[data-theme="dark"] :where(
+  .auth-card input,
+  .auth-card select,
+  .auth-card textarea,
+  .auth-stage input,
+  .auth-stage select,
+  .auth-stage textarea
+) {
+  border-color: var(--noir-input-border, var(--fy-input-border)) !important;
+  background: var(--noir-surface) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .auth-card__title,
+  .auth-stage__brand h1,
+  .auth-signup-section-title,
+  .welcome-landing h1,
+  .welcome-landing h2,
+  .welcome-landing h3
+) {
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .auth-card__hint,
+  .auth-card__link,
+  .auth-stage__lead,
+  .auth-stage__eyebrow,
+  .welcome-landing__lede,
+  .welcome-landing__flow-label,
+  .welcome-landing__role-card p
+) {
+  color: var(--noir-text-secondary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .auth-card__link:hover,
+  .welcome-landing a:hover,
+  .welcome-landing__eyebrow,
+  .welcome-landing__nav-brand,
+  .welcome-landing__nav-links a
+) {
+  color: var(--noir-accent) !important;
+}
+
+html[data-theme="dark"] .welcome-landing {
+  background: var(--noir-bg) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] main[class*="bg-[#F7F5EF]"] {
+  background: var(--noir-bg) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] main[class*="bg-[#F7F5EF]"] :where(
+  header,
+  aside,
+  section,
+  dl
+) {
+  background: var(--noir-surface) !important;
+  border-color: var(--noir-border) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .fy-logo__wordmark,
+  .auth-stage__brand .fy-logo__wordmark
+) {
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .welcome-landing__nav-wrap,
+  .welcome-landing__nav,
+  .welcome-landing__cta-band,
+  .welcome-landing__footer
+) {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface) !important;
+  color: var(--noir-text-primary) !important;
+}
+
+html[data-theme="dark"] :where(
+  .welcome-landing__preview-chrome,
+  .welcome-landing__preview-body,
+  .welcome-landing__preview-card,
+  .welcome-landing__flow-step,
+  .welcome-landing__chip
+) {
+  border-color: var(--noir-border) !important;
+  background: var(--noir-surface-raised) !important;
+  color: var(--noir-text-secondary) !important;
+}
+
+/* Keep mobile shells contained; tables scroll inside their own surfaces. */
+html[data-theme="dark"] :where(
+  .admin-shell,
+  .student-shell,
+  .portal-shell,
+  .module3-workspace
+) {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+html[data-theme="dark"] :where(
+  .admin-shell .overflow-x-auto,
+  .student-shell .overflow-x-auto,
+  .portal-shell .overflow-x-auto,
+  .fy-table-scroll
+) {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-color: var(--noir-border) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="dark"] * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

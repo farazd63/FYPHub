@@ -243,7 +243,7 @@ export function PanelScheduling({ api }: { api: string }) {
       )}
 
       {rescheduleRow && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="reschedule-heading">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-fy-page/75 p-4" role="dialog" aria-modal="true" aria-labelledby="reschedule-heading">
           <form className="w-full max-w-md rounded-2xl border border-fy-border bg-fy-surface p-5 shadow-xl grid gap-3" onSubmit={(event) => void submitReschedule(event)}>
             <h2 id="reschedule-heading" className="text-lg font-bold text-fy-text">Reschedule Team {rescheduleRow.team_id}</h2>
             <label className="student-upload-label">

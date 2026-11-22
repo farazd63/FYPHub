@@ -8,10 +8,7 @@
   min-height: 100dvh;
   overflow-x: hidden;
   overflow-y: auto;
-  background:
-    radial-gradient(ellipse 70% 55% at 8% 12%, rgb(224 168 92 / 0.14), transparent 58%),
-    radial-gradient(ellipse 45% 40% at 92% 88%, rgb(126 184 201 / 0.08), transparent 52%),
-    linear-gradient(165deg, #07080b 0%, #0c0e12 48%, #10141c 100%);
+  background: var(--fy-page);
   color: var(--fy-text, #eceef2);
   padding: clamp(0.85rem, 2.4vw, 1.75rem);
 }
@@ -62,9 +59,9 @@
   min-height: calc(100dvh - 2 * clamp(0.85rem, 2.4vw, 1.75rem));
   margin-inline: auto;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--fy-brand, #e0a85c) 28%, var(--fy-border, #2a3140));
+  border: 1px solid color-mix(in srgb, var(--fy-brand) 28%, var(--fy-border));
   border-radius: clamp(1.25rem, 2.2vw, 1.75rem);
-  background: #0c0e12;
+  background: var(--fy-surface);
   box-shadow:
     0 0 0 1px rgb(224 168 92 / 0.1),
     0 40px 90px rgb(0 0 0 / 0.55),
@@ -84,7 +81,7 @@
   height: 2.65rem;
   border-color: rgb(255 255 255 / 0.16);
   background: rgb(12 14 18 / 0.62);
-  color: var(--fy-brand, #e0a85c);
+  color: var(--fy-brand);
   backdrop-filter: blur(14px) saturate(1.2);
   -webkit-backdrop-filter: blur(14px) saturate(1.2);
   box-shadow: 0 8px 22px rgb(0 0 0 / 0.28);
@@ -92,7 +89,7 @@
 
 .auth-stage__theme-dock .fy-theme-toggle:hover {
   background: rgb(16 20 28 / 0.82);
-  border-color: color-mix(in srgb, var(--fy-brand, #e0a85c) 45%, transparent);
+  border-color: color-mix(in srgb, var(--fy-brand) 45%, transparent);
   color: var(--fy-brand-hover, #f0bc74);
 }
 
@@ -189,7 +186,7 @@
 
 .auth-stage__eyebrow {
   margin: 1.1rem 0 0;
-  color: var(--fy-brand, #e0a85c);
+  color: var(--fy-brand);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -317,7 +314,7 @@
 }
 
 .auth-card__link {
-  color: var(--fy-brand, #e0a85c) !important;
+  color: var(--fy-brand) !important;
   transition: color 180ms ease, opacity 180ms ease;
 }
 
@@ -347,7 +344,7 @@
 .auth-card input:focus,
 .auth-card select:focus,
 .auth-card textarea:focus {
-  border-color: var(--fy-brand, #e0a85c) !important;
+  border-color: var(--fy-brand) !important;
   box-shadow: 0 0 0 3px rgb(224 168 92 / 0.3) !important;
   background: rgb(8 10 14 / 0.88) !important;
   outline: none;
@@ -398,20 +395,20 @@
 .auth-card a,
 .auth-card button[type="button"].font-semibold,
 .auth-card .underline {
-  color: var(--fy-brand, #e0a85c);
+  color: var(--fy-brand);
 }
 
 .auth-card [role="alert"] {
   border: 1px solid color-mix(in srgb, var(--fy-danger) 40%, transparent);
   border-radius: var(--fy-radius-control, 0.5rem);
   background: var(--fy-danger-soft, #2a1518);
-  color: var(--fy-danger, #f07178);
+  color: var(--fy-danger);
 }
 
 .auth-card [role="status"] {
   border-radius: var(--fy-radius-control, 0.5rem);
-  background: var(--fy-brand-soft, #2a2116);
-  color: var(--fy-brand, #e0a85c);
+  background: var(--fy-brand-soft);
+  color: var(--fy-brand);
 }
 
 .auth-card .password-guidance {
@@ -440,8 +437,8 @@
 }
 
 .auth-card__actions nav button[aria-current="page"] {
-  background: var(--fy-brand-soft, #2a2116);
-  color: var(--fy-brand, #e0a85c);
+  background: var(--fy-brand-soft);
+  color: var(--fy-brand);
 }
 
 .fy-logo {
@@ -454,7 +451,7 @@
 .fy-logo__icon {
   width: 2.75rem;
   height: auto;
-  color: var(--fy-brand, #e0a85c);
+  color: var(--fy-brand);
   filter: drop-shadow(0 0 14px rgb(224 168 92 / 0.4));
 }
 
@@ -471,7 +468,7 @@
   text-shadow: 0 8px 28px rgb(0 0 0 / 0.4);
 }
 
-.fy-logo--auth-mobile .fy-logo__icon { width: 3rem; color: var(--fy-brand, #e0a85c); }
+.fy-logo--auth-mobile .fy-logo__icon { width: 3rem; color: var(--fy-brand); }
 .fy-logo--auth-mobile .fy-logo__wordmark { font-size: 1.6rem; }
 
 .fy-logo--compact .fy-logo__icon { width: 2.2rem; }

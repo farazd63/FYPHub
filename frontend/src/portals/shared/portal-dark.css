@@ -364,7 +364,7 @@ html[data-theme="dark"] {
 }
 .cycle-overview::before { opacity: 0.35; background: radial-gradient(circle at 90% 26%, rgb(224 168 92 / 0.12), transparent 30%) !important; }
 .cycle-overview__hero {
-  background: linear-gradient(115deg, #1a1208, #2a2116 58%, #151922) !important;
+  background: var(--fy-surface-raised) !important;
   box-shadow: var(--fy-shadow) !important;
   color: var(--fy-text) !important;
 }
@@ -899,7 +899,7 @@ html[data-theme="dark"] {
 /* —— Progress dashboard: kill purple/light palette —— */
 .student-shell .progress-page { color: var(--fy-text) !important; }
 .student-shell .progress-hero {
-  background: linear-gradient(125deg, #1a1208 0%, #2a2116 48%, #151922 100%) !important;
+  background: var(--fy-surface-raised) !important;
   box-shadow: var(--fy-shadow) !important;
   color: var(--fy-text) !important;
   border: 1px solid var(--fy-border) !important;
@@ -1393,7 +1393,7 @@ html[data-theme="dark"] {
   border: 1px solid color-mix(in srgb, var(--fy-brand) 22%, var(--fy-border)) !important;
   background:
     radial-gradient(ellipse 55% 80% at 0% 0%, rgb(224 168 92 / 0.12), transparent 55%),
-    linear-gradient(145deg, #1a1208 0%, var(--fy-surface) 48%, #151922 100%) !important;
+    var(--fy-surface-raised) !important;
   box-shadow: var(--fy-shadow) !important;
 }
 

@@ -277,7 +277,7 @@
 .progress-hero {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 20px;
   border-radius: 24px; border: 1px solid var(--fy-border);
-  background: linear-gradient(125deg, #1a1208 0%, #2a2116 48%, #151922 100%);
+  background: var(--fy-surface-raised);
   box-shadow: var(--fy-shadow); color: var(--fy-text); padding: clamp(24px, 4vw, 38px);
 }
 .progress-hero h1 { margin: 0; color: var(--fy-text); font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -0.045em; line-height: 1.05; }

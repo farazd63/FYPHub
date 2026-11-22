@@ -12,6 +12,7 @@ import "./ui/ui.css";
 import "./portals/shared/portal-dark.css";
 import "./modules/module-3/module-3-contrast.css";
 import "./typography-floor.css";
+import "./noir-theme.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

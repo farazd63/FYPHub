@@ -16,27 +16,30 @@ test("shared design system is loaded after the base styles", () => {
   assert.ok(main.indexOf('import "./index.css";') < main.indexOf('import "./design-system.css";'));
 });
 
-test("design tokens define light default and dark charcoal gold themes", () => {
+test("design tokens define a default Noir theme and a light alternate", () => {
   const css = read("design-tokens.css");
   assert.match(css, /:root\[data-theme="light"\]|:root,\s*:root\[data-theme="light"\]/);
   assert.match(css, /:root\[data-theme="dark"\]/);
-  assert.match(css, /--fy-page:\s*var\(--fy-bg\)|--fy-bg:\s*#f4f7fe/i);
+  assert.match(css, /--fy-bg:\s*#f4f7fe/i);
   assert.match(css, /--fy-primary:\s*#243ffa/i);
-  assert.match(css, /--fy-page:\s*#0c0e12/);
-  assert.match(css, /--fy-surface:\s*#151922/);
-  assert.match(css, /--fy-brand:\s*#e0a85c/);
-  assert.match(css, /--fy-success:\s*#7ddea0/);
-  assert.match(css, /--fy-warning:\s*#e0a85c/);
-  assert.match(css, /--fy-danger:\s*#f07178/);
+  assert.match(css, /--noir-bg:\s*#0B0D0F/);
+  assert.match(css, /--noir-surface:\s*#121518/);
+  assert.match(css, /--noir-accent:\s*#D7A25F/);
+  assert.match(css, /--noir-success:\s*#3FB984/);
+  assert.match(css, /--noir-warning:\s*#D9A441/);
+  assert.match(css, /--noir-danger:\s*#D66B6B/);
+  assert.match(css, /--fy-page:\s*#0B0D0F/);
+  assert.match(css, /--fy-surface:\s*#121518/);
+  assert.match(css, /--fy-brand:\s*#D7A25F/);
   assert.match(css, /--fy-radius-card:\s*1\.25rem/);
   assert.match(css, /--fy-shell-sidebar-top/);
 });
 
-test("FOUC script applies theme before paint and defaults to light", () => {
+test("FOUC script applies theme before paint and defaults to Noir", () => {
   const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
   assert.match(html, /fyphub-theme/);
   assert.match(html, /data-theme/);
-  assert.match(html, /"light"/);
+  assert.match(html, /"dark"/);
   assert.match(html, /theme-color/);
 });
 
