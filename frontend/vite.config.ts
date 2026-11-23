@@ -2,6 +2,11 @@ import { defineConfig, type ProxyOptions } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+const runtimeProcess = globalThis as typeof globalThis & {
+  process?: { env?: Record<string, string | undefined> };
+};
+const configuredBasePath = runtimeProcess.process?.env?.VITE_BASE_PATH;
+
 type ProxyWithErrorEvents = {
   on: (
     event: "error",
@@ -28,6 +33,9 @@ const apiProxy: ProxyOptions = {
 };
 
 export default defineConfig({
+  // GitHub Pages publishes this project below /FYPHub/, while local and
+  // container deployments continue to use the root path.
+  base: configuredBasePath || "/",
   plugins: [react(), tailwindcss()],
   server: {
     host: "127.0.0.1",
