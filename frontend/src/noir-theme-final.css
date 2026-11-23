@@ -445,9 +445,9 @@ html[data-theme="dark"] #root :where(
   }
 
   .auth-form-panel--signup .auth-signup-head {
-    position: sticky;
-    top: 0;
-    z-index: 4;
+    position: relative;
+    top: auto;
+    z-index: 1;
     margin: -1.5rem -1.75rem 1rem;
     padding: 1.5rem 1.75rem 0.9rem;
     border-bottom: 1px solid var(--fy-border);
