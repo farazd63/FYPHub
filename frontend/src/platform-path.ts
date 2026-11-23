@@ -1,6 +1,6 @@
 const configuredBase = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "");
 
-/** Return the application route without the repository prefix used by Pages. */
+/** Return the application route without the configured asset base prefix. */
 export function appPathname() {
   const pathname = window.location.pathname;
   if (!configuredBase || configuredBase === "/") return pathname;
@@ -10,7 +10,7 @@ export function appPathname() {
     : pathname;
 }
 
-/** Prefix an application route for local root hosting or a Pages subpath. */
+/** Prefix an application route for the configured frontend base path. */
 export function appPath(pathname: string) {
   const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
   return configuredBase && configuredBase !== "/"
