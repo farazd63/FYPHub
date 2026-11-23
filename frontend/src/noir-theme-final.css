@@ -383,8 +383,7 @@ html[data-theme="dark"] #root :where(
   #root:has(.auth-stage) {
     height: auto !important;
     min-height: 100%;
-    overflow-x: hidden !important;
-    overflow-y: visible !important;
+    overflow: visible !important;
   }
 
   .auth-stage {
@@ -426,8 +425,8 @@ html[data-theme="dark"] #root :where(
 
   .auth-stage__panel.auth-card.auth-card-shell .auth-stage__grid > .auth-stage__brand,
   .auth-stage--switch .auth-welcome-panel {
-    position: sticky !important;
-    top: clamp(0.85rem, 2.4vw, 1.75rem) !important;
+    position: relative !important;
+    top: auto !important;
     align-self: start !important;
     height: min(720px, calc(100dvh - 2rem)) !important;
     min-height: 0 !important;

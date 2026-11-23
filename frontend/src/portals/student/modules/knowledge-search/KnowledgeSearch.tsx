@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArchivedProjectDetail } from "../ArchivedProjectDetail";
+import { appPathname } from "../../../../platform-path";
 
 type Result = {
   rank: number;
@@ -32,7 +33,7 @@ type Filters = {
 const yearValid = (value: string) =>
   !value.trim() || /^\d{4}$/.test(value.trim());
 const projectRouteFromPath = () => {
-  const match = window.location.pathname.match(
+  const match = appPathname().match(
     /^\/student\/search\/projects\/(\d+)$/,
   );
   if (!match) return null;

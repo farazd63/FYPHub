@@ -14,9 +14,10 @@ import { FypHubBrand } from "../shared/FypHubBrand";
 import { AnnouncementSection } from "../../announcements/AnnouncementSection";
 import { pushPortalRoute } from "../shared/portal-history";
 import { usePersistentSidebarCollapse } from "../shared/usePersistentSidebarCollapse";
+import { appPathname } from "../../platform-path";
 
 type Page = "overview" | "requests" | "scheduling";
-const coordinatorPageFromPath = (): Page => window.location.pathname === "/coordinator/requests" ? "requests" : window.location.pathname === "/coordinator/scheduling" ? "scheduling" : "overview";
+const coordinatorPageFromPath = (): Page => appPathname() === "/coordinator/requests" ? "requests" : appPathname() === "/coordinator/scheduling" ? "scheduling" : "overview";
 const coordinatorPath = (page: Page) => page === "overview" ? "/coordinator" : `/coordinator/${page}`;
 
 export function CoordinatorPortal({ api, user, onLogout }: { api: string; user: { full_name: string; role?: string }; onLogout: () => void }) {
@@ -30,7 +31,7 @@ export function CoordinatorPortal({ api, user, onLogout }: { api: string; user: 
   }, []);
   useEffect(() => { const syncFromHistory = () => { setPage(coordinatorPageFromPath()); setMobileOpen(false); window.scrollTo({ top: 0, left: 0, behavior: "auto" }); }; window.addEventListener("popstate", syncFromHistory); return () => window.removeEventListener("popstate", syncFromHistory); }, []);
   const initials = user.full_name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "C";
-  const navigate = (next: Page) => { setPage(next); setMobileOpen(false); const path = coordinatorPath(next); if (window.location.pathname !== path) pushPortalRoute(path); window.scrollTo({ top: 0, left: 0, behavior: "auto" }); };
+  const navigate = (next: Page) => { setPage(next); setMobileOpen(false); const path = coordinatorPath(next); if (appPathname() !== path) pushPortalRoute(path); window.scrollTo({ top: 0, left: 0, behavior: "auto" }); };
   const content = page === "scheduling"
     ? <PanelScheduling api={api} />
     : <div className="coordinator-requests-stack"><AnnouncementSection api={api} /><CoordinatorRequestsPdf api={api} /><ProposalComplianceWorkspace api={api} reviewerMode /></div>;

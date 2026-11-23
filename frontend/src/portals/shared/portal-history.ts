@@ -10,7 +10,7 @@ export function pushPortalRoute(path: string, page: DashboardHistoryPage = "acco
   window.history.pushState(
     { ...currentState(), fyphubNavigation: { page } },
     "",
-    path,
+    appPath(path),
   );
 }
 
@@ -18,6 +18,7 @@ export function replacePortalRoute(path: string, page: DashboardHistoryPage = "a
   window.history.replaceState(
     { ...currentState(), fyphubNavigation: { page } },
     "",
-    path,
+    appPath(path),
   );
 }
+import { appPath } from "../../platform-path";

@@ -16,6 +16,7 @@ import { ThemeToggle } from "../../ui/ThemeToggle";
 import { AnnouncementBell } from "../../announcements/AnnouncementBell";
 import { pushPortalRoute } from "../shared/portal-history";
 import { usePersistentSidebarCollapse } from "../shared/usePersistentSidebarCollapse";
+import { appPathname } from "../../platform-path";
 import "./student.css";
 import "./student-content.css";
 import "./student-admin-theme.css";
@@ -198,7 +199,7 @@ export const STUDENT_PHASES: readonly StudentPhase[] = [
 ];
 
 function initialStudentPage() {
-  const path = window.location.pathname;
+  const path = appPathname();
   if (path.startsWith("/student/search")) return "search";
   if (path.startsWith("/student/group-ai")) return "group-ai";
   if (

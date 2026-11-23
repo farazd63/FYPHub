@@ -17,6 +17,7 @@ import { Stepper } from "./ui/Stepper";
 import { Button } from "./ui/Button";
 import { Card } from "./ui/Card";
 import { WelcomeLanding } from "./pages/WelcomeLanding";
+import { appPath, appPathname } from "./platform-path";
 import "./auth.css";
 
 type Member = { id: string; full_name: string; email: string; registration: string };
@@ -84,7 +85,7 @@ const createClientId = () => {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 };
 const isLandingPath = (pathname: string) => pathname === "/" || pathname === "/welcome";
-const welcomePublicPath = () => (window.location.pathname === "/welcome" ? "/welcome" : "/");
+const welcomePublicPath = () => (appPathname() === "/welcome" ? "/welcome" : "/");
 const formatCycleLabel = (cycle: Cycle) => {
   const named = cycle.display_name?.trim();
   const code = cycle.code?.trim();
@@ -266,7 +267,7 @@ function AuthLayout({ children, actions, compact = false, authMode, transitionin
               </div>
             </div>
           </section>
-          <section ref={activeFormRef} tabIndex={-1} className={`auth-card auth-form-panel ${compact ? "auth-card--compact" : ""}`}>
+          <section ref={activeFormRef} tabIndex={-1} className={`auth-card auth-form-panel ${compact ? "auth-card--compact" : ""} ${authMode === "signup" ? "auth-form-panel--signup" : authMode === "signin" ? "auth-form-panel--signin" : ""}`}>
             <div className="auth-card__shine" aria-hidden="true" />
             <header className={`auth-card__header ${actions ? "auth-card__header--actions" : ""}`}>
               <div className="auth-card__mobile-brand"><Logo authMobile /></div>
@@ -340,7 +341,7 @@ function Field({
 
 export default function App() {
   const [page, setPage] = useState<string>("in");
-  const [authMode, setAuthMode] = useState<AuthMode>(() => window.location.pathname === "/signup" ? "signup" : "signin");
+  const [authMode, setAuthMode] = useState<AuthMode>(() => appPathname() === "/signup" ? "signup" : "signin");
   const [authTransitioning, setAuthTransitioning] = useState(false);
   const authTransitionTimerRef = useRef<number | null>(null);
   const [authUser, setAuthUser] = useState<SafeUser | null>(null);
@@ -355,7 +356,7 @@ export default function App() {
   const [members, setMembers] = useState<Member[]>([]);
   const [signIn, setSignIn] = useState({ email: "", password: "" });
   const [recoveryView, setRecoveryView] = useState<"forgot" | "reset">(
-    () => window.location.pathname === "/reset-password" ? "reset" : "forgot",
+    () => appPathname() === "/reset-password" ? "reset" : "forgot",
   );
   useEffect(() => {
     const titles: Record<string, string> = {
@@ -487,7 +488,7 @@ export default function App() {
     });
   }, [policy]);
   useEffect(() => {
-    if (window.location.pathname === "/reset-password") return;
+    if (appPathname() === "/reset-password") return;
     void (async () => {
       try {
         const response = await fetch(`${API}/api/v1/auth/me`, {
@@ -504,8 +505,8 @@ export default function App() {
           }
           setAuthUser(user);
           setPage(destination);
-          const homePath = destination === "admin-portal" ? "/admin" : "/";
-          if (window.location.pathname === "/login" || window.location.pathname === "/signup") {
+          const homePath = appPath(destination === "admin-portal" ? "/admin" : "/");
+          if (appPathname() === "/login" || appPathname() === "/signup") {
             window.history.replaceState({ fyphubNavigation: { page: destination } }, "", homePath);
           }
         }
@@ -640,14 +641,15 @@ export default function App() {
     setNotice(Object.keys(nextErrors).length ? validationNotice(nextErrors, members) : "");
     const current = readPublicRoute(window.history.state);
     const changed = !current || current.page !== next.page || current.signupRole !== next.signupRole || current.step !== next.step || current.studentMode !== next.studentMode;
-    const publicPath =
+    const publicPath = appPath(
       next.page === "welcome"
         ? welcomePublicPath()
         : next.page === "up"
           ? "/signup"
           : next.page === "recover"
             ? "/recover"
-            : "/login";
+            : "/login",
+    );
     if (mode === "push" && changed) window.history.pushState({ fyphubNavigation: next }, "", publicPath);
     if ((mode === "replace" || (mode === "pop" && changed)) && changed) window.history.replaceState({ fyphubNavigation: next }, "", publicPath);
   }
@@ -671,7 +673,7 @@ export default function App() {
     return () => window.cancelAnimationFrame(frame);
   }, [page, step]);
   useEffect(() => {
-    const pathname = window.location.pathname;
+    const pathname = appPathname();
   const stored = readPublicRoute(window.history.state);
     let initial = stored ?? (isLandingPath(pathname) ? publicRoute("welcome") : publicRoute("in"));
     if (isLandingPath(pathname) && stored?.page === "in") {
@@ -683,7 +685,7 @@ export default function App() {
     if (pathname === "/signup") {
       initial = publicRoute("up");
     }
-    if (window.location.pathname === "/reset-password") {
+    if (appPathname() === "/reset-password") {
       queueMicrotask(() => {
         setRecoveryView("reset");
         setResetToken(new URLSearchParams(window.location.search).get("token") ?? "");
@@ -695,13 +697,13 @@ export default function App() {
         setRecoveryView("forgot");
         setPage("recover");
       });
-      window.history.replaceState({ fyphubNavigation: publicRoute("recover") }, "", "/recover");
+      window.history.replaceState({ fyphubNavigation: publicRoute("recover") }, "", appPath("/recover"));
     } else if (pathname === "/signup") {
       queueMicrotask(() => {
         setPage("up");
         setStep(1);
       });
-      window.history.replaceState({ fyphubNavigation: publicRoute("up") }, "", "/signup");
+      window.history.replaceState({ fyphubNavigation: publicRoute("up") }, "", appPath("/signup"));
     } else {
       if (!readPublicRoute(window.history.state)) window.history.replaceState({ fyphubNavigation: initial }, "", window.location.href);
       publicNavigationRef.current(initial, "pop");
@@ -723,7 +725,7 @@ export default function App() {
         return;
       }
       publicNavigationRef.current(
-        readPublicRoute(event.state) ?? (isLandingPath(window.location.pathname) ? publicRoute("welcome") : publicRoute("in")),
+        readPublicRoute(event.state) ?? (isLandingPath(appPathname()) ? publicRoute("welcome") : publicRoute("in")),
         "pop",
       );
     };
@@ -895,7 +897,7 @@ export default function App() {
       }
       setAuthUser(confirmedUser);
       setSignIn({ email: "", password: "" });
-      const homePath = destination === "admin-portal" ? "/admin" : "/";
+      const homePath = appPath(destination === "admin-portal" ? "/admin" : "/");
       window.history.pushState({ fyphubNavigation: { page: destination } }, "", homePath);
       setPage(destination);
     } catch {
@@ -1035,7 +1037,7 @@ export default function App() {
       setAuthUser(null);
       setSignIn({ email: "", password: "" });
       setAuthError("");
-      window.history.replaceState({ fyphubNavigation: publicRoute("in") }, "", "/login");
+      window.history.replaceState({ fyphubNavigation: publicRoute("in") }, "", appPath("/login"));
       navigatePublic(publicRoute("in"), "replace");
     }
   }
@@ -1359,6 +1361,7 @@ export default function App() {
             aria-hidden={authMode !== "signup"}
             inert={authMode !== "signup" ? true : undefined}
           >
+            <div className="auth-signup-head">
               <h1 className="text-center text-lg font-bold">
               Create Student Group Account
               </h1>
@@ -1378,6 +1381,7 @@ export default function App() {
                 </div>
                 <p className="auth-signup-required-note"><span aria-hidden="true">*</span> Required fields</p>
               </div>
+            </div>
               {step === 1 && (
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="sm:col-span-2 grid gap-2">

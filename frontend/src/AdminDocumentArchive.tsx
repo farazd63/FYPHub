@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BackButton, StatusBadge } from "./ui";
 import { AdminAddButton } from "./ui/AdminAddButton";
+import { appPathname } from "./platform-path";
 import "./admin-document-archive.css";
 
 type Cycle = {
@@ -195,7 +196,7 @@ async function readJson(response: Response) {
 }
 
 const archiveRouteFromPath = () => {
-  const match = window.location.pathname.match(
+  const match = appPathname().match(
     /^\/admin\/document-requirements\/cycles\/(\d+)\/groups\/(\d+)$/,
   );
   if (!match) return null;

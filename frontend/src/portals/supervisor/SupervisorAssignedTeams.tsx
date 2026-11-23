@@ -4,6 +4,7 @@ import { Alert } from "../../ui";
 import { IconButton } from "../../ui/IconButton";
 import { SupervisorGroupDetails, type GroupWorkspace, type GroupTab, date } from "./SupervisorGroupDetails";
 import { pushPortalRoute, replacePortalRoute } from "../shared/portal-history";
+import { appPathname } from "../../platform-path";
 
 const projectStatusLabel = (value?: string | null) => ({
   IN_PROGRESS: "In progress",
@@ -21,7 +22,7 @@ const projectTitleLabel = (data: GroupWorkspace) => {
 
 const validGroupTabs: GroupTab[] = ["overview", "members", "proposal", "project", "documents", "discussion"];
 const groupSelectionFromLocation = () => {
-  const match = window.location.pathname.match(/\/supervisor\/groups\/(\d+)/);
+  const match = appPathname().match(/\/supervisor\/groups\/(\d+)/);
   if (!match) return null;
   const requestedTab = new URLSearchParams(window.location.search).get("tab") as GroupTab | null;
   return { id: Number(match[1]), tab: requestedTab && validGroupTabs.includes(requestedTab) ? requestedTab : "overview" };

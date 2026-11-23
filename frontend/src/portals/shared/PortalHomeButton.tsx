@@ -1,4 +1,5 @@
 import { Home } from "lucide-react";
+import { appPath, appPathname } from "../../platform-path";
 
 type Props = {
   onClick?: () => void;
@@ -6,9 +7,9 @@ type Props = {
 };
 
 function defaultHome() {
-  const path = window.location.pathname;
+  const path = appPathname();
   const homePath = path.startsWith("/admin") ? "/admin" : path.startsWith("/student") ? "/student" : path.startsWith("/supervisor") ? "/supervisor" : path.startsWith("/coordinator") ? "/coordinator" : path.startsWith("/evaluator") ? "/evaluator" : path;
-  window.location.assign(homePath);
+  window.location.assign(appPath(homePath));
 }
 
 export function PortalHomeButton({ onClick = defaultHome, className = "" }: Props) {

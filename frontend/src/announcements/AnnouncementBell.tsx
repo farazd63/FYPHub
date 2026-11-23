@@ -2,6 +2,7 @@ import { Bell, Check, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Announcement } from "./AnnouncementSection";
 import "./announcement-bell.css";
+import { appPathname } from "../platform-path";
 
 type Props = { api: string; role?: string };
 type Source = "announcement" | "notification" | "collaboration" | "document";
@@ -31,7 +32,7 @@ const priorityLabel = (value: string) => value.replaceAll("_", " ").toLowerCase(
 const kindLabel = (value: string) => value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 const dateLabel = (value?: string | null) => value ? new Date(value).toLocaleString() : "Not recorded";
 const mostRecentUnreadId = (rows: HeaderNotification[]) => rows.filter((row) => row.unread).sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0]?.id ?? null;
-const roleFromPath = () => window.location.pathname.startsWith("/student") ? "STUDENT" : window.location.pathname.startsWith("/supervisor") ? "SUPERVISOR" : "";
+const roleFromPath = () => appPathname().startsWith("/student") ? "STUDENT" : appPathname().startsWith("/supervisor") ? "SUPERVISOR" : "";
 
 async function readJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { credentials: "include" });
