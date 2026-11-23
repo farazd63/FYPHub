@@ -373,65 +373,66 @@ html[data-theme="dark"] #root :where(
   }
 }
 
-/* Desktop signup pages must use the document as the scroll owner. The old
-   fixed-height form scrollbar could move the stepper and section heading out
-   of view while the member list continued below it. Let the auth card grow
-   with its content so the browser page can scroll normally. */
+/* Desktop auth uses one stable card: the welcome image and theme control stay
+   in place, while the form column owns the vertical scroll. The signup head
+   remains visible inside that scroll area so the stepper and current section
+   never disappear above the member cards. */
 @media (min-width: 1024px) {
   html:has(.auth-stage),
   body:has(.auth-stage),
   #root:has(.auth-stage) {
-    height: auto !important;
+    height: 100% !important;
     min-height: 100%;
-    overflow: visible !important;
+    overflow: hidden !important;
   }
 
   .auth-stage {
-    height: auto !important;
-    min-height: 100dvh !important;
-    max-height: none !important;
-    overflow: visible !important;
-    overflow-y: visible !important;
+    height: 100dvh !important;
+    min-height: 0 !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
   }
 
   .auth-stage__panel.auth-card.auth-card-shell {
-    height: auto !important;
-    min-height: min(720px, calc(100dvh - 2rem)) !important;
-    max-height: none !important;
-  }
-
-  .auth-stage__grid {
-    height: auto !important;
-    min-height: inherit !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
-
-  .auth-stage__brand,
-  .auth-stage__panel.auth-card.auth-card-shell .auth-form-panel {
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
-
-  /* Keep the campus image at the original viewport-sized composition while
-     the signup form grows. The welcome column is the sticky viewport-sized
-     surface; its image fills that column instead of stretching with the
-     long member list. */
-  .auth-stage__panel.auth-card.auth-card-shell {
-    overflow: visible !important;
-    clip-path: inset(0 round clamp(1.25rem, 2.2vw, 1.75rem));
-  }
-
-  .auth-stage__panel.auth-card.auth-card-shell .auth-stage__grid > .auth-stage__brand,
-  .auth-stage--switch .auth-welcome-panel {
-    position: relative !important;
-    top: auto !important;
-    align-self: start !important;
     height: min(720px, calc(100dvh - 2rem)) !important;
     min-height: 0 !important;
     max-height: calc(100dvh - 2rem) !important;
     overflow: hidden !important;
+  }
+
+  .auth-stage__grid {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .auth-stage__brand,
+  .auth-stage__panel.auth-card.auth-card-shell .auth-form-panel {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+  }
+
+  .auth-stage__brand {
+    position: relative !important;
+    align-self: stretch !important;
+    overflow: hidden !important;
+  }
+
+  .auth-stage__panel.auth-card.auth-card-shell .auth-form-panel {
+    align-self: stretch !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    scrollbar-gutter: stable;
+  }
+
+  .auth-stage__panel.auth-card.auth-card-shell .auth-form-panel--signin {
+    justify-content: center !important;
+  }
+
+  .auth-stage__panel.auth-card.auth-card-shell .auth-form-panel--signup {
+    justify-content: flex-start !important;
   }
 
   .auth-stage__media,
@@ -441,6 +442,16 @@ html[data-theme="dark"] #root :where(
     width: 100% !important;
     height: 100% !important;
     max-height: none !important;
+  }
+
+  .auth-form-panel--signup .auth-signup-head {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    margin: -1.5rem -1.75rem 1rem;
+    padding: 1.5rem 1.75rem 0.9rem;
+    border-bottom: 1px solid var(--fy-border);
+    background: var(--fy-surface);
   }
 }
 
