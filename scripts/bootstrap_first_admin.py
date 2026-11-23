@@ -18,8 +18,9 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.database import SessionLocal  # noqa: E402
-from app.models import User, UserRole  # noqa: E402
-from app.security import hash_password  # noqa: E402
+from app.models import InstitutionMembership, User, UserRole  # noqa: E402
+from app.security import hash_password, validate_full_name, validate_password  # noqa: E402
+from app.tenant import primary_institution_id, utc_now  # noqa: E402
 
 EXPECTED_DATABASE = "fyphub_p1"
 
@@ -31,12 +32,13 @@ def main() -> None:
     password = getpass.getpass("Administrator password: ")
     confirmation = getpass.getpass("Confirm administrator password: ")
 
-    if not full_name or len(full_name) > 255:
-        raise RuntimeError("Full name must be between 1 and 255 non-whitespace characters.")
-    if not email or len(email) > 320 or "@" not in email:
-        raise RuntimeError("Enter a valid administrator email address.")
-    if not 8 <= len(password) <= 128:
-        raise RuntimeError("Password must be between 8 and 128 characters.")
+    try:
+        full_name = validate_full_name(full_name)
+        if not email.endswith("@szabist-isb.pk"):
+            raise ValueError("Only @szabist-isb.pk university emails are accepted.")
+        validate_password(password)
+    except ValueError as error:
+        raise RuntimeError(str(error)) from error
     if password != confirmation:
         raise RuntimeError("Passwords do not match.")
 
@@ -51,14 +53,31 @@ def main() -> None:
         if session.execute(select(User.id).where(User.email == email)).first() is not None:
             raise RuntimeError("That email already belongs to an account; no account was changed.")
 
+        institution_id = primary_institution_id(session)
+        if institution_id is None:
+            raise RuntimeError("The primary SZABIST institution is not configured.")
+        now = utc_now()
+        user = User(
+            full_name=full_name,
+            email=email,
+            registration_number=None,
+            password_hash=hash_password(password),
+            role=UserRole.ADMIN,
+            institution_id=institution_id,
+            is_active=True,
+            email_verified_at=now,
+            access_approved_at=now,
+        )
+        session.add(user)
+        session.flush()
         session.add(
-            User(
-                full_name=full_name,
-                email=email,
-                registration_number=None,
-                password_hash=hash_password(password),
-                role=UserRole.ADMIN,
-                is_active=True,
+            InstitutionMembership(
+                institution_id=institution_id,
+                user_id=user.id,
+                membership_role="INSTITUTION_ADMIN",
+                status="ACTIVE",
+                approved_by_id=user.id,
+                approved_at=now,
             )
         )
 

@@ -14,6 +14,18 @@ The public login screen includes an Administrator role card. Selecting it does n
 
 ## First-admin bootstrap
 
+### Browser setup
+
+The first administrator can also be created without opening the repository or a terminal. Set a private `FIRST_ADMIN_SETUP_KEY` in the deployment environment, start the application, and open:
+
+```text
+/setup/first-admin
+```
+
+The page is available only while no `ADMIN` account exists and the setup key is configured. It requires a valid `@szabist-isb.pk` administrator email, strong password, and the one-time key. The backend creates the account with active institutional membership, marks the initial email/access checks complete, and closes the setup endpoint after the first administrator is created. The setup key is never stored in the database or returned by the API.
+
+Do not use a predictable setup key or expose the setup page on an untrusted public deployment. After setup, remove or rotate `FIRST_ADMIN_SETUP_KEY` if the deployment process allows it.
+
 Run locally, only after reviewing the target database:
 
 ```powershell

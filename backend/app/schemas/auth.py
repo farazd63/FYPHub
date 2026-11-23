@@ -80,6 +80,47 @@ class LoginRequest(BaseModel):
         return self
 
 
+class FirstAdminSetupRequest(BaseModel):
+    """One-time browser setup input for the first institution administrator."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    setup_key: str = Field(min_length=16, max_length=256)
+    full_name: str
+    email: EmailStr
+    password: str
+    confirm_password: str
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalized_email(cls, value: object) -> object:
+        from .email import normalize_szabist_email
+
+        return normalize_szabist_email(value)
+
+    @field_validator("full_name")
+    @classmethod
+    def normalized_name(cls, value: str) -> str:
+        from ..security import validate_full_name
+
+        return validate_full_name(value)
+
+    @field_validator("password")
+    @classmethod
+    def valid_password(cls, value: str) -> str:
+        try:
+            validate_password(value)
+        except ValueError as error:
+            raise ValueError(str(error)) from error
+        return value
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> "FirstAdminSetupRequest":
+        if self.password != self.confirm_password:
+            raise ValueError("Password and confirmation password must match.")
+        return self
+
+
 class CurrentUserResponse(BaseModel):
     """Safe account data returned after session authentication."""
 

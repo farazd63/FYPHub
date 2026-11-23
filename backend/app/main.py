@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 import json
 import logging
+import secrets
 import time
 import uuid
 
@@ -16,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from .database import engine, get_db
 from .config import settings
-from .models import AdminAuditEvent, AuthSession, PasswordResetToken, Team, TeamMember, User, UserRole
+from .models import AdminAuditEvent, AuthSession, Institution, PasswordResetToken, Team, TeamMember, User, UserRole
 from .models import InstitutionMembership
 from .models import AcademicCycle, AcademicGroupPolicy, SupervisorCapacityPolicy, SupervisorAssignment, SupervisorRequest, SupervisorRequestStatus
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType, ProposalComplianceSubmission
@@ -30,7 +31,7 @@ from .document_requirements import router as document_requirements_router, stude
 from .coordinator_operations import router as coordinator_operations_router
 from .academic_cycle_overview import router as academic_cycle_overview_router
 from .schemas.academic import CycleCreate, CycleOut, CycleUpdate, PolicyOut, PolicyUpdate
-from .schemas.auth import CurrentUserResponse, LoginRequest, RegistrationRequest, RegistrationResponse
+from .schemas.auth import CurrentUserResponse, FirstAdminSetupRequest, LoginRequest, RegistrationRequest, RegistrationResponse
 from .schemas.admin_users import AdminStudentGroupApproval, AdminStudentGroupMemberCreate, AdminUserCreate, AdminUserPage, AdminUserPasswordChange, AdminUserResponse, AdminUserRoleChange, AdminUserStatusChange, AdminUserUpdate
 from .schemas.supervisor_capacity import CapacitySession, SupervisorCapacityOut, SupervisorCapacityWrite
 from .schemas.team_registration import StudentGroupRegistrationRequest, TeamMemberInput, TeamRegistrationRequest, TeamRegistrationResponse
@@ -53,7 +54,7 @@ from .auth import (
     log_temporary_auth_diagnostic,
 )
 from .institutions import router as institutions_router
-from .tenant import ensure_access_ready, is_platform_admin, issue_email_verification_token, resolve_registration_institution, send_email_verification, set_tenant_context
+from .tenant import ensure_access_ready, is_platform_admin, issue_email_verification_token, primary_institution_id, resolve_registration_institution, send_email_verification, set_tenant_context
 
 app = FastAPI(title="FYPHub API")
 settings.document_storage_root.mkdir(parents=True, exist_ok=True)
@@ -124,6 +125,105 @@ async def request_validation_error(_: Request, error: RequestValidationError) ->
             }
         },
     )
+
+
+@app.get("/api/v1/setup/first-admin/status")
+def first_admin_setup_status(session: Session = Depends(get_db)) -> dict[str, bool]:
+    """Expose only whether the one-time browser setup is currently available."""
+    admin_exists = session.execute(
+        select(User.id).where(User.role == UserRole.ADMIN).limit(1)
+    ).first() is not None
+    return {"available": bool(settings.first_admin_setup_key) and not admin_exists}
+
+
+@app.post("/api/v1/setup/first-admin", response_model=CurrentUserResponse, status_code=status.HTTP_201_CREATED)
+def create_first_admin(
+    payload: FirstAdminSetupRequest,
+    request: Request,
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Create the first institution ADMIN through a one-time browser flow."""
+    validate_mutating_origin(request)
+    if not settings.first_admin_setup_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "first_admin_setup_unavailable", "message": "First administrator setup is not enabled."},
+        )
+    if not secrets.compare_digest(payload.setup_key, settings.first_admin_setup_key):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "invalid_first_admin_setup_key", "message": "The setup key is invalid."},
+        )
+
+    # Serialize the only-admin check so two simultaneous first-run browsers
+    # cannot both create an administrator.
+    session.execute(text("SELECT pg_advisory_xact_lock(98137242)"))
+    if session.execute(select(User.id).where(User.role == UserRole.ADMIN).limit(1)).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "first_admin_already_exists", "message": "The first administrator has already been created."},
+        )
+
+    institution_id = primary_institution_id(session)
+    institution = session.get(Institution, institution_id) if institution_id is not None else None
+    if institution is None or institution.status != "ACTIVE":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "institution_setup_unavailable", "message": "The primary institution is not configured yet."},
+        )
+    normalized_email = str(payload.email).strip().lower()
+    if session.execute(select(User.id).where(User.email == normalized_email).limit(1)).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "duplicate_account", "message": "An account with that email already exists."},
+        )
+
+    now = utc_now()
+    user = User(
+        full_name=payload.full_name,
+        email=normalized_email,
+        registration_number=None,
+        password_hash=hash_password(payload.password),
+        role=UserRole.ADMIN,
+        institution_id=institution.id,
+        is_active=True,
+        email_verified_at=now,
+        access_approved_at=now,
+    )
+    session.add(user)
+    try:
+        session.flush()
+        session.add(
+            InstitutionMembership(
+                institution_id=institution.id,
+                user_id=user.id,
+                membership_role="INSTITUTION_ADMIN",
+                status="ACTIVE",
+                approved_by_id=user.id,
+                approved_at=now,
+            )
+        )
+        session.add(
+            AdminAuditEvent(
+                institution_id=institution.id,
+                actor_id=user.id,
+                affected_user_id=user.id,
+                target_type="USER",
+                target_id=user.id,
+                action="first_admin_created",
+                changed_values={"email": user.email, "role": user.role.value},
+            )
+        )
+        session.commit()
+        session.refresh(user)
+    except IntegrityError as error:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "duplicate_account", "message": "An account with that email already exists."},
+        ) from error
+
+    return account_response(session, user)
 
 
 def registration_error(

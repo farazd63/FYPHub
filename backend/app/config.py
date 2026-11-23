@@ -34,6 +34,7 @@ class Settings:
     email_verification_base_url: str = "http://localhost:8010/api/v1/auth/verify-email"
     app_env: str = "production"
     registration_mode: str = "restricted"
+    first_admin_setup_key: str = ""
     AI_PROVIDER: str = ""
     GROQ_API_KEY: str = ""
     GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
@@ -90,6 +91,7 @@ def get_settings() -> Settings:
         email_verification_base_url=os.getenv("EMAIL_VERIFICATION_BASE_URL", "http://localhost:8010/api/v1/auth/verify-email").rstrip("/"),
         app_env=os.getenv("APP_ENV", "production").strip().lower(),
         registration_mode=os.getenv("REGISTRATION_MODE", "restricted"),
+        first_admin_setup_key=os.getenv("FIRST_ADMIN_SETUP_KEY", "").strip(),
         AI_PROVIDER=os.getenv("AI_PROVIDER", "").strip().lower(),
         GROQ_API_KEY=os.getenv("GROQ_API_KEY", ""),
         GROQ_BASE_URL=os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/"),

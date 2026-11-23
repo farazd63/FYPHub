@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AdminPortal } from "./AdminPortal";
 import { PasswordField } from "./PasswordField";
 import { passwordPolicyError } from "./passwordPolicy";
@@ -297,7 +297,7 @@ function Field({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  type?: "text" | "email";
+  type?: "text" | "email" | "password";
   inputMode?: "text" | "numeric";
   pattern?: string;
   maxLength?: number;
@@ -339,6 +339,105 @@ function Field({
   );
 }
 
+function FirstAdminSetup({ api, onComplete, onBack }: { api: string; onComplete: (email: string) => void; onBack: () => void }) {
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [form, setForm] = useState({ setupKey: "", fullName: "", email: "", password: "", confirmPassword: "" });
+  const emailError = form.email ? szabistEmailValidationMessage(form.email) ?? "" : "";
+
+  useEffect(() => {
+    let active = true;
+    void fetch(`${api}/api/v1/setup/first-admin/status`, { credentials: "include" })
+      .then((response) => response.json())
+      .then((body: { available?: boolean }) => {
+        if (active) setAvailable(body.available === true);
+      })
+      .catch(() => {
+        if (active) setAvailable(false);
+      });
+    return () => { active = false; };
+  }, [api]);
+
+  const update = (field: keyof typeof form, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+    setMessage("");
+  };
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitting) return;
+    if (!form.setupKey.trim() || !form.fullName.trim() || !form.email.trim() || !form.password || !form.confirmPassword) {
+      setError("Complete all fields to create the first administrator.");
+      return;
+    }
+    if (emailError) {
+      setError(emailError);
+      return;
+    }
+    const passwordError = passwordPolicyError(form.password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      const response = await fetch(`${api}/api/v1/setup/first-admin`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          setup_key: form.setupKey,
+          full_name: form.fullName,
+          email: normalizeEmail(form.email),
+          password: form.password,
+          confirm_password: form.confirmPassword,
+        }),
+      });
+      const body = await response.json().catch(() => ({})) as { detail?: ApiDetail | string };
+      if (!response.ok) {
+        const detail = typeof body.detail === "string" ? body.detail : body.detail?.message;
+        throw new Error(detail || "The first administrator could not be created.");
+      }
+      setMessage("Administrator account created. Redirecting to login...");
+      window.setTimeout(() => onComplete(form.email.trim().toLowerCase()), 500);
+    } catch (submissionError) {
+      setError(submissionError instanceof Error ? submissionError.message : "The first administrator could not be created.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <AuthLayout compact>
+      <div className="space-y-4">
+        <h1 className="text-[26px] font-bold sm:text-[28px]">First Administrator Setup</h1>
+        <p className="text-sm text-[#4f6470]">Create the first FYPHub administrator from this browser. This page closes permanently after the first administrator is created.</p>
+        {available === null && <p role="status" className="rounded-lg bg-[#eaf2ff] px-3 py-2 text-sm text-[#243746]">Checking setup availability...</p>}
+        {available === false && <><p role="alert" className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">First administrator setup is unavailable. It may already be completed or has not been enabled by the deployment operator.</p><button type="button" onClick={onBack} className={`${AUTH_PRIMARY} w-full`}>Back to Login</button></>}
+        {available === true && <form onSubmit={(event) => void submit(event)} className="space-y-3">
+          <Field label="One-time setup key" type="password" autoComplete="off" required value={form.setupKey} disabled={submitting} onChange={(value) => update("setupKey", value)} />
+          <Field label="Administrator name" autoComplete="name" required value={form.fullName} disabled={submitting} onChange={(value) => update("fullName", value)} />
+          <Field label="Administrator email" type="email" autoComplete="email" required value={form.email} error={emailError || undefined} disabled={submitting} onChange={(value) => update("email", value)} />
+          <PasswordField label="Password" required value={form.password} disabled={submitting} error={form.password ? passwordPolicyError(form.password) : undefined} onChange={(value) => update("password", value)} />
+          <PasswordField label="Confirm password" confirm required value={form.confirmPassword} disabled={submitting} error={form.confirmPassword && form.password !== form.confirmPassword ? "Passwords do not match." : undefined} onChange={(value) => update("confirmPassword", value)} />
+          {error && <p role="alert" className="rounded-lg bg-[#fff3f0] px-3 py-2 text-sm text-[#a43a33]">{error}</p>}
+          {message && <p role="status" className="rounded-lg bg-[#e4eee7] px-3 py-2 text-sm text-[#176B66]">{message}</p>}
+          <button type="submit" disabled={submitting} className={`${AUTH_PRIMARY} min-h-[46px] w-full`}>{submitting ? "Creating administrator..." : "Create Administrator"}</button>
+          <button type="button" disabled={submitting} onClick={onBack} className="w-full text-sm font-semibold text-[#176B66] underline">Back to Login</button>
+        </form>}
+      </div>
+    </AuthLayout>
+  );
+}
+
 export default function App() {
   const [page, setPage] = useState<string>("in");
   const [authMode, setAuthMode] = useState<AuthMode>(() => appPathname() === "/signup" ? "signup" : "signin");
@@ -349,6 +448,7 @@ export default function App() {
   useEffect(() => { authUserRef.current = authUser; }, [authUser]);
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [firstAdminSetupAvailable, setFirstAdminSetupAvailable] = useState(false);
   const [step, setStep] = useState(1);
   const [notice, setNotice] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -364,6 +464,7 @@ export default function App() {
       in: "FYPHub | Sign In",
       up: "FYPHub | Create Team Account",
       recover: recoveryView === "reset" ? "FYPHub | Reset Password" : "FYPHub | Forgot Password",
+      "first-admin": "FYPHub | First Administrator Setup",
       "admin-portal": "FYPHub | Administrator",
       account: authUser?.role === "STUDENT"
         ? "FYPHub | Group"
@@ -406,6 +507,19 @@ export default function App() {
     cycle: string;
   } | null>(null);
   const publicNavigationRef = useRef<(route: PublicRoute, mode?: "push" | "replace" | "pop") => void>(() => undefined);
+
+  useEffect(() => {
+    let active = true;
+    void fetch(`${API}/api/v1/setup/first-admin/status`, { credentials: "include" })
+      .then((response) => response.json())
+      .then((body: { available?: boolean }) => {
+        if (active) setFirstAdminSetupAvailable(body.available === true);
+      })
+      .catch(() => {
+        if (active) setFirstAdminSetupAvailable(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -488,7 +602,7 @@ export default function App() {
     });
   }, [policy]);
   useEffect(() => {
-    if (appPathname() === "/reset-password") return;
+    if (appPathname() === "/reset-password" || appPathname() === "/setup/first-admin") return;
     void (async () => {
       try {
         const response = await fetch(`${API}/api/v1/auth/me`, {
@@ -685,7 +799,10 @@ export default function App() {
     if (pathname === "/signup") {
       initial = publicRoute("up");
     }
-    if (appPathname() === "/reset-password") {
+    if (appPathname() === "/setup/first-admin") {
+      queueMicrotask(() => setPage("first-admin"));
+      window.history.replaceState({ fyphubSetup: true }, "", appPath("/setup/first-admin"));
+    } else if (appPathname() === "/reset-password") {
       queueMicrotask(() => {
         setRecoveryView("reset");
         setResetToken(new URLSearchParams(window.location.search).get("token") ?? "");
@@ -1198,6 +1315,24 @@ export default function App() {
     return (
       <AdminPortal api={API} user={authUser} onLogout={() => void signOut()} />
     );
+  if (page === "first-admin")
+    return (
+      <FirstAdminSetup
+        api={API}
+        onComplete={(email) => {
+          setSignIn({ email, password: "" });
+          setAuthError("");
+          setPage("in");
+          setAuthMode("signin");
+          window.history.replaceState({ fyphubNavigation: publicRoute("in") }, "", appPath("/login"));
+        }}
+        onBack={() => {
+          setPage("in");
+          setAuthMode("signin");
+          window.history.replaceState({ fyphubNavigation: publicRoute("in") }, "", appPath("/login"));
+        }}
+      />
+    );
   if (page === "recover")
     return (
       <AuthLayout compact>
@@ -1353,6 +1488,21 @@ export default function App() {
                   Create an account
                 </button>
               </p>
+              {firstAdminSetupAvailable && (
+                <p className="auth-card__hint text-center text-sm">
+                  First-time administrator?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.history.pushState({ fyphubSetup: true }, "", appPath("/setup/first-admin"));
+                      setPage("first-admin");
+                    }}
+                    className="auth-card__link font-semibold underline"
+                  >
+                    Set up administrator
+                  </button>
+                </p>
+              )}
             </form>
           </div>
           </div>
