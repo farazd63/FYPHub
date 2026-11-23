@@ -338,15 +338,13 @@ body:has(.student-shell .student-collab),
    The header and fixed sidebar provide the chrome; the active page uses all
    remaining space instead of leaving a centered max-width dead band. */
 .student-shell:has(.group-ai-page) > .student-body,
-.student-shell:has(.student-collab) > .student-body,
-.student-shell:has(.supervisor-page) > .student-body {
+.student-shell:has(.student-collab) > .student-body {
   height: calc(100dvh - var(--fy-shell-header, 4rem)) !important;
   min-height: 0 !important;
 }
 
 .student-shell:has(.group-ai-page) .student-content,
-.student-shell:has(.student-collab) .student-content,
-.student-shell:has(.supervisor-page) .student-content {
+.student-shell:has(.student-collab) .student-content {
   width: 100% !important;
   height: 100% !important;
   min-width: 0;
@@ -354,8 +352,7 @@ body:has(.student-shell .student-collab),
 }
 
 .student-shell:has(.group-ai-page) .student-content__inner,
-.student-shell:has(.student-collab) .student-content__inner,
-.student-shell:has(.supervisor-page) .student-content__inner {
+.student-shell:has(.student-collab) .student-content__inner {
   width: 100%;
   max-width: none;
   min-width: 0;
@@ -363,8 +360,7 @@ body:has(.student-shell .student-collab),
 }
 
 .student-shell:has(.group-ai-page) .group-ai-page,
-.student-shell:has(.student-collab) .student-collab,
-.student-shell:has(.supervisor-page) .supervisor-page {
+.student-shell:has(.student-collab) .student-collab {
   width: 100%;
   max-width: none;
   min-width: 0;
@@ -476,17 +472,41 @@ body:has(.student-shell .student-collab),
 
 @media (min-width: 768px) {
   .student-shell:has(.student-collab) .student-content {
-    margin-left: var(--fy-shell-sidebar-width) !important;
+    margin-left: calc(var(--fy-shell-pad) + var(--fy-shell-sidebar-width)) !important;
     padding: 0 !important;
     border-left: 1px solid var(--fy-border) !important;
   }
 
   .student-shell:has(.student-sidebar.role-sidebar.student-sidebar--collapsed):has(.student-collab) .student-content {
-    margin-left: var(--fy-shell-sidebar-collapsed-width) !important;
+    margin-left: calc(var(--fy-shell-pad) + var(--fy-shell-sidebar-collapsed-width)) !important;
   }
 
   .student-shell:has(.student-collab) .student-content__inner {
     padding: 0 !important;
+  }
+}
+
+/* Keep the collaboration page outside the fixed rail even when a later
+   workspace rule tries to reset the content column to width-only spacing. */
+@media (min-width: 768px) {
+  .student-shell.student-shell:has(.student-collab) > .student-body > .student-content,
+  .student-shell.student-shell:has(.group-ai-page) > .student-body > .student-content {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: 1 1 auto !important;
+    margin-left: calc(var(--fy-shell-pad) + var(--fy-shell-sidebar-width)) !important;
+    overflow-x: clip !important;
+    isolation: isolate;
+  }
+
+  .student-shell.student-shell:has(.student-sidebar.role-sidebar.student-sidebar--collapsed):has(.student-collab) > .student-body > .student-content,
+  .student-shell.student-shell:has(.student-sidebar.role-sidebar.student-sidebar--collapsed):has(.group-ai-page) > .student-body > .student-content {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: 1 1 auto !important;
+    margin-left: calc(var(--fy-shell-pad) + var(--fy-shell-sidebar-collapsed-width)) !important;
   }
 }
 

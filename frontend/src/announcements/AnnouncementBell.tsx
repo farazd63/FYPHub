@@ -43,11 +43,26 @@ function resultValue<T>(result: PromiseSettledResult<unknown>, fallback: T): T {
   return result.status === "fulfilled" ? result.value as T : fallback;
 }
 
+function notificationPath(row: AppNotification): string | undefined {
+  const payload = row.payload ?? {};
+  const payloadPath = typeof payload.path === "string" && payload.path.startsWith("/") ? payload.path : undefined;
+  if (row.kind === "COLLABORATION_PASSWORD_RESET_REQUESTED") {
+    const cycleId = Number(payload.cycle_id);
+    const groupId = Number(payload.group_id);
+    const memberId = Number(payload.member_id);
+    if (Number.isInteger(cycleId) && cycleId > 0 && Number.isInteger(groupId) && groupId > 0) {
+      const params = new URLSearchParams({ cycle_id: String(cycleId), group_id: String(groupId), focus: "collaboration-reset" });
+      if (Number.isInteger(memberId) && memberId > 0) params.set("member_id", String(memberId));
+      return `/admin/student-groups?${params.toString()}`;
+    }
+  }
+  return payloadPath;
+}
+
 function appNotification(row: AppNotification): HeaderNotification {
   const payload = row.payload ?? {};
   const payloadTitle = typeof payload.title === "string" ? payload.title : "";
   const payloadMessage = typeof payload.message === "string" ? payload.message : "";
-  const payloadPath = typeof payload.path === "string" && payload.path.startsWith("/") ? payload.path : undefined;
   return {
     id: `notification:${row.id}`,
     source: "notification",
@@ -57,7 +72,7 @@ function appNotification(row: AppNotification): HeaderNotification {
     unread: !row.read_at,
     priority: "normal",
     notificationId: row.id,
-    href: payloadPath,
+    href: notificationPath(row),
   };
 }
 
@@ -105,7 +120,7 @@ export function AnnouncementBell({ api, role }: Props) {
           priority: "info",
           channelId: channel.id,
           messageId: message.id,
-          href: normalizedRole === "STUDENT" ? "/student/collaboration" : `/supervisor/groups/${channel.group_id}`,
+            href: normalizedRole === "STUDENT" ? "/student/collaboration" : `/supervisor/groups/${channel.group_id}?tab=discussion`,
         }];
       });
       const requiredRequirements = requirements.filter((requirement) => requirement.is_required !== false);
@@ -123,7 +138,7 @@ export function AnnouncementBell({ api, role }: Props) {
             createdAt: requirement.created_at,
             unread: true,
             priority: overdue ? "urgent" as const : "important" as const,
-            href: "/student/documents",
+            href: `/student/documents?requirement_id=${requirement.id}&focus=requirement`,
           }];
         }
         if (["CHANGES_REQUESTED", "RESUBMISSION_REQUIRED"].includes(submission.status)) {
@@ -135,7 +150,7 @@ export function AnnouncementBell({ api, role }: Props) {
             createdAt: submission.updated_at || requirement.created_at,
             unread: true,
             priority: "urgent" as const,
-            href: "/student/documents",
+            href: `/student/documents?requirement_id=${requirement.id}&focus=requirement`,
           }];
         }
         return [];
@@ -192,20 +207,45 @@ export function AnnouncementBell({ api, role }: Props) {
     if (next && !loadedAll) void load(true);
   };
 
+  const persistRead = useCallback(async (row: HeaderNotification) => {
+    if (row.source === "announcement" && row.announcementId) {
+      await fetch(`${api}/api/v1/announcements/${row.announcementId}/read`, { method: "POST", credentials: "include" });
+    }
+    if (row.source === "notification" && row.notificationId) {
+      await fetch(`${api}/api/v1/notifications/${row.notificationId}/read`, { method: "POST", credentials: "include" });
+    }
+    if (row.source === "collaboration" && row.channelId && row.messageId) {
+      const collaborationRole = (role?.trim().toUpperCase() || roleFromPath()) === "SUPERVISOR" ? "supervisor" : "student";
+      await fetch(`${api}/api/v1/${collaborationRole}/collaboration/channels/${row.channelId}/read`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message_id: row.messageId }) });
+    }
+  }, [api, role]);
+
   const markRead = async (row: HeaderNotification) => {
     setReadOverrides((current) => ({ ...current, [row.id]: true }));
     setRows((current) => current.map((item) => item.id === row.id ? { ...item, unread: false } : item));
     setHighlightedId((current) => current === row.id ? null : current);
     try {
-      if (row.source === "announcement" && row.announcementId) await fetch(`${api}/api/v1/announcements/${row.announcementId}/read`, { method: "POST", credentials: "include" });
-      if (row.source === "notification" && row.notificationId) await fetch(`${api}/api/v1/notifications/${row.notificationId}/read`, { method: "POST", credentials: "include" });
-      if (row.source === "collaboration" && row.channelId && row.messageId) {
-        const collaborationRole = (role?.trim().toUpperCase() || roleFromPath()) === "SUPERVISOR" ? "supervisor" : "student";
-        await fetch(`${api}/api/v1/${collaborationRole}/collaboration/channels/${row.channelId}/read`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message_id: row.messageId }) });
-      }
+      await persistRead(row);
     } catch { /* The item remains locally dismissed until the next refresh. */ }
     if (row.href) window.location.assign(row.href);
   };
+
+  const markVisibleRead = useCallback(async (visibleRows: HeaderNotification[]) => {
+    if (!visibleRows.length) return;
+    const visibleIds = new Set(visibleRows.map((row) => row.id));
+    setReadOverrides((current) => ({ ...current, ...Object.fromEntries(visibleRows.map((row) => [row.id, true])) }));
+    setRows((current) => current.map((row) => visibleIds.has(row.id) ? { ...row, unread: false } : row));
+    setHighlightedId((current) => current && visibleIds.has(current) ? null : current);
+    await Promise.allSettled(visibleRows.map((row) => persistRead(row)));
+  }, [persistRead]);
+
+  useEffect(() => {
+    if (!open || loading) return;
+    const visibleUnreadRows = displayRows.filter((row) => row.unread);
+    if (!visibleUnreadRows.length) return;
+    const timer = window.setTimeout(() => void markVisibleRead(visibleUnreadRows), 0);
+    return () => window.clearTimeout(timer);
+  }, [displayRows, loading, markVisibleRead, open]);
 
   return <div className="announcement-bell" ref={rootRef}>
     <button type="button" className="announcement-bell__button" aria-label={unread ? `${unread} unread notifications` : "Notifications"} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}>

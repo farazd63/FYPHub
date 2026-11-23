@@ -137,6 +137,145 @@
   }
 }
 
+/* Desktop auth pages are a viewport frame. Long signup steps scroll inside
+   the form panel instead of expanding the page and moving the whole card. */
+@media (min-width: 1024px) {
+  .auth-stage {
+    --auth-stage-pad: clamp(0.85rem, 2.4vw, 1.75rem);
+    box-sizing: border-box;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    padding: var(--auth-stage-pad) !important;
+  }
+
+  .auth-stage__panel.auth-card.auth-card-shell {
+    box-sizing: border-box;
+    height: min(720px, calc(100dvh - (2 * var(--auth-stage-pad)))) !important;
+    min-height: 0 !important;
+    max-height: calc(100dvh - (2 * var(--auth-stage-pad))) !important;
+    align-self: center !important;
+    justify-self: center !important;
+    display: grid !important;
+  }
+
+  .auth-stage__grid {
+    box-sizing: border-box;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .auth-stage__brand,
+  .auth-stage--switch .auth-welcome-panel {
+    box-sizing: border-box;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .auth-stage__panel.auth-card.auth-card-shell .auth-form-panel {
+    box-sizing: border-box;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    scrollbar-gutter: stable;
+  }
+
+  .auth-form-layer,
+  .auth-form-views {
+    min-height: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  html[data-theme="light"] .auth-stage {
+    --auth-stage-pad: clamp(1rem, 2.4vw, 1.75rem);
+  }
+}
+
+/* The outer authentication surface is the shared animated card. Keep the
+   existing inner form card styles intact while preventing the shared shell
+   from inheriting the form card's floating-dock geometry. */
+.auth-stage__panel.auth-card.auth-card-shell {
+  display: grid;
+  flex-direction: initial;
+  justify-content: initial;
+  align-self: initial;
+  width: min(100%, 1180px);
+  min-height: calc(100dvh - 2 * clamp(0.85rem, 2.4vw, 1.75rem));
+  margin: 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--fy-brand) 28%, var(--fy-border));
+  border-radius: clamp(1.25rem, 2.2vw, 1.75rem);
+  background: var(--fy-surface);
+  box-shadow:
+    0 0 0 1px rgb(224 168 92 / 0.1),
+    0 40px 90px rgb(0 0 0 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.04);
+  animation: auth-panel-in 780ms var(--auth-ease-out) both;
+}
+
+/* Keep both sign-in and sign-up content visually centered inside the form
+   panel. When a longer sign-up step needs more room, the panel still owns the
+   vertical scroll so no fields are lost. */
+.auth-stage__panel.auth-card.auth-card-shell .auth-form-panel {
+  justify-content: center;
+}
+
+@media (max-width: 1023px) {
+  .auth-stage__panel.auth-card.auth-card-shell {
+    min-height: auto;
+    margin: 0 auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  .auth-stage__panel.auth-card.auth-card-shell {
+    width: min(100%, 1080px);
+    min-height: min(720px, calc(100dvh - 2rem));
+  }
+
+  .auth-stage--compact .auth-stage__panel.auth-card.auth-card-shell {
+    width: min(100%, 920px);
+    min-height: min(620px, calc(100dvh - 2rem));
+  }
+}
+
+html[data-theme="light"] .auth-stage__panel.auth-card.auth-card-shell {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 1180px);
+  min-height: calc(100dvh - 2 * clamp(1rem, 2.4vw, 1.75rem));
+  margin: 0 auto;
+  padding: 0;
+  border: 1px solid rgb(36 63 250 / 0.1);
+  border-radius: clamp(1.35rem, 2.4vw, 1.85rem);
+  background: var(--fy-surface);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.9) inset,
+    0 24px 60px rgb(11 27 63 / 0.1),
+    0 8px 24px rgb(36 63 250 / 0.08);
+}
+
+@media (min-width: 1024px) {
+  html[data-theme="light"] .auth-stage__panel.auth-card.auth-card-shell {
+    width: min(100%, 1080px);
+    min-height: min(720px, calc(100dvh - 2rem));
+  }
+
+  html[data-theme="light"] .auth-stage--compact .auth-stage__panel.auth-card.auth-card-shell {
+    width: min(100%, 920px);
+    min-height: min(620px, calc(100dvh - 2rem));
+  }
+}
+
 .auth-stage__brand {
   position: relative;
   display: none;
@@ -1176,4 +1315,464 @@ html[data-theme="light"] .fy-logo--auth .fy-logo__wordmark {
     border-radius: var(--fy-radius-card);
     width: min(100%, 420px);
   }
+}
+
+/* Animated sign-in/sign-up switch: both forms stay mounted while a large
+   clipped diagonal mask crosses the shared rounded authentication card. */
+.auth-stage--switch .auth-stage__grid {
+  position: relative;
+  isolation: isolate;
+}
+
+.auth-stage--switch .auth-welcome-panel,
+.auth-stage--switch .auth-form-panel {
+  transition: transform 760ms var(--auth-ease-in-out), opacity 420ms ease;
+  will-change: transform, opacity;
+}
+
+.auth-form-views {
+  position: relative;
+  min-width: 0;
+}
+
+.auth-form-view {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-112%) skewX(-7deg);
+  transition:
+    transform 760ms var(--auth-ease-in-out),
+    opacity 360ms ease-in-out,
+    visibility 0s linear 760ms;
+}
+
+.auth-form-view--signup {
+  transform: translateX(112%) skewX(7deg);
+}
+
+.auth-form-view.is-active {
+  position: relative;
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0) skewX(0);
+  transition-delay: 0s;
+}
+
+.auth-stage--switch.is-signin .auth-welcome-panel { order: 1; }
+.auth-stage--switch.is-signin .auth-form-panel { order: 2; }
+.auth-stage--switch.is-signup .auth-welcome-panel {
+  order: 2;
+  transform: translateX(0);
+}
+.auth-stage--switch.is-signup .auth-form-panel {
+  order: 1;
+  transform: translateX(0);
+}
+
+.auth-stage--switch.is-transitioning .auth-form-view {
+  visibility: visible;
+  pointer-events: none;
+}
+
+.auth-stage--switch.is-transitioning.is-signup .auth-form-view--signin {
+  animation: auth-form-exit-signup 760ms var(--auth-ease-in-out) both;
+}
+
+.auth-stage--switch.is-transitioning.is-signup .auth-form-view--signup {
+  animation: auth-form-enter-signup 760ms var(--auth-ease-in-out) both;
+}
+
+.auth-stage--switch.is-transitioning.is-signin .auth-form-view--signup {
+  animation: auth-form-exit-signin 760ms var(--auth-ease-in-out) both;
+}
+
+.auth-stage--switch.is-transitioning.is-signin .auth-form-view--signin {
+  animation: auth-form-enter-signin 760ms var(--auth-ease-in-out) both;
+}
+
+@media (min-width: 1024px) {
+  .auth-stage--switch.is-transitioning.is-signin .auth-welcome-panel {
+    animation: auth-welcome-signin 760ms var(--auth-ease-in-out) both;
+  }
+
+  .auth-stage--switch.is-transitioning.is-signin .auth-form-panel {
+    animation: auth-form-signin 760ms var(--auth-ease-in-out) both;
+  }
+
+  .auth-stage--switch.is-transitioning.is-signup .auth-welcome-panel {
+    animation: auth-welcome-signup 760ms var(--auth-ease-in-out) both;
+  }
+
+  .auth-stage--switch.is-transitioning.is-signup .auth-form-panel {
+    animation: auth-form-signup 760ms var(--auth-ease-in-out) both;
+  }
+}
+
+.auth-sweep {
+  position: absolute;
+  top: -22%;
+  bottom: -22%;
+  left: 50%;
+  z-index: 7;
+  width: 72%;
+  min-width: 18rem;
+  pointer-events: none;
+  opacity: 0;
+  overflow: visible;
+  transform: translateX(-150%) skewX(-12deg);
+  background: linear-gradient(105deg, var(--fy-surface) 0%, color-mix(in srgb, var(--fy-surface-raised) 90%, var(--fy-brand) 10%) 58%, color-mix(in srgb, var(--fy-brand) 28%, var(--fy-surface-raised)) 100%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--fy-brand) 18%, var(--fy-border)),
+    18px 0 34px color-mix(in srgb, var(--fy-brand) 18%, transparent);
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.auth-sweep-inner {
+  position: absolute;
+  inset: 0;
+  transform: skewX(12deg);
+  background:
+    linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--fy-brand) 8%, transparent) 48%, color-mix(in srgb, var(--fy-brand) 22%, transparent) 100%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.04), transparent 42%, rgb(0 0 0 / 0.16));
+}
+
+.auth-divider-edge {
+  position: absolute;
+  top: -12%;
+  right: -0.7rem;
+  bottom: -12%;
+  width: 1.4rem;
+  transform: skewX(-12deg);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fy-brand) 48%, transparent), transparent);
+  filter: blur(5px);
+  opacity: 0.78;
+}
+
+.auth-stage--switch.is-transitioning.is-signup .auth-sweep {
+  animation: auth-sweep-signup 760ms var(--auth-ease-in-out) both;
+}
+
+.auth-stage--switch.is-transitioning.is-signin .auth-sweep {
+  animation: auth-sweep-signin 760ms var(--auth-ease-in-out) both;
+}
+
+/* Drive the same transition from the shared card state as well, so the
+   animation cannot depend on the route component being replaced. */
+.auth-card.auth-card-shell.is-transitioning.is-signup .auth-sweep {
+  animation: auth-sweep-signup 760ms var(--auth-ease-in-out) both;
+}
+
+.auth-card.auth-card-shell.is-transitioning.is-signin .auth-sweep {
+  animation: auth-sweep-signin 760ms var(--auth-ease-in-out) both;
+}
+
+.auth-switch-link {
+  margin: var(--fy-space-5, 1.25rem) 0 0;
+  color: var(--fy-text-secondary);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+@keyframes auth-sweep-signup {
+  0% { opacity: 0; transform: translateX(-150%) skewX(-12deg); }
+  12% { opacity: 1; }
+  86% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(150%) skewX(-12deg); }
+}
+
+@keyframes auth-sweep-signin {
+  0% { opacity: 0; transform: translateX(150%) skewX(-12deg); }
+  12% { opacity: 1; }
+  86% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-150%) skewX(-12deg); }
+}
+
+@keyframes auth-welcome-signin {
+  0% { opacity: 1; transform: translateX(100%) skewX(3deg); }
+  100% { opacity: 1; transform: translateX(0) skewX(0); }
+}
+
+@keyframes auth-form-signin {
+  0% { opacity: 1; transform: translateX(-180%) skewX(-3deg); }
+  100% { opacity: 1; transform: translateX(0) skewX(0); }
+}
+
+@keyframes auth-welcome-signup {
+  0% { opacity: 1; transform: translateX(-180%) skewX(-3deg); }
+  100% { opacity: 1; transform: translateX(0) skewX(0); }
+}
+
+@keyframes auth-form-signup {
+  0% { opacity: 1; transform: translateX(100%) skewX(3deg); }
+  100% { opacity: 1; transform: translateX(0) skewX(0); }
+}
+
+@keyframes auth-form-exit-signup {
+  0% { opacity: 1; transform: translateX(0) skewX(0); }
+  100% { opacity: 0; transform: translateX(-10%) skewX(-2deg); }
+}
+
+@keyframes auth-form-enter-signup {
+  0% { opacity: 0; transform: translateX(10%) skewX(2deg); }
+  100% { opacity: 1; transform: translateX(0) skewX(0); }
+}
+
+@keyframes auth-form-exit-signin {
+  0% { opacity: 1; transform: translateX(0) skewX(0); }
+  100% { opacity: 0; transform: translateX(10%) skewX(2deg); }
+}
+
+@keyframes auth-form-enter-signin {
+  0% { opacity: 0; transform: translateX(-10%) skewX(-2deg); }
+  100% { opacity: 1; transform: translateX(0) skewX(0); }
+}
+
+@media (max-width: 1023px) {
+  .auth-stage--switch .auth-stage__grid {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .auth-stage--switch .auth-welcome-panel {
+    display: grid !important;
+    order: 1;
+    min-height: 12rem;
+    height: auto;
+    background: linear-gradient(145deg, rgb(23 31 45 / 0.98), rgb(10 13 19 / 0.98));
+  }
+
+  .auth-stage--switch .auth-form-panel {
+    order: 2;
+    width: min(100% - 1rem, 30rem);
+    margin: 0.75rem auto 1rem;
+    transform: none;
+  }
+
+  .auth-stage--switch.is-signup .auth-welcome-panel { order: 2; }
+  .auth-stage--switch.is-signup .auth-form-panel { order: 1; }
+
+  .auth-stage--switch .auth-stage__brand-copy {
+    gap: 0.45rem;
+    max-width: 30rem;
+    padding: 1.5rem 1.25rem 2.25rem;
+  }
+
+  .auth-stage--switch .auth-stage__brand-copy h1 {
+    max-width: 18ch;
+    font-size: clamp(1.55rem, 6vw, 2.2rem);
+  }
+
+  .auth-stage--switch .auth-stage__lead {
+    max-width: 42ch;
+    font-size: 0.9rem;
+  }
+
+  .auth-stage--switch .auth-stage__credits { display: none; }
+  .auth-stage--switch .auth-sweep { width: 58%; }
+}
+
+@media (max-width: 560px) {
+  .auth-stage--switch .auth-welcome-panel { min-height: 10.5rem; }
+  .auth-stage--switch .auth-form-panel {
+    width: calc(100% - 0.8rem);
+    margin: 0.55rem auto 0.8rem;
+  }
+}
+
+/* Mobile/tablet signup pages must use one document scroll.  The stage used
+   to become a second scroll container while its panel grew with the member
+   list, which could leave the cycle/step header above an inaccessible clip.
+   Keep the rounded auth card as the visual clip, but let the document own the
+   vertical scroll so every signup section remains reachable after adding
+   members. */
+@media (max-width: 1023px) {
+  html:has(.auth-stage),
+  body:has(.auth-stage),
+  #root:has(.auth-stage) {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+
+  .auth-stage {
+    height: auto !important;
+    min-height: 100svh !important;
+    max-height: none !important;
+    overflow-x: clip !important;
+    overflow-y: visible !important;
+    overscroll-behavior-y: auto;
+  }
+
+  .auth-stage__panel.auth-card.auth-card-shell {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+  }
+
+  .auth-stage__grid,
+  .auth-form-panel,
+  .auth-card__body,
+  .auth-form-views {
+    overflow: visible !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-stage--switch .auth-welcome-panel,
+  .auth-stage--switch .auth-form-panel {
+    transition: none;
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+
+  .auth-form-view {
+    transition: none;
+    transform: none;
+  }
+
+  .auth-stage--switch .auth-sweep {
+    animation: none !important;
+    opacity: 0;
+  }
+}
+
+/* Compact desktop composition: keep auth focused without letting it fill the viewport. */
+@media (min-width: 1024px) {
+  .auth-stage {
+    display: grid;
+    place-items: center;
+  }
+
+  .auth-stage__panel {
+    width: min(100%, 1080px);
+    min-height: min(720px, calc(100dvh - 2rem));
+  }
+
+  .auth-stage--compact .auth-stage__panel {
+    width: min(100%, 920px);
+    min-height: min(620px, calc(100dvh - 2rem));
+  }
+
+  .auth-stage__brand-copy {
+    padding: 2rem 1.75rem 2.35rem;
+  }
+
+  .auth-stage__brand-copy h1 {
+    font-size: clamp(2rem, 3vw, 2.8rem);
+  }
+
+  .auth-card {
+    padding: 1.5rem 1.75rem;
+  }
+
+  /* The light theme previously forced the form to inherit the full viewport height. */
+  html[data-theme="light"] .auth-stage__grid {
+    height: auto;
+    min-height: 0;
+  }
+
+  html[data-theme="light"] .auth-stage__brand-copy {
+    padding: 2rem 1.75rem 2.35rem;
+  }
+
+  html[data-theme="light"] .auth-stage__brand-copy h1 {
+    font-size: clamp(2rem, 3vw, 2.8rem);
+  }
+
+  html[data-theme="light"] .auth-card {
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 1.5rem 1.75rem;
+  }
+}
+
+/* Campus branding image: keep the photo inside the welcome side only, so the
+   form remains clean in both themes and the sign-up side can reverse safely. */
+@media (min-width: 1024px) {
+  .auth-stage__media,
+  .auth-stage__veil {
+    inset: 0 auto 0 0;
+    width: 58%;
+  }
+
+  .auth-stage--compact .auth-stage__media,
+  .auth-stage--compact .auth-stage__veil {
+    width: calc(100% - 440px);
+  }
+
+  .auth-stage--switch.is-signup .auth-stage__media,
+  .auth-stage--switch.is-signup .auth-stage__veil {
+    right: 0;
+    left: auto;
+  }
+
+  .auth-stage__media img {
+    object-position: center center;
+    filter: saturate(0.92) contrast(1.06) brightness(0.7);
+  }
+
+  html[data-theme="light"] .auth-stage__media,
+  html[data-theme="light"] .auth-stage__veil {
+    display: block !important;
+  }
+
+  html[data-theme="light"] .auth-stage__brand {
+    background-color: transparent !important;
+    background-image: none !important;
+  }
+
+  html[data-theme="light"] .auth-stage__media img {
+    filter: saturate(0.95) contrast(1.04) brightness(0.76);
+  }
+
+  html[data-theme="light"] .auth-stage__veil {
+    background:
+      linear-gradient(108deg, rgb(5 18 42 / 0.78) 0%, rgb(9 27 58 / 0.42) 56%, rgb(7 16 38 / 0.68) 100%),
+      linear-gradient(180deg, rgb(5 16 38 / 0.12) 0%, transparent 42%, rgb(4 12 30 / 0.38) 100%);
+  }
+}
+
+/* Keep the campus photo bright enough to read while preserving a controlled
+   contrast layer for the white welcome copy in both theme modes. */
+.auth-stage__media img {
+  filter: saturate(1.04) contrast(1.03) brightness(1.02);
+}
+
+.auth-stage__veil {
+  background:
+    linear-gradient(108deg, rgb(5 8 13 / 0.62) 0%, rgb(5 8 13 / 0.28) 54%, rgb(5 8 13 / 0.5) 100%),
+    linear-gradient(180deg, rgb(5 8 13 / 0.08) 0%, transparent 44%, rgb(5 8 13 / 0.24) 100%);
+}
+
+.auth-stage__brand-copy,
+.auth-stage__brand-copy h1,
+.auth-stage__lead,
+.auth-stage__eyebrow {
+  color: #fff !important;
+}
+
+.auth-stage__brand-copy h1 {
+  text-shadow: 0 4px 22px rgb(0 0 0 / 0.72), 0 1px 3px rgb(0 0 0 / 0.85);
+}
+
+.auth-stage__eyebrow,
+.auth-stage__lead {
+  text-shadow: 0 2px 14px rgb(0 0 0 / 0.72);
+}
+
+html[data-theme="light"] .auth-stage__media img {
+  filter: saturate(1.04) contrast(1.02) brightness(1.02);
+}
+
+html[data-theme="light"] .auth-stage__veil {
+  background:
+    linear-gradient(108deg, rgb(5 14 30 / 0.56) 0%, rgb(5 14 30 / 0.24) 54%, rgb(5 14 30 / 0.46) 100%),
+    linear-gradient(180deg, rgb(5 14 30 / 0.06) 0%, transparent 44%, rgb(5 14 30 / 0.2) 100%);
 }

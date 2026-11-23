@@ -1,0 +1,496 @@
+/* Final dark-mode surface pass.
+   This file is loaded after feature CSS so legacy literal white backgrounds
+   cannot leak through on older dashboards and portal modules. */
+
+html[data-theme="dark"] #root :where(
+  .portal-header,
+  .portal-logout,
+  .student-header,
+  .student-logout,
+  .academic-cycle-dashboard__state,
+  .academic-cycle-dashboard__summary > div,
+  .academic-cycle-dashboard__tabs button,
+  .academic-cycle-dashboard__table-wrap,
+  .academic-cycle-dashboard__card,
+  .academic-cycle-dashboard__management,
+  .cycle-overview__summary,
+  .cycle-overview__message,
+  .cycle-overview__error,
+  .cycle-overview__empty,
+  .group-ai-page,
+  .group-ai-heading,
+  .group-ai-secondary,
+  .group-ai-card,
+  .group-ai-message,
+  .group-ai-floating-panel,
+  .group-ai-floating-panel__header,
+  .group-ai-floating-panel__close,
+  .group-ai-history,
+  .group-ai-history__new,
+  .group-ai-prompts,
+  .group-ai-composer,
+  .module3-panel,
+  .module3-secondary-button,
+  .module3-close-button,
+  .module3-score-ring > div,
+  .module3-preview,
+  .module3-template-row,
+  .module3-rule-grid > div,
+  .module3-paper-page,
+  .module3-paper-page::before,
+  .module3-paper-alert,
+  .module3-paper-ok,
+  .supervisor-monitor-summary span,
+  .supervisor-filter-clear,
+  .supervisor-card,
+  .supervisor-actions button:first-child,
+  .student-request-card,
+  .student-request-input,
+  .student-supervisor-option,
+  .student-overview__summary,
+  .student-content-card,
+  .student-content__card,
+  .student-phase-card,
+  .student-placeholder,
+  .student-collab,
+  .student-collab__heading,
+  .student-collab__composer,
+  .student-collab__message,
+  .archive-back-button
+) {
+  background: var(--noir-surface) !important;
+  background-color: var(--noir-surface) !important;
+  background-image: none !important;
+  border-color: var(--noir-border) !important;
+}
+
+html[data-theme="dark"] #root :where(
+  .academic-cycle-dashboard__meta,
+  .academic-cycle-dashboard__status,
+  .academic-cycle-dashboard__counts span,
+  .group-ai-scope,
+  .group-ai-messages,
+  .group-ai-history__item:hover,
+  .group-ai-history__item.is-active,
+  .group-ai-rules,
+  .group-ai-response-meta > span,
+  .supervisor-queue-item,
+  .supervisor-queue-item--selected,
+  .supervisor-capacity,
+  .student-collab__history,
+  .student-collab__sender-picker select,
+  .student-collab__identity-check,
+  .student-collab__composer textarea,
+  .student-collab__identity-fields input,
+  .student-collab__attachment-card,
+  .student-collab__rich-card,
+  .student-collab__attachment-preview,
+  .student-collab__attachment-draft-preview,
+  .student-collab__structured-fields input,
+  .student-collab__structured-fields textarea,
+  .student-collab__tool-button,
+  .student-collab__contact-picker button,
+  .student-collab__quick-replies button,
+  .student-collab__poll-options button,
+  .student-collab__attachment-menu,
+  .student-collab__structured-composer,
+  .student-collab__emoji-panel
+) {
+  background: var(--noir-surface-raised) !important;
+  background-color: var(--noir-surface-raised) !important;
+  background-image: none !important;
+  border-color: var(--noir-border) !important;
+}
+
+html[data-theme="dark"] #root :where(
+  .group-ai-page,
+  .group-ai-heading,
+  .group-ai-card,
+  .group-ai-floating-panel,
+  .group-ai-floating-panel__header,
+  .group-ai-history,
+  .group-ai-prompts,
+  .group-ai-composer,
+  .student-collab,
+  .student-collab__heading,
+  .student-collab__composer,
+  .student-collab__message,
+  .student-collab__structured-fields input,
+  .student-collab__identity-fields input,
+  .student-collab__attachment-preview,
+  .student-collab__attachment-menu,
+  .student-collab__structured-composer,
+  .student-collab__emoji-panel
+) {
+  border-color: var(--noir-border) !important;
+}
+
+html[data-theme="dark"] #root :where(
+  .group-ai-message,
+  .student-collab__message,
+  .student-collab__composer textarea,
+  .student-collab__structured-fields input,
+  .student-collab__structured-fields textarea,
+  .student-collab__identity-fields input,
+  .student-collab__contact-picker button,
+  .student-collab__quick-replies button,
+  .student-collab__poll-options button
+) {
+  color: var(--noir-text-primary) !important;
+}
+
+/* Keep selected and branded controls intact after the surface pass. */
+html[data-theme="dark"] #root :where(
+  .group-ai-composer button,
+  .student-collab__composer button,
+  .student-collab__send-button,
+  .student-collab__structured-fields > button,
+  .student-collab__identity-fields button,
+  .module3-primary-button,
+  .supervisor-actions button:not(:first-child),
+  .archive-result-card button
+) {
+  background-image: none !important;
+}
+
+/* Authentication theme parity.
+   These rules intentionally define geometry once for both themes. Theme
+   files may change surfaces, borders, and text colors, but never the auth
+   card's layout, spacing, or responsive positions. */
+.auth-card__body {
+  display: block !important;
+  gap: initial !important;
+}
+
+.auth-stage__brand-copy {
+  width: min(100%, 34rem) !important;
+  max-width: 34rem !important;
+  gap: 0.85rem !important;
+  padding: 2rem 1.75rem 2.35rem !important;
+}
+
+.auth-stage__brand-copy h1 {
+  max-width: 13ch !important;
+  line-height: 1.08 !important;
+  letter-spacing: -0.04em !important;
+}
+
+.auth-stage__eyebrow {
+  margin: 1.1rem 0 0 !important;
+}
+
+.auth-card h1,
+.auth-card__title {
+  font-size: clamp(1.6rem, 2.4vw, 1.95rem) !important;
+  letter-spacing: -0.03em !important;
+}
+
+.auth-card__title {
+  line-height: 1.15 !important;
+}
+
+.auth-card label {
+  font-size: 0.875rem !important;
+  letter-spacing: normal !important;
+  line-height: 1.428571rem !important;
+}
+
+.auth-card .auth-primary,
+.auth-card button[type="submit"],
+.auth-card button.auth-primary {
+  min-height: 0 !important;
+  margin-top: 0 !important;
+}
+
+.auth-stage__lead {
+  max-width: 36ch !important;
+  line-height: 1.55 !important;
+}
+
+@media (min-width: 1024px) {
+  .auth-stage {
+    padding: clamp(0.85rem, 2.4vw, 1.75rem) !important;
+  }
+
+  .auth-stage__panel.auth-card.auth-card-shell {
+    display: grid !important;
+    flex-direction: initial !important;
+    width: min(100%, 1080px) !important;
+    height: min(720px, calc(100dvh - (2 * clamp(0.85rem, 2.4vw, 1.75rem)))) !important;
+    min-height: 0 !important;
+    max-height: calc(100dvh - (2 * clamp(0.85rem, 2.4vw, 1.75rem))) !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+  }
+
+  .auth-stage__grid {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.2fr) minmax(380px, 440px) !important;
+    width: auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    flex: none !important;
+  }
+
+  .auth-stage__brand {
+    display: grid !important;
+    align-self: stretch !important;
+    width: auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+  }
+
+  .auth-form-panel {
+    display: flex !important;
+    width: auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 1.5rem 1.75rem !important;
+    border-radius: 0 !important;
+    box-sizing: border-box !important;
+    border-left: 1px solid var(--fy-border) !important;
+  }
+
+  .auth-stage__brand-copy {
+    gap: 0.85rem !important;
+    padding: 2rem 1.75rem 2.35rem !important;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 800px) {
+  .auth-stage__brand-copy {
+    gap: 0.5rem !important;
+  }
+
+  .auth-stage__brand-copy h1 {
+    line-height: 1.12 !important;
+  }
+
+  .auth-stage__lead {
+    font-size: 0.95rem !important;
+    line-height: 1.45 !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .auth-stage {
+    min-height: 100svh !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: max(0.5rem, env(safe-area-inset-top)) 0.5rem
+      max(0.5rem, env(safe-area-inset-bottom)) !important;
+  }
+
+  .auth-stage__panel.auth-card.auth-card-shell {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 auto !important;
+    border-radius: 1.1rem !important;
+  }
+
+  .auth-stage__grid {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    grid-template-columns: none !important;
+  }
+
+  .auth-stage__brand,
+  .auth-stage--switch .auth-welcome-panel {
+    display: grid !important;
+    order: 1;
+    align-self: stretch !important;
+    align-content: start !important;
+    justify-items: stretch !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 12rem !important;
+    max-height: none !important;
+    padding: 1.25rem 0.85rem 0 !important;
+    overflow: visible !important;
+  }
+
+  .auth-stage__brand-copy {
+    width: 100% !important;
+    max-width: 26rem !important;
+    gap: 0.6rem !important;
+    padding: 1.15rem 0.45rem 0 !important;
+  }
+
+  .auth-stage__eyebrow {
+    margin-top: 0.8rem !important;
+    font-size: 0.62rem !important;
+    letter-spacing: 0.14em !important;
+    line-height: 1.4 !important;
+  }
+
+  .auth-stage__brand-copy h1 {
+    max-width: 12ch !important;
+    font-size: clamp(2rem, 9.5vw, 2.7rem) !important;
+    line-height: 1.02 !important;
+  }
+
+  .auth-stage__lead {
+    max-width: 29ch !important;
+    font-size: 0.98rem !important;
+    line-height: 1.42 !important;
+  }
+
+  .auth-form-panel {
+    order: 2;
+    width: calc(100% - 0.8rem) !important;
+    max-width: 30rem !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0.55rem auto 0.8rem !important;
+    padding: 1rem 0.9rem !important;
+    border-radius: 1rem !important;
+    overflow: visible !important;
+  }
+
+  .auth-card__header {
+    margin-bottom: 1.25rem !important;
+  }
+
+  .auth-stage--switch.is-signup .auth-welcome-panel,
+  .auth-stage--switch.is-signup .auth-stage__brand {
+    order: 2;
+  }
+
+  .auth-stage--switch.is-signup .auth-form-panel {
+    order: 1;
+  }
+}
+
+/* Desktop signup pages must use the document as the scroll owner. The old
+   fixed-height form scrollbar could move the stepper and section heading out
+   of view while the member list continued below it. Let the auth card grow
+   with its content so the browser page can scroll normally. */
+@media (min-width: 1024px) {
+  html:has(.auth-stage),
+  body:has(.auth-stage),
+  #root:has(.auth-stage) {
+    height: auto !important;
+    min-height: 100%;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+  }
+
+  .auth-stage {
+    height: auto !important;
+    min-height: 100dvh !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-y: visible !important;
+  }
+
+  .auth-stage__panel.auth-card.auth-card-shell {
+    height: auto !important;
+    min-height: min(720px, calc(100dvh - 2rem)) !important;
+    max-height: none !important;
+  }
+
+  .auth-stage__grid {
+    height: auto !important;
+    min-height: inherit !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .auth-stage__brand,
+  .auth-stage__panel.auth-card.auth-card-shell .auth-form-panel {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Keep the campus image at the original viewport-sized composition while
+     the signup form grows. The welcome column is the sticky viewport-sized
+     surface; its image fills that column instead of stretching with the
+     long member list. */
+  .auth-stage__panel.auth-card.auth-card-shell {
+    overflow: visible !important;
+    clip-path: inset(0 round clamp(1.25rem, 2.2vw, 1.75rem));
+  }
+
+  .auth-stage__panel.auth-card.auth-card-shell .auth-stage__grid > .auth-stage__brand,
+  .auth-stage--switch .auth-welcome-panel {
+    position: sticky !important;
+    top: clamp(0.85rem, 2.4vw, 1.75rem) !important;
+    align-self: start !important;
+    height: min(720px, calc(100dvh - 2rem)) !important;
+    min-height: 0 !important;
+    max-height: calc(100dvh - 2rem) !important;
+    overflow: hidden !important;
+  }
+
+  .auth-stage__media,
+  .auth-stage__veil {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+  }
+}
+
+/* Keep page canvases flat on the shared portal background.  Older portal
+   rules applied a surface fill to the entire page wrapper, which produced a
+   visible gray/graphite slab behind headings such as "Supervisor Capacity".
+   Raised cards, hero panels, tables, dialogs, and navigation surfaces keep
+   their own intentional layers; only the page-level canvas is cleared. */
+#root :where(
+  .student-shell .supervisor-page,
+  .student-shell .student-phase-page,
+  .student-shell .student-overview,
+  .student-shell .group-ai-page,
+  .student-shell .module3-workspace,
+  .admin-shell .cycle-overview,
+  .admin-shell .cycle-detail-page,
+  .portal-shell .academic-cycle-dashboard
+) {
+  background: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+#root :where(
+  .student-shell .student-page-heading,
+  .student-shell .supervisor-page-heading,
+  .student-shell .fy-page-header,
+  .admin-shell .fy-page-header,
+  .portal-shell .fy-page-header,
+  .module3-page-heading,
+  .module3-admin-page-heading
+) {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* Portal copy should remain crisp in both themes. */
+#root :where(.admin-shell, .student-shell, .portal-shell) :where(
+  h1,
+  h2,
+  h3,
+  h4,
+  p,
+  span,
+  strong,
+  small
+) {
+  text-shadow: none !important;
+}

@@ -9,6 +9,11 @@ The Student Overview contains an embedded Collaboration Channel card below the e
 - `GET /api/v1/student/collaboration/channels/{id}`: authorized channel metadata.
 - `GET /api/v1/student/collaboration/channels/{id}/messages`: history. Optional `limit` (1–200) and `before_id` support loading earlier messages. Existing consumers without pagination retain the complete-history response.
 - `POST /api/v1/student/collaboration/channels/{id}/messages`: send plain-text content.
+- `GET /api/v1/student/collaboration/channels/{id}/member-identity`: show password-set and current-session verification status without exposing hashes.
+- `POST /api/v1/student/collaboration/channels/{id}/member-identity/setup|verify`: create or verify the selected member's collaboration password.
+- `POST /api/v1/student/collaboration/channels/{id}/member-identity/forgot`: create a visible administrator reset request.
+- `GET /api/v1/admin/student-groups/{group_id}/collaboration-credentials`: show member credential status and pending reset requests to an administrator.
+- `POST /api/v1/admin/student-groups/{group_id}/collaboration-credentials/{member_id}/reset`: revoke the old credential and active identity sessions, notify the group account, and allow the member to create a new password.
 - New `POST /api/v1/student/collaboration/channels/{id}/read`: monotonically advance the current principal's read marker using `{ "message_id": ... }`.
 - Matching supervisor channel routes reuse the same authorization and handlers. Existing supervisor group-conversation endpoints continue to call these handlers.
 
@@ -16,9 +21,9 @@ The Student Overview contains an embedded Collaboration Channel card below the e
 
 An active channel, active assignment and accepted supervision request are required. Only the group's shared student principal, active group members, and the specific assigned supervisor pass channel authorization. Other groups, unrelated supervisors and other roles are denied. A dissolved group, ended assignment or archived channel immediately loses access.
 
-The portal's shared group login and cookie-session authentication are preserved. Group members continue using their existing shared credentials; read markers and sender attribution are associated with the authenticated account, not an inferred individual behind shared credentials. Member-level authorization is also tested independently.
+The portal's shared group login and cookie-session authentication are preserved. Before sending, a student selects the active group member and creates or verifies that member's separate collaboration password. The API stores only an Argon2id password hash, then binds the verified member to the authenticated browser session; message endpoints reject a forged `sender_member_id` without that binding. New messages display the verified member's name and registration number. A forgotten password creates a pending administrator request; an admin removes the old credential and existing bindings, and the group account receives an in-app notification with a direct link to create a new password. Because the portal still starts from one shared group account, first-time setup is a declared claim under that shared login; an email OTP or admin-issued setup code is still needed if the institution requires cryptographic proof of the physical person during first setup. Supervisor messages continue to use the authenticated supervisor account.
 
-The existing `collaboration_channels`, `collaboration_messages` and `collaboration_participants` tables are reused. Migration `ri2d3e4f5a6b` adds nullable `last_read_message_id` and `last_read_at` columns to participants; no duplicate chat tables are introduced. A read marker may reference only a non-deleted message from that channel and cannot move backwards.
+The existing `collaboration_channels`, `collaboration_messages` and `collaboration_participants` tables are reused. Migration `z7n9o0p1q2r3` adds `collaboration_member_credentials`, browser-session bindings and administrator reset requests; no duplicate chat tables are introduced. A read marker may reference only a non-deleted message from that channel and cannot move backwards.
 
 Messages must contain non-whitespace content and be at most 4,000 characters. Content is stored without trimming so indentation, line breaks and trailing newlines survive. The browser renders messages as escaped React text with pre-wrap and long-word wrapping, never executable HTML.
 

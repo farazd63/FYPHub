@@ -6,6 +6,7 @@ import { Menu } from "lucide-react";
 import { ThemeToggle } from "../../../ui/ThemeToggle";
 import { AnnouncementBell } from "../../../announcements/AnnouncementBell";
 import { pushPortalRoute } from "../../shared/portal-history";
+import { usePersistentSidebarCollapse } from "../../shared/usePersistentSidebarCollapse";
 import { displayInitials } from "../../shared/displayInitials";
 import { EvaluatorWorkflow } from "./EvaluatorWorkflow";
 import { ProposalComplianceWorkspace } from "../../../modules/module-3/ProposalComplianceWorkspace";
@@ -22,7 +23,7 @@ const evaluatorPath = (page: EvaluatorNavKey) => page === "overview" ? "/evaluat
 export function StudentEvaluatorPortal({ api, user, onLogout }: { api: string; user: { full_name: string; role?: string }; onLogout: () => void }) {
   const [active, setActive] = useState<EvaluatorNavKey>(evaluatorPageFromPath);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = usePersistentSidebarCollapse("evaluator");
   useEffect(() => { const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); }; window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, []);
   useEffect(() => { const syncFromHistory = () => { setActive(evaluatorPageFromPath()); setMobileOpen(false); window.scrollTo({ top: 0, left: 0, behavior: "auto" }); }; window.addEventListener("popstate", syncFromHistory); return () => window.removeEventListener("popstate", syncFromHistory); }, []);
   const initials = displayInitials(user.full_name, "E");

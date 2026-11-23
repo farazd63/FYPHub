@@ -55,9 +55,25 @@ def authentication_error() -> HTTPException:
 
 
 def validate_mutating_origin(request: Request) -> None:
-    """Allow same-origin/non-browser calls, but reject a supplied foreign browser Origin."""
+    """Allow same-origin/non-browser calls, but reject a supplied foreign browser Origin.
+
+    The portal is commonly opened from another device over the local network
+    (for example, ``http://10.34.118.50:5173`` on a phone).  A fixed localhost
+    allow-list cannot recognize that request even though it is same-origin.
+    Prefer the origin reconstructed from the trusted reverse-proxy headers and
+    keep the explicit development origins as a fallback for direct API calls.
+    """
     origin = request.headers.get("origin")
-    if origin is not None and origin not in ALLOWED_BROWSER_ORIGINS:
+    if origin is None:
+        return
+
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+    scheme = forwarded_proto or request.url.scheme
+    forwarded_host = request.headers.get("x-forwarded-host", "").split(",", 1)[0].strip()
+    host = forwarded_host or request.headers.get("host", "").strip()
+    same_origin = bool(host) and origin.rstrip("/") == f"{scheme}://{host}".rstrip("/")
+
+    if origin not in ALLOWED_BROWSER_ORIGINS and not same_origin:
         log_temporary_auth_diagnostic(
             request,
             "origin_rejected",

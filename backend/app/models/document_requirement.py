@@ -71,6 +71,7 @@ class DocumentSubmissionVersion(Base):
     content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     uploaded_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     uploader_id = synonym("uploaded_by_id")
+    student_hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 

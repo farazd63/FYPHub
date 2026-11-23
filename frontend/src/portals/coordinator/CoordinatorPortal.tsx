@@ -13,6 +13,7 @@ import { AnnouncementBell } from "../../announcements/AnnouncementBell";
 import { FypHubBrand } from "../shared/FypHubBrand";
 import { AnnouncementSection } from "../../announcements/AnnouncementSection";
 import { pushPortalRoute } from "../shared/portal-history";
+import { usePersistentSidebarCollapse } from "../shared/usePersistentSidebarCollapse";
 
 type Page = "overview" | "requests" | "scheduling";
 const coordinatorPageFromPath = (): Page => window.location.pathname === "/coordinator/requests" ? "requests" : window.location.pathname === "/coordinator/scheduling" ? "scheduling" : "overview";
@@ -20,7 +21,7 @@ const coordinatorPath = (page: Page) => page === "overview" ? "/coordinator" : `
 
 export function CoordinatorPortal({ api, user, onLogout }: { api: string; user: { full_name: string; role?: string }; onLogout: () => void }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = usePersistentSidebarCollapse("coordinator");
   const [page, setPage] = useState<Page>("overview");
   useEffect(() => {
     const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); };

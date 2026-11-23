@@ -1,21 +1,40 @@
 """Private assignment-scoped Module 2 collaboration channels."""
 
 import mimetypes
+from datetime import timedelta
 from pathlib import Path
 from typing import Annotated, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from .auth import get_current_user, require_roles, utc_now, validate_mutating_origin
+from .auth import SESSION_COOKIE_NAME, get_current_user, require_roles, utc_now, validate_mutating_origin
 from .config import settings
 from .database import get_db
-from .models import AcademicCycle, CollaborationChannel, CollaborationMessage, CollaborationParticipant, SupervisorAssignment, SupervisorRequest, Team, TeamMember, User, UserRole
+from .models import (
+    AcademicCycle,
+    AdminAuditEvent,
+    AuthSession,
+    CollaborationChannel,
+    CollaborationMemberCredential,
+    CollaborationMemberSession,
+    CollaborationMessage,
+    CollaborationParticipant,
+    CollaborationPasswordResetRequest,
+    Module2Notification,
+    SupervisorAssignment,
+    SupervisorRequest,
+    Team,
+    TeamMember,
+    User,
+    UserRole,
+)
+from .security import hash_password, hash_session_token, validate_password, verify_password
 
 router = APIRouter(prefix="/api/v1", tags=["module-2-private-collaboration"])
 
@@ -23,6 +42,7 @@ router = APIRouter(prefix="/api/v1", tags=["module-2-private-collaboration"])
 class MessageWrite(BaseModel):
     model_config = ConfigDict(extra="forbid")
     message_text: str = Field(min_length=1, max_length=4000)
+    sender_member_id: StrictInt | None = Field(default=None, gt=0)
     message_kind: Literal["TEXT", "DOCUMENT", "MEDIA", "AUDIO", "CONTACT", "POLL", "EVENT", "STICKER", "CATALOGUE", "QUICK_REPLY"] = "TEXT"
     message_payload: dict[str, object] = Field(default_factory=dict)
     attachment_reference: str | None = Field(default=None, max_length=500)
@@ -53,11 +73,151 @@ class ReadWrite(BaseModel):
     message_id: StrictInt = Field(gt=0)
 
 
+class MemberPasswordSetup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    member_id: StrictInt = Field(gt=0)
+    password: str = Field(min_length=8, max_length=128)
+    confirm_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("password")
+    @classmethod
+    def policy(cls, value: str) -> str:
+        validate_password(value)
+        return value
+
+    @model_validator(mode="after")
+    def matching_passwords(self):
+        if self.password != self.confirm_password:
+            raise ValueError("Passwords do not match.")
+        return self
+
+
+class MemberPasswordVerify(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    member_id: StrictInt = Field(gt=0)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class MemberPasswordResetRequestWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    member_id: StrictInt = Field(gt=0)
+
+
 def _active_channel(session: Session, channel_id: int) -> CollaborationChannel:
     channel = session.get(CollaborationChannel, channel_id)
     if channel is None:
         raise HTTPException(404, "Collaboration channel was not found.")
     return channel
+
+
+def _browser_auth_session(session: Session, request: Request, actor: User) -> AuthSession:
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not token:
+        raise HTTPException(401, "Authentication required.")
+    auth_session = session.scalar(
+        select(AuthSession).where(
+            AuthSession.user_id == actor.id,
+            AuthSession.token_hash == hash_session_token(token),
+            AuthSession.revoked_at.is_(None),
+            AuthSession.expires_at > utc_now(),
+        )
+    )
+    if auth_session is None:
+        raise HTTPException(401, "Authentication required.")
+    return auth_session
+
+
+def _identity_member(session: Session, channel: CollaborationChannel, actor: User, member_id: int) -> TeamMember:
+    if actor.role != UserRole.STUDENT:
+        raise HTTPException(403, "Only a student group member can use a member identity.")
+    member = session.scalar(
+        select(TeamMember).where(
+            TeamMember.id == member_id,
+            TeamMember.team_id == channel.team_id,
+            TeamMember.is_active.is_(True),
+        )
+    )
+    if member is None:
+        raise HTTPException(422, "The selected group member is not active in this group.")
+    team = session.get(Team, channel.team_id)
+    if team is not None and team.shared_user_id != actor.id:
+        own_member = _student_member(session, actor, channel.team_id)
+        if own_member is None or own_member.id != member.id:
+            raise HTTPException(403, "You can only use your own group-member identity.")
+    return member
+
+
+def _identity_status(session: Session, channel: CollaborationChannel, actor: User, request: Request | None) -> list[dict]:
+    if actor.role != UserRole.STUDENT:
+        return []
+    members = session.scalars(
+        select(TeamMember)
+        .where(TeamMember.team_id == channel.team_id, TeamMember.is_active.is_(True))
+        .order_by(TeamMember.id)
+    ).all()
+    credentials = {
+        credential.team_member_id: credential
+        for credential in session.scalars(
+            select(CollaborationMemberCredential).where(CollaborationMemberCredential.channel_id == channel.id)
+        ).all()
+    }
+    pending_ids = {
+        row.team_member_id
+        for row in session.scalars(
+            select(CollaborationPasswordResetRequest).where(
+                CollaborationPasswordResetRequest.channel_id == channel.id,
+                CollaborationPasswordResetRequest.status == "PENDING",
+            )
+        ).all()
+    }
+    verified_member_id = None
+    if request is not None:
+        auth_session = _browser_auth_session(session, request, actor)
+        binding = session.scalar(
+            select(CollaborationMemberSession).where(
+                CollaborationMemberSession.auth_session_id == auth_session.id,
+                CollaborationMemberSession.channel_id == channel.id,
+                CollaborationMemberSession.revoked_at.is_(None),
+                CollaborationMemberSession.expires_at > utc_now(),
+            )
+        )
+        verified_member_id = binding.team_member_id if binding else None
+    return [
+        {
+            "member_id": member.id,
+            "name": member.full_name,
+            "registration_number": member.registration_number,
+            "password_set": member.id in credentials,
+            "is_verified": member.id == verified_member_id,
+            "reset_requested": member.id in pending_ids,
+        }
+        for member in members
+    ]
+
+
+def _bind_identity(session: Session, request: Request, actor: User, channel: CollaborationChannel, member: TeamMember) -> None:
+    auth_session = _browser_auth_session(session, request, actor)
+    now = utc_now()
+    binding = session.scalar(
+        select(CollaborationMemberSession).where(
+            CollaborationMemberSession.auth_session_id == auth_session.id,
+            CollaborationMemberSession.channel_id == channel.id,
+        )
+    )
+    if binding is None:
+        binding = CollaborationMemberSession(
+            auth_session_id=auth_session.id,
+            channel_id=channel.id,
+            team_member_id=member.id,
+            verified_at=now,
+            expires_at=min(auth_session.expires_at, now + timedelta(hours=8)),
+        )
+        session.add(binding)
+    else:
+        binding.team_member_id = member.id
+        binding.verified_at = now
+        binding.expires_at = min(auth_session.expires_at, now + timedelta(hours=8))
+        binding.revoked_at = None
 
 
 def _student_member(session: Session, actor: User, team_id: int) -> TeamMember | None:
@@ -159,7 +319,54 @@ def _channel_out(session: Session, channel: CollaborationChannel, actor: User) -
 
 def _message_out(session: Session, message: CollaborationMessage) -> dict:
     sender = session.get(User, message.sender_user_id)
-    return {"id": message.id, "channel_id": message.channel_id, "sender_user_id": message.sender_user_id, "sender_name": sender.full_name if sender else "Unknown user", "sender_role": sender.role.value if sender else "UNKNOWN", "message_text": message.message_text, "message_kind": message.message_kind, "message_payload": message.message_payload or {}, "attachment_reference": message.attachment_reference, "created_at": message.created_at, "updated_at": message.updated_at, "deleted_at": message.deleted_at}
+    member = session.get(TeamMember, message.sender_team_member_id) if message.sender_team_member_id else None
+    sender_name = member.full_name if member else (sender.full_name if sender else "Unknown user")
+    return {"id": message.id, "channel_id": message.channel_id, "sender_user_id": message.sender_user_id, "sender_member_id": member.id if member else None, "sender_member_name": member.full_name if member else None, "sender_member_registration_number": member.registration_number if member else None, "sender_name": sender_name, "sender_role": sender.role.value if sender else "UNKNOWN", "message_text": message.message_text, "message_kind": message.message_kind, "message_payload": message.message_payload or {}, "attachment_reference": message.attachment_reference, "created_at": message.created_at, "updated_at": message.updated_at, "deleted_at": message.deleted_at}
+
+
+def _selected_member(session: Session, channel: CollaborationChannel, actor: User, member_id: int | None) -> TeamMember | None:
+    """Resolve the member label for a student message.
+
+    The shared group principal may select any active member of its own team.
+    If an individual student principal is used in the future, it can only
+    select its own matching member record.
+    """
+    if actor.role == UserRole.SUPERVISOR:
+        if member_id is not None:
+            raise HTTPException(422, "A supervisor message cannot select a group member.")
+        return None
+    if actor.role != UserRole.STUDENT:
+        raise HTTPException(403, "Student or supervisor identity is required.")
+    if member_id is None:
+        raise HTTPException(422, "Select the group member sending this message.")
+    member = session.scalar(select(TeamMember).where(TeamMember.id == member_id, TeamMember.team_id == channel.team_id, TeamMember.is_active.is_(True)))
+    if member is None:
+        raise HTTPException(422, "The selected group member is not active in this group.")
+    team = session.get(Team, channel.team_id)
+    if team is not None and team.shared_user_id != actor.id:
+        own_member = _student_member(session, actor, channel.team_id)
+        if own_member is None or own_member.id != member.id:
+            raise HTTPException(403, "You can only send as your own group-member identity.")
+    return member
+
+
+def _verified_member(session: Session, channel: CollaborationChannel, actor: User, request: Request, member_id: int | None) -> TeamMember | None:
+    member = _selected_member(session, channel, actor, member_id)
+    if member is None or actor.role == UserRole.SUPERVISOR:
+        return member
+    auth_session = _browser_auth_session(session, request, actor)
+    binding = session.scalar(
+        select(CollaborationMemberSession).where(
+            CollaborationMemberSession.auth_session_id == auth_session.id,
+            CollaborationMemberSession.channel_id == channel.id,
+            CollaborationMemberSession.team_member_id == member.id,
+            CollaborationMemberSession.revoked_at.is_(None),
+            CollaborationMemberSession.expires_at > utc_now(),
+        )
+    )
+    if binding is None:
+        raise HTTPException(403, "Verify the selected member's collaboration password before sending.")
+    return member
 
 
 FILE_MESSAGE_KINDS = {"DOCUMENT", "MEDIA", "AUDIO", "STICKER"}
@@ -197,6 +404,306 @@ def _list_channels(session: Session, actor: User) -> list[dict]:
             raise
         result.append(_channel_out(session, row, actor))
     return result
+
+
+@router.get("/student/collaboration/channels/{channel_id}/member-identity")
+def member_identity_status(channel_id: int, request: Request, actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
+    channel = _active_channel(session, channel_id)
+    _authorize(session, channel, actor)
+    return {"channel_id": channel.id, "members": _identity_status(session, channel, actor, request)}
+
+
+@router.post("/student/collaboration/channels/{channel_id}/member-identity/setup")
+def setup_member_identity(channel_id: int, payload: MemberPasswordSetup, request: Request, actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    channel = _active_channel(session, channel_id)
+    _authorize(session, channel, actor, write=True)
+    member = _identity_member(session, channel, actor, payload.member_id)
+    existing = session.scalar(
+        select(CollaborationMemberCredential).where(
+            CollaborationMemberCredential.channel_id == channel.id,
+            CollaborationMemberCredential.team_member_id == member.id,
+        )
+    )
+    if existing is not None:
+        raise HTTPException(409, "This member already has a collaboration password. Verify it instead.")
+    session.add(
+        CollaborationMemberCredential(
+            channel_id=channel.id,
+            team_member_id=member.id,
+            password_hash=hash_password(payload.password),
+        )
+    )
+    _bind_identity(session, request, actor, channel, member)
+    session.commit()
+    return {"channel_id": channel.id, "member_id": member.id, "status": "VERIFIED"}
+
+
+@router.post("/student/collaboration/channels/{channel_id}/member-identity/verify")
+def verify_member_identity(channel_id: int, payload: MemberPasswordVerify, request: Request, actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    channel = _active_channel(session, channel_id)
+    _authorize(session, channel, actor, write=True)
+    member = _identity_member(session, channel, actor, payload.member_id)
+    credential = session.scalar(
+        select(CollaborationMemberCredential).where(
+            CollaborationMemberCredential.channel_id == channel.id,
+            CollaborationMemberCredential.team_member_id == member.id,
+        )
+    )
+    if credential is None:
+        raise HTTPException(409, "Create this member's collaboration password first.")
+    if not verify_password(payload.password, credential.password_hash):
+        raise HTTPException(401, "The collaboration password is incorrect.")
+    _bind_identity(session, request, actor, channel, member)
+    session.commit()
+    return {"channel_id": channel.id, "member_id": member.id, "status": "VERIFIED"}
+
+
+@router.post("/student/collaboration/channels/{channel_id}/member-identity/forgot")
+def request_member_identity_reset(channel_id: int, payload: MemberPasswordResetRequestWrite, request: Request, actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    channel = _active_channel(session, channel_id)
+    _authorize(session, channel, actor, write=True)
+    member = _identity_member(session, channel, actor, payload.member_id)
+    pending = session.scalar(
+        select(CollaborationPasswordResetRequest).where(
+            CollaborationPasswordResetRequest.channel_id == channel.id,
+            CollaborationPasswordResetRequest.team_member_id == member.id,
+            CollaborationPasswordResetRequest.status == "PENDING",
+        )
+    )
+    team = session.get(Team, channel.team_id)
+    cycle = session.get(AcademicCycle, team.academic_cycle_id) if team else None
+    group_label = team.group_name if team and team.group_name else f"Group {team.group_number if team and team.group_number is not None else channel.team_id}"
+    new_request = pending is None
+    if new_request:
+        session.add(
+            CollaborationPasswordResetRequest(
+                channel_id=channel.id,
+                team_member_id=member.id,
+                requested_by_user_id=actor.id,
+            )
+        )
+    if new_request:
+        admins = session.scalars(
+            select(User).where(User.role == UserRole.ADMIN, User.is_active.is_(True))
+        ).all()
+        for admin in admins:
+            session.add(
+                Module2Notification(
+                    recipient_user_id=admin.id,
+                    kind="COLLABORATION_PASSWORD_RESET_REQUESTED",
+                    payload={
+                        "title": "Collaboration password reset requested",
+                        "message": f"{member.full_name} requested a new collaboration password for {group_label}.",
+                        "path": f"/admin/student-groups?cycle_id={team.academic_cycle_id}&group_id={channel.team_id}&member_id={member.id}&focus=collaboration-reset",
+                        "focus": "collaboration-reset",
+                        "channel_id": channel.id,
+                        "group_id": channel.team_id,
+                        "member_id": member.id,
+                        "member_name": member.full_name,
+                        "registration_number": member.registration_number,
+                        "cycle_id": team.academic_cycle_id if team else None,
+                        "cycle_name": cycle.display_name if cycle else None,
+                    },
+                )
+            )
+    session.commit()
+    return {"channel_id": channel.id, "member_id": member.id, "status": "PENDING", "message": "The reset request was sent to an administrator."}
+
+
+def _admin_channel(session: Session, group_id: int, cycle_id: int) -> tuple[Team, CollaborationChannel | None]:
+    team = session.scalar(select(Team).where(Team.id == group_id, Team.academic_cycle_id == cycle_id))
+    if team is None:
+        raise HTTPException(404, "The student group was not found in this cycle.")
+    channel = session.scalar(
+        select(CollaborationChannel)
+        .where(CollaborationChannel.team_id == team.id, CollaborationChannel.status == "ACTIVE")
+        .order_by(CollaborationChannel.id.desc())
+    )
+    return team, channel
+
+
+@router.get("/admin/collaboration-credentials")
+def admin_collaboration_credentials_list(
+    cycle_id: Annotated[int | None, Query(gt=0)] = None,
+    actor: User = Depends(require_roles(UserRole.ADMIN)),
+    session: Session = Depends(get_db),
+):
+    """List active collaboration channels and their member credential status."""
+    query = select(Team).where(Team.status != "dissolved").order_by(Team.academic_cycle_id, Team.group_number, Team.id)
+    if cycle_id is not None:
+        query = query.where(Team.academic_cycle_id == cycle_id)
+    teams = session.scalars(query).all()
+    items = []
+    for team in teams:
+        channel = session.scalar(
+            select(CollaborationChannel)
+            .where(CollaborationChannel.team_id == team.id, CollaborationChannel.status == "ACTIVE")
+            .order_by(CollaborationChannel.id.desc())
+        )
+        if channel is None:
+            continue
+        cycle = session.get(AcademicCycle, team.academic_cycle_id)
+        group_user = session.get(User, team.shared_user_id)
+        members = session.scalars(
+            select(TeamMember)
+            .where(TeamMember.team_id == team.id, TeamMember.is_active.is_(True))
+            .order_by(TeamMember.is_creator.desc(), TeamMember.id)
+        ).all()
+        credentials = {
+            row.team_member_id: row
+            for row in session.scalars(
+                select(CollaborationMemberCredential).where(CollaborationMemberCredential.channel_id == channel.id)
+            ).all()
+        }
+        pending = {
+            row.team_member_id: row
+            for row in session.scalars(
+                select(CollaborationPasswordResetRequest).where(
+                    CollaborationPasswordResetRequest.channel_id == channel.id,
+                    CollaborationPasswordResetRequest.status == "PENDING",
+                )
+            ).all()
+        }
+        items.append(
+            {
+                "group_id": team.id,
+                "group_name": team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}",
+                "group_email": group_user.email if group_user else None,
+                "shared_user_id": team.shared_user_id,
+                "cycle_id": team.academic_cycle_id,
+                "cycle_name": cycle.display_name if cycle else None,
+                "channel_id": channel.id,
+                "channel_status": channel.status,
+                "members": [
+                    {
+                        "member_id": member.id,
+                        "name": member.full_name,
+                        "registration_number": member.registration_number,
+                        "password_set": member.id in credentials,
+                        "reset_requested": member.id in pending,
+                        "requested_at": pending[member.id].requested_at if member.id in pending else None,
+                    }
+                    for member in members
+                ],
+            }
+        )
+    return {"items": items}
+
+
+@router.get("/admin/student-groups/{group_id}/collaboration-credentials")
+def admin_collaboration_credentials(group_id: int, cycle_id: Annotated[int, Query(gt=0)], actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
+    team, channel = _admin_channel(session, group_id, cycle_id)
+    members = session.scalars(
+        select(TeamMember).where(TeamMember.team_id == team.id, TeamMember.is_active.is_(True)).order_by(TeamMember.id)
+    ).all()
+    credentials = {
+        row.team_member_id: row
+        for row in session.scalars(
+            select(CollaborationMemberCredential).where(CollaborationMemberCredential.channel_id == channel.id) if channel else select(CollaborationMemberCredential).where(CollaborationMemberCredential.id == -1)
+        ).all()
+    }
+    pending_ids = {
+        row.team_member_id
+        for row in session.scalars(
+            select(CollaborationPasswordResetRequest).where(
+                CollaborationPasswordResetRequest.channel_id == channel.id,
+                CollaborationPasswordResetRequest.status == "PENDING",
+            ) if channel else select(CollaborationPasswordResetRequest).where(CollaborationPasswordResetRequest.id == -1)
+        ).all()
+    }
+    return {
+        "group_id": team.id,
+        "channel_id": channel.id if channel else None,
+        "channel_status": channel.status if channel else None,
+        "members": [
+            {
+                "member_id": member.id,
+                "name": member.full_name,
+                "registration_number": member.registration_number,
+                "password_set": member.id in credentials,
+                "reset_requested": member.id in pending_ids,
+            }
+            for member in members
+        ],
+    }
+
+
+@router.post("/admin/student-groups/{group_id}/collaboration-credentials/{member_id}/reset")
+def admin_reset_collaboration_credential(group_id: int, member_id: int, cycle_id: Annotated[int, Query(gt=0)], request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    team, channel = _admin_channel(session, group_id, cycle_id)
+    if channel is None:
+        raise HTTPException(409, "The collaboration channel is created after a supervisor is assigned.")
+    member = session.scalar(
+        select(TeamMember).where(
+            TeamMember.id == member_id,
+            TeamMember.team_id == team.id,
+            TeamMember.is_active.is_(True),
+        )
+    )
+    if member is None:
+        raise HTTPException(404, "The active group member was not found.")
+    credential = session.scalar(
+        select(CollaborationMemberCredential).where(
+            CollaborationMemberCredential.channel_id == channel.id,
+            CollaborationMemberCredential.team_member_id == member.id,
+        )
+    )
+    if credential is not None:
+        session.delete(credential)
+    for binding in session.scalars(
+        select(CollaborationMemberSession).where(
+            CollaborationMemberSession.channel_id == channel.id,
+            CollaborationMemberSession.team_member_id == member.id,
+            CollaborationMemberSession.revoked_at.is_(None),
+        )
+    ).all():
+        binding.revoked_at = utc_now()
+    pending = session.scalar(
+        select(CollaborationPasswordResetRequest).where(
+            CollaborationPasswordResetRequest.channel_id == channel.id,
+            CollaborationPasswordResetRequest.team_member_id == member.id,
+            CollaborationPasswordResetRequest.status == "PENDING",
+        )
+    )
+    if pending is not None:
+        pending.status = "RESOLVED"
+        pending.resolved_at = utc_now()
+        pending.resolved_by_user_id = actor.id
+    group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
+    session.add(
+        Module2Notification(
+            recipient_user_id=team.shared_user_id,
+            kind="COLLABORATION_PASSWORD_RESET_RESOLVED",
+            payload={
+                "title": "Collaboration password reset approved",
+                "message": f"An administrator cleared the collaboration password for {member.full_name} in {group_label}. Open the collaboration channel and create a new password.",
+                "path": f"/student/collaboration?focus=collaboration-password&member_id={member.id}",
+                "focus": "collaboration-password",
+                "channel_id": channel.id,
+                "group_id": team.id,
+                "member_id": member.id,
+                "member_name": member.full_name,
+                "registration_number": member.registration_number,
+                "cycle_id": team.academic_cycle_id,
+            },
+        )
+    )
+    session.add(
+        AdminAuditEvent(
+            actor_id=actor.id,
+            affected_user_id=None,
+            target_type="COLLABORATION_MEMBER",
+            target_id=member.id,
+            action="collaboration_member_password_revoked",
+            changed_values={"channel_id": channel.id, "team_member_id": member.id, "password_removed": True},
+        )
+    )
+    session.commit()
+    return {"group_id": team.id, "channel_id": channel.id, "member_id": member.id, "member_name": member.full_name, "password_removed": True, "status": "RESET"}
 
 
 @router.get("/student/collaboration/channels")
@@ -237,7 +744,8 @@ def collaboration_messages(channel_id: int, actor: User = Depends(get_current_us
 def send_collaboration_message(channel_id: int, payload: MessageWrite, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     validate_mutating_origin(request)
     channel = _active_channel(session, channel_id); _authorize(session, channel, actor, write=True)
-    message = CollaborationMessage(channel_id=channel.id, sender_user_id=actor.id, message_text=payload.message_text, message_kind=payload.message_kind, message_payload=payload.message_payload, attachment_reference=payload.attachment_reference)
+    member = _verified_member(session, channel, actor, request, payload.sender_member_id)
+    message = CollaborationMessage(channel_id=channel.id, sender_user_id=actor.id, sender_team_member_id=member.id if member else None, message_text=payload.message_text, message_kind=payload.message_kind, message_payload=payload.message_payload, attachment_reference=payload.attachment_reference)
     session.add(message); channel.updated_at = func.now(); session.commit(); session.refresh(message)
     return _message_out(session, message)
 
@@ -283,11 +791,13 @@ async def upload_collaboration_file(
     upload: UploadFile = File(...),
     message_kind: str = Form("DOCUMENT"),
     caption: str = Form(""),
+    sender_member_id: int | None = Form(None),
     actor: User = Depends(get_current_user),
     session: Session = Depends(get_db),
 ):
     validate_mutating_origin(request)
     channel = _active_channel(session, channel_id); _authorize(session, channel, actor, write=True)
+    member = _verified_member(session, channel, actor, request, sender_member_id)
     kind = _attachment_kind(message_kind, upload.content_type)
     data = await upload.read()
     if not data or len(data) > 25 * 1024 * 1024:
@@ -301,6 +811,7 @@ async def upload_collaboration_file(
         message = CollaborationMessage(
             channel_id=channel.id,
             sender_user_id=actor.id,
+            sender_team_member_id=member.id if member else None,
             message_text=caption.strip() or original,
             message_kind=kind,
             message_payload={"name": original, "mime_type": upload.content_type or "application/octet-stream", "size": len(data)},

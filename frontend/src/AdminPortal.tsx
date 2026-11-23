@@ -19,6 +19,7 @@ import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
 import { ThemeToggle } from "./ui/ThemeToggle";
 import { AnnouncementBell } from "./announcements/AnnouncementBell";
 import { pushPortalRoute } from "./portals/shared/portal-history";
+import { usePersistentSidebarCollapse } from "./portals/shared/usePersistentSidebarCollapse";
 import "./AdminSidebar.css";
 type User={full_name:string;email:string;role:string};
 type Page="overview"|"announcements"|"users"|"studentGroups"|"cycles"|"cycleDetails"|"templates"|"capacity"|"deadlines"|"reminders"|"archive"|"documentRequirements"|"matching"|"replacement";
@@ -30,13 +31,13 @@ const groups:NavGroup[]=[
  {id:"requirements",label:"Requirements & Review",items:[{label:"Required Documents",page:"documentRequirements"}]},
 ];
 const cycleIdFromPath=():number|null=>{const match=window.location.pathname.match(/^\/admin\/cycles\/(\d+)$/);if(!match)return null;const value=Number(match[1]);return Number.isInteger(value)&&value>0?value:null;};
-const fromPath=():Page=>cycleIdFromPath()!==null?"cycleDetails":window.location.pathname==="/admin/announcements"?"announcements":window.location.pathname==="/admin/document-requirements"||window.location.pathname.startsWith("/admin/document-requirements/cycles/")?"documentRequirements":window.location.pathname==="/admin/templates"?"templates":window.location.pathname==="/admin/archive"?"archive":window.location.pathname==="/admin/student-groups"?"studentGroups":window.location.pathname==="/admin/supervisor-matching"?"matching":window.location.pathname==="/admin/supervisor-replacement"?"replacement":"overview";
-const pagePath=(page:Page,cycleId?:number)=>page==="cycleDetails"?`/admin/cycles/${cycleId}`:page==="announcements"?"/admin/announcements":page==="documentRequirements"?"/admin/document-requirements":page==="templates"?"/admin/templates":page==="archive"?"/admin/archive":page==="studentGroups"?"/admin/student-groups":page==="matching"?"/admin/supervisor-matching":page==="replacement"?"/admin/supervisor-replacement":"/admin";
+const fromPath=():Page=>cycleIdFromPath()!==null?"cycleDetails":window.location.pathname==="/admin/announcements"?"announcements":window.location.pathname==="/admin/document-requirements"||window.location.pathname.startsWith("/admin/document-requirements/cycles/")?"documentRequirements":window.location.pathname==="/admin/templates"?"templates":window.location.pathname==="/admin/archive"?"archive":window.location.pathname==="/admin/student-groups"?"studentGroups":window.location.pathname==="/admin/users"?"users":window.location.pathname==="/admin/supervisor-matching"?"matching":window.location.pathname==="/admin/supervisor-replacement"?"replacement":"overview";
+const pagePath=(page:Page,cycleId?:number)=>page==="cycleDetails"?`/admin/cycles/${cycleId}`:page==="announcements"?"/admin/announcements":page==="documentRequirements"?"/admin/document-requirements":page==="templates"?"/admin/templates":page==="archive"?"/admin/archive":page==="studentGroups"?"/admin/student-groups":page==="users"?"/admin/users":page==="matching"?"/admin/supervisor-matching":page==="replacement"?"/admin/supervisor-replacement":"/admin";
 const groupId=(page:Page)=>page==="cycleDetails"?"academic":groups.find(g=>g.items.some(i=>i.page===page))?.id??"workspace";
 const expandedFor=(page:Page)=>Object.fromEntries(groups.map(group=>[group.id,group.id===groupId(page)]));
 
 export function AdminPortal({api,user,onLogout}:{api:string;user:User;onLogout:()=>void}){
- const [page,setPage]=useState<Page>(fromPath),[cycleDetailId,setCycleDetailId]=useState<number|null>(()=>cycleIdFromPath()),[menu,setMenu]=useState(false),[collapsed,setCollapsed]=useState(false),[revision,setRevision]=useState(0),[demoWarning,setDemoWarning]=useState("");
+ const [page,setPage]=useState<Page>(fromPath),[cycleDetailId,setCycleDetailId]=useState<number|null>(()=>cycleIdFromPath()),[menu,setMenu]=useState(false),[collapsed,setCollapsed]=usePersistentSidebarCollapse("admin"),[revision,setRevision]=useState(0),[demoWarning,setDemoWarning]=useState("");
  const [expanded,setExpanded]=useState<Record<string,boolean>>(()=>Object.fromEntries(groups.map(g=>[g.id,g.id===groupId(fromPath())])));
  const permitted=["ADMIN","COORDINATOR"].includes(user.role.trim().toUpperCase());
  const initials=user.full_name.trim().split(/\s+/).filter(Boolean).slice(0,2).map(p=>Array.from(p)[0]).join("").toUpperCase()||"A";

@@ -17,13 +17,14 @@ import "./modules/supervisor-requests/supervisor-requests.css";
 import "./supervisor-group-workspace.css";
 import { SupervisorExpertiseProfile } from "./modules/SupervisorExpertiseProfile";
 import { pushPortalRoute } from "../shared/portal-history";
+import { usePersistentSidebarCollapse } from "../shared/usePersistentSidebarCollapse";
 
 type SupervisorUser = { full_name: string; role?: string };
 type Page = "overview" | "requests" | "assigned" | "capacity" | "history" | "expertise";
 const supervisorPageFromPath = (): Page => window.location.pathname.startsWith("/supervisor/groups/") || window.location.pathname === "/supervisor/assigned-groups" ? "assigned" : window.location.pathname === "/supervisor/requests" ? "requests" : window.location.pathname === "/supervisor/capacity" ? "capacity" : window.location.pathname === "/supervisor/history" ? "history" : window.location.pathname === "/supervisor/expertise" ? "expertise" : "overview";
 const supervisorPath = (page: Page) => page === "overview" ? "/supervisor" : `/supervisor/${page === "assigned" ? "assigned-groups" : page}`;
 export function SupervisorPortal({ api, user, onLogout }: { api: string; user: SupervisorUser; onLogout: () => void }) {
-  const [mobileOpen, setMobileOpen] = useState(false); const [collapsed, setCollapsed] = useState(false); const [page, setPage] = useState<Page>(supervisorPageFromPath);
+  const [mobileOpen, setMobileOpen] = useState(false); const [collapsed, setCollapsed] = usePersistentSidebarCollapse("supervisor"); const [page, setPage] = useState<Page>(supervisorPageFromPath);
   useEffect(() => { const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); }; window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, []);
   useEffect(() => { const syncFromHistory = () => { setPage(supervisorPageFromPath()); setMobileOpen(false); window.scrollTo({ top: 0, left: 0, behavior: "auto" }); }; window.addEventListener("popstate", syncFromHistory); return () => window.removeEventListener("popstate", syncFromHistory); }, []);
   const [requestId, setRequestId] = useState<number | undefined>();

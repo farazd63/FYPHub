@@ -12,13 +12,13 @@ from unittest.mock import patch
 from urllib.parse import urlsplit
 
 from fastapi import HTTPException
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.auth import SESSION_COOKIE_NAME, get_current_user, require_roles, utc_now
 from app.database import engine, get_db
 from app.main import app
-from app.models import AuthSession, DocumentUploadRequirement, PasswordResetToken, User, UserRole
+from app.models import AuthSession, DocumentUploadRequirement, Module2Notification, PasswordResetToken, User, UserRole
 from app.password_reset import PASSWORD_RESET_GENERIC_MESSAGE
 from app.security import generate_session_token, hash_password, hash_session_token
 
@@ -339,6 +339,12 @@ class AuthSessionTests(unittest.TestCase):
 
     def test_forgot_password_is_generic_and_stores_only_a_hash(self) -> None:
         sent: list[str] = []
+        admin_session = Session(bind=self.connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        admin = User(full_name="Reset Admin", email=f"reset-admin-{uuid4().hex}@example.com", password_hash=hash_password("Reset Admin Password!"), role=UserRole.ADMIN, is_active=True)
+        admin_session.add(admin)
+        admin_session.commit()
+        admin_id = admin.id
+        admin_session.close()
         with patch("app.password_reset._smtp_configured", return_value=True), patch("app.password_reset._send_reset_email", side_effect=lambda _address, link: sent.append(link) or True):
             status, _, body = request("POST", "/api/v1/auth/forgot-password", {"email": self.email}, headers={"Origin": "http://localhost:5173"})
         self.assertEqual(status, 200)
@@ -348,6 +354,15 @@ class AuthSessionTests(unittest.TestCase):
         stored = self.connection.execute(text("SELECT token_hash FROM password_reset_tokens WHERE user_id=:id"), {"id": self.user_id}).scalar_one()
         self.assertNotEqual(stored, raw_token)
         self.assertEqual(stored, hash_session_token(raw_token))
+        notification = self.connection.execute(
+            select(Module2Notification).where(
+                Module2Notification.recipient_user_id == admin_id,
+                Module2Notification.kind == "PASSWORD_RESET_REQUESTED",
+            )
+        ).scalar_one()
+        self.assertEqual(notification.payload["user_id"], self.user_id)
+        self.assertIn("/admin/users?", notification.payload["path"])
+        self.assertIn("search=", notification.payload["path"])
         unknown = request("POST", "/api/v1/auth/forgot-password", {"email": "unknown-reset@example.com"})
         self.assertEqual(unknown[2], body)
 

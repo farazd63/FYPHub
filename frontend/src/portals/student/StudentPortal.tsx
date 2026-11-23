@@ -15,6 +15,7 @@ import { Bot, Menu } from "lucide-react";
 import { ThemeToggle } from "../../ui/ThemeToggle";
 import { AnnouncementBell } from "../../announcements/AnnouncementBell";
 import { pushPortalRoute } from "../shared/portal-history";
+import { usePersistentSidebarCollapse } from "../shared/usePersistentSidebarCollapse";
 import "./student.css";
 import "./student-content.css";
 import "./student-admin-theme.css";
@@ -219,7 +220,7 @@ export function StudentPortal({
   onLogout: () => void;
 }) {
   const [activeId, setActiveId] = useState(initialStudentPage);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = usePersistentSidebarCollapse("student");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHistoryCollapsed, setChatHistoryCollapsed] = useState(false);

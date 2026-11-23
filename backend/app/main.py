@@ -1274,7 +1274,23 @@ def list_admin_users(
     users = session.execute(
         statement.order_by(User.id).offset((page - 1) * page_size).limit(page_size)
     ).scalars().all()
-    return {"items": users, "page": page, "page_size": page_size, "total": total}
+    student_ids = [user.id for user in users if user.role == UserRole.STUDENT]
+    group_names: dict[int, str] = {}
+    if student_ids:
+        teams = session.scalars(
+            select(Team).where(Team.shared_user_id.in_(student_ids)).order_by(Team.id)
+        ).all()
+        group_names = {
+            team.shared_user_id: team.group_name or f"Group {team.group_number or '—'}"
+            for team in teams
+        }
+    items = []
+    for user in users:
+        item = AdminUserResponse.model_validate(user).model_dump()
+        if user.role == UserRole.STUDENT:
+            item["group_name"] = group_names.get(user.id, "Student group")
+        items.append(item)
+    return {"items": items, "page": page, "page_size": page_size, "total": total}
 
 
 @app.post("/api/v1/admin/users", status_code=status.HTTP_201_CREATED, response_model=AdminUserResponse)

@@ -568,6 +568,112 @@
   white-space: nowrap;
 }
 
+.student-collab__sender-picker {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr);
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0 0 10px;
+}
+
+.student-collab__sender-picker label {
+  margin: 0;
+  color: #526985;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.student-collab__sender-picker select {
+  min-height: 36px;
+  border: 1px solid #d8e2ee;
+  border-radius: 10px;
+  background: #f8fbff;
+  color: #183047;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.student-collab__sender-picker small {
+  grid-column: 2;
+  color: #657b96;
+  font-size: 11px;
+}
+
+.student-collab__identity-check {
+  margin: 0 0 12px;
+  padding: 11px 12px;
+  border: 1px solid #d8e2ee;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.student-collab__identity-check label {
+  display: block;
+  margin: 0 0 7px;
+  color: #183047;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.student-collab__identity-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.student-collab__identity-fields input {
+  min-width: 150px;
+  flex: 1 1 160px;
+  min-height: 34px;
+  border: 1px solid #d8e2ee;
+  border-radius: 9px;
+  padding: 7px 9px;
+  background: #fff;
+  color: #183047;
+  font: inherit;
+  font-size: 12px;
+}
+
+.student-collab__identity-fields button,
+.student-collab__identity-link {
+  min-height: 34px;
+  border: 0;
+  border-radius: 9px;
+  padding: 7px 10px;
+  background: #124bc4;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.student-collab__identity-link {
+  min-height: auto;
+  margin-top: 8px;
+  padding: 0;
+  background: transparent;
+  color: #124bc4;
+  text-decoration: underline;
+}
+
+.student-collab__identity-hint {
+  display: block;
+  margin-top: 7px;
+  color: #657b96;
+  font-size: 11px;
+}
+
+.student-collab__identity-error,
+.student-collab__identity-success {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+.student-collab__identity-error { color: #b42318; }
+.student-collab__identity-success { color: #16704a; }
+
 .student-collab__composer textarea {
   min-height: 62px;
   max-height: 118px;

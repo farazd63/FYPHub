@@ -1,0 +1,271 @@
+/*
+ * Portal shell geometry guardrails.
+ *
+ * The role sidebar is shared by student, supervisor, coordinator, evaluator,
+ * and admin portals. Keep its final geometry here so older role-specific
+ * styles cannot create a second flex width, rounded outer slab, or an
+ * overflowing content pane.
+ */
+
+.student-sidebar.role-sidebar,
+.student-sidebar.role-sidebar *,
+.admin-shell__content,
+.student-shell .student-content,
+.student-shell .student-content__inner,
+.admin-shell .admin-enter {
+  box-sizing: border-box;
+}
+
+.student-sidebar.role-sidebar .role-sidebar__panel,
+.student-sidebar.role-sidebar .role-sidebar__rail,
+.student-sidebar.role-sidebar .role-sidebar__rail-list,
+.student-sidebar.role-sidebar .student-sidebar__nav {
+  min-height: 0;
+}
+
+/* Shared chrome scale: the same header controls appear on every portal. */
+.student-shell .portal-home-button,
+.admin-shell .portal-home-button,
+.student-shell .portal-history-controls button,
+.admin-shell .admin-history-controls button {
+  box-sizing: border-box;
+  width: 36px !important;
+  height: 36px !important;
+  flex: 0 0 36px !important;
+  border-radius: 9px !important;
+}
+
+.student-shell .portal-home-button svg,
+.admin-shell .portal-home-button svg,
+.student-shell .portal-history-controls button svg,
+.admin-shell .admin-history-controls button svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (min-width: 768px) {
+  /* Fixed rails are outside the flex flow; the content pane owns the width. */
+  .student-shell > .student-body,
+  .admin-shell > .admin-shell__body {
+    min-width: 0;
+    column-gap: 16px !important;
+    row-gap: 0 !important;
+  }
+
+  .student-shell .student-content,
+  .admin-shell .admin-shell__content {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: 1 1 auto !important;
+    position: relative;
+    z-index: 1;
+    overflow-x: clip !important;
+    isolation: isolate;
+  }
+
+  /* The sidebar is fixed and therefore leaves the flex row. Reserve its full
+     outer footprint explicitly; width-only reservation lets page content sit
+     underneath the rail, especially in the 96px collapsed state. */
+  .student-shell .student-content {
+    margin-left: calc(var(--fy-shell-pad) + var(--fy-shell-sidebar-width) + 24px) !important;
+  }
+
+  .student-shell:has(.student-sidebar.role-sidebar.student-sidebar--collapsed) .student-content {
+    margin-left: calc(var(--fy-shell-pad) + var(--fy-shell-sidebar-collapsed-width) + 24px) !important;
+  }
+
+  @media (min-width: 1024px) {
+    .admin-shell .admin-shell__content {
+      margin-left: calc(var(--fy-shell-pad) + var(--fy-shell-sidebar-width) + 24px) !important;
+    }
+
+    .admin-shell:has(.student-sidebar.role-sidebar.student-sidebar--collapsed) .admin-shell__content {
+      margin-left: calc(var(--fy-shell-pad) + var(--fy-shell-sidebar-collapsed-width) + 24px) !important;
+    }
+  }
+
+  .student-shell .student-content__inner,
+  .admin-shell .admin-enter {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  /* Keep every role rail as one contained rounded surface. The previous
+     bottom-only radius created square top corners and a visible vertical seam
+     in collapsed navigation. */
+  .student-shell .student-sidebar.role-sidebar,
+  .admin-shell .student-sidebar.role-sidebar,
+  main:has(.admin-sidebar) .student-sidebar.role-sidebar {
+    flex-shrink: 0 !important;
+    z-index: 2;
+    top: calc(var(--fy-shell-header) + var(--fy-shell-pad)) !important;
+    left: var(--fy-shell-pad) !important;
+    align-self: flex-start !important;
+    width: var(--fy-shell-sidebar-width, 348px) !important;
+    flex-basis: var(--fy-shell-sidebar-width, 348px) !important;
+    height: calc(100dvh - var(--fy-shell-header) - var(--fy-shell-pad) - var(--fy-shell-pad)) !important;
+    max-height: calc(100dvh - var(--fy-shell-header) - var(--fy-shell-pad) - var(--fy-shell-pad)) !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid var(--fy-border, #d8dee6) !important;
+    border-radius: 24px !important;
+    box-shadow: var(--fy-shadow, 0 16px 34px rgb(26 36 51 / 0.10)) !important;
+  }
+
+  .student-shell .student-sidebar.role-sidebar .role-sidebar__rail,
+  .admin-shell .student-sidebar.role-sidebar .role-sidebar__rail,
+  main:has(.admin-sidebar) .student-sidebar.role-sidebar .role-sidebar__rail,
+  .student-shell .student-sidebar.role-sidebar .role-sidebar__panel,
+  .admin-shell .student-sidebar.role-sidebar .role-sidebar__panel,
+  main:has(.admin-sidebar) .student-sidebar.role-sidebar .role-sidebar__panel {
+    border-radius: inherit;
+  }
+
+  /* Keep the menu and page visually continuous. Content clipping still
+     prevents avatars/cards from bleeding back into the rail. */
+  .student-shell .student-content,
+  .admin-shell .admin-shell__content {
+    border-left: 0 !important;
+  }
+
+  /* One control scale for every role portal and every navigation section. */
+  .student-sidebar.role-sidebar .role-sidebar__collapse {
+    top: 14px !important;
+    right: auto !important;
+    left: 14px !important;
+    width: 44px !important;
+    height: 44px !important;
+    flex: 0 0 44px !important;
+    border-radius: 12px !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__collapse {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+  }
+
+  .student-shell .student-sidebar.role-sidebar.student-sidebar--collapsed,
+  .admin-shell .student-sidebar.role-sidebar.student-sidebar--collapsed,
+  main:has(.admin-sidebar) .student-sidebar.role-sidebar.student-sidebar--collapsed {
+    width: var(--fy-shell-sidebar-collapsed-width, 96px) !important;
+    flex-basis: var(--fy-shell-sidebar-collapsed-width, 96px) !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail {
+    gap: 10px !important;
+    padding: 70px 12px 14px !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-item {
+    width: 44px !important;
+    height: 44px !important;
+    flex: 0 0 44px !important;
+    border-radius: 12px !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-icon,
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-icon svg {
+    width: 19px !important;
+    height: 19px !important;
+  }
+
+  /* Expanded state: only the menu panel occupies the sidebar. */
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__rail {
+    display: none !important;
+  }
+
+  .student-sidebar.role-sidebar:not(.student-sidebar--collapsed) .role-sidebar__panel {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+  }
+
+  /* Collapsed state: only the compact icon rail occupies the sidebar. */
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__rail-list {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed .role-sidebar__panel {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Mobile navigation is a drawer and never reserves a blank side column. */
+  .student-shell .student-content,
+  .admin-shell .admin-shell__content {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  .student-shell .student-sidebar.role-sidebar,
+  .admin-shell .student-sidebar.role-sidebar {
+    max-width: min(88vw, 320px) !important;
+    box-sizing: border-box;
+    /* Drawer menus are detached from the header, so retain a complete card
+       radius while matching the same shared surface treatment. */
+    border-radius: var(--fy-radius-card, 0.75rem) !important;
+    border: 1px solid var(--fy-border, #d8dee6) !important;
+    box-shadow: var(--fy-shadow, 0 16px 34px rgb(26 36 51 / 0.14)) !important;
+  }
+}
+
+/* Document previews are viewport overlays, but they must still respect the
+   authenticated portal chrome.  The previous full-viewport inset allowed the
+   preview title and PDF toolbar to sit underneath the fixed header, while the
+   expanded rail could cover the left side of the document. */
+.portal-document-preview {
+  position: fixed !important;
+  top: var(--fy-shell-header, 4rem) !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: calc(var(--fy-shell-pad, 1.5rem) + var(--fy-shell-sidebar-width, 348px) + 24px) !important;
+  z-index: 20 !important;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.portal-document-preview__card {
+  min-width: 0;
+  min-height: 0;
+}
+
+.student-shell:has(.student-sidebar.role-sidebar.student-sidebar--collapsed) .portal-document-preview {
+  left: calc(var(--fy-shell-pad, 1.5rem) + var(--fy-shell-sidebar-collapsed-width, 96px) + 24px) !important;
+}
+
+@media (max-width: 767px) {
+  /* Mobile navigation is a drawer. Keep the preview below the header and let
+     the drawer/backdrop sit above it when the user opens navigation. */
+  .portal-document-preview,
+  .student-shell:has(.student-sidebar.role-sidebar.student-sidebar--collapsed) .portal-document-preview {
+    top: var(--fy-shell-header, 4rem) !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 30 !important;
+    padding: 12px !important;
+  }
+}

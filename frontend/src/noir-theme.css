@@ -837,9 +837,11 @@ html[data-theme="dark"] .auth-stage__panel {
   box-shadow: var(--fy-shadow-nav) !important;
 }
 
-html[data-theme="dark"] .auth-stage__media { opacity: 0.18; }
+html[data-theme="dark"] .auth-stage__media { opacity: 0.94; }
 html[data-theme="dark"] .auth-stage__veil {
-  background: var(--fy-scrim) !important;
+  background:
+    linear-gradient(108deg, rgb(5 8 13 / 0.62) 0%, rgb(5 8 13 / 0.28) 54%, rgb(5 8 13 / 0.5) 100%),
+    linear-gradient(180deg, rgb(5 8 13 / 0.08) 0%, transparent 44%, rgb(5 8 13 / 0.24) 100%) !important;
 }
 html[data-theme="dark"] .auth-stage__glow { opacity: 0.22 !important; }
 
@@ -882,10 +884,25 @@ html[data-theme="dark"] :where(
 }
 
 html[data-theme="dark"] :where(
+  .auth-stage__brand-copy,
+  .auth-stage__brand-copy h1,
+  .auth-stage__lead,
+  .auth-stage__eyebrow
+) {
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"] .auth-stage__brand-copy h1 {
+  text-shadow: 0 4px 22px rgb(0 0 0 / 0.72), 0 1px 3px rgb(0 0 0 / 0.85);
+}
+
+html[data-theme="dark"] :where(.auth-stage__lead, .auth-stage__eyebrow) {
+  text-shadow: 0 2px 14px rgb(0 0 0 / 0.72);
+}
+
+html[data-theme="dark"] :where(
   .auth-card__hint,
   .auth-card__link,
-  .auth-stage__lead,
-  .auth-stage__eyebrow,
   .welcome-landing__lede,
   .welcome-landing__flow-label,
   .welcome-landing__role-card p
@@ -952,6 +969,45 @@ html[data-theme="dark"] :where(
   border-color: var(--noir-border) !important;
   background: var(--noir-surface-raised) !important;
   color: var(--noir-text-secondary) !important;
+}
+
+/* Final legacy-surface guard: older routes still contain literal white and
+   pastel Tailwind backgrounds. Keep dark mode fully dark without changing
+   text utilities such as text-white. */
+html[data-theme="dark"] #root :where(
+  [class~="bg-white"],
+  [class*="bg-white/"],
+  [class*="bg-[#fff"],
+  [class*="bg-[#FFF"],
+  [class*="bg-[#f"],
+  [class*="bg-[#F"],
+  [class*="bg-[#e"],
+  [class*="bg-[#E"],
+  [style*="background: white"],
+  [style*="background-color: white"],
+  [style*="background:#fff"],
+  [style*="background-color:#fff"],
+  [style*="background: #fff"],
+  [style*="background-color: #fff"]
+) {
+  background: var(--noir-surface) !important;
+  background-color: var(--noir-surface) !important;
+  background-image: none !important;
+}
+
+html[data-theme="dark"] #root :where(
+  .module3-paper,
+  .module3-paper-page,
+  .module3-paper-page::before,
+  .module3-highlight,
+  .module3-paper-alert,
+  .module3-paper-alert--minor,
+  .module3-paper-ok,
+  iframe
+) {
+  background: var(--noir-surface) !important;
+  background-color: var(--noir-surface) !important;
+  background-image: none !important;
 }
 
 /* Keep mobile shells contained; tables scroll inside their own surfaces. */

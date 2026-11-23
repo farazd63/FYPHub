@@ -38,7 +38,17 @@ from .supervisor_request_conversation import SupervisorRequestMessage
 from .archived_project import ArchivedProject, ArchivedProjectDocument, ArchivedProjectDocumentType
 from .archive_import_batch import ArchiveImportBatch
 from .project_workflow import ProjectMilestone, ProjectTask, SupervisionMeeting, DefenseSchedule, DefensePanelMember, PanelEvaluation, PanelEvaluationScore
-from .module2_collaboration import Module2Notification, Module2ChannelRead, Module2ChatbotSession, CollaborationChannel, CollaborationParticipant, CollaborationMessage
+from .module2_collaboration import (
+    Module2Notification,
+    Module2ChannelRead,
+    Module2ChatbotSession,
+    CollaborationChannel,
+    CollaborationParticipant,
+    CollaborationMessage,
+    CollaborationMemberCredential,
+    CollaborationMemberSession,
+    CollaborationPasswordResetRequest,
+)
 from .agent_supervision import SupervisionAgentRun
 from .supervisor_matching import (
     MatchingAuditLog,

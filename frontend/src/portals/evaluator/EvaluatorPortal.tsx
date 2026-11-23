@@ -5,6 +5,7 @@ import { FypHubBrand } from "../shared/FypHubBrand";
 import { Menu } from "lucide-react";
 import { ThemeToggle } from "../../ui/ThemeToggle";
 import { displayInitials } from "../shared/displayInitials";
+import { usePersistentSidebarCollapse } from "../shared/usePersistentSidebarCollapse";
 import "../student/student.css";
 import "./evaluator.css";
 
@@ -24,7 +25,7 @@ const titles: Record<Exclude<EvaluatorNavKey, "overview">, string> = {
 export function EvaluatorPortal({ user, onLogout }: Props) {
   const [active, setActive] = useState<EvaluatorNavKey>("overview");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = usePersistentSidebarCollapse("evaluator");
   useEffect(() => {
     const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); };
     window.addEventListener("keydown", close);

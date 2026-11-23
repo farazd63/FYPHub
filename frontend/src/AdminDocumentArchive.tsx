@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BackButton, StatusBadge } from "./ui";
 import { AdminAddButton } from "./ui/AdminAddButton";
+import "./admin-document-archive.css";
 
 type Cycle = {
   id: number;
@@ -106,41 +107,6 @@ type Archive = Group & {
   filtered_requirements: number;
   member_user_ids: number[];
 };
-type Filters = {
-  search: string;
-  section: string;
-  status: string;
-  student: string;
-  requirement: string;
-  date_from: string;
-  date_to: string;
-};
-type Preview = {
-  url: string;
-  title: string;
-  pageCount: number;
-  error?: string;
-};
-
-const emptyFilters: Filters = {
-  search: "",
-  section: "",
-  status: "",
-  student: "",
-  requirement: "",
-  date_from: "",
-  date_to: "",
-};
-const statuses = [
-  "NOT_SUBMITTED",
-  "DRAFT",
-  "SUBMITTED",
-  "UNDER_REVIEW",
-  "CHANGES_REQUESTED",
-  "ACCEPTED",
-  "REJECTED",
-  "CLOSED",
-];
 const fileFormatOptions = [
   { value: "pdf", label: "PDF" },
   { value: "doc", label: "DOC" },
@@ -224,17 +190,6 @@ const dateText = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : "Not submitted";
 const display = (value?: string | null, fallback = "Not assigned") =>
   value && value.trim() ? value : fallback;
-const statusLabel = (value: string) =>
-  ({
-    NOT_SUBMITTED: "Not submitted",
-    DRAFT: "Draft",
-    SUBMITTED: "Submitted",
-    UNDER_REVIEW: "Under review",
-    CHANGES_REQUESTED: "Changes requested",
-    ACCEPTED: "Accepted",
-    REJECTED: "Rejected",
-    CLOSED: "Closed",
-  })[value] || value;
 async function readJson(response: Response) {
   return response.json().catch(() => ({})) as Promise<unknown>;
 }
@@ -272,11 +227,8 @@ export function AdminDocumentArchive({ api }: { api: string }) {
   const [detailState, setDetailState] = useState<
     "idle" | "loading" | "ready" | "error"
   >("idle");
-  const [filters, setFilters] = useState<Filters>(emptyFilters);
-  const [appliedFilters, setAppliedFilters] = useState<Filters>(emptyFilters);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [preview, setPreview] = useState<Preview | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -348,20 +300,11 @@ export function AdminDocumentArchive({ api }: { api: string }) {
   );
 
   const loadArchive = useCallback(
-    async (
-      cycleId: number,
-      groupId: number,
-      nextFilters: Filters = appliedFilters,
-    ) => {
+    async (cycleId: number, groupId: number) => {
       setDetailState("loading");
-      const query = new URLSearchParams();
-      Object.entries(nextFilters).forEach(([key, value]) => {
-        if (value.trim()) query.set(key, value.trim());
-      });
       try {
-        const suffix = query.toString() ? `?${query.toString()}` : "";
         const response = await fetch(
-          `${api}/api/v1/admin/document-archive/cycles/${cycleId}/groups/${groupId}${suffix}`,
+          `${api}/api/v1/admin/document-archive/cycles/${cycleId}/groups/${groupId}`,
           { credentials: "include" },
         );
         const body = await readJson(response);
@@ -385,7 +328,7 @@ export function AdminDocumentArchive({ api }: { api: string }) {
         setDetailState("error");
       }
     },
-    [api, appliedFilters],
+    [api],
   );
 
   useEffect(() => {
@@ -407,8 +350,6 @@ export function AdminDocumentArchive({ api }: { api: string }) {
       }
       setSelectedGroupId(null);
       setArchive(null);
-      setAppliedFilters(emptyFilters);
-      setFilters(emptyFilters);
       void loadGroups(selectedCycleId);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -420,13 +361,6 @@ export function AdminDocumentArchive({ api }: { api: string }) {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadArchive, selectedCycleId, selectedGroupId]);
-  useEffect(
-    () => () => {
-      if (preview?.url) URL.revokeObjectURL(preview.url);
-    },
-    [preview?.url],
-  );
-
   const selectCycle = (value: string) => {
     setNotice("");
     setSelectedGroupId(null);
@@ -440,19 +374,6 @@ export function AdminDocumentArchive({ api }: { api: string }) {
       `/admin/document-requirements/cycles/${selectedCycleId}/groups/${groupId}`,
     );
   };
-  const submitFilters = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setAppliedFilters(filters);
-    if (selectedCycleId !== null && selectedGroupId !== null)
-      void loadArchive(selectedCycleId, selectedGroupId, filters);
-  };
-  const resetFilters = () => {
-    setFilters(emptyFilters);
-    setAppliedFilters(emptyFilters);
-    if (selectedCycleId !== null && selectedGroupId !== null)
-      void loadArchive(selectedCycleId, selectedGroupId, emptyFilters);
-  };
-
   const download = async (
     row: ArchiveRow,
     version = row.latest_version_id
@@ -482,98 +403,6 @@ export function AdminDocumentArchive({ api }: { api: string }) {
         error instanceof Error
           ? error.message
           : "The document could not be downloaded.",
-      );
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const openPreview = async (
-    row: ArchiveRow,
-    version = row.latest_version_id
-      ? row.versions.find((item) => item.id === row.latest_version_id)
-      : row.versions[row.versions.length - 1],
-  ) => {
-    if (!version?.view_url) return;
-    if (preview?.url) URL.revokeObjectURL(preview.url);
-    setBusy(`preview-${version.id}`);
-    setPreview({ url: "", title: version.original_filename, pageCount: 1 });
-    try {
-      const response = await fetch(`${api}${version.view_url}`, {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("The document could not be previewed.");
-      setPreview({
-        url: URL.createObjectURL(await response.blob()),
-        title: version.original_filename,
-        pageCount: Number(response.headers.get("X-Preview-Page-Count")) || 1,
-      });
-    } catch (error) {
-      setPreview({
-        url: "",
-        title: version.original_filename,
-        pageCount: 1,
-        error:
-          error instanceof Error
-            ? error.message
-            : "The document could not be previewed.",
-      });
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const review = async (
-    row: ArchiveRow,
-    action:
-      | "approve"
-      | "under-review"
-      | "request-changes"
-      | "request-replacement"
-      | "reject",
-  ) => {
-    if (!row.submission_id) return;
-    const comment =
-      action === "reject" ||
-      action === "request-changes" ||
-      action === "request-replacement"
-        ? window.prompt(
-            action === "reject"
-              ? "Reason for rejection (optional):"
-              : "Changes requested (optional):",
-            "",
-          )
-        : null;
-    if (
-      comment === null &&
-      (action === "reject" ||
-        action === "request-changes" ||
-        action === "request-replacement")
-    )
-      return;
-    setBusy(`review-${row.submission_id}`);
-    setNotice("");
-    try {
-      const query = comment ? `?comment=${encodeURIComponent(comment)}` : "";
-      const response = await fetch(
-        `${api}/api/v1/document-requirements/${row.requirement_id}/submissions/${row.submission_id}/${action}${query}`,
-        { method: "POST", credentials: "include" },
-      );
-      const body = await readJson(response);
-      if (!response.ok)
-        throw new Error(
-          errorText(body, "The review action could not be completed."),
-        );
-      setNotice(
-        `Document marked ${action === "under-review" ? "under review" : action === "request-changes" || action === "request-replacement" ? "changes requested" : action === "approve" ? "accepted" : "rejected"}.`,
-      );
-      if (selectedCycleId !== null && selectedGroupId !== null)
-        await loadArchive(selectedCycleId, selectedGroupId, appliedFilters);
-    } catch (error) {
-      setNotice(
-        error instanceof Error
-          ? error.message
-          : "The review action could not be completed.",
       );
     } finally {
       setBusy(null);
@@ -643,7 +472,7 @@ export function AdminDocumentArchive({ api }: { api: string }) {
       await loadCycles();
       await loadGroups(selectedCycleId);
       if (selectedGroupId !== null)
-        await loadArchive(selectedCycleId, selectedGroupId, appliedFilters);
+        await loadArchive(selectedCycleId, selectedGroupId);
     } catch (error) {
       setNotice(
         error instanceof Error
@@ -1031,135 +860,19 @@ export function AdminDocumentArchive({ api }: { api: string }) {
                       <strong>{archive.completion_percentage}%</strong>
                     </div>
                   </div>
-                  <form
-                    onSubmit={submitFilters}
-                    className="mt-5 grid gap-3 rounded-lg border bg-fy-surface-muted p-4 sm:grid-cols-2 lg:grid-cols-4"
-                  >
-                    <label className="grid gap-1 text-xs font-semibold">
-                      Search
-                      <input
-                        value={filters.search}
-                        onChange={(event) =>
-                          setFilters({ ...filters, search: event.target.value })
-                        }
-                        placeholder="Group ID/name or registration number..."
-                        className="rounded border bg-fy-surface p-2 text-sm font-normal"
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold">
-                      Section
-                      <input
-                        value={filters.section}
-                        onChange={(event) =>
-                          setFilters({
-                            ...filters,
-                            section: event.target.value,
-                          })
-                        }
-                        className="rounded border bg-fy-surface p-2 text-sm font-normal"
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold">
-                      Requirement
-                      <input
-                        value={filters.requirement}
-                        onChange={(event) =>
-                          setFilters({
-                            ...filters,
-                            requirement: event.target.value,
-                          })
-                        }
-                        className="rounded border bg-fy-surface p-2 text-sm font-normal"
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold">
-                      Student / registration
-                      <input
-                        value={filters.student}
-                        onChange={(event) =>
-                          setFilters({
-                            ...filters,
-                            student: event.target.value,
-                          })
-                        }
-                        className="rounded border bg-fy-surface p-2 text-sm font-normal"
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold">
-                      Status
-                      <select
-                        value={filters.status}
-                        onChange={(event) =>
-                          setFilters({ ...filters, status: event.target.value })
-                        }
-                        className="rounded border bg-fy-surface p-2 text-sm font-normal"
-                      >
-                        <option value="">All statuses</option>
-                        {statuses.map((status) => (
-                          <option key={status} value={status}>
-                            {statusLabel(status)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold">
-                      From
-                      <input
-                        type="date"
-                        value={filters.date_from}
-                        onChange={(event) =>
-                          setFilters({
-                            ...filters,
-                            date_from: event.target.value,
-                          })
-                        }
-                        className="rounded border bg-fy-surface p-2 text-sm font-normal"
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold">
-                      To
-                      <input
-                        type="date"
-                        value={filters.date_to}
-                        onChange={(event) =>
-                          setFilters({
-                            ...filters,
-                            date_to: event.target.value,
-                          })
-                        }
-                        className="rounded border bg-fy-surface p-2 text-sm font-normal"
-                      />
-                    </label>
-                    <div className="flex items-end gap-2">
-                      <button
-                        type="submit"
-                        className="fy-btn fy-btn--primary fy-btn--sm"
-                      >
-                        Apply filters
-                      </button>
-                      <button
-                        type="button"
-                        onClick={resetFilters}
-                        className="rounded border px-3 py-2 text-sm font-semibold"
-                      >
-                        Reset
-                      </button>
-                    </div>
-                  </form>
                   <p className="mt-4 text-sm text-fy-text-secondary">
                     Showing {archive.filtered_requirements} of{" "}
                     {archive.total_requirements} requirements.
                   </p>
-                  <div className="mt-3 overflow-x-auto">
-                    <table className="w-full min-w-[1900px] text-left text-xs">
+                  <div className="admin-document-archive__records mt-3">
+                    <table className="admin-document-archive__table w-full text-left text-xs">
                       <thead className="border-b bg-fy-surface-muted uppercase tracking-wide text-fy-text-secondary">
                         <tr>
                           <th className="px-2 py-3">Cycle</th>
                           <th className="px-2 py-3">Group</th>
-                          <th className="px-2 py-3">Project</th>
                           <th className="px-2 py-3">Section</th>
                           <th className="px-2 py-3">Requirement</th>
-                          <th className="px-2 py-3">Student / uploader</th>
+                          <th className="px-2 py-3">Group / uploader</th>
                           <th className="px-2 py-3">Registration</th>
                           <th className="px-2 py-3">File</th>
                           <th className="px-2 py-3">Submitted</th>
@@ -1171,171 +884,75 @@ export function AdminDocumentArchive({ api }: { api: string }) {
                           <th className="px-2 py-3">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y">
+                      <tbody className="admin-document-archive__body">
                         {archive.requirements.map((row) => (
                           <tr key={row.id} className="align-top">
-                            <td className="px-2 py-3">{row.cycle_name}</td>
-                            <td className="px-2 py-3 font-semibold">
+                            <td data-label="Cycle" className="px-2 py-3">{row.cycle_name}</td>
+                            <td data-label="Group" className="px-2 py-3 font-semibold">
                               {row.group_code}
                             </td>
-                            <td className="px-2 py-3">
-                              {display(row.project_title, "No project")}
-                            </td>
-                            <td className="px-2 py-3">
+                            <td data-label="Section" className="px-2 py-3">
                               {row.requirement_section}
                             </td>
-                            <td className="px-2 py-3">
+                            <td data-label="Requirement" className="px-2 py-3">
                               <strong>{row.requirement_name}</strong>
                               <span className="block text-fy-text-secondary">
                                 {row.is_required ? "Required" : "Optional"}
                               </span>
                             </td>
-                            <td className="px-2 py-3">
-                              {display(row.student_name, "Not submitted")}
+                            <td data-label="Group / uploader" className="px-2 py-3">
+                              <strong>
+                                {display(row.group_name, row.group_code)}
+                              </strong>
                               <span className="block text-fy-text-secondary">
-                                Uploader: {display(row.uploader_name, "-")}
+                                Uploaded by: {display(row.uploader_name, "-")}
                               </span>
                             </td>
-                            <td className="px-2 py-3">
+                            <td data-label="Registration" className="px-2 py-3">
                               {display(row.registration_number, "-")}
                             </td>
-                            <td className="px-2 py-3">
+                            <td data-label="File" className="px-2 py-3">
                               {display(row.submitted_file_name, "No file")}
                             </td>
-                            <td className="px-2 py-3">
+                            <td data-label="Submitted" className="px-2 py-3">
                               {dateText(row.submitted_at)}
                             </td>
-                            <td className="px-2 py-3">
+                            <td data-label="Version" className="px-2 py-3">
                               {row.version_number
                                 ? `v${row.version_number}`
                                 : "-"}
                             </td>
-                            <td className="px-2 py-3">
+                            <td data-label="Status" className="px-2 py-3">
                               <StatusBadge status={row.current_status} />
                             </td>
-                            <td className="px-2 py-3">
+                            <td data-label="Reviewer" className="px-2 py-3">
                               {display(
                                 row.reviewer_name || row.reviewer?.name,
                                 "-",
                               )}
                             </td>
-                            <td className="px-2 py-3">
+                            <td data-label="Review date" className="px-2 py-3">
                               {row.reviewed_at
                                 ? dateText(row.reviewed_at)
                                 : "-"}
                             </td>
-                            <td className="max-w-[220px] whitespace-pre-wrap px-2 py-3">
+                            <td data-label="Comments" className="max-w-[220px] whitespace-pre-wrap px-2 py-3">
                               {display(row.reviewer_comments, "-")}
                             </td>
-                            <td className="px-2 py-3">
+                            <td data-label="Actions" className="px-2 py-3">
                               <div className="flex min-w-[230px] flex-wrap gap-1">
                                 {row.submission_id &&
                                   row.versions.length > 0 && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        disabled={busy !== null}
-                                        onClick={() => void openPreview(row)}
-                                        className="rounded border border-fy-brand px-2 py-1 font-semibold text-fy-brand"
-                                      >
-                                        View
-                                      </button>
-                                      <button
-                                        type="button"
-                                        disabled={busy !== null}
-                                        onClick={() => void download(row)}
-                                        className="rounded border border-fy-brand px-2 py-1 font-semibold text-fy-brand"
-                                      >
-                                        Download
-                                      </button>
-                                    </>
+                                    <button
+                                      type="button"
+                                      disabled={busy !== null}
+                                      onClick={() => void download(row)}
+                                      className="rounded border border-fy-brand px-2 py-1 font-semibold text-fy-brand"
+                                    >
+                                      Download
+                                    </button>
                                   )}
-                                {row.submission_id && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      disabled={busy !== null}
-                                      onClick={() =>
-                                        void review(row, "under-review")
-                                      }
-                                      className="rounded border px-2 py-1"
-                                    >
-                                      Under review
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={busy !== null}
-                                      onClick={() =>
-                                        void review(row, "approve")
-                                      }
-                                      className="rounded border border-emerald-300 px-2 py-1 text-emerald-700"
-                                    >
-                                      Approve
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={busy !== null}
-                                      onClick={() =>
-                                        void review(row, "request-replacement")
-                                      }
-                                      className="rounded border border-amber-300 px-2 py-1 text-amber-800"
-                                    >
-                                      Request changes
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={busy !== null}
-                                      onClick={() => void review(row, "reject")}
-                                      className="rounded border border-red-300 px-2 py-1 text-red-700"
-                                    >
-                                      Reject
-                                    </button>
-                                  </>
-                                )}
                               </div>
-                              {false && row.versions.length > 1 && (
-                                <details className="mt-2 rounded border bg-fy-surface-muted p-2">
-                                  <summary className="cursor-pointer font-semibold">
-                                    Version history ({row.versions.length})
-                                  </summary>
-                                  <div className="mt-2 grid gap-1">
-                                    {row.versions
-                                      .slice(0, -1)
-                                      .reverse()
-                                      .map((version) => (
-                                        <div
-                                          key={version.id}
-                                          className="flex items-center justify-between gap-2"
-                                        >
-                                          <span>
-                                            v{version.version_number} ·{" "}
-                                            {version.original_filename}
-                                          </span>
-                                          <span className="flex gap-1">
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                void openPreview(row, version)
-                                              }
-                                              className="underline"
-                                            >
-                                              View
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                void download(row, version)
-                                              }
-                                              className="underline"
-                                            >
-                                              Download
-                                            </button>
-                                          </span>
-                                        </div>
-                                      ))}
-                                  </div>
-                                </details>
-                              )}
                             </td>
                           </tr>
                         ))}
@@ -1383,50 +1000,6 @@ export function AdminDocumentArchive({ api }: { api: string }) {
             </section>
           )}
         </>
-      )}
-      {preview && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Preview ${preview.title}`}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"
-        >
-          <div className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-fy-surface shadow-2xl">
-            <div className="flex items-center justify-between gap-3 border-b p-4">
-              <div>
-                <h2 className="font-semibold">{preview.title}</h2>
-                <p className="text-xs text-fy-text-secondary">
-                  Inline document preview · Download is a separate action.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (preview.url) URL.revokeObjectURL(preview.url);
-                  setPreview(null);
-                }}
-                className="rounded bg-slate-800 px-3 py-2 text-sm font-semibold text-white"
-              >
-                Close
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 bg-slate-100 p-3">
-              {preview.error ? (
-                <p role="alert" className="p-6 text-sm text-red-700">
-                  {preview.error}
-                </p>
-              ) : preview.url ? (
-                <iframe
-                  title={`Preview of ${preview.title}`}
-                  src={`${preview.url}#page=1`}
-                  className="h-full w-full rounded border bg-fy-surface"
-                />
-              ) : (
-                <p className="p-6 text-sm">Generating preview...</p>
-              )}
-            </div>
-          </div>
-        </div>
       )}
     </section>
   );

@@ -1,0 +1,75 @@
+/* Authenticated portal scroll contract.
+   Headers and desktop rails may stay fixed/sticky, but page content must be
+   allowed to grow beyond the viewport so every dashboard tab can scroll. */
+html:has(.admin-shell),
+html:has(.student-shell),
+html:has(.portal-shell),
+body:has(.admin-shell),
+body:has(.student-shell),
+body:has(.portal-shell) {
+  height: auto !important;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+}
+
+#root:has(.admin-shell),
+#root:has(.student-shell),
+#root:has(.portal-shell) {
+  height: auto !important;
+  min-height: 100dvh;
+  overflow: visible !important;
+}
+
+.admin-shell,
+.student-shell,
+.portal-shell {
+  height: auto !important;
+  min-height: 100dvh;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.admin-shell > .admin-shell__body,
+.admin-shell > div,
+.student-shell > .student-body,
+.portal-shell > .portal-body,
+main:has(.admin-sidebar) > div {
+  height: auto !important;
+  min-height: calc(100dvh - var(--fy-shell-header, 4rem));
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.admin-shell__content,
+.student-shell .student-content,
+.portal-shell .portal-content,
+main:has(.admin-sidebar) > div > section {
+  height: auto !important;
+  min-height: calc(100dvh - var(--fy-shell-header, 4rem));
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.admin-shell .admin-enter,
+.student-shell .student-content__inner,
+.portal-shell .portal-content__inner,
+main:has(.admin-sidebar) .admin-enter {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Supervisor detail tabs are regular pages. Only the discussion/chat view
+   should use a dedicated history scroller. */
+.student-shell:has(.supervisor-page):not(:has(.student-collab)) .student-content,
+.student-shell:has(.supervisor-page):not(:has(.student-collab)) .student-content__inner,
+.student-shell:has(.supervisor-page):not(:has(.student-collab)) .supervisor-page,
+.student-shell:has(.supervisor-page):not(:has(.student-collab)) .supervisor-group-card,
+.student-shell:has(.supervisor-page):not(:has(.student-collab)) .supervisor-group-workspace {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}

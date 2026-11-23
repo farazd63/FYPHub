@@ -65,7 +65,7 @@ def workspace(db, actor, group, assignment=None, request_row=None):
     activity = [group.updated_at]
     for req in requirements:
         rows = db.scalars(select(DocumentSubmission).where(DocumentSubmission.requirement_id == req.id, or_(DocumentSubmission.group_id == group.id, (DocumentSubmission.group_id.is_(None)) & (DocumentSubmission.student_id == account.id)))).all()
-        submissions = [_submission_out(row, db).model_dump() for row in rows]
+        submissions = [_submission_out(row, db, include_student_hidden=True).model_dump() for row in rows]
         for sub in submissions:
             activity.extend(v["uploaded_at"] for v in sub["versions"])
         documents.append({"id": req.id, "title": req.title, "allowed_file_types": req.allowed_file_types, "due_at": req.due_at, "status": req.status, "submissions": submissions})

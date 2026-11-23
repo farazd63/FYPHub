@@ -10,6 +10,7 @@ test("portal shells unlock document scroll when content is taller than the viewp
   const tokens = read("design-tokens.css");
   const student = read("portals/student/student.css");
   const portal = read("portals/shared/portal-shell.css");
+  const scroll = read("portal-scroll.css");
 
   // Document-level scroll must be enabled for authenticated shells.
   // Ancestors must stay overflow:visible so sticky header/sidebar keep working.
@@ -25,6 +26,9 @@ test("portal shells unlock document scroll when content is taller than the viewp
   assert.match(design, /\.admin-shell__content[\s\S]*overflow:\s*visible\s*!important/);
   assert.match(design, /\.student-shell \.student-content[\s\S]*overflow:\s*visible\s*!important/);
   assert.match(portal, /\.portal-content\s*\{[^}]*overflow:\s*visible/);
+  assert.match(scroll, /overflow-y:\s*auto\s*!important/);
+  assert.match(scroll, /\.student-shell \.student-content[\s\S]*height:\s*auto\s*!important/);
+  assert.match(scroll, /supervisor-page\):not\(:has\(\.student-collab\)\)/);
 
   // Fail if the old viewport-lock pattern returns for admin/student shells.
   assert.doesNotMatch(
@@ -78,9 +82,11 @@ test("sidebar uses one shared top offset with content padding", () => {
 test("conversation and supervisor workspaces fill the available pane", () => {
   const layout = read("portals/shared/conversation-layout.css");
   const supervisor = read("portals/supervisor/supervisor-group-workspace.css");
+  const scroll = read("portal-scroll.css");
 
   assert.match(layout, /\.group-ai-page,\s*\.student-collab\s*\{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*none/);
   assert.match(layout, /:has\(\.group-ai-page\) > \.student-body[\s\S]*height:\s*100dvh\s*!important/);
-  assert.match(layout, /:has\(\.supervisor-page\) \.student-content__inner[\s\S]*max-width:\s*none/);
+  assert.doesNotMatch(layout, /\.student-shell:has\(\.supervisor-page\) > \.student-body/);
+  assert.match(scroll, /supervisor-page\):not\(:has\(\.student-collab\)\)[\s\S]*overflow:\s*visible\s*!important/);
   assert.match(supervisor, /:has\(\.supervisor-page\) \.supervisor-page[\s\S]*width:\s*100%/);
 });

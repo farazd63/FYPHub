@@ -13,7 +13,7 @@ ARG SOURCE_VERSION=local
 RUN echo "Building frontend source revision ${SOURCE_VERSION}"
 COPY . .
 
-ARG VITE_API_BASE_URL=http://localhost:8010
+ARG VITE_API_BASE_URL=
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
 RUN npm run build

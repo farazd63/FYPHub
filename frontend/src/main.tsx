@@ -14,6 +14,9 @@ import "./modules/module-3/module-3-contrast.css";
 import "./typography-floor.css";
 import "./noir-theme.css";
 import "./mobile-responsive.css";
+import "./portal-scroll.css";
+import "./portals/shared/portal-shell-fixes.css";
+import "./noir-theme-final.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

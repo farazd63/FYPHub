@@ -1,0 +1,115 @@
+.admin-document-archive__records {
+  min-width: 0;
+}
+
+.admin-document-archive__table {
+  display: block;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 0;
+}
+
+.admin-document-archive__table thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.admin-document-archive__body {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-document-archive__table tr {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--fy-border, #d8e2ef);
+  border-radius: 14px;
+  background: var(--fy-surface, #fff);
+  box-shadow: 0 7px 20px rgb(24 56 112 / 5%);
+}
+
+.admin-document-archive__table td {
+  display: block;
+  min-width: 0;
+  padding: 8px 10px;
+  overflow-wrap: anywhere;
+  color: var(--fy-text, #183047);
+  line-height: 1.35;
+}
+
+.admin-document-archive__table td::before {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--fy-text-secondary, #607087);
+  content: attr(data-label);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.admin-document-archive__table td:nth-child(5) {
+  grid-column: span 2;
+}
+
+.admin-document-archive__table td:nth-child(7),
+.admin-document-archive__table td:nth-child(13) {
+  grid-column: span 3;
+}
+
+.admin-document-archive__table td:nth-child(13) {
+  max-width: none;
+}
+
+.admin-document-archive__table td:nth-child(14) {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--fy-border, #d8e2ef);
+}
+
+.admin-document-archive__table td:nth-child(14) > div {
+  min-width: 0 !important;
+}
+
+.admin-document-archive__table td:nth-child(14) button {
+  white-space: normal;
+}
+
+@media (max-width: 900px) {
+  .admin-document-archive__table tr {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-document-archive__table td:nth-child(5),
+  .admin-document-archive__table td:nth-child(7),
+  .admin-document-archive__table td:nth-child(13),
+  .admin-document-archive__table td:nth-child(14) {
+    grid-column: auto;
+  }
+
+  .admin-document-archive__table td {
+    display: grid;
+    grid-template-columns: minmax(98px, 34%) minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    border-top: 1px solid var(--fy-border, #d8e2ef);
+  }
+
+  .admin-document-archive__table td:first-child {
+    border-top: 0;
+  }
+
+  .admin-document-archive__table td::before {
+    margin-bottom: 0;
+  }
+
+  .admin-document-archive__table td:nth-child(14) {
+    display: block;
+  }
+}

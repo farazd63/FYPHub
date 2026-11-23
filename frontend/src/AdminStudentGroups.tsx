@@ -83,6 +83,19 @@ type MemberForm = {
   registration_number: string;
   email: string;
 };
+type CollaborationCredential = {
+  member_id: number;
+  name: string;
+  registration_number: string;
+  password_set: boolean;
+  reset_requested: boolean;
+};
+type CollaborationCredentialsResponse = {
+  group_id: number;
+  channel_id: number | null;
+  channel_status: string | null;
+  members: CollaborationCredential[];
+};
 
 const readPositiveId = (name: string) => {
   const value = Number(new URLSearchParams(window.location.search).get(name));
@@ -157,6 +170,11 @@ export function AdminStudentGroups({ api }: { api: string }) {
   });
   const [memberError, setMemberError] = useState("");
   const [memberBusy, setMemberBusy] = useState(false);
+  const [collaborationCredentials, setCollaborationCredentials] = useState<CollaborationCredentialsResponse | null>(null);
+  const [collaborationState, setCollaborationState] = useState<LoadState>("idle");
+  const [collaborationError, setCollaborationError] = useState("");
+  const [collaborationReload, setCollaborationReload] = useState(0);
+  const [collaborationBusyMemberId, setCollaborationBusyMemberId] = useState<number | null>(null);
 
   const selectedCycle = useMemo(
     () => cycles.find((cycle) => cycle.id === selectedCycleId) ?? null,
@@ -322,11 +340,54 @@ export function AdminStudentGroups({ api }: { api: string }) {
     return () => controller.abort();
   }, [api, selectedCycleId, selectedGroupId]);
 
+  useEffect(() => {
+    if (selectedCycleId === null || selectedGroupId === null) return;
+    const controller = new AbortController();
+    const loadCredentials = async () => {
+      setCollaborationState("loading");
+      setCollaborationError("");
+      try {
+        const response = await fetch(
+          `${api}/api/v1/admin/student-groups/${selectedGroupId}/collaboration-credentials?${new URLSearchParams({ cycle_id: String(selectedCycleId) })}`,
+          { credentials: "include", signal: controller.signal },
+        );
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok)
+          throw new Error(errorText(body, "Collaboration credential status could not be loaded."));
+        setCollaborationCredentials(body as CollaborationCredentialsResponse);
+        setCollaborationState("ready");
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setCollaborationState("error");
+          setCollaborationError(error instanceof Error ? error.message : "Collaboration credential status could not be loaded.");
+        }
+      }
+    };
+    void loadCredentials();
+    return () => controller.abort();
+  }, [api, collaborationReload, selectedCycleId, selectedGroupId]);
+
+  useEffect(() => {
+    if (detailState !== "ready" || collaborationState !== "ready") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("focus") !== "collaboration-reset") return;
+    const memberId = readPositiveId("member_id");
+    const target = memberId
+      ? document.getElementById(`collaboration-reset-member-${memberId}`)
+      : document.getElementById("collaboration-credentials-heading");
+    if (!target) return;
+    const timer = window.setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    return () => window.clearTimeout(timer);
+  }, [collaborationState, detailState]);
+
   const selectCycle = (cycleId: number | null) => {
     setNotice("");
     setCycleError("");
     setGroupError("");
     setDetailError("");
+    setCollaborationCredentials(null);
+    setCollaborationState("idle");
+    setCollaborationError("");
     setSelectedCycleId(cycleId);
     setSelectedGroupId(null);
     setArchive(null);
@@ -340,6 +401,9 @@ export function AdminStudentGroups({ api }: { api: string }) {
       return;
     setNotice("");
     setDetailError("");
+    setCollaborationCredentials(null);
+    setCollaborationState("idle");
+    setCollaborationError("");
     setSelectedGroupId(groupId);
     writeSelection(selectedCycleId, groupId);
   };
@@ -415,6 +479,28 @@ export function AdminStudentGroups({ api }: { api: string }) {
       );
     } finally {
       setMemberBusy(false);
+    }
+  };
+
+  const resetCollaborationCredential = async (member: CollaborationCredential) => {
+    if (selectedCycleId === null || selectedGroupId === null || collaborationBusyMemberId !== null) return;
+    if (!window.confirm(`Remove the old collaboration password for ${member.name}? They will create a new password from the Student portal.`)) return;
+    setCollaborationBusyMemberId(member.member_id);
+    setCollaborationError("");
+    try {
+      const response = await fetch(
+        `${api}/api/v1/admin/student-groups/${selectedGroupId}/collaboration-credentials/${member.member_id}/reset?${new URLSearchParams({ cycle_id: String(selectedCycleId) })}`,
+        { method: "POST", credentials: "include" },
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(errorText(body, "The collaboration password could not be reset."));
+      setNotice(`The old collaboration password for ${body.member_name || member.name} was removed. They can now create a new password in the Student portal.`);
+      setCollaborationReload((value) => value + 1);
+    } catch (error) {
+      setCollaborationError(error instanceof Error ? error.message : "The collaboration password could not be reset.");
+    } finally {
+      setCollaborationBusyMemberId(null);
     }
   };
 
@@ -694,12 +780,6 @@ export function AdminStudentGroups({ api }: { api: string }) {
                         <p className="text-sm text-fy-text-secondary">
                           {group.group_email}
                         </p>
-                        <p className="mt-2 text-sm">
-                          <strong>Project:</strong>{" "}
-                          {display(group.project?.title)} ·{" "}
-                          <strong>Supervisor:</strong>{" "}
-                          {display(group.supervisor?.name)}
-                        </p>
                         <span className="mt-2 block text-sm font-semibold text-fy-brand">
                           {selectedGroupId === group.id
                             ? "Selected group"
@@ -978,6 +1058,25 @@ export function AdminStudentGroups({ api }: { api: string }) {
                       </p>
                     )}
                   </div>
+                  <section className="mt-6 rounded-lg border border-fy-border bg-fy-brand-soft p-4" aria-labelledby="collaboration-credentials-heading">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h3 id="collaboration-credentials-heading" className="text-lg font-bold text-fy-text">Pending collaboration password resets</h3>
+                        <p className="mt-1 max-w-2xl text-sm text-fy-text-secondary">Members create and verify their own collaboration identity password in the Student portal. This admin area is restricted to requested resets only.</p>
+                      </div>
+                    </div>
+                    {collaborationState === "loading" && <p className="mt-3 text-sm text-fy-text-secondary">Loading collaboration credential status...</p>}
+                    {collaborationState === "error" && <p role="alert" className="mt-3 rounded-lg bg-fy-danger-soft p-3 text-sm text-fy-danger">{collaborationError}</p>}
+                    {collaborationState === "ready" && !collaborationCredentials?.channel_id && <p className="mt-3 rounded-lg border border-dashed border-fy-border bg-fy-surface px-3 py-3 text-sm text-fy-text-secondary">The collaboration channel will be created after a supervisor is assigned.</p>}
+                    {collaborationState === "ready" && collaborationCredentials?.channel_id && collaborationCredentials.members.every((credential) => !credential.reset_requested) && <p className="mt-3 rounded-lg border border-dashed border-fy-border bg-fy-surface px-3 py-3 text-sm text-fy-text-secondary">No pending collaboration password reset requests.</p>}
+                    {collaborationState === "ready" && collaborationCredentials?.channel_id && collaborationCredentials.members.some((credential) => credential.reset_requested) && <div className="mt-3 grid gap-2">
+                      {collaborationCredentials.members.filter((credential) => credential.reset_requested).map((credential) => <div id={`collaboration-reset-member-${credential.member_id}`} key={credential.member_id} className="flex scroll-mt-6 flex-wrap items-center justify-between gap-3 rounded-lg border border-fy-border bg-fy-surface px-3 py-3">
+                        <div><strong className="text-sm text-fy-text">{credential.name}</strong><p className="text-xs text-fy-text-secondary">{credential.registration_number} Â· {credential.password_set ? "Password configured" : "Password not configured"}{credential.reset_requested ? " Â· Reset requested" : ""}</p></div>
+                        <div className="flex items-center gap-2"><StatusBadge status="RESET REQUESTED" /><button type="button" disabled={collaborationBusyMemberId !== null} onClick={() => void resetCollaborationCredential(credential)} className="rounded-lg border border-fy-brand px-3 py-2 text-xs font-semibold text-fy-brand">{collaborationBusyMemberId === credential.member_id ? "Removing..." : "Remove old password"}</button></div>
+                      </div>)}
+                    </div>}
+                    {collaborationError && collaborationState === "ready" && <p role="alert" className="mt-3 rounded-lg bg-fy-danger-soft p-3 text-sm text-fy-danger">{collaborationError}</p>}
+                  </section>
                   <h3 className="mt-6 text-lg font-bold text-fy-text">
                     Requirements, submissions, versions, and review history
                   </h3>
@@ -1244,8 +1343,8 @@ export function AdminStudentGroups({ api }: { api: string }) {
               </p>
             )}
             <div className="mt-5 rounded-lg bg-fy-brand-soft px-3 py-3 text-xs text-fy-text-secondary">
-              Members do not receive separate portal accounts or passwords. The
-              entire group uses its existing shared email and password.
+               The group still uses one shared portal account, but every member
+               gets a separate collaboration password from the panel above.
             </div>
             <div className="mt-5 flex justify-end gap-3">
               <button

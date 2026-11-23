@@ -12,6 +12,7 @@ from .email import normalize_email
 class AdminUserResponse(BaseModel):
     id: int
     full_name: str
+    group_name: str | None = None
     email: str
     registration_number: str | None
     role: UserRole

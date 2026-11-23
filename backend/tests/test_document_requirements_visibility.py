@@ -1,7 +1,11 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-from app.document_requirements import _visible, student_requirements
+import pytest
+
+from fastapi import HTTPException
+
+from app.document_requirements import _ensure_review_transition, _visible, student_requirements
 from app.models import UserRole
 
 
@@ -60,3 +64,22 @@ def test_requirement_for_another_student_stays_hidden(monkeypatch):
     row = _requirement("Another student", assigned_user_id=11)
     monkeypatch.setattr("app.document_requirements._student_cycle_ids", lambda _user, _db: {7})
     assert student_requirements(student, _Db([row])) == []
+
+
+def test_document_review_requires_review_before_decision():
+    _ensure_review_transition("UPLOADED", "UNDER_REVIEW")
+    _ensure_review_transition("UNDER_REVIEW", "ACCEPTED")
+    _ensure_review_transition("UNDER_REVIEW", "RESUBMISSION_REQUIRED")
+    _ensure_review_transition("UNDER_REVIEW", "REJECTED")
+
+
+def test_document_review_rejects_decision_before_review():
+    with pytest.raises(HTTPException) as error:
+        _ensure_review_transition("UPLOADED", "ACCEPTED")
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "invalid_review_transition"
+
+
+def test_document_review_does_not_reopen_final_decision():
+    with pytest.raises(HTTPException):
+        _ensure_review_transition("ACCEPTED", "UNDER_REVIEW")

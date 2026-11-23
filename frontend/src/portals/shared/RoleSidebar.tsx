@@ -29,6 +29,22 @@ export type RoleSidebarItem = {
   disabled?: boolean;
 };
 
+function sectionIconFor(label: string, fallback?: ReactNode): ReactNode {
+  const value = label.trim().toLowerCase();
+  if (value.includes("workspace") || value.includes("overview")) return <SidebarIcon name="overview" />;
+  if (value.includes("history") && !value.includes("schedule")) return <SidebarIcon name="history" />;
+  if (value.includes("schedule") || value.includes("calendar")) return <SidebarIcon name="schedule" />;
+  if (value.includes("archive") || value.includes("knowledge")) return <SidebarIcon name="archive" />;
+  if (value.includes("document") || value.includes("requirement")) return <SidebarIcon name="documents" />;
+  if (value.includes("review") || value.includes("evaluation")) return <SidebarIcon name="review" />;
+  if (value.includes("communication") || value.includes("message")) return <SidebarIcon name="messages" />;
+  if (value.includes("capacity")) return <SidebarIcon name="capacity" />;
+  if (value.includes("people") || value.includes("access") || value.includes("team") || value.includes("supervision")) return <SidebarIcon name="people" />;
+  if (value.includes("request")) return <SidebarIcon name="requests" />;
+  if (value.includes("project") || value.includes("progress")) return <SidebarIcon name="progress" />;
+  return fallback ?? <SidebarIcon name="overview" />;
+}
+
 type Props = {
   ariaLabel: string;
   workspaceLabel: string;
@@ -116,7 +132,7 @@ export function RoleSidebar({ ariaLabel, workspaceLabel, items, active, collapse
             const firstItem = items.find((item) => item.section === section);
             const selected = selectedSection === section;
             return <button key={section} type="button" className="role-sidebar__rail-item" aria-label={`Open ${section}`} aria-pressed={selected} title={section} onClick={() => selectSection(section)}>
-              <span className="role-sidebar__rail-icon" aria-hidden="true">{firstItem?.icon}</span>
+              <span className="role-sidebar__rail-icon" aria-hidden="true">{sectionIconFor(section, firstItem?.icon)}</span>
             </button>;
           })}
         </div>
@@ -140,7 +156,7 @@ export function RoleSidebar({ ariaLabel, workspaceLabel, items, active, collapse
                     else setInternalExpanded((current) => Object.fromEntries(sections.map((item) => [item, item === section])));
                   }
                 }}>
-                  <span className="role-sidebar__menu-section-name"><span className="role-sidebar__menu-section-icon" aria-hidden="true">{sectionItems[0]?.icon}</span><span>{section}</span></span>
+                  <span className="role-sidebar__menu-section-name"><span className="role-sidebar__menu-section-icon" aria-hidden="true">{sectionIconFor(section, sectionItems[0]?.icon)}</span><span>{section}</span></span>
                   {sectionOpen ? <ChevronDown strokeWidth={1.8} size={16} aria-hidden="true" /> : <ChevronRight strokeWidth={1.8} size={16} aria-hidden="true" />}
                 </button>
                 {sectionOpen && <div className="role-sidebar__section-items">{sectionItems.map((item) => <button key={item.id} type="button" className="student-sidebar__item" disabled={item.disabled} aria-current={active === item.id ? "page" : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={() => { onSelect(item.id); onClose(); }}>

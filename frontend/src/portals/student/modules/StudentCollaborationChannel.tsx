@@ -28,12 +28,16 @@ import "./student-collaboration.css";
 import "../../shared/conversation-layout.css";
 
 type Member = { id: number; name?: string; full_name?: string; registration_number: string; email?: string | null; is_active?: boolean };
+type MemberIdentity = { member_id: number; name: string; registration_number: string; password_set: boolean; is_verified: boolean; reset_requested: boolean };
 type Group = { id: number; group_name: string; academic_cycle: string | null; members: Member[]; supervisor: { name: string } | null; supervisor_assignment: { id: number } | null };
 type Channel = { id: number; group_id: number; group_name: string; cycle_name: string; status: string; assignment_status: string; members: Member[]; supervisor: { name: string } | null; last_read_message_id: number };
 type MessageKind = "TEXT" | "DOCUMENT" | "MEDIA" | "AUDIO" | "CONTACT" | "POLL" | "EVENT" | "STICKER" | "CATALOGUE" | "QUICK_REPLY";
 type Message = {
   id: number;
   sender_user_id: number;
+  sender_member_id?: number | null;
+  sender_member_name?: string | null;
+  sender_member_registration_number?: string | null;
   sender_name: string;
   sender_role: string;
   message_text: string;
@@ -91,6 +95,16 @@ function voiceDurationLabel(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+function collaborationPasswordPolicyError(password: string): string {
+  const missing: string[] = [];
+  if (password.length < 8) missing.push("8 characters");
+  if (!/[A-Z]/.test(password)) missing.push("an uppercase letter");
+  if (!/[a-z]/.test(password)) missing.push("a lowercase letter");
+  if (!/[0-9]/.test(password)) missing.push("a number");
+  if (!/[^A-Za-z0-9]/.test(password)) missing.push("a special character");
+  return missing.length ? `Use at least ${missing.join(", ")}.` : "";
+}
+
 export function CollaborationChannel({ api, userId, role = "student", groupId, className = "" }: CollaborationChannelProps) {
   const collaborationBase = api + "/api/v1/" + role;
   const supervisorMode = role === "supervisor";
@@ -110,6 +124,16 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
   const [editDraft, setEditDraft] = useState("");
   const [messageMutationId, setMessageMutationId] = useState<number | null>(null);
   const [open, setOpen] = useState(true);
+  const [selectedMemberId, setSelectedMemberId] = useState<number | null>(() => {
+    const requestedMemberId = Number(new URLSearchParams(window.location.search).get("member_id"));
+    return Number.isInteger(requestedMemberId) && requestedMemberId > 0 ? requestedMemberId : null;
+  });
+  const [memberIdentity, setMemberIdentity] = useState<MemberIdentity[]>([]);
+  const [identityPassword, setIdentityPassword] = useState("");
+  const [identityConfirmPassword, setIdentityConfirmPassword] = useState("");
+  const [identityBusy, setIdentityBusy] = useState(false);
+  const [identityError, setIdentityError] = useState("");
+  const [identityNotice, setIdentityNotice] = useState("");
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [fileAction, setFileAction] = useState<FileAction | null>(null);
@@ -130,6 +154,7 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
   const readPending = useRef(false);
   const initialized = useRef(false);
   const activeChannel = useRef<number | null>(null);
+  const channelId = channel?.id;
 
   const refreshChannel = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -155,11 +180,32 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
         setMessagesReady(false);
         setEditingMessageId(null);
         setEditDraft("");
+        const requestedMemberId = Number(new URLSearchParams(window.location.search).get("member_id"));
+        const requestedMemberIsInChannel = new URLSearchParams(window.location.search).get("focus") === "collaboration-password"
+          && Number.isInteger(requestedMemberId)
+          && requestedMemberId > 0
+          && current?.members.some(member => member.id === requestedMemberId);
+        setSelectedMemberId(requestedMemberIsInChannel ? requestedMemberId : null);
+        setMemberIdentity([]);
+        setIdentityPassword("");
+        setIdentityConfirmPassword("");
+        setIdentityError("");
+        setIdentityNotice("");
         initialized.current = false;
         stickToLatest.current = true;
         lastRead.current = current?.last_read_message_id ?? 0;
       }
       setChannel(current);
+      if (!supervisorMode && current) {
+        try {
+          const identity = await read<{ members: MemberIdentity[] }>(collaborationBase + "/collaboration/channels/" + current.id + "/member-identity", { signal });
+          if (!signal?.aborted) setMemberIdentity(identity.members ?? []);
+        } catch (caught) {
+          if (!signal?.aborted) setIdentityError(caught instanceof Error ? caught.message : "Member identity status could not be loaded.");
+        }
+      } else {
+        setMemberIdentity([]);
+      }
       if (current) lastRead.current = Math.max(lastRead.current, current.last_read_message_id);
       setError("");
     } catch (caught) {
@@ -169,6 +215,73 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
     }
   }, [api, collaborationBase, groupId, supervisorMode]);
 
+  const refreshMemberIdentity = async () => {
+    if (!channelId || supervisorMode) return;
+    const identity = await read<{ members: MemberIdentity[] }>(collaborationBase + "/collaboration/channels/" + channelId + "/member-identity");
+    setMemberIdentity(identity.members ?? []);
+  };
+
+  const verifyMemberIdentity = async () => {
+    if (!channelId || selectedMemberId === null || identityBusy) return;
+    if (!identityPassword) {
+      setIdentityError("Enter the collaboration password.");
+      return;
+    }
+    const selected = memberIdentity.find(item => item.member_id === selectedMemberId);
+    const isSetup = !selected?.password_set;
+    if (isSetup) {
+      const policyError = collaborationPasswordPolicyError(identityPassword);
+      if (policyError) {
+        setIdentityError(policyError);
+        return;
+      }
+    }
+    if (isSetup && identityPassword !== identityConfirmPassword) {
+      setIdentityError("Passwords do not match.");
+      return;
+    }
+    setIdentityBusy(true);
+    setIdentityError("");
+    setIdentityNotice("");
+    try {
+      await read(collaborationBase + "/collaboration/channels/" + channelId + "/member-identity/" + (isSetup ? "setup" : "verify"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(isSetup
+          ? { member_id: selectedMemberId, password: identityPassword, confirm_password: identityConfirmPassword }
+          : { member_id: selectedMemberId, password: identityPassword }),
+      });
+      setIdentityPassword("");
+      setIdentityConfirmPassword("");
+      setIdentityNotice("Identity verified. Future messages will use this member's name.");
+      await refreshMemberIdentity();
+    } catch (caught) {
+      setIdentityError(caught instanceof Error ? caught.message : "The collaboration password could not be verified.");
+    } finally {
+      setIdentityBusy(false);
+    }
+  };
+
+  const forgotMemberIdentity = async () => {
+    if (!channelId || selectedMemberId === null || identityBusy) return;
+    setIdentityBusy(true);
+    setIdentityError("");
+    setIdentityNotice("");
+    try {
+      await read(collaborationBase + "/collaboration/channels/" + channelId + "/member-identity/forgot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ member_id: selectedMemberId }),
+      });
+      setIdentityNotice("Reset request sent. An administrator will clear the old password, then you can create a new one here.");
+      await refreshMemberIdentity();
+    } catch (caught) {
+      setIdentityError(caught instanceof Error ? caught.message : "The reset request could not be sent.");
+    } finally {
+      setIdentityBusy(false);
+    }
+  };
+
   useEffect(() => {
     const controller = new AbortController();
     const initial = window.setTimeout(() => void refreshChannel(controller.signal), 0);
@@ -176,7 +289,6 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
     return () => { controller.abort(); window.clearTimeout(initial); window.clearInterval(timer); };
   }, [refreshChannel]);
 
-  const channelId = channel?.id;
   const markRead = useCallback(async (messageId: number) => {
     if (!channelId || messageId <= lastRead.current || readPending.current || document.visibilityState !== "visible") return;
     const bounds = history.current?.getBoundingClientRect();
@@ -342,6 +454,14 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
     successMessage = "Message sent.",
   ): Promise<boolean> => {
     if (!channelId || sendPending.current) return false;
+    if (!supervisorMode && selectedMemberId === null) {
+      setError("Select the group member sending this message.");
+      return false;
+    }
+    if (!supervisorMode && !memberIdentity.find(item => item.member_id === selectedMemberId)?.is_verified) {
+      setError("Verify the selected member's collaboration password before sending.");
+      return false;
+    }
     const invalid = validateCollaborationMessage(payload.message_text);
     if (invalid) { setError(invalid); return false; }
     sendPending.current = true;
@@ -349,7 +469,7 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
     setError("");
     setMessageStatus("");
     try {
-      const message = await read<Message>(collaborationBase + "/collaboration/channels/" + channelId + "/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const message = await read<Message>(collaborationBase + "/collaboration/channels/" + channelId + "/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(supervisorMode ? payload : { ...payload, sender_member_id: selectedMemberId }) });
       if (activeChannel.current !== channelId) return false;
       stickToLatest.current = true;
       setMessages(previous => mergeCollaborationMessages(previous, [message]));
@@ -432,6 +552,14 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
 
   const uploadFile = async (file: File, kind: FileAction["kind"], caption = ""): Promise<boolean> => {
     if (!channelId || sendPending.current) return false;
+    if (!supervisorMode && selectedMemberId === null) {
+      setError("Select the group member sending this file.");
+      return false;
+    }
+    if (!supervisorMode && !memberIdentity.find(item => item.member_id === selectedMemberId)?.is_verified) {
+      setError("Verify the selected member's collaboration password before sharing a file.");
+      return false;
+    }
     sendPending.current = true;
     setSending(true);
     setError("");
@@ -440,6 +568,7 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
     form.append("upload", file);
     form.append("message_kind", kind);
     form.append("caption", caption.trim());
+    if (!supervisorMode && selectedMemberId !== null) form.append("sender_member_id", String(selectedMemberId));
     try {
       const message = await read<Message>(collaborationBase + "/collaboration/channels/" + channelId + "/files", { method: "POST", body: form });
       if (activeChannel.current !== channelId) return false;
@@ -513,6 +642,21 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
   };
 
   const members = (channel?.members ?? group?.members ?? []).filter(member => member.is_active !== false);
+  const selectedIdentity = memberIdentity.find(item => item.member_id === selectedMemberId) ?? null;
+  const chooseMember = (memberId: number | null) => {
+    setSelectedMemberId(memberId);
+    setIdentityPassword("");
+    setIdentityConfirmPassword("");
+    setIdentityError("");
+    setIdentityNotice("");
+    setError("");
+  };
+  useEffect(() => {
+    if (supervisorMode || !channelId || !memberIdentity.length) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("focus") !== "collaboration-password" || selectedMemberId === null) return;
+    window.requestAnimationFrame(() => document.getElementById("student-collaboration-password")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, [channelId, memberIdentity.length, selectedMemberId, supervisorMode]);
   const setDraftValue = (key: keyof StructuredDraft, value: string) => setStructuredDraft(current => ({ ...current, [key]: value }));
   const chatTitle = channel?.group_name ?? group?.group_name ?? "Collaboration Channel";
   const chatInitials = chatTitle.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase() || "C";
@@ -571,6 +715,7 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
               return <article key={message.id} className={"student-collab__message " + (isOwn ? "student-collab__message--own" : "")}>
                 <header>
                   <strong>{message.sender_name}</strong>
+                  {message.sender_member_registration_number && <small> · {message.sender_member_registration_number}</small>}
                   <span>{message.sender_role === "SUPERVISOR" ? "Supervisor" : "Student group member"}</span>
                   <time dateTime={message.created_at}>{new Date(message.created_at).toLocaleString()}</time>
                   {isOwn && <div className="student-collab__message-actions" aria-label="Message actions">
@@ -610,6 +755,18 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
               {structuredKind === "CATALOGUE" && <div className="student-collab__structured-fields"><label>Item title<input value={structuredDraft.title} onChange={event => setDraftValue("title", event.target.value)} placeholder="Recommended research resource" /></label><label>Details<textarea rows={3} value={structuredDraft.details} onChange={event => setDraftValue("details", event.target.value)} placeholder="Describe the resource or item." /></label><label>Link <span>(optional)</span><input type="url" value={structuredDraft.link} onChange={event => setDraftValue("link", event.target.value)} placeholder="https://" /></label><button type="button" onClick={() => void sendStructured()}>Share item <Send size={14} aria-hidden /></button></div>}
             </div>}
             {emojiOpen && <div className="student-collab__emoji-panel" role="dialog" aria-label="Quick emoji"><button type="button" onClick={() => { setDraft(value => value + "👍"); setEmojiOpen(false); }}>👍</button><button type="button" onClick={() => { setDraft(value => value + "✅"); setEmojiOpen(false); }}>✅</button><button type="button" onClick={() => { setDraft(value => value + "🎉"); setEmojiOpen(false); }}>🎉</button><button type="button" onClick={() => { setDraft(value => value + "📌"); setEmojiOpen(false); }}>📌</button><button type="button" onClick={() => { setDraft(value => value + "💡"); setEmojiOpen(false); }}>💡</button></div>}
+             {!supervisorMode && <div className="student-collab__sender-picker"><label htmlFor="student-collab-sender">Sending as</label><select id="student-collab-sender" value={selectedMemberId ?? ""} onChange={event => chooseMember(event.target.value ? Number(event.target.value) : null)} disabled={sending || recording}><option value="">Choose your name</option>{(channel?.members ?? []).map(member => <option key={member.id} value={member.id}>{member.name ?? member.full_name} · {member.registration_number}</option>)}</select><small>Choose your name, then verify its collaboration password.</small></div>}
+            {!supervisorMode && selectedMemberId !== null && !selectedIdentity?.is_verified && <div id="student-collaboration-password" className="student-collab__identity-check" role="region" aria-label="Member identity verification">
+              {selectedIdentity?.is_verified ? <p className="student-collab__identity-success">Verified as <strong>{selectedIdentity.name}</strong>. Messages are saved under this member until the session expires.</p> : <form onSubmit={event => { event.preventDefault(); void verifyMemberIdentity(); }}>
+                <label htmlFor="student-collab-member-password">{selectedIdentity?.password_set ? "Enter collaboration identity password" : "Create collaboration identity password"}</label>
+                <div className="student-collab__identity-fields"><input id="student-collab-member-password" type="password" autoComplete={selectedIdentity?.password_set ? "current-password" : "new-password"} value={identityPassword} onChange={event => setIdentityPassword(event.target.value)} placeholder="At least 8 characters" disabled={identityBusy} />{!selectedIdentity?.password_set && <input type="password" autoComplete="new-password" value={identityConfirmPassword} onChange={event => setIdentityConfirmPassword(event.target.value)} placeholder="Confirm password" disabled={identityBusy} />}<button type="submit" disabled={identityBusy}>{identityBusy ? "Checking…" : selectedIdentity?.password_set ? "Verify name" : "Save password"}</button></div>
+                {!selectedIdentity?.password_set && <small className="student-collab__identity-hint">Use 8+ characters with uppercase, lowercase, number, and special character.</small>}
+                <small className="student-collab__identity-hint">This is separate from the group sign-in password and is used only to identify you in this collaboration channel.</small>
+                {selectedIdentity?.password_set && <button type="button" className="student-collab__identity-link" onClick={() => void forgotMemberIdentity()} disabled={identityBusy}>Forgot password? Request reset</button>}
+              </form>}
+              {identityError && <p className="student-collab__identity-error" role="alert">{identityError}</p>}
+              {identityNotice && <p className="student-collab__identity-success" role="status">{identityNotice}</p>}
+            </div>}
             <label className="student-collab__composer-label" htmlFor="student-collab-message">Message your collaboration channel</label>
             {pendingAttachment && <div className="student-collab__attachment-draft" role="region" aria-label="Attachment ready to send">
               <div className="student-collab__attachment-draft-preview">
@@ -630,7 +787,7 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
             </div>}
             <textarea id="student-collab-message" rows={4} value={draft} disabled={recording} onChange={event => setDraft(event.target.value.slice(0, COLLABORATION_MESSAGE_LIMIT + 1))} placeholder="Write a message…" onKeyDown={event => { if (sendsOnEnter({ key: event.key, shiftKey: event.shiftKey, isComposing: event.nativeEvent.isComposing })) { event.preventDefault(); void send(); } }} />
             <input ref={fileInput} type="file" hidden accept={fileAction?.accept} capture={fileAction?.capture} onChange={(event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (file && fileAction) { setPendingAttachment({ file, kind: fileAction.kind, previewUrl: URL.createObjectURL(file), confirmed: false }); setFileAction(null); setAttachmentMenuOpen(false); setError(""); setMessageStatus(""); } event.target.value = ""; }} />
-            <div className="student-collab__composer-bottom"><div className="student-collab__composer-tools"><button type="button" className="student-collab__tool-button" aria-label="Share document, media, or more" aria-expanded={attachmentMenuOpen} disabled={recording || sending} onClick={() => { setAttachmentMenuOpen(value => !value); setEmojiOpen(false); }}><Paperclip size={20} aria-hidden /></button><button type="button" className="student-collab__tool-button" aria-label="Add emoji" aria-expanded={emojiOpen} disabled={recording || sending} onClick={() => { setEmojiOpen(value => !value); setAttachmentMenuOpen(false); }}><Smile size={20} aria-hidden /></button><button type="button" className={`student-collab__tool-button ${recording ? "student-collab__tool-button--recording" : ""}`} aria-label={recording ? "Stop voice recording" : "Record voice message"} title={recording ? "Stop voice recording" : "Record voice message"} aria-pressed={recording} disabled={sending || (!recording && Boolean(pendingAttachment))} onClick={() => { if (recording) stopVoiceRecording(); else void startVoiceRecording(); }}>{recording ? <Square size={15} aria-hidden /> : <Mic size={17} aria-hidden />}</button>{recording && <span className="student-collab__voice-status" role="status">Recording {voiceDurationLabel(recordingSeconds)}</span>}<small>Enter to send · Shift + Enter for a new line · {draft.length}/{COLLABORATION_MESSAGE_LIMIT}{draft.length > COLLABORATION_MESSAGE_LIMIT ? " · Too long" : ""}</small></div><button type="button" className="student-collab__send-button" disabled={recording || sending || Boolean(pendingAttachment && !pendingAttachment.confirmed) || (!pendingAttachment && Boolean(validateCollaborationMessage(draft)))} onClick={() => void send()}><Send size={16} aria-hidden />{sending ? "Sending…" : pendingAttachment ? "Send attachment" : "Send"}</button></div>
+             <div className="student-collab__composer-bottom"><div className="student-collab__composer-tools"><button type="button" className="student-collab__tool-button" aria-label="Share document, media, or more" aria-expanded={attachmentMenuOpen} disabled={recording || sending || (!supervisorMode && selectedMemberId === null)} onClick={() => { setAttachmentMenuOpen(value => !value); setEmojiOpen(false); }}><Paperclip size={20} aria-hidden /></button><button type="button" className="student-collab__tool-button" aria-label="Add emoji" aria-expanded={emojiOpen} disabled={recording || sending} onClick={() => { setEmojiOpen(value => !value); setAttachmentMenuOpen(false); }}><Smile size={20} aria-hidden /></button><button type="button" className={`student-collab__tool-button ${recording ? "student-collab__tool-button--recording" : ""}`} aria-label={recording ? "Stop voice recording" : "Record voice message"} title={recording ? "Stop voice recording" : "Record voice message"} aria-pressed={recording} disabled={sending || (!recording && Boolean(pendingAttachment)) || (!supervisorMode && selectedMemberId === null)} onClick={() => { if (recording) stopVoiceRecording(); else void startVoiceRecording(); }}>{recording ? <Square size={15} aria-hidden /> : <Mic size={17} aria-hidden />}</button>{recording && <span className="student-collab__voice-status" role="status">Recording {voiceDurationLabel(recordingSeconds)}</span>}<small>Enter to send · Shift + Enter for a new line · {draft.length}/{COLLABORATION_MESSAGE_LIMIT}{draft.length > COLLABORATION_MESSAGE_LIMIT ? " · Too long" : ""}</small></div><button type="button" className="student-collab__send-button" disabled={recording || sending || (!supervisorMode && selectedMemberId === null) || Boolean(pendingAttachment && !pendingAttachment.confirmed) || (!pendingAttachment && Boolean(validateCollaborationMessage(draft)))} onClick={() => void send()}><Send size={16} aria-hidden />{sending ? "Sending…" : pendingAttachment ? "Send attachment" : "Send"}</button></div>
           </div>
           {messageStatus && <p role="status">{messageStatus}</p>}{readError && <p role="status">{readError}</p>}
         </>}

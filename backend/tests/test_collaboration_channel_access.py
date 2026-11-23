@@ -57,6 +57,8 @@ class CollaborationChannelAccessTests(unittest.TestCase):
         self.db.commit()
         application = FastAPI()
         application.include_router(router)
+        from app.notifications import router as notifications_router
+        application.include_router(notifications_router)
         from app.supervisor_workspace import router as workspace_router
         application.include_router(workspace_router)
         factory = patch("app.database.SessionLocal", side_effect=lambda: Session(bind=self.connection, autoflush=False, expire_on_commit=False, join_transaction_mode="create_savepoint"))
@@ -71,6 +73,11 @@ class CollaborationChannelAccessTests(unittest.TestCase):
 
     def path(self, suffix=""):
         return f"/api/v1/student/collaboration/channels/{self.channel.id}{suffix}"
+
+    def establish_identity(self, member_index=0, password="Member Pass1!"):
+        response = self.call("POST", self.path("/member-identity/setup"), json={"member_id": self.members[member_index].id, "password": password, "confirm_password": password})
+        self.assertEqual(response.status_code, 200, response.text)
+        return response
 
     def test_all_members_and_shared_group_login_can_access_only_their_channel(self):
         # Portal authentication intentionally uses the existing shared group
@@ -97,7 +104,8 @@ class CollaborationChannelAccessTests(unittest.TestCase):
         self.assertEqual(existing_view.json()["messages"][0]["message_text"], "Please review the proposal.")
 
     def test_message_owner_can_edit_and_soft_delete(self):
-        created = self.call("POST", self.path("/messages"), json={"message_text": "Draft update"}).json()
+        self.establish_identity()
+        created = self.call("POST", self.path("/messages"), json={"message_text": "Draft update", "sender_member_id": self.members[0].id}).json()
         edited = self.call("PATCH", self.path(f"/messages/{created['id']}"), json={"message_text": "Final update"})
         self.assertEqual(edited.status_code, 200, edited.text)
         self.assertEqual(edited.json()["message_text"], "Final update")
@@ -108,7 +116,8 @@ class CollaborationChannelAccessTests(unittest.TestCase):
         self.assertEqual(self.call("GET", self.path("/messages")).json(), [])
 
     def test_message_changes_are_limited_to_the_sender(self):
-        created = self.call("POST", self.path("/messages"), json={"message_text": "Private note"}).json()
+        self.establish_identity()
+        created = self.call("POST", self.path("/messages"), json={"message_text": "Private note", "sender_member_id": self.members[0].id}).json()
         edit = self.call("PATCH", self.path(f"/messages/{created['id']}"), "supervisor", json={"message_text": "Changed by another user"})
         delete = self.call("DELETE", self.path(f"/messages/{created['id']}"), "supervisor")
         self.assertEqual(edit.status_code, 403, edit.text)
@@ -138,17 +147,20 @@ class CollaborationChannelAccessTests(unittest.TestCase):
         self.assertEqual(self.call("GET", self.path(), "supervisor").status_code, 403)
 
     def test_multiline_code_message_is_preserved_and_returned(self):
+        self.establish_identity(member_index=1)
         value = "    function check() {\n        return '<script>plain text</script>';\n    }\n" + "long-line " * 200
-        created = self.call("POST", self.path("/messages"), json={"message_text": value})
+        created = self.call("POST", self.path("/messages"), json={"message_text": value, "sender_member_id": self.members[1].id})
         self.assertEqual(created.status_code, 201, created.text)
         self.assertEqual(created.json()["message_text"], value)
+        self.assertEqual(created.json()["sender_member_id"], self.members[1].id)
+        self.assertEqual(created.json()["sender_member_name"], self.members[1].full_name)
         response = self.call("GET", self.path("/messages"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()[0]["message_text"], value)
         self.assertIn("created_at", response.json()[0])
 
     def test_empty_overlong_and_spoofed_messages_are_rejected(self):
-        for payload in ({"message_text": ""}, {"message_text": " \n\t "}, {"message_text": "x" * 4001}, {"message_text": "Hello", "sender_user_id": self.users["supervisor"].id}):
+        for payload in ({"message_text": ""}, {"message_text": " \n\t "}, {"message_text": "x" * 4001}, {"message_text": "Hello", "sender_user_id": self.users["supervisor"].id}, {"message_text": "Hello"}):
             self.assertEqual(self.call("POST", self.path("/messages"), json=payload).status_code, 422)
 
     def test_read_markers_are_monotonic_and_scoped_to_channel(self):
@@ -164,8 +176,62 @@ class CollaborationChannelAccessTests(unittest.TestCase):
         self.assertEqual(self.call("POST", self.path("/read"), json={"message_id": other.id}).status_code, 404)
 
     def test_history_pagination_and_authentication(self):
-        first = self.call("POST", self.path("/messages"), json={"message_text": "Earlier"}).json()
-        second = self.call("POST", self.path("/messages"), json={"message_text": "Latest"}).json()
+        self.establish_identity()
+        first = self.call("POST", self.path("/messages"), json={"message_text": "Earlier", "sender_member_id": self.members[0].id}).json()
+        second = self.call("POST", self.path("/messages"), json={"message_text": "Latest", "sender_member_id": self.members[0].id}).json()
         self.assertEqual([row["id"] for row in self.call("GET", self.path("/messages?limit=1")).json()], [second["id"]])
         self.assertEqual([row["id"] for row in self.call("GET", self.path(f"/messages?before_id={second['id']}&limit=1")).json()], [first["id"]])
         self.assertEqual(self.client.get(self.path()).status_code, 401)
+
+    def test_member_password_gates_identity_and_admin_reset(self):
+        status = self.call("GET", self.path("/member-identity"))
+        self.assertEqual(status.status_code, 200, status.text)
+        self.assertFalse(status.json()["members"][0]["password_set"])
+        self.assertEqual(self.call("POST", self.path("/messages"), json={"message_text": "Not verified", "sender_member_id": self.members[0].id}).status_code, 403)
+
+        self.establish_identity(member_index=1, password="Member Pass2!")
+        wrong = self.call("POST", self.path("/member-identity/verify"), json={"member_id": self.members[1].id, "password": "Wrong Pass2!"})
+        self.assertEqual(wrong.status_code, 401, wrong.text)
+        created = self.call("POST", self.path("/messages"), json={"message_text": "Verified update", "sender_member_id": self.members[1].id})
+        self.assertEqual(created.status_code, 201, created.text)
+        self.assertEqual(created.json()["sender_member_name"], self.members[1].full_name)
+
+        forgot = self.call("POST", self.path("/member-identity/forgot"), json={"member_id": self.members[1].id})
+        self.assertEqual(forgot.status_code, 200, forgot.text)
+        admin_notifications = self.call("GET", "/api/v1/notifications", "admin")
+        self.assertEqual(admin_notifications.status_code, 200, admin_notifications.text)
+        reset_notification = next((row for row in admin_notifications.json() if row["kind"] == "COLLABORATION_PASSWORD_RESET_REQUESTED"), None)
+        self.assertIsNotNone(reset_notification)
+        self.assertEqual(reset_notification["payload"]["member_id"], self.members[1].id)
+        credential_list = self.call("GET", "/api/v1/admin/collaboration-credentials", "admin")
+        self.assertEqual(credential_list.status_code, 200, credential_list.text)
+        listed_group = next(row for row in credential_list.json()["items"] if row["group_id"] == self.team.id)
+        listed_member = next(row for row in listed_group["members"] if row["member_id"] == self.members[1].id)
+        self.assertTrue(listed_member["reset_requested"])
+        admin_view = self.call("GET", f"/api/v1/admin/student-groups/{self.team.id}/collaboration-credentials?cycle_id={self.team.academic_cycle_id}", "admin")
+        self.assertEqual(admin_view.status_code, 200, admin_view.text)
+        self.assertTrue(next(row for row in admin_view.json()["members"] if row["member_id"] == self.members[1].id)["reset_requested"])
+        reset = self.call("POST", f"/api/v1/admin/student-groups/{self.team.id}/collaboration-credentials/{self.members[1].id}/reset?cycle_id={self.team.academic_cycle_id}", "admin")
+        self.assertEqual(reset.status_code, 200, reset.text)
+        self.assertTrue(reset.json()["password_removed"])
+        self.assertEqual(self.call("POST", self.path("/messages"), json={"message_text": "Revoked", "sender_member_id": self.members[1].id}).status_code, 403)
+        student_notifications = self.call("GET", "/api/v1/notifications")
+        self.assertEqual(student_notifications.status_code, 200, student_notifications.text)
+        resolved_notification = next((row for row in student_notifications.json() if row["kind"] == "COLLABORATION_PASSWORD_RESET_RESOLVED"), None)
+        self.assertIsNotNone(resolved_notification)
+        self.assertEqual(resolved_notification["payload"]["member_id"], self.members[1].id)
+        status_after_reset = self.call("GET", self.path("/member-identity"))
+        reset_member = next(row for row in status_after_reset.json()["members"] if row["member_id"] == self.members[1].id)
+        self.assertFalse(reset_member["password_set"])
+        self.assertFalse(reset_member["is_verified"])
+        recreated = self.establish_identity(member_index=1, password="Member New2!")
+        self.assertEqual(recreated.status_code, 200, recreated.text)
+        forgot_again = self.call("POST", self.path("/member-identity/forgot"), json={"member_id": self.members[1].id})
+        self.assertEqual(forgot_again.status_code, 200, forgot_again.text)
+        admin_notifications_after_second_request = self.call("GET", "/api/v1/notifications", "admin")
+        requested_notifications = [
+            row for row in admin_notifications_after_second_request.json()
+            if row["kind"] == "COLLABORATION_PASSWORD_RESET_REQUESTED"
+            and row["payload"].get("member_id") == self.members[1].id
+        ]
+        self.assertGreaterEqual(len(requested_notifications), 2)

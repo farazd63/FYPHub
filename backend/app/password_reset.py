@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 from threading import Lock
+from urllib.parse import urlencode
 
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -17,7 +18,7 @@ from sqlalchemy.orm import Session
 from .auth import utc_now, validate_mutating_origin
 from .config import settings
 from .database import get_db
-from .models import AdminAuditEvent, AuthSession, PasswordResetToken, User
+from .models import AdminAuditEvent, AuthSession, Module2Notification, PasswordResetToken, User, UserRole
 from .schemas.password_reset import ForgotPasswordRequest, PasswordResetMessage, ResetPasswordRequest
 from .security import generate_session_token, hash_password, hash_session_token
 
@@ -146,6 +147,25 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, session: S
             requested_ip=client_ip[:64],
         )
     )
+    admin_path = "/admin/users?" + urlencode({"focus": "password-reset", "user_id": user.id, "search": user.email})
+    for admin in session.scalars(select(User).where(User.role == UserRole.ADMIN, User.is_active.is_(True))).all():
+        session.add(
+            Module2Notification(
+                recipient_user_id=admin.id,
+                kind="PASSWORD_RESET_REQUESTED",
+                payload={
+                    "title": "Password reset requested",
+                    "message": f"{user.full_name} requested a password reset for their {user.role.value.lower()} account.",
+                    "path": admin_path,
+                    "focus": "password-reset",
+                    "user_id": user.id,
+                    "account_name": user.full_name,
+                    "account_email": user.email,
+                    "registration_number": user.registration_number,
+                    "identifier_type": kind,
+                },
+            )
+        )
     _audit(session, user.id, "password_reset_requested", {"identifier_type": kind, "delivery": "smtp" if _smtp_configured() else "development"})
     session.commit()
 

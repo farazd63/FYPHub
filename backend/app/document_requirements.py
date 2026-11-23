@@ -97,6 +97,29 @@ def _supervisor_can_review(row, req, user, db):
         SupervisorRequest.status.in_(["SUBMITTED", "CHANGES_REQUESTED"]),
     )) is not None
 
+
+REVIEW_TRANSITIONS = {
+    "UPLOADED": {"UNDER_REVIEW"},
+    "UNDER_REVIEW": {"ACCEPTED", "RESUBMISSION_REQUIRED", "REJECTED"},
+}
+
+
+def _ensure_review_transition(current_status: str, next_status: str) -> None:
+    """Keep document review actions in the visible supervisor workflow order."""
+    allowed = REVIEW_TRANSITIONS.get(current_status, set())
+    if next_status not in allowed:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "invalid_review_transition",
+                "message": (
+                    f"A document in {current_status.replace('_', ' ').lower()} status "
+                    f"cannot be changed to {next_status.replace('_', ' ').lower()}."
+                ),
+                "allowed_next_statuses": sorted(allowed),
+            },
+        )
+
 def _out(req, db=None):
     result = RequirementOut.model_validate(req)
     if db is not None:
@@ -264,8 +287,11 @@ def _validate(req, upload, data):
     if not signatures[suffix]: raise HTTPException(422, "File signature is invalid.")
     return suffix
 
-def _submission_out(row, db):
-    versions = db.scalars(select(DocumentSubmissionVersion).where(DocumentSubmissionVersion.submission_id == row.id).order_by(DocumentSubmissionVersion.version_number)).all()
+def _submission_out(row, db, *, include_student_hidden: bool = False):
+    version_query = select(DocumentSubmissionVersion).where(DocumentSubmissionVersion.submission_id == row.id)
+    if not include_student_hidden:
+        version_query = version_query.where(DocumentSubmissionVersion.student_hidden_at.is_(None))
+    versions = db.scalars(version_query.order_by(DocumentSubmissionVersion.version_number)).all()
     events = db.scalars(select(DocumentSubmissionReviewEvent).where(DocumentSubmissionReviewEvent.submission_id == row.id).order_by(DocumentSubmissionReviewEvent.created_at, DocumentSubmissionReviewEvent.id)).all()
     reviewer_ids = {event.reviewer_id for event in events}
     reviewers = {user.id: user for user in db.scalars(select(User).where(User.id.in_(reviewer_ids))).all()} if reviewer_ids else {}
@@ -338,7 +364,7 @@ def all_submissions(requirement_id: int, actor: User = Depends(require_roles(*AD
     for row in rows:
         student = db.get(User, row.student_id)
         group = db.get(Team, row.group_id) if row.group_id is not None else None
-        submission = _submission_out(row, db)
+        submission = _submission_out(row, db, include_student_hidden=True)
         result.append({
             **submission.model_dump(mode="json"),
             "student": {"id": student.id, "name": student.full_name, "email": student.email, "registration_number": student.registration_number} if student else {"id": row.student_id, "name": "Unknown student", "email": None, "registration_number": None},
@@ -350,7 +376,24 @@ def all_submissions(requirement_id: int, actor: User = Depends(require_roles(*AD
 def versions(requirement_id: int, actor: User = Depends(get_current_user), db: Session = Depends(get_db)):
     req = db.get(DocumentUploadRequirement, requirement_id); row = _submission(req, actor, db) if req else None
     if row is None: raise HTTPException(404, "Submission not found.")
-    return [VersionOut.model_validate(v).model_copy(update={"download_url": f"/api/v1/document-requirements/submissions/{row.id}/versions/{v.id}/download", "preview_url": f"/api/v1/document-requirements/submissions/{row.id}/versions/{v.id}/preview"}) for v in db.scalars(select(DocumentSubmissionVersion).where(DocumentSubmissionVersion.submission_id == row.id).order_by(DocumentSubmissionVersion.version_number)).all()]
+    version_query = select(DocumentSubmissionVersion).where(DocumentSubmissionVersion.submission_id == row.id)
+    if actor.role == UserRole.STUDENT:
+        version_query = version_query.where(DocumentSubmissionVersion.student_hidden_at.is_(None))
+    return [VersionOut.model_validate(v).model_copy(update={"download_url": f"/api/v1/document-requirements/submissions/{row.id}/versions/{v.id}/download", "preview_url": f"/api/v1/document-requirements/submissions/{row.id}/versions/{v.id}/preview"}) for v in db.scalars(version_query.order_by(DocumentSubmissionVersion.version_number)).all()]
+
+@router.delete("/submissions/{submission_id}/versions/{version_id}", status_code=204)
+def hide_version_from_student(submission_id: int, version_id: int, _: object = Depends(validate_mutating_origin), actor: User = Depends(require_roles(UserRole.STUDENT)), db: Session = Depends(get_db)):
+    row = db.get(DocumentSubmission, submission_id)
+    version = db.get(DocumentSubmissionVersion, version_id)
+    if not row or not version or version.submission_id != row.id:
+        raise HTTPException(404, "Document version not found.")
+    if row.student_id != actor.id and row.group_id not in _student_team_ids(actor, db):
+        raise HTTPException(403, "You are not authorized to remove this document from your view.")
+    if version.student_hidden_at is not None:
+        raise HTTPException(404, "Document version not found.")
+    version.student_hidden_at = _now()
+    _audit(db, actor, "document_version_hidden_by_student", row.id, {"version_id": version.id, "version_number": version.version_number}, actor.id)
+    db.commit()
 
 @router.get("/submissions/{submission_id}/versions/{version_id}/download")
 def download(submission_id: int, version_id: int, actor: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -366,6 +409,8 @@ def _authorized_version(submission_id: int, version_id: int, actor: User, db: Se
     req = db.get(DocumentUploadRequirement, row.requirement_id)
     assigned = _supervisor_can_review(row, req, actor, db)
     if actor.role not in ADMIN and not (actor.role == UserRole.STUDENT and (row.student_id == actor.id or row.group_id in _student_team_ids(actor, db))) and not assigned: raise HTTPException(403, "You are not authorized to view this document.")
+    if actor.role == UserRole.STUDENT and version.student_hidden_at is not None:
+        raise HTTPException(404, "Document version not found.")
     return row, version
 
 
@@ -396,11 +441,12 @@ def preview(submission_id: int, version_id: int, actor: User = Depends(get_curre
 def _review(requirement_id, submission_id, decision, comment, actor, db):
     req = db.get(DocumentUploadRequirement, requirement_id); row = db.get(DocumentSubmission, submission_id)
     if not req or not row or row.requirement_id != req.id: raise HTTPException(404, "Submission not found.")
-    if actor.role not in ADMIN and not _supervisor_can_review(row, req, actor, db): raise HTTPException(403, "You are not authorized to review this document.")
+    if not _supervisor_can_review(row, req, actor, db): raise HTTPException(403, "Only the assigned supervisor can review this document.")
+    _ensure_review_transition(row.status, decision)
     row.status = decision; row.review_comment = comment; row.reviewed_by_id = actor.id; row.reviewed_at = _now()
     latest_version = db.scalar(select(DocumentSubmissionVersion).where(DocumentSubmissionVersion.submission_id == row.id).order_by(DocumentSubmissionVersion.version_number.desc()).limit(1))
     db.add(DocumentSubmissionReviewEvent(submission_id=row.id, version_id=latest_version.id if latest_version else None, status=decision, reviewer_id=actor.id, comment=comment, created_at=row.reviewed_at))
-    _audit(db, actor, "document_submission_" + decision.lower(), row.id, {"status": decision}, row.student_id); db.commit(); db.refresh(row); return _submission_out(row, db)
+    _audit(db, actor, "document_submission_" + decision.lower(), row.id, {"status": decision}, row.student_id); db.commit(); db.refresh(row); return _submission_out(row, db, include_student_hidden=True)
 
 @router.post("/{requirement_id}/submissions/{submission_id}/approve", response_model=SubmissionOut)
 def approve(requirement_id:int, submission_id:int, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "ACCEPTED", None, actor, db)

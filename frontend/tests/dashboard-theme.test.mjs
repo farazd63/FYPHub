@@ -4,6 +4,7 @@ import test from "node:test";
 
 const sourceRoot = new URL("../src/", import.meta.url);
 const main = fs.readFileSync(new URL("main.tsx", sourceRoot), "utf8");
+const scroll = fs.readFileSync(new URL("portal-scroll.css", sourceRoot), "utf8");
 const theme = fs.readFileSync(new URL("dashboard-theme.css", sourceRoot), "utf8");
 const navigation = fs.readFileSync(new URL("portals/shared/dashboard-nav.css", sourceRoot), "utf8");
 const roleSidebar = fs.readFileSync(new URL("portals/shared/role-sidebar.css", sourceRoot), "utf8");
@@ -11,6 +12,8 @@ const brand = fs.readFileSync(new URL("portals/shared/FypHubBrand.tsx", sourceRo
 
 test("all dashboards load the shared reference-inspired theme after base styles", () => {
   assert.match(main, /import "\.\/dashboard-theme\.css";/);
+  assert.match(main, /import "\.\/portal-scroll\.css";/);
+  assert.match(scroll, /overflow-y:\s*auto\s*!important/);
   assert.match(theme, /--dash-canvas:\s*var\(--fy-page/);
   assert.match(theme, /--dash-blue:\s*var\(--fy-brand/);
   assert.match(theme, /student-shell/);

@@ -193,7 +193,7 @@ def restore_supervisor(supervisor_id: int, payload: DepartureRestoreWrite, reque
         session,
         {supervisor.id},
         kind="SUPERVISOR_DEPARTURE_RESTORED",
-        payload={"supervisor_id": supervisor.id, "message": "An administrator restored your supervisor availability."},
+        payload={"supervisor_id": supervisor.id, "path": "/supervisor/assigned-groups", "message": "An administrator restored your supervisor availability."},
     )
     session.add(
         AdminAuditEvent(
@@ -283,8 +283,13 @@ def reassign(case_id: int, payload: ReplacementAssignWrite, request: Request, ac
         case.notes = f"{case.notes}\n{payload.notes}" if case.notes else payload.notes
     from .collaboration_channels import ensure_collaboration_channel
     ensure_collaboration_channel(session, assignment, team)
-    recipients = _student_recipient_ids(session, team) | {case.previous_supervisor_id, supervisor.id}
-    _notify(session, recipients, kind="SUPERVISOR_REASSIGNED", payload={"case_id": case.id, "team_id": team.id, "previous_supervisor_id": case.previous_supervisor_id, "new_supervisor_id": supervisor.id, "reason": case.reason, "message": "An administrator reassigned your supervision."})
+    assignment_payload = {"case_id": case.id, "team_id": team.id, "previous_supervisor_id": case.previous_supervisor_id, "new_supervisor_id": supervisor.id, "reason": case.reason, "message": "An administrator reassigned your supervision."}
+    if case.previous_supervisor_id == supervisor.id:
+        _notify(session, {supervisor.id}, kind="SUPERVISOR_REASSIGNED", payload={**assignment_payload, "path": "/supervisor/assigned-groups"})
+    else:
+        _notify(session, {case.previous_supervisor_id}, kind="SUPERVISOR_REASSIGNED", payload={**assignment_payload, "path": "/supervisor/assigned-groups"})
+        _notify(session, {supervisor.id}, kind="SUPERVISOR_REASSIGNED", payload={**assignment_payload, "path": f"/supervisor/groups/{team.id}?tab=overview"})
+    _notify(session, _student_recipient_ids(session, team), kind="SUPERVISOR_REASSIGNED", payload={**assignment_payload, "path": "/student/supervisor-info"})
     session.add(AdminAuditEvent(actor_id=actor.id, affected_user_id=supervisor.id, target_type="SUPERVISOR_REPLACEMENT", target_id=case.id, action="supervisor_reassigned", changed_values={"team_id": team.id, "previous_supervisor_id": case.previous_supervisor_id, "new_supervisor_id": supervisor.id, "reason": case.reason, "notes": payload.notes}))
     try:
         session.commit()

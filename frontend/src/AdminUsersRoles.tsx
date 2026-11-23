@@ -10,6 +10,7 @@ type Role = "STUDENT" | "SUPERVISOR" | "COORDINATOR" | "PANEL_MEMBER" | "ADMIN";
 type User = {
   id: number;
   full_name: string;
+  group_name?: string | null;
   email: string;
   registration_number: string | null;
   role: Role;
@@ -35,6 +36,8 @@ const input =
 const detail = (value: unknown) =>
   (value as { detail?: { message?: string } })?.detail?.message ??
   "The account change could not be completed.";
+const accountLabel = (user: User) =>
+  user.role === "STUDENT" ? user.group_name || "Student group" : user.full_name;
 
 export function AdminUsersRoles({ api }: { api: string }) {
   const [data, setData] = useState<Page>({
@@ -44,7 +47,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
     total: 0,
   });
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get("search")?.trim() ?? "");
   const [role, setRole] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -377,20 +380,20 @@ export function AdminUsersRoles({ api }: { api: string }) {
                       <td className="px-4 py-3">
                         <p
                           className="truncate font-semibold"
-                          title={user.full_name}
+                          title={accountLabel(user)}
                         >
-                          {user.full_name}
+                          {accountLabel(user)}
                         </p>
                         <p
                           className="truncate text-xs text-[#60716b]"
                           title={
-                            user.registration_number
+                            user.role !== "STUDENT" && user.registration_number
                               ? `${user.email} · ${user.registration_number}`
                               : user.email
                           }
                         >
                           {user.email}
-                          {user.registration_number
+                          {user.role !== "STUDENT" && user.registration_number
                             ? ` · ${user.registration_number}`
                             : ""}
                         </p>
@@ -412,7 +415,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                         </span>
                       </td>
                       <td className="px-3 py-3">
-                        <div className="flex flex-wrap gap-1.5" aria-label={`Actions for ${user.full_name}`}>
+                        <div className="flex flex-wrap gap-1.5" aria-label={`Actions for ${accountLabel(user)}`}>
                           <IconButton label={user.is_active ? "Deactivate account" : "Activate account"} size="sm" variant="secondary" disabled={busy === user.id} onClick={() => setConfirm({ user, type: "status", value: String(!user.is_active) })}><Power size={15} strokeWidth={1.8} aria-hidden /></IconButton>
                           <IconButton label={user.is_active ? "Remove portal access" : "Allow portal access"} size="sm" variant={user.is_active ? "danger" : "secondary"} disabled={busy === user.id} onClick={() => user.is_active ? setConfirm({ user, type: "delete", value: "delete" }) : setConfirm({ user, type: "status", value: "true" })}>{user.is_active ? <ShieldOff size={15} strokeWidth={1.8} aria-hidden /> : <ShieldCheck size={15} strokeWidth={1.8} aria-hidden />}</IconButton>
                           <IconButton label="Change password" size="sm" variant="secondary" disabled={busy === user.id} onClick={() => { setPasswordUser(user); setPasswordForm({ new_password: "", confirm_password: "" }); setPasswordError(""); }}><KeyRound size={15} strokeWidth={1.8} aria-hidden /></IconButton>
@@ -550,7 +553,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
               {confirm.type === "permanent" ? "Confirm permanent deletion" : confirm.type === "delete" ? "Confirm access removal" : confirm.value === "true" ? "Confirm portal access" : "Confirm account change"}
             </h2>
             <p className="mt-2 text-sm text-[#60716b]">
-              {confirm.type === "permanent" ? `Permanently delete ${confirm.user.full_name}? This cannot be undone. Accounts with linked academic or audit history must use Remove access instead.` : confirm.type === "delete" ? `Remove portal access for ${confirm.user.full_name}? They will be signed out and unable to sign in. All previous records and audit history will be preserved.` : confirm.value === "true" ? `Allow portal access for ${confirm.user.full_name}? They will be able to sign in again.` : `Deactivate ${confirm.user.full_name}?`}
+              {confirm.type === "permanent" ? `Permanently delete ${accountLabel(confirm.user)}? This cannot be undone. Accounts with linked academic or audit history must use Remove access instead.` : confirm.type === "delete" ? `Remove portal access for ${accountLabel(confirm.user)}? They will be signed out and unable to sign in. All previous records and audit history will be preserved.` : confirm.value === "true" ? `Allow portal access for ${accountLabel(confirm.user)}? They will be able to sign in again.` : `Deactivate ${accountLabel(confirm.user)}?`}
             </p>
             <div className="mt-5 flex justify-end gap-3">
               <button
@@ -575,9 +578,9 @@ export function AdminUsersRoles({ api }: { api: string }) {
       )}
       {passwordUser && (
         <div role="dialog" aria-modal="true" aria-labelledby="password-heading" className="fixed inset-0 z-50 grid place-items-center bg-[#243746]/35 p-4">
-          <form onSubmit={(event) => void changePassword(event)} className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+          <form onSubmit={(event) => void changePassword(event)} className="w-full max-w-xl rounded-xl bg-white p-5 shadow-xl">
             <h2 id="password-heading" className="text-lg font-bold">Change account password</h2>
-            <p className="mt-2 text-sm text-[#60716b]">Set a new password for {passwordUser.full_name}. Existing passwords are never displayed because only one-way password hashes are stored.</p>
+            <p className="mt-2 text-sm text-[#60716b]">Set a new sign-in password for {passwordUser.full_name}. Existing passwords are never displayed because only one-way password hashes are stored.</p>
             <div className="mt-4 grid gap-3">
               <PasswordField label="New password" value={passwordForm.new_password} guidance disabled={busy === passwordUser.id} error={passwordError && !passwordError.includes("match") ? passwordError : undefined} onChange={(value) => { setPasswordForm({ ...passwordForm, new_password: value }); setPasswordError(""); }} />
               <PasswordField label="Confirm new password" value={passwordForm.confirm_password} confirm disabled={busy === passwordUser.id} error={passwordError.includes("match") ? passwordError : undefined} onChange={(value) => { setPasswordForm({ ...passwordForm, confirm_password: value }); setPasswordError(""); }} />

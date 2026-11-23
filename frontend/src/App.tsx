@@ -11,7 +11,7 @@ import { StudentPortal } from "./portals/student/StudentPortal";
 import { SupervisorPortal } from "./portals/supervisor/SupervisorPortal";
 import { CoordinatorPortal } from "./portals/coordinator/CoordinatorPortal";
 import { StudentEvaluatorPortal as EvaluatorPortal } from "./portals/student/modules/StudentEvaluatorPortal";
-import authHeroImage from "./assets/fyphub-auth-hero.jpg";
+import authHeroImage from "./assets/fyphub-auth-campus.png";
 import { ThemeToggle } from "./ui/ThemeToggle";
 import { Stepper } from "./ui/Stepper";
 import { Button } from "./ui/Button";
@@ -72,6 +72,17 @@ type DashboardPage = "account" | "admin-portal";
 
 const STEPS = ["Academic Cycle", "Group Members", "Group Credentials"];
 const SIGNUP_STEP_IDS = ["cycle", "members", "credentials"] as const;
+const AUTH_SWITCH_DURATION = 760;
+const createClientId = () => {
+  const browserCrypto = globalThis.crypto;
+  if (typeof browserCrypto?.randomUUID === "function") return browserCrypto.randomUUID();
+  if (typeof browserCrypto?.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    browserCrypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+};
 const isLandingPath = (pathname: string) => pathname === "/" || pathname === "/welcome";
 const welcomePublicPath = () => (window.location.pathname === "/welcome" ? "/welcome" : "/");
 const formatCycleLabel = (cycle: Cycle) => {
@@ -100,7 +111,7 @@ const PASSWORD_RESET_GENERIC_MESSAGE = "If an account exists for that email, a r
 const academicCycleError = (status: number) => ({ 401: "Your session has expired. Please sign in again.", 403: "You are not authorized to load academic cycles.", 404: "The academic-cycles endpoint was not found.", 500: "The backend could not load academic cycles." }[status] ?? "Academic cycles could not be loaded.");
 
 const newMember = (): Member => ({
-  id: crypto.randomUUID(),
+  id: createClientId(),
   full_name: "",
   email: "",
   registration: "",
@@ -180,22 +191,43 @@ function Logo({ compact = false, auth = false, authMobile = false }: { compact?:
   );
 }
 
-function AuthLayout({ children, actions, compact = false }: { children: ReactNode; actions?: ReactNode; compact?: boolean }) {
+type AuthMode = "signin" | "signup";
+
+function AuthLayout({ children, actions, compact = false, authMode, transitioning = false }: { children: ReactNode; actions?: ReactNode; compact?: boolean; authMode?: AuthMode; transitioning?: boolean }) {
+  const activeFormRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!authMode) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setTimeout(() => {
+      const target = activeFormRef.current?.querySelector<HTMLElement>(".auth-form-view.is-active input:not([disabled]), .auth-form-view.is-active select:not([disabled]), .auth-form-view.is-active textarea:not([disabled]), .auth-form-view.is-active button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])");
+      if (target) target.focus({ preventScroll: true });
+      else activeFormRef.current?.focus({ preventScroll: true });
+    }, reducedMotion || !transitioning ? 0 : AUTH_SWITCH_DURATION);
+    return () => window.clearTimeout(timer);
+  }, [authMode, transitioning]);
+  const isSwitching = Boolean(authMode);
   return (
-    <main className={`auth-stage ${compact ? "auth-stage--compact" : ""}`}>
+    <main className={`auth-stage ${compact ? "auth-stage--compact" : ""} ${isSwitching ? `auth-stage--switch ${authMode === "signup" ? "is-signup" : "is-signin"} ${transitioning ? "is-transitioning" : ""}` : ""}`}>
       <div className="auth-stage__glow auth-stage__glow--a" aria-hidden="true" />
       <div className="auth-stage__glow auth-stage__glow--b" aria-hidden="true" />
       <div className="auth-stage__noise" aria-hidden="true" />
-      <div className="auth-stage__panel">
+      <div className={`auth-stage__panel auth-card auth-card-shell ${isSwitching ? (authMode === "signup" ? "is-signup" : "is-signin") : ""} ${transitioning ? "is-transitioning" : ""}`}>
         <div className="auth-stage__theme-dock" data-corner="top-right">
           <ThemeToggle />
         </div>
-        <div className="auth-stage__media" aria-hidden="true">
-          <img src={authHeroImage} alt="" width="1600" height="900" />
-        </div>
-        <div className="auth-stage__veil" aria-hidden="true" />
-        <div className="auth-stage__grid">
-          <section className="auth-stage__brand">
+        <div className={`auth-stage__grid ${isSwitching ? "auth-stage__grid--switch" : ""}`}>
+          {isSwitching && (
+            <div className="auth-sweep" aria-hidden="true">
+              <div className="auth-sweep-inner">
+                <span className="auth-divider-edge" />
+              </div>
+            </div>
+          )}
+          <section className={`auth-stage__brand ${isSwitching ? "auth-welcome-panel" : ""}`}>
+            <div className="auth-stage__media" aria-hidden="true">
+              <img src={authHeroImage} alt="" width="1600" height="900" />
+            </div>
+            <div className="auth-stage__veil" aria-hidden="true" />
             <div className="auth-stage__orb auth-stage__orb--a" aria-hidden="true" />
             <div className="auth-stage__orb auth-stage__orb--b" aria-hidden="true" />
             <div className="auth-stage__orb auth-stage__orb--c" aria-hidden="true" />
@@ -234,7 +266,7 @@ function AuthLayout({ children, actions, compact = false }: { children: ReactNod
               </div>
             </div>
           </section>
-          <section className={`auth-card ${compact ? "auth-card--compact" : ""}`}>
+          <section ref={activeFormRef} tabIndex={-1} className={`auth-card auth-form-panel ${compact ? "auth-card--compact" : ""}`}>
             <div className="auth-card__shine" aria-hidden="true" />
             <header className={`auth-card__header ${actions ? "auth-card__header--actions" : ""}`}>
               <div className="auth-card__mobile-brand"><Logo authMobile /></div>
@@ -308,6 +340,9 @@ function Field({
 
 export default function App() {
   const [page, setPage] = useState<string>("in");
+  const [authMode, setAuthMode] = useState<AuthMode>(() => window.location.pathname === "/signup" ? "signup" : "signin");
+  const [authTransitioning, setAuthTransitioning] = useState(false);
+  const authTransitionTimerRef = useRef<number | null>(null);
   const [authUser, setAuthUser] = useState<SafeUser | null>(null);
   const authUserRef = useRef<SafeUser | null>(null);
   useEffect(() => { authUserRef.current = authUser; }, [authUser]);
@@ -597,6 +632,9 @@ export default function App() {
       }
     }
     setPage(next.page);
+    if (next.page === "in" || next.page === "up") {
+      setAuthMode(next.page === "up" ? "signup" : "signin");
+    }
     setStep(next.step);
     setErrors(nextErrors);
     setNotice(Object.keys(nextErrors).length ? validationNotice(nextErrors, members) : "");
@@ -616,6 +654,22 @@ export default function App() {
   useEffect(() => {
     publicNavigationRef.current = navigatePublic;
   });
+  useEffect(() => {
+    if (page !== "up") return;
+    const frame = window.requestAnimationFrame(() => {
+      // Signup steps can change height substantially (especially when member
+      // cards are added). Reset both possible scroll owners so the stepper and
+      // cycle/structure heading never remain above the viewport after a step
+      // transition or browser scroll anchoring adjustment.
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.querySelector<HTMLElement>(".auth-form-panel")?.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [page, step]);
   useEffect(() => {
     const pathname = window.location.pathname;
   const stored = readPublicRoute(window.history.state);
@@ -986,9 +1040,23 @@ export default function App() {
     }
   }
 
-  const changePage = (value: "in" | "up") => {
-    navigatePublic(publicRoute(value));
+  const switchAuthMode = (nextMode: AuthMode) => {
+    if (authTransitioning || authMode === nextMode) return;
+    if (authTransitionTimerRef.current !== null) {
+      window.clearTimeout(authTransitionTimerRef.current);
+    }
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setAuthMode(nextMode);
+    setAuthTransitioning(!reducedMotion);
+    authTransitionTimerRef.current = window.setTimeout(() => {
+      authTransitionTimerRef.current = null;
+      setAuthTransitioning(false);
+      navigatePublic(publicRoute(nextMode === "signup" ? "up" : "in"));
+    }, reducedMotion ? 0 : AUTH_SWITCH_DURATION);
   };
+  useEffect(() => () => {
+    if (authTransitionTimerRef.current !== null) window.clearTimeout(authTransitionTimerRef.current);
+  }, []);
   if (page === "welcome" && !authUser) {
     return (
       <WelcomeLanding
@@ -1198,9 +1266,15 @@ export default function App() {
           </div>
       </AuthLayout>
     );
-  if (page === "in")
+  if (page === "in" || page === "up")
     return (
-      <AuthLayout compact>
+      <AuthLayout authMode={authMode} transitioning={authTransitioning}>
+          <div className="auth-form-views auth-form-layer">
+          <div
+            className={`auth-form-view signin-form auth-form-view--signin ${authMode === "signin" ? "is-active" : ""}`}
+            aria-hidden={authMode !== "signin"}
+            inert={authMode !== "signin" ? true : undefined}
+          >
           <div>
             <h1 className="auth-card__title">Welcome back</h1>
             <p className="auth-card__hint mt-1.5 mb-4 text-sm">
@@ -1271,76 +1345,20 @@ export default function App() {
                 Don&apos;t have an account?{" "}
                 <button
                   type="button"
-                  onClick={() => navigatePublic(publicRoute("up"))}
+                  onClick={(event) => { event.preventDefault(); switchAuthMode("signup"); }}
                   className="auth-card__link font-semibold underline"
                 >
-                  Create Account
+                  Create an account
                 </button>
               </p>
             </form>
           </div>
-      </AuthLayout>
-    );
-  return (
-    <AuthLayout actions={<nav aria-label="Account navigation" className="flex gap-1"><button type="button" aria-current={page === "in" ? "page" : undefined} disabled={submitting} onClick={() => changePage("in")} className={page === "in" ? "rounded-lg bg-fy-brand-soft px-3 py-2 text-sm font-semibold text-fy-brand" : "rounded-lg px-3 py-2 text-sm font-semibold text-fy-text-secondary hover:text-fy-brand"}>Sign In</button><button type="button" aria-current={page === "up" ? "page" : undefined} disabled={submitting} onClick={() => changePage("up")} className={page === "up" ? "rounded-lg bg-fy-brand-soft px-3 py-2 text-sm font-semibold text-fy-brand" : "rounded-lg px-3 py-2 text-sm font-semibold text-fy-text-secondary hover:text-fy-brand"}>Sign Up</button></nav>}>
-          {page === "in" ? (
-            <>
-              <h1 className="mb-7 text-center text-2xl font-bold">Sign In</h1>
-              <p className="-mt-4 mb-5 text-center text-sm text-[#4f6470]">
-                SZABIST accounts use an <span className="font-semibold">@szabist-isb.pk</span> email address.
-              </p>
-              <div className="space-y-5">
-                <Field
-                  label="Email"
-                  type="email"
-                  autoComplete="username"
-                  value={signIn.email}
-                  onChange={(value) =>
-                    setSignIn((current) => ({ ...current, email: value }))
-                  }
-                />
-                <PasswordField
-                  label="Password"
-                  autoComplete="current-password"
-                  guidance
-                  value={signIn.password}
-                  onChange={(value) =>
-                    setSignIn((current) => ({ ...current, password: value }))
-                  }
-                />
-                <button
-                  type="button"
-                  disabled
-                  className="w-full cursor-not-allowed rounded-lg bg-[#cddfd3] py-3 text-sm font-semibold text-[#4f6470]"
-                >
-                  Sign In
-                </button>
-                <p className="text-center text-sm text-[#4f6470]">
-                  Need a team account?{" "}
-                  <button
-                    type="button"
-                    onClick={() => changePage("up")}
-                    className="font-semibold text-[#176B66] underline"
-                  >
-                    Sign Up
-                  </button>
-                </p>
-              </div>
-            </>
-          ) : success ? (
-            <div className="space-y-5 py-5 text-center">
-              <h1 className="text-2xl font-bold text-[#176B66]">
-                Student group account created successfully.
-              </h1>
-              <p className="text-sm text-[#4f6470]">
-                Group ID: {success.teamId}. Academic cycle: {success.cycle}.
-              </p>
-              <p className="text-sm text-[#4f6470]">
-                Use the group email and password to sign in.
-              </p>
-            </div>
-          ) : (
-            <>
+          </div>
+          <div
+            className={`auth-form-view signup-form auth-form-view--signup ${authMode === "signup" ? "is-active" : ""}`}
+            aria-hidden={authMode !== "signup"}
+            inert={authMode !== "signup" ? true : undefined}
+          >
               <h1 className="text-center text-lg font-bold">
               Create Student Group Account
               </h1>
@@ -1477,8 +1495,15 @@ export default function App() {
                   </Button>
                 )}
               </div>
-            </>
-          )}
-    </AuthLayout>
-  );
+              <p className="auth-switch-link">
+                Already have an account?{" "}
+                <button type="button" onClick={(event) => { event.preventDefault(); switchAuthMode("signin"); }} className="auth-card__link font-semibold underline">
+                  Sign in
+                </button>
+              </p>
+          </div>
+        </div>
+      </AuthLayout>
+    );
+  return null;
 }
