@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, mo
 
 from ..models import UserRole
 from ..security import validate_full_name, validate_password
-from .email import normalize_email
+from .email import normalize_email, normalize_szabist_email
 
 
 class RegistrationRequest(BaseModel):
@@ -94,24 +94,17 @@ class FirstAdminSetupRequest(BaseModel):
     @field_validator("email", mode="before")
     @classmethod
     def normalized_email(cls, value: object) -> object:
-        from .email import normalize_szabist_email
-
         return normalize_szabist_email(value)
 
     @field_validator("full_name")
     @classmethod
     def normalized_name(cls, value: str) -> str:
-        from ..security import validate_full_name
-
         return validate_full_name(value)
 
     @field_validator("password")
     @classmethod
     def valid_password(cls, value: str) -> str:
-        try:
-            validate_password(value)
-        except ValueError as error:
-            raise ValueError(str(error)) from error
+        validate_password(value)
         return value
 
     @model_validator(mode="after")

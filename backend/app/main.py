@@ -17,8 +17,7 @@ from sqlalchemy.orm import Session
 
 from .database import engine, get_db
 from .config import settings
-from .models import AdminAuditEvent, AuthSession, Institution, PasswordResetToken, Team, TeamMember, User, UserRole
-from .models import InstitutionMembership
+from .models import AdminAuditEvent, AuthSession, Institution, InstitutionMembership, PasswordResetToken, Team, TeamMember, User, UserRole
 from .models import AcademicCycle, AcademicGroupPolicy, SupervisorCapacityPolicy, SupervisorAssignment, SupervisorRequest, SupervisorRequestStatus
 from .models import TemplateReference, TemplateReferenceVersion, AcademicRuleVersion, TemplateType, ProposalComplianceSubmission
 from .schemas.templates import TemplateCreate, TemplateVersionCreate, RuleCreate, TemplateListOut, TemplateOut, RuleOut, TemplateDetail
@@ -127,13 +126,14 @@ async def request_validation_error(_: Request, error: RequestValidationError) ->
     )
 
 
+def _first_admin_exists(session: Session) -> bool:
+    return session.scalar(select(User.id).where(User.role == UserRole.ADMIN).limit(1)) is not None
+
+
 @app.get("/api/v1/setup/first-admin/status")
 def first_admin_setup_status(session: Session = Depends(get_db)) -> dict[str, bool]:
     """Expose only whether the one-time browser setup is currently available."""
-    admin_exists = session.execute(
-        select(User.id).where(User.role == UserRole.ADMIN).limit(1)
-    ).first() is not None
-    return {"available": bool(settings.first_admin_setup_key) and not admin_exists}
+    return {"available": bool(settings.first_admin_setup_key) and not _first_admin_exists(session)}
 
 
 @app.post("/api/v1/setup/first-admin", response_model=CurrentUserResponse, status_code=status.HTTP_201_CREATED)
@@ -158,7 +158,7 @@ def create_first_admin(
     # Serialize the only-admin check so two simultaneous first-run browsers
     # cannot both create an administrator.
     session.execute(text("SELECT pg_advisory_xact_lock(98137242)"))
-    if session.execute(select(User.id).where(User.role == UserRole.ADMIN).limit(1)).first() is not None:
+    if _first_admin_exists(session):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": "first_admin_already_exists", "message": "The first administrator has already been created."},

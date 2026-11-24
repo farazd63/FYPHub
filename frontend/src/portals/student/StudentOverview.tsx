@@ -45,7 +45,7 @@ export function StudentOverview({ api }: Props) {
   useEffect(() => { const controller = new AbortController(); void fetch(`${api}/api/v1/student/group/me`, { credentials: "include", signal: controller.signal }).then((response) => response.ok ? response.json() as Promise<Group> : Promise.reject(new Error())).then((value) => { if (!controller.signal.aborted) setGroup(value); }).catch(() => undefined); return () => controller.abort(); }, [api]);
 
   return <section className="student-overview min-w-0" aria-labelledby="student-overview-heading">
-    <PageHeader className="student-overview__hero" eyebrow="Student workspace" title="Your FYP workspace" description="Important updates for your group appear here." />
+    <PageHeader className="student-overview__hero" title="Your FYP workspace" />
     <AnnouncementSection api={api} />
     {group && <section className="student-overview__context mt-6 grid min-w-0 gap-3 sm:grid-cols-3" aria-label="Group project overview"><StatCard label="Project" value={<span className="student-stat-value-clamp" title={group.project?.title || group.group_name}>{group.project?.title || group.group_name}</span>} /><StatCard label="Supervisor" value={group.supervisor?.name || "Pending"} /><StatCard label="Academic cycle" value={group.academic_cycle || "Not set"} /></section>}
     {state === "loading" && <p className="mt-6 text-sm text-fy-text-secondary">Loading notifications…</p>}

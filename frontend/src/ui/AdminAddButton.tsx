@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { createPortal } from "react-dom";
 import { Plus, X } from "lucide-react";
 import "./admin-add-button.css";
 
@@ -23,7 +22,6 @@ export function AdminAddButton({ open, onClick, label }: Props) {
 
   return (
     <>
-      {open && createPortal(<div className="admin-add-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClick(); }} />, document.body)}
       <button
         type="button"
         className="admin-add-button"

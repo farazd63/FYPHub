@@ -357,7 +357,9 @@ html[data-theme="dark"] .welcome-landing__nav {
   font-weight: var(--fy-weight-semibold);
 }
 
-.welcome-landing__lede {
+.welcome-landing__lede,
+.welcome-landing__footer-note {
+  display: none;
   margin: var(--fy-space-4) 0 0;
   max-width: 52ch;
   color: var(--fy-text-secondary);

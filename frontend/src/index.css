@@ -49,22 +49,29 @@ textarea:focus-visible {
   box-shadow: var(--fy-focus-ring);
 }
 
-/* Keep dashboard headers focused on the feature itself; role/section eyebrow labels are intentionally omitted. */
-.cycle-overview__eyebrow,
-.student-overview__eyebrow,
-.module3-eyebrow,
-.module3-kicker,
-.fy-page-header__eyebrow,
-.cycle-detail__eyebrow,
-.expertise-eyebrow,
-.matching-eyebrow,
-.group-ai-eyebrow,
-.announcement-section__eyebrow,
-.progress-hero .progress-kicker,
+/* Keep page hierarchy while removing explanatory copy around headings. */
+.fy-page-header__desc,
+.fy-section__desc,
+.student-page-heading > p:not(.student-overview__eyebrow),
+.student-content h1 + p,
+.supervisor-page-heading > span,
+.module3-page-heading > div > p:not(.module3-eyebrow),
+.expertise-heading > div > p:not(.expertise-eyebrow),
+.matching-hero > div > p:not(.matching-eyebrow),
+.progress-hero > div > p:not(.progress-kicker),
+.cycle-detail-page__heading > p,
+.student-overview__heading > p,
+.announcement-section__heading > p,
+.evaluator-placeholder p,
+main:has(.admin-sidebar) .admin-enter h1 + p,
+.admin-supervisor-matching__heading > p,
+.group-ai-heading__identity h1 + p,
+[class*="eyebrow"],
+[class*="kicker"],
 .supervisor-page-heading > p,
-.admin-replacement-page > div:first-child > p:first-child,
-section[aria-label="Document Submission Archive"] > div:first-child > div:first-child > p:first-child,
-section[aria-labelledby="student-groups-heading"] > div:first-child > div:first-child > p:first-child { display: none !important; }
+.admin-replacement-page > div:first-child > p,
+section[aria-label="Document Submission Archive"] > div:first-child > div:first-child > p,
+section[aria-labelledby="student-groups-heading"] > div:first-child > div:first-child > p { display: none !important; }
 
 @keyframes admin-page-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes admin-card-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }

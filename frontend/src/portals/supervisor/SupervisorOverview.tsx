@@ -46,13 +46,12 @@ export function SupervisorOverview({ api, onOpenRequest }: { api: string; onOpen
 
   return (
     <section className="supervisor-page" aria-labelledby="supervisor-overview-heading">
-      <PageHeader className="supervisor-page-heading" eyebrow="Supervisor workspace" title="Overview" description="Live request activity and decisions for your supervisor account." />
+      <PageHeader className="supervisor-page-heading" title="Overview" />
       <AnnouncementSection api={api} />
       {error && <div className="supervisor-alert" role="alert">{error} <IconButton label="Refresh supervisor activity" size="sm" variant="secondary" onClick={() => void load()}><RefreshCw size={15} strokeWidth={1.8} aria-hidden /></IconButton></div>}
       {loading ? <div className="supervisor-card supervisor-empty">Loading supervisor activity…</div> : !rows.length ? (
         <div className="supervisor-card supervisor-empty">
           <h2>No assigned request activity yet</h2>
-          <p className="mt-2">New requests assigned to you will appear here after a student submits a proposal.</p>
           <IconButton label="Refresh supervisor activity" size="sm" variant="primary" className="mt-4" onClick={() => void load()}><RefreshCw size={15} strokeWidth={1.8} aria-hidden /></IconButton>
         </div>
       ) : (
@@ -87,11 +86,10 @@ export function SupervisorOverview({ api, onOpenRequest }: { api: string; onOpen
                   <small>Updated {new Date(pending.updated_at).toLocaleString()}</small>
                 </button>
               ) : (
-                <p className="supervisor-empty">There are no submitted requests awaiting a decision. Withdrawn requests are history; student drafts are not sent yet.</p>
+                <p className="supervisor-empty">No pending requests.</p>
               )}
               <div className="supervisor-capacity-unavailable">
                 <strong>Capacity</strong>
-                <span>Capacity configuration is managed by Admin.</span>
               </div>
             </div>
           </div>

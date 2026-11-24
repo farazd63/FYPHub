@@ -1,3 +1,37 @@
+.admin-document-requirement-form {
+  min-width: 0;
+  border: 1px solid var(--fy-border, #d8e2ef);
+  border-radius: 14px;
+  background: var(--fy-surface, #fff);
+  padding: 18px;
+}
+
+.admin-document-requirement-form h3,
+.admin-document-requirement-form > label,
+.admin-document-requirement-form > div {
+  min-width: 0;
+}
+
+.admin-document-requirement-form input,
+.admin-document-requirement-form textarea,
+.admin-document-requirement-form select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (min-width: 760px) {
+  .admin-document-requirement-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-document-requirement-form h3,
+  .admin-document-requirement-form > label:nth-of-type(3),
+  .admin-document-requirement-form > div {
+    grid-column: 1 / -1;
+  }
+}
+
 .admin-document-archive__records {
   min-width: 0;
 }

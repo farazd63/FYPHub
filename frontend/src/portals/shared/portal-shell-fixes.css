@@ -52,9 +52,22 @@
     row-gap: 0 !important;
   }
 
-  .student-shell .student-content,
-  .admin-shell .admin-shell__content {
+  .student-shell .student-content {
     width: 0 !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: 1 1 auto !important;
+    position: relative;
+    z-index: 1;
+    overflow-x: clip !important;
+    isolation: isolate;
+  }
+
+  /* The admin rail is fixed, so the content pane must keep a real width.
+     A zero-width flex basis can collapse the overview into a narrow column
+     after the sidebar is taken out of document flow. */
+  .admin-shell .admin-shell__content {
+    width: auto !important;
     min-width: 0 !important;
     max-width: none !important;
     flex: 1 1 auto !important;

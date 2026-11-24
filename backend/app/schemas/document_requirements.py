@@ -44,7 +44,18 @@ class RequirementPatch(BaseModel):
     allowed_file_types: list[str] | None = None
     max_file_size_mb: int | None = Field(default=None, ge=1, le=100)
     reminder_days_before: int | None = Field(default=None, ge=0, le=365)
+    is_required: bool | None = None
     late_upload_allowed: bool | None = None
+
+    @field_validator("allowed_file_types")
+    @classmethod
+    def file_types(cls, value):
+        if value is None:
+            return value
+        normalized = [item.lower().lstrip(".") for item in value]
+        if not normalized or any(item not in TYPES for item in normalized):
+            raise ValueError("One or more file formats are not supported.")
+        return list(dict.fromkeys(normalized))
 
 class RequirementOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)

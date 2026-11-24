@@ -1,9 +1,10 @@
 .cycle-overview {
   position: relative;
   isolation: isolate;
+  width: 100%;
   max-width: none;
   min-height: 70vh;
-  margin: 0 auto;
+  margin: 0;
   padding: clamp(20px, 3vw, 36px);
   overflow: hidden;
   border: 1px solid #e1e9f6;

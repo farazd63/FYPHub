@@ -39,7 +39,6 @@ const WORKFLOW_STEPS = [
 const ROLE_CARDS = [
   {
     title: "Student",
-    description: "Group workspace for documents, proposals, and supervision.",
     icon: GraduationCap,
     bullets: [
       "Overview & group members",
@@ -52,7 +51,6 @@ const ROLE_CARDS = [
   },
   {
     title: "Supervisor",
-    description: "Review requests and guide assigned student teams.",
     icon: UserCheck,
     bullets: [
       "Workspace overview",
@@ -64,13 +62,11 @@ const ROLE_CARDS = [
   },
   {
     title: "Coordinator",
-    description: "Coordinate people access and panel scheduling.",
     icon: Users,
     bullets: ["Supervisor requests", "Panel scheduling"],
   },
   {
     title: "Panel Member",
-    description: "Evaluator workspace for defence and scoring workflows.",
     icon: ClipboardCheck,
     bullets: [
       "Overview",
@@ -84,7 +80,6 @@ const ROLE_CARDS = [
   },
   {
     title: "Admin",
-    description: "Configure academic cycles first, then people, templates, and requirements.",
     icon: BookOpen,
     bullets: [
       "Overview & FYP archive",
@@ -173,9 +168,6 @@ export function WelcomeLanding({ onLogin, onSignup }: WelcomeLandingProps) {
             <div className="welcome-landing__hero-copy">
               <p className="welcome-landing__eyebrow">Final Year Project Workspace</p>
               <h1>Manage Your Final Year Project with Intelligence</h1>
-              <p className="welcome-landing__tagline">
-                One guided workspace from group signup through final defence.
-              </p>
               <p className="welcome-landing__lede">
                 FYPHub keeps students, supervisors, coordinators, panel members, and administrators aligned on the same academic cycle, documents, and review steps — without scattered spreadsheets.
               </p>
@@ -239,7 +231,6 @@ export function WelcomeLanding({ onLogin, onSignup }: WelcomeLandingProps) {
           <Section
             id="workflow"
             title="Project workflow"
-            description="Six connected stages every group moves through in FYPHub."
           >
             <h3 className="fy-sr-only">Workflow diagram</h3>
             <div className="welcome-landing__diagram">
@@ -262,7 +253,6 @@ export function WelcomeLanding({ onLogin, onSignup }: WelcomeLandingProps) {
           <Section
             id="roles"
             title="Choose your role"
-            description="Each workspace mirrors the real sidebar menus inside FYPHub."
           >
             <div className="welcome-landing__roles">
               {ROLE_CARDS.map((role) => {
@@ -275,7 +265,6 @@ export function WelcomeLanding({ onLogin, onSignup }: WelcomeLandingProps) {
                       </span>
                       <h3 className="fy-role-card__title">{role.title}</h3>
                     </div>
-                    <p className="fy-role-card__desc">{role.description}</p>
                     <ul className="welcome-landing__role-menu">
                       {role.bullets.map((item) => (
                         <li key={item}>{item}</li>
@@ -294,9 +283,6 @@ export function WelcomeLanding({ onLogin, onSignup }: WelcomeLandingProps) {
             <h2 id="welcome-cta-heading" className="fy-title">
               Ready to open your final year workspace?
             </h2>
-            <p className="welcome-landing__lede welcome-landing__lede--center">
-              Create your student group account or sign in with an existing role.
-            </p>
             <div className="welcome-landing__cta-row welcome-landing__cta-row--center">
               <Button size="lg" onClick={onSignup}>
                 Get Started
@@ -310,7 +296,6 @@ export function WelcomeLanding({ onLogin, onSignup }: WelcomeLandingProps) {
         <Container>
           <div className="welcome-landing__footer-brand">
             <BrandMark />
-            <p>FYPHub keeps final-year groups, supervisors, and panels on one academic cycle from signup to defence.</p>
           </div>
           <div className="welcome-landing__footer-grid">
             <div>

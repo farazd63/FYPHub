@@ -1,4 +1,4 @@
-"""Interactively create the first FYPHub administrator, once only.
+r"""Interactively create the first FYPHub administrator, once only.
 
 Run from the repository root:
     & '.\backend\.venv\Scripts\python.exe' .\scripts\bootstrap_first_admin.py
@@ -19,6 +19,7 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.database import SessionLocal  # noqa: E402
 from app.models import InstitutionMembership, User, UserRole  # noqa: E402
+from app.schemas.email import normalize_szabist_email  # noqa: E402
 from app.security import hash_password, validate_full_name, validate_password  # noqa: E402
 from app.tenant import primary_institution_id, utc_now  # noqa: E402
 
@@ -28,14 +29,13 @@ EXPECTED_DATABASE = "fyphub_p1"
 def main() -> None:
     """Prompt locally for a new first-admin account without exposing credentials."""
     full_name = input("Administrator full name: ").strip()
-    email = input("Administrator email: ").strip().lower()
+    email = input("Administrator email: ")
     password = getpass.getpass("Administrator password: ")
     confirmation = getpass.getpass("Confirm administrator password: ")
 
     try:
         full_name = validate_full_name(full_name)
-        if not email.endswith("@szabist-isb.pk"):
-            raise ValueError("Only @szabist-isb.pk university emails are accepted.")
+        email = str(normalize_szabist_email(email))
         validate_password(password)
     except ValueError as error:
         raise RuntimeError(str(error)) from error

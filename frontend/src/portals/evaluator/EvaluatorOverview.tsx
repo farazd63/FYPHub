@@ -16,13 +16,13 @@ type EvaluatorOverviewProps = { api: string; onSelect: (key: FeatureKey) => void
 type Schedule = { id: number; status: string };
 type Evaluation = { id: number; status: string };
 
-const cards: Array<{ key: FeatureKey; title: string; summary: string; status: string; icon: LucideIcon }> = [
-  { key: "queue", title: "Evaluation Queue", summary: "Assigned defenses that still need scoring or a decision.", status: "Available", icon: ClipboardList },
-  { key: "proposal", title: "Proposal Review", summary: "Review compliance reports and approve, reject, or request changes.", status: "Available", icon: FileSearch },
-  { key: "schedule", title: "Defense Schedule", summary: "All defense sessions assigned to you by the coordinator.", status: "Available", icon: CalendarDays },
-  { key: "criteria", title: "Evaluation Criteria", summary: "Score against criteria while drafting or submitting evaluations.", status: "Available", icon: ListChecks },
-  { key: "scoring", title: "Scoring & Feedback", summary: "Save drafts and submit scored feedback for assigned defenses.", status: "Available", icon: MessageSquareText },
-  { key: "history", title: "Decision History", summary: "Submitted evaluation decisions for your assigned defenses.", status: "Available", icon: History },
+const cards: Array<{ key: FeatureKey; title: string; status: string; icon: LucideIcon }> = [
+  { key: "queue", title: "Evaluation Queue", status: "Available", icon: ClipboardList },
+  { key: "proposal", title: "Proposal Review", status: "Available", icon: FileSearch },
+  { key: "schedule", title: "Defense Schedule", status: "Available", icon: CalendarDays },
+  { key: "criteria", title: "Evaluation Criteria", status: "Available", icon: ListChecks },
+  { key: "scoring", title: "Scoring & Feedback", status: "Available", icon: MessageSquareText },
+  { key: "history", title: "Decision History", status: "Available", icon: History },
 ];
 
 export function EvaluatorOverview({ api, onSelect }: EvaluatorOverviewProps) {
@@ -58,9 +58,7 @@ export function EvaluatorOverview({ api, onSelect }: EvaluatorOverviewProps) {
     <section className="student-overview evaluator-overview" aria-labelledby="evaluator-overview-heading">
       <PageHeader
         className="student-overview__hero"
-        eyebrow="Evaluator workspace"
         title="Evaluation workspace"
-        description="Review assigned defenses, proposals, and evaluation history for work assigned to you."
       />
       <AnnouncementSection api={api} />
       <div className="student-overview__summary" aria-label="Evaluator workspace summary">
@@ -68,7 +66,7 @@ export function EvaluatorOverview({ api, onSelect }: EvaluatorOverviewProps) {
         <div><strong>{pending}</strong><span>pending actions</span></div>
         <div><strong>{submitted || "—"}</strong><span>submitted results</span></div>
       </div>
-      <div className="student-overview__heading"><div><h2>Evaluator features</h2><p>Open a feature to work with your assigned records.</p></div></div>
+      <div className="student-overview__heading"><h2>Evaluator features</h2></div>
       <div className="student-overview__grid">
         {cards.map((card) => {
           const Icon = card.icon;
@@ -79,7 +77,6 @@ export function EvaluatorOverview({ api, onSelect }: EvaluatorOverviewProps) {
                 <FeatureChip>{card.status}</FeatureChip>
               </span>
               <strong>{card.title}</strong>
-              <span className="evaluator-feature-card__summary">{card.summary}</span>
               <span className="student-phase-card__open">Open feature <span aria-hidden="true">→</span></span>
             </button>
           );

@@ -40,13 +40,13 @@ export function AdminOverview({ api, onManage, onCycleDetails }: { api: string; 
   }, [load]);
 
   return <section aria-label="Academic cycles overview" className="cycle-overview">
-    <PageHeader className="cycle-overview__hero" title="Academic cycles" description="A clear view of registration and group-size policies across your academic cycles." />
+    <PageHeader className="cycle-overview__hero" title="Academic cycles" />
     <AnnouncementSection api={api} onManage={onManage} />
     {state === "loading" && <p className="cycle-overview__message">Loading academic cycles...</p>}
     {state === "error" && <div role="alert" className="cycle-overview__error">Academic cycles could not be loaded.<button onClick={() => void load()} className="cycle-overview__retry">Retry</button></div>}
     {state === "ready" && <>
-      <div className="cycle-overview__list-heading"><div><h2>Cycle overview</h2><p>Registration status and configured group size for each cycle.</p></div></div>
-      {!rows.length ? <div className="cycle-overview__empty"><span className="cycle-overview__calendar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/></svg></span><h3>No academic cycles are configured.</h3><p>Configured cycles will appear here.</p></div> : <div className="cycle-overview__grid">{rows.map((row, index) => <article key={row.id} className={`cycle-overview__card ${row.registration_open ? "cycle-overview__card--open" : "cycle-overview__card--closed"}`} style={{ animationDelay: `${260 + Math.min(index, 8) * 70}ms` }}>
+      <div className="cycle-overview__list-heading"><h2>Cycle overview</h2></div>
+      {!rows.length ? <div className="cycle-overview__empty"><span className="cycle-overview__calendar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/></svg></span><h3>No academic cycles are configured.</h3></div> : <div className="cycle-overview__grid">{rows.map((row, index) => <article key={row.id} className={`cycle-overview__card ${row.registration_open ? "cycle-overview__card--open" : "cycle-overview__card--closed"}`} style={{ animationDelay: `${260 + Math.min(index, 8) * 70}ms` }}>
         <div className="cycle-overview__card-top"><span className="cycle-overview__calendar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/></svg></span><StatusBadge status={row.registration_open ? "OPEN" : "CLOSED"} /></div>
         <div className="cycle-overview__card-title"><p>Academic cycle</p><h3>{row.display_name}</h3><span>{row.code}</span></div>
         <div className="cycle-overview__policy"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M17 8a3 3 0 0 1 0 6m1 2a5 5 0 0 1 3 4"/></svg><div><span>Maximum group size</span><strong>{row.policy ? `${row.policy.max_group_size} including creator` : row.policyError ? "Unavailable" : "Not configured"}</strong></div></div>

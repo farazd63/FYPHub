@@ -109,7 +109,14 @@ const PRIMARY =
 const AUTH_PRIMARY =
   "auth-primary fy-btn fy-btn--primary rounded-xl bg-fy-brand px-5 py-2.5 text-sm font-semibold text-fy-text-on-brand transition-colors hover:bg-fy-brand-hover disabled:cursor-not-allowed";
 const PASSWORD_RESET_GENERIC_MESSAGE = "If an account exists for that email, a reset link will be sent.";
+const FIRST_ADMIN_SETUP_PATH = "/setup/first-admin";
 const academicCycleError = (status: number) => ({ 401: "Your session has expired. Please sign in again.", 403: "You are not authorized to load academic cycles.", 404: "The academic-cycles endpoint was not found.", 500: "The backend could not load academic cycles." }[status] ?? "Academic cycles could not be loaded.");
+const fetchFirstAdminSetupAvailable = async (api: string) => {
+  const response = await fetch(`${api}/api/v1/setup/first-admin/status`, { credentials: "include" });
+  if (!response.ok) return false;
+  const body = await response.json() as { available?: boolean };
+  return body.available === true;
+};
 
 const newMember = (): Member => ({
   id: createClientId(),
@@ -339,7 +346,9 @@ function Field({
   );
 }
 
-function FirstAdminSetup({ api, onComplete, onBack }: { api: string; onComplete: (email: string) => void; onBack: () => void }) {
+type FirstAdminSetupProps = { api: string; onComplete: (email: string) => void; onBack: () => void };
+
+function FirstAdminSetup({ api, onComplete, onBack }: FirstAdminSetupProps) {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -349,10 +358,9 @@ function FirstAdminSetup({ api, onComplete, onBack }: { api: string; onComplete:
 
   useEffect(() => {
     let active = true;
-    void fetch(`${api}/api/v1/setup/first-admin/status`, { credentials: "include" })
-      .then((response) => response.json())
-      .then((body: { available?: boolean }) => {
-        if (active) setAvailable(body.available === true);
+    void fetchFirstAdminSetupAvailable(api)
+      .then((isAvailable) => {
+        if (active) setAvailable(isAvailable);
       })
       .catch(() => {
         if (active) setAvailable(false);
@@ -407,7 +415,7 @@ function FirstAdminSetup({ api, onComplete, onBack }: { api: string; onComplete:
         throw new Error(detail || "The first administrator could not be created.");
       }
       setMessage("Administrator account created. Redirecting to login...");
-      window.setTimeout(() => onComplete(form.email.trim().toLowerCase()), 500);
+      window.setTimeout(() => onComplete(normalizeEmail(form.email)), 500);
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : "The first administrator could not be created.");
     } finally {
@@ -510,10 +518,9 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    void fetch(`${API}/api/v1/setup/first-admin/status`, { credentials: "include" })
-      .then((response) => response.json())
-      .then((body: { available?: boolean }) => {
-        if (active) setFirstAdminSetupAvailable(body.available === true);
+    void fetchFirstAdminSetupAvailable(API)
+      .then((isAvailable) => {
+        if (active) setFirstAdminSetupAvailable(isAvailable);
       })
       .catch(() => {
         if (active) setFirstAdminSetupAvailable(false);
@@ -602,7 +609,7 @@ export default function App() {
     });
   }, [policy]);
   useEffect(() => {
-    if (appPathname() === "/reset-password" || appPathname() === "/setup/first-admin") return;
+    if (appPathname() === "/reset-password" || appPathname() === FIRST_ADMIN_SETUP_PATH) return;
     void (async () => {
       try {
         const response = await fetch(`${API}/api/v1/auth/me`, {
@@ -799,9 +806,9 @@ export default function App() {
     if (pathname === "/signup") {
       initial = publicRoute("up");
     }
-    if (appPathname() === "/setup/first-admin") {
+    if (appPathname() === FIRST_ADMIN_SETUP_PATH) {
       queueMicrotask(() => setPage("first-admin"));
-      window.history.replaceState({ fyphubSetup: true }, "", appPath("/setup/first-admin"));
+      window.history.replaceState({ fyphubSetup: true }, "", appPath(FIRST_ADMIN_SETUP_PATH));
     } else if (appPathname() === "/reset-password") {
       queueMicrotask(() => {
         setRecoveryView("reset");
@@ -1494,7 +1501,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      window.history.pushState({ fyphubSetup: true }, "", appPath("/setup/first-admin"));
+                      window.history.pushState({ fyphubSetup: true }, "", appPath(FIRST_ADMIN_SETUP_PATH));
                       setPage("first-admin");
                     }}
                     className="auth-card__link font-semibold underline"

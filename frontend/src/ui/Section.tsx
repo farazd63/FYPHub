@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 
 type SectionProps = {
   title?: string;
-  description?: string;
   children: ReactNode;
   className?: string;
   id?: string;
@@ -10,7 +9,6 @@ type SectionProps = {
 
 export function Section({
   title,
-  description,
   children,
   className,
   id,
@@ -22,14 +20,11 @@ export function Section({
       id={id}
       aria-labelledby={headingId}
     >
-      {(title || description) && (
+      {title && (
         <header className="fy-section__header">
-          {title && (
-            <h2 id={headingId} className="fy-section__title">
-              {title}
-            </h2>
-          )}
-          {description && <p className="fy-section__desc">{description}</p>}
+          <h2 id={headingId} className="fy-section__title">
+            {title}
+          </h2>
         </header>
       )}
       <div className="fy-section__body">{children}</div>

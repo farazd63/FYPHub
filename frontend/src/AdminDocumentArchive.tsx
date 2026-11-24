@@ -13,6 +13,19 @@ type Cycle = {
   requirement_count?: number;
   submission_count?: number;
 };
+type Requirement = {
+  id: number;
+  title: string;
+  description?: string | null;
+  academic_cycle_id: number;
+  due_at: string;
+  module: string;
+  allowed_file_types: string[];
+  max_file_size_mb: number;
+  is_required: boolean;
+  status: string;
+  submission_count?: number;
+};
 type Member = {
   id: number;
   name: string;
@@ -108,24 +121,28 @@ type Archive = Group & {
   filtered_requirements: number;
   member_user_ids: number[];
 };
-const fileFormatOptions = [
-  { value: "pdf", label: "PDF" },
-  { value: "doc", label: "DOC" },
-  { value: "docx", label: "DOCX" },
-  { value: "txt", label: "TXT" },
-  { value: "ppt", label: "PPT" },
-  { value: "pptx", label: "PPTX" },
-  { value: "zip", label: "ZIP" },
-  { value: "mp3", label: "MP3 audio" },
-  { value: "wav", label: "WAV audio" },
-  { value: "m4a", label: "M4A audio" },
-  { value: "ogg", label: "OGG audio" },
-  { value: "mp4", label: "MP4 video" },
-  { value: "mov", label: "MOV video" },
-  { value: "avi", label: "AVI video" },
-  { value: "mkv", label: "MKV video" },
-  { value: "webm", label: "WEBM video" },
+const fileFormatOptions: Array<{
+  value: string;
+  label: string;
+  extensions: string[];
+}> = [
+  { value: "pdf", label: "PDF", extensions: ["pdf"] },
+  { value: "word", label: "Word", extensions: ["doc", "docx"] },
+  {
+    value: "video",
+    label: "Video",
+    extensions: ["mp4", "mov", "avi", "mkv", "webm"],
+  },
+  { value: "ppt", label: "PPT", extensions: ["ppt", "pptx"] },
+  { value: "audio", label: "Audio", extensions: ["mp3", "wav", "m4a", "ogg"] },
+  { value: "txt", label: "TXT", extensions: ["txt"] },
+  { value: "zip", label: "ZIP", extensions: ["zip"] },
 ];
+
+const formatLabels = (extensions: string[]) =>
+  fileFormatOptions
+    .filter((option) => option.extensions.some((extension) => extensions.includes(extension)))
+    .map((option) => option.label);
 
 const FIELD_MESSAGES: Record<string, Record<string, string>> = {
   max_file_size_mb: {
@@ -189,6 +206,13 @@ const errorText = (body: unknown, fallback: string) => {
 
 const dateText = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : "Not submitted";
+const dateTimeInputValue = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 16);
+  const offset = date.getTimezoneOffset();
+  return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16);
+};
 const display = (value?: string | null, fallback = "Not assigned") =>
   value && value.trim() ? value : fallback;
 async function readJson(response: Response) {
@@ -222,6 +246,10 @@ export function AdminDocumentArchive({ api }: { api: string }) {
   const [cycleState, setCycleState] = useState<"loading" | "ready" | "error">(
     "loading",
   );
+  const [requirements, setRequirements] = useState<Requirement[]>([]);
+  const [requirementsState, setRequirementsState] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
   const [groupState, setGroupState] = useState<
     "idle" | "loading" | "ready" | "error"
   >("idle");
@@ -231,6 +259,9 @@ export function AdminDocumentArchive({ api }: { api: string }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [editingRequirementId, setEditingRequirementId] = useState<number | null>(
+    null,
+  );
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -267,6 +298,36 @@ export function AdminDocumentArchive({ api }: { api: string }) {
       setCycleState("error");
     }
   }, [api]);
+
+  const loadRequirements = useCallback(
+    async (cycleId: number) => {
+      setRequirementsState("loading");
+      try {
+        const response = await fetch(`${api}/api/v1/document-requirements`, {
+          credentials: "include",
+        });
+        const body = await readJson(response);
+        if (!response.ok)
+          throw new Error(
+            errorText(body, "Document requirements could not be loaded."),
+          );
+        const rows = Array.isArray(body) ? (body as Requirement[]) : [];
+        setRequirements(
+          rows.filter((requirement) => requirement.academic_cycle_id === cycleId),
+        );
+        setRequirementsState("ready");
+      } catch (error) {
+        setRequirements([]);
+        setNotice(
+          error instanceof Error
+            ? error.message
+            : "Document requirements could not be loaded.",
+        );
+        setRequirementsState("error");
+      }
+    },
+    [api],
+  );
 
   const loadGroups = useCallback(
     async (cycleId: number) => {
@@ -357,6 +418,17 @@ export function AdminDocumentArchive({ api }: { api: string }) {
   }, [detailOnly, loadGroups, selectedCycleId]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      if (detailOnly || selectedCycleId === null) {
+        setRequirements([]);
+        setRequirementsState("idle");
+        return;
+      }
+      void loadRequirements(selectedCycleId);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [detailOnly, loadRequirements, selectedCycleId]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
       if (selectedCycleId !== null && selectedGroupId !== null)
         void loadArchive(selectedCycleId, selectedGroupId);
     }, 0);
@@ -410,7 +482,46 @@ export function AdminDocumentArchive({ api }: { api: string }) {
     }
   };
 
-  const createRequirement = async (publish: boolean) => {
+  const resetRequirementForm = () => {
+    setEditingRequirementId(null);
+    setTitle("");
+    setDescription("");
+    setDeadline("");
+    setModule("General");
+    setFormats(["pdf"]);
+    setMaxSize("10");
+    setRequired(true);
+  };
+
+  const editRequirement = (requirement: Requirement) => {
+    setEditingRequirementId(requirement.id);
+    setTitle(requirement.title);
+    setDescription(requirement.description || "");
+    setDeadline(dateTimeInputValue(requirement.due_at));
+    setModule(requirement.module || "General");
+    setFormats(requirement.allowed_file_types || []);
+    setMaxSize(String(requirement.max_file_size_mb));
+    setRequired(requirement.is_required);
+    setShowCreate(true);
+    setNotice("");
+  };
+
+  const openCreateForm = () => {
+    resetRequirementForm();
+    setShowCreate(true);
+    setNotice("");
+  };
+
+  const toggleCreateForm = () => {
+    if (showCreate) {
+      setShowCreate(false);
+      resetRequirementForm();
+      return;
+    }
+    openCreateForm();
+  };
+
+  const saveRequirement = async (publish: boolean) => {
     if (
       selectedCycleId === null ||
       !title.trim() ||
@@ -422,11 +533,16 @@ export function AdminDocumentArchive({ api }: { api: string }) {
       );
       return;
     }
-    setBusy("create");
+    const editing = editingRequirementId !== null;
+    setBusy(editing ? `edit-${editingRequirementId}` : "create");
     setNotice("");
     try {
-      const response = await fetch(`${api}/api/v1/document-requirements`, {
-        method: "POST",
+      const response = await fetch(
+        editing
+          ? `${api}/api/v1/document-requirements/${editingRequirementId}`
+          : `${api}/api/v1/document-requirements`,
+        {
+        method: editing ? "PATCH" : "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -439,13 +555,20 @@ export function AdminDocumentArchive({ api }: { api: string }) {
           is_required: required,
           due_at: new Date(deadline).toISOString(),
         }),
-      });
+        },
+      );
       const body = await readJson(response);
       if (!response.ok)
         throw new Error(
-          errorText(body, "The requirement could not be created."),
+          errorText(
+            body,
+            editing
+              ? "The requirement could not be updated."
+              : "The requirement could not be created.",
+          ),
         );
       if (
+        !editing &&
         publish &&
         body &&
         typeof body === "object" &&
@@ -463,14 +586,17 @@ export function AdminDocumentArchive({ api }: { api: string }) {
             ),
           );
       }
-      setTitle("");
-      setDescription("");
-      setDeadline("");
-      setFormats(["pdf"]);
+      resetRequirementForm();
+      setShowCreate(false);
       setNotice(
-        publish ? "Requirement published." : "Requirement saved as draft.",
+        editing
+          ? "Requirement updated."
+          : publish
+            ? "Requirement published."
+            : "Requirement saved as draft.",
       );
       await loadCycles();
+      await loadRequirements(selectedCycleId);
       await loadGroups(selectedCycleId);
       if (selectedGroupId !== null)
         await loadArchive(selectedCycleId, selectedGroupId);
@@ -478,7 +604,9 @@ export function AdminDocumentArchive({ api }: { api: string }) {
       setNotice(
         error instanceof Error
           ? error.message
-          : "The requirement could not be created.",
+          : editing
+            ? "The requirement could not be updated."
+            : "The requirement could not be created.",
       );
     } finally {
       setBusy(null);
@@ -499,17 +627,9 @@ export function AdminDocumentArchive({ api }: { api: string }) {
               Back to archive
             </BackButton>
           )}
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-fy-brand">
-            {detailOnly ? "Group archive" : "Requirements &amp; Review"}
-          </p>
           <h1 className="text-3xl font-bold text-fy-text">
             {detailOnly ? "Group document archive" : "Document Submission Archive"}
           </h1>
-          <p className="mt-1 text-sm text-fy-text-secondary">
-            {detailOnly
-              ? "Review submissions, versions, and decisions for this group."
-              : "Browse every requirement by academic cycle, group, project, student, version, and review history."}
-          </p>
         </div>
         {!detailOnly && <label className="grid min-w-[260px] gap-1 text-sm font-semibold text-fy-text">
           Academic cycle
@@ -571,13 +691,15 @@ export function AdminDocumentArchive({ api }: { api: string }) {
               <AdminAddButton
                 open={showCreate}
                 label="document requirement"
-                onClick={() => setShowCreate((value) => !value)}
+                onClick={toggleCreateForm}
               />
             </div>
             {showCreate && (
-              <div className="mt-5 grid gap-4 border-t pt-5">
+                <div className="admin-document-requirement-form mt-5 grid gap-4 border-t pt-5">
                 <h3 className="text-lg font-semibold">
-                  Create requirement for this cycle
+                  {editingRequirementId === null
+                    ? "Create requirement for this cycle"
+                    : "Edit requirement for this cycle"}
                 </h3>
                 <label className="grid gap-1 text-sm">
                   Requirement name
@@ -624,13 +746,22 @@ export function AdminDocumentArchive({ api }: { api: string }) {
                         >
                           <input
                             type="checkbox"
-                            checked={formats.includes(option.value)}
+                            checked={option.extensions.some((extension) =>
+                              formats.includes(extension),
+                            )}
                             onChange={(event) =>
                               setFormats((current) =>
                                 event.target.checked
-                                  ? [...current, option.value]
+                                  ? [
+                                      ...new Set([
+                                        ...current.filter(
+                                          (item) => !option.extensions.includes(item),
+                                        ),
+                                        ...option.extensions,
+                                      ]),
+                                    ]
                                   : current.filter(
-                                      (item) => item !== option.value,
+                                      (item) => !option.extensions.includes(item),
                                     ),
                               )
                             }
@@ -640,7 +771,7 @@ export function AdminDocumentArchive({ api }: { api: string }) {
                       ))}
                     </div>
                     <span className="text-xs font-normal text-fy-text-secondary">
-                      Students may upload any selected format.
+                      Students may upload any file in a selected format.
                     </span>
                   </div>
                   <label className="grid gap-1 text-sm">
@@ -667,20 +798,102 @@ export function AdminDocumentArchive({ api }: { api: string }) {
                   <button
                     type="button"
                     disabled={busy !== null}
-                    onClick={() => void createRequirement(false)}
+                    onClick={() => void saveRequirement(false)}
                     className="fy-btn fy-btn--primary"
                   >
-                    Save draft
+                    {editingRequirementId === null ? "Save draft" : "Save changes"}
                   </button>
-                  <button
-                    type="button"
-                    disabled={busy !== null}
-                    onClick={() => void createRequirement(true)}
-                    className="fy-btn fy-btn--primary"
-                  >
-                    Publish requirement
-                  </button>
+                  {editingRequirementId === null && (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void saveRequirement(true)}
+                      className="fy-btn fy-btn--primary"
+                    >
+                      Publish requirement
+                    </button>
+                  )}
+                  {editingRequirementId !== null && (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => {
+                        setShowCreate(false);
+                        resetRequirementForm();
+                      }}
+                      className="fy-btn"
+                    >
+                      Cancel
+                    </button>
+                  )}
                 </div>
+              </div>
+            )}
+            {!detailOnly && (
+              <div className="mt-6 border-t border-fy-border pt-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold">Existing requirements</h3>
+                    <p className="text-sm text-fy-text-secondary">
+                      Requirements already assigned to this academic cycle can be edited here.
+                    </p>
+                  </div>
+                  {requirementsState === "ready" && (
+                    <span className="text-sm text-fy-text-secondary">
+                      {requirements.length} requirement{requirements.length === 1 ? "" : "s"}
+                    </span>
+                  )}
+                </div>
+                {requirementsState === "loading" && (
+                  <p className="mt-3 text-sm text-fy-text-secondary">
+                    Loading existing requirements...
+                  </p>
+                )}
+                {requirementsState === "error" && (
+                  <p className="mt-3 text-sm text-red-700">
+                    Existing requirements could not be loaded.
+                  </p>
+                )}
+                {requirementsState === "ready" && !requirements.length && (
+                  <p className="mt-3 text-sm text-fy-text-secondary">
+                    No requirements have been assigned to this cycle yet.
+                  </p>
+                )}
+                {requirementsState === "ready" && requirements.length > 0 && (
+                  <div className="mt-3 grid gap-3">
+                    {requirements.map((requirement) => (
+                      <article
+                        key={requirement.id}
+                        className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-fy-border bg-fy-surface-muted p-4"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-semibold">{requirement.title}</h4>
+                            <span className="rounded-full bg-fy-brand-soft px-2 py-1 text-xs font-semibold text-fy-brand">
+                              {requirement.status}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-sm text-fy-text-secondary">
+                            {requirement.module} · Due {dateText(requirement.due_at)} · {requirement.is_required ? "Required" : "Optional"}
+                          </p>
+                          <p className="mt-1 text-xs text-fy-text-secondary">
+                            {requirement.submission_count ?? 0} submission{requirement.submission_count === 1 ? "" : "s"} · Allowed: {formatLabels(requirement.allowed_file_types).join(", ") || "Custom"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={busy !== null || requirement.status === "ARCHIVED"}
+                          onClick={() => editRequirement(requirement)}
+                          className="rounded border border-fy-brand px-3 py-2 text-sm font-semibold text-fy-brand disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {requirement.status === "ARCHIVED"
+                            ? "Archived (locked)"
+                            : "Edit requirement"}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </section>}

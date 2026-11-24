@@ -46,7 +46,7 @@ export function AdminAnnouncements({ api }: Props) {
   };
 
   return <section className="admin-announcements">
-    <PageHeader eyebrow="Workspace communication" title="Announcements" description="Create, publish, target, archive, and review the updates shown across every dashboard." actions={<AdminAddButton open={showCreate} label="announcement" onClick={() => setShowCreate((value) => !value)} />} />
+    <PageHeader title="Announcements" actions={<AdminAddButton open={showCreate} label="announcement" onClick={() => setShowCreate((value) => !value)} />} />
     {showCreate && permissions && <AnnouncementComposer api={api} permissions={permissions} publishAfterCreate={false} onCreated={() => { setShowCreate(false); void load(); }} />}
     {error && <p className="admin-announcements__error" role="alert">{error}</p>}
     <div className="admin-announcements__list">
