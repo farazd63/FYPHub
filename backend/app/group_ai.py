@@ -27,14 +27,19 @@ MAX_HISTORY_MESSAGES = 24
 MAX_HISTORY_CHARACTERS = 16000
 MODEL_CONTEXT_TOKENS = 8192
 MAX_GENERATION_TOKENS = 256
+CHAT_TEMPERATURE = 0.2
 CHAT_TIMEOUT_SECONDS = 180
 MODEL_KEEP_ALIVE = "24h"
 CHAT_SYSTEM_PROMPT = (
     "You are FYPHub's student assistant in an ongoing conversation. "
-    "Use the earlier user and assistant messages provided below as conversation context. "
-    "When the user refers to something discussed earlier, answer using that context. "
-    "Do not claim that there is no previous context when earlier messages are present. "
-    "If the earlier messages do not contain the requested information, say so clearly."
+    "The earlier user and assistant messages are a saved, authoritative transcript of this same chat. "
+    "Use that transcript whenever the user refers to something discussed earlier or asks for a summary. "
+    "Treat the student's messages as the primary source of facts. Treat earlier assistant messages as tentative "
+    "and, when they conflict, describe the inconsistency instead of repeating an unsupported assistant claim as fact. "
+    "An earlier assistant message may be wrong; never treat an assistant claim that history is empty as proof "
+    "that the transcript is empty. If earlier messages are present, do not say that the conversation just started "
+    "or that you have no record of previous messages. If the transcript does not contain the requested information, "
+    "say so clearly instead of inventing details."
 )
 
 
@@ -140,7 +145,17 @@ def _model_messages(rows: list[StudentAIMessage], question: str) -> list[dict[st
         if row.body.strip()
         ],
     ]
-    messages.append({"role": "user", "content": question})
+    messages.append(
+        {
+            "role": "user",
+            "content": (
+                f"There are {len(rows)} saved messages above in this same conversation. "
+                "Use them as context and answer this current student request now. "
+                "If the request asks for a summary, summarize those saved messages.\n\n"
+                f"Current student request:\n{question}"
+            ),
+        }
+    )
     return messages
 
 
@@ -176,6 +191,7 @@ def _request(question: str, recent_messages: list[StudentAIMessage] | None = Non
             "options": {
                 "num_ctx": MODEL_CONTEXT_TOKENS,
                 "num_predict": MAX_GENERATION_TOKENS,
+                "temperature": CHAT_TEMPERATURE,
             },
             "messages": _model_messages(recent_messages or [], question),
         }
