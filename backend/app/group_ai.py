@@ -23,10 +23,19 @@ from .models import StudentAIConversation, StudentAIMessage, User, UserRole
 router = APIRouter(prefix="/api/v1/group-ai", tags=["student-ai"])
 
 CHAT_MODEL = "llama3.1:8b"
-MAX_HISTORY_MESSAGES = 12
+MAX_HISTORY_MESSAGES = 24
+MAX_HISTORY_CHARACTERS = 16000
+MODEL_CONTEXT_TOKENS = 8192
 MAX_GENERATION_TOKENS = 256
 CHAT_TIMEOUT_SECONDS = 180
 MODEL_KEEP_ALIVE = "24h"
+CHAT_SYSTEM_PROMPT = (
+    "You are FYPHub's student assistant in an ongoing conversation. "
+    "Use the earlier user and assistant messages provided below as conversation context. "
+    "When the user refers to something discussed earlier, answer using that context. "
+    "Do not claim that there is no previous context when earlier messages are present. "
+    "If the earlier messages do not contain the requested information, say so clearly."
+)
 
 
 class ConversationWrite(BaseModel):
@@ -108,17 +117,28 @@ def _recent_rows(session: Session, conversation_id: int) -> list[StudentAIMessag
         .order_by(StudentAIMessage.id.desc())
         .limit(MAX_HISTORY_MESSAGES)
     ).all()
-    return list(reversed(rows))
+    selected: list[StudentAIMessage] = []
+    characters = 0
+    for row in rows:
+        row_characters = len(row.body)
+        if selected and characters + row_characters > MAX_HISTORY_CHARACTERS:
+            break
+        selected.append(row)
+        characters += row_characters
+    return list(reversed(selected))
 
 
 def _model_messages(rows: list[StudentAIMessage], question: str) -> list[dict[str, str]]:
     messages = [
+        {"role": "system", "content": CHAT_SYSTEM_PROMPT},
+        *[
         {
             "role": "assistant" if row.author_kind == "AI" else "user",
             "content": row.body,
         }
         for row in rows
         if row.body.strip()
+        ],
     ]
     messages.append({"role": "user", "content": question})
     return messages
@@ -153,7 +173,10 @@ def _request(question: str, recent_messages: list[StudentAIMessage] | None = Non
             "model": CHAT_MODEL,
             "stream": True,
             "keep_alive": MODEL_KEEP_ALIVE,
-            "options": {"num_predict": MAX_GENERATION_TOKENS},
+            "options": {
+                "num_ctx": MODEL_CONTEXT_TOKENS,
+                "num_predict": MAX_GENERATION_TOKENS,
+            },
             "messages": _model_messages(recent_messages or [], question),
         }
     ).encode("utf-8")

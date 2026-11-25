@@ -82,6 +82,7 @@ export function GroupAIChat({
   const activeRequest = useRef<AbortController | null>(null);
   const activeReader = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const stickToLatest = useRef(true);
+  const autoOpenLatest = useRef(true);
   const temporaryIdRef = useRef(-1);
   const chatUrl = `${api}/api/v1/group-ai`;
   const conversationsUrl = `${chatUrl}/conversations`;
@@ -111,6 +112,7 @@ export function GroupAIChat({
 
   const loadConversation = useCallback(
     async (conversationId: number) => {
+      autoOpenLatest.current = false;
       setConversationLoading(true);
       setError("");
       setSelectedConversationId(conversationId);
@@ -153,6 +155,19 @@ export function GroupAIChat({
   }, [floating, loadConversations, open]);
 
   useEffect(() => {
+    if (
+      loading ||
+      conversationLoading ||
+      selectedConversationId !== null ||
+      !autoOpenLatest.current ||
+      !conversations.length
+    ) {
+      return;
+    }
+    void loadConversation(conversations[0].id);
+  }, [conversationLoading, conversations, loadConversation, loading, selectedConversationId]);
+
+  useEffect(() => {
     if (loading || conversationLoading || selectedConversationId !== null)
       return;
     const frame = window.requestAnimationFrame(() => composer.current?.focus());
@@ -169,6 +184,7 @@ export function GroupAIChat({
   }, [conversationLoading, messages]);
 
   const startNewChat = () => {
+    autoOpenLatest.current = false;
     setSelectedConversationId(null);
     setMessages([]);
     setDraft("");
