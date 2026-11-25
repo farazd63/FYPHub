@@ -6,7 +6,6 @@ export const supervisorNav: readonly RoleSidebarItem[] = [
   { id: "assigned", label: "Assigned Students & Teams", icon: <SidebarIcon name="people" />, section: "Supervision" },
   { id: "capacity", label: "Supervisor Capacity", icon: <SidebarIcon name="capacity" />, section: "Supervision" },
   { id: "history", label: "Decision History", icon: <SidebarIcon name="history" />, section: "History & Communication" },
-  { id: "expertise", label: "Expertise Profile", icon: <SidebarIcon name="supervisor" />, section: "History & Communication" },
 ];
 
 export function SupervisorSidebar({ active, collapsed, mobileOpen, onSelect, onToggle, onClose }: { active: string; collapsed: boolean; mobileOpen: boolean; onSelect: (id: string) => void; onToggle: () => void; onClose: () => void }) {

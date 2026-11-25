@@ -54,6 +54,7 @@ from .auth import (
 )
 from .institutions import router as institutions_router
 from .tenant import ensure_access_ready, is_platform_admin, issue_email_verification_token, primary_institution_id, resolve_registration_institution, send_email_verification, set_tenant_context
+from .team_naming import cycle_period, generated_group_name
 
 app = FastAPI(title="FYPHub API")
 settings.document_storage_root.mkdir(parents=True, exist_ok=True)
@@ -2202,7 +2203,7 @@ def register_team(
             invitation.accepted_at = utc_now()
 
         next_group_number = (session.scalar(select(func.max(Team.group_number)).where(Team.academic_cycle_id == cycle.id)) or 0) + 1
-        team = Team(academic_cycle_id=cycle.id, group_number=next_group_number, group_name=None, shared_user_id=user.id)
+        team = Team(academic_cycle_id=cycle.id, group_number=next_group_number, group_name=generated_group_name(cycle, next_group_number), shared_user_id=user.id)
         session.add(team)
         session.flush()
 
@@ -2351,8 +2352,8 @@ def student_group_detail(session: Session, team: Team) -> dict[str, object]:
         "group_id": team.id,
         "group_number": visible_group_number,
         "group_code": f"{cycle.code}-{visible_group_number}" if cycle and visible_group_number is not None else None,
-        "group_name": team.group_name or f"Group {visible_group_number or '—'}",
-        "group_name_assigned": team.group_name is not None,
+        "group_name": team.group_name or generated_group_name(cycle, visible_group_number),
+        "group_name_assigned": True,
         "group_email": account.email if account else None,
         "academic_cycle_id": team.academic_cycle_id,
         "academic_cycle": cycle.display_name if cycle else None,
@@ -2626,9 +2627,10 @@ def set_student_group_status(
         )
     ) if account.institution_id is not None else None
     if active:
-        if not group_name:
-            raise admin_user_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "group_name_required", "Assign an official group name before approving this signup.", "group_name")
-        group.group_name = group_name
+        cycle = session.get(AcademicCycle, group.academic_cycle_id)
+        if cycle is None or cycle_period(cycle) is None:
+            raise admin_user_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "academic_cycle_metadata_missing", "Set the academic year and session before approving this group.")
+        group.group_name = generated_group_name(cycle, group.group_number or cycle_group_number(session, group))
         approval_time = utc_now()
         account.email_verified_at = account.email_verified_at or approval_time
         account.access_approved_at = approval_time
@@ -2650,7 +2652,7 @@ def set_student_group_status(
 
 @app.patch("/api/v1/admin/student-groups/{group_id}/activate")
 def activate_student_group(group_id: int, payload: AdminStudentGroupApproval, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> dict[str, object]:
-    return set_student_group_status(group_id, True, request, actor, session, payload.group_name)
+    return set_student_group_status(group_id, True, request, actor, session)
 
 
 @app.patch("/api/v1/admin/student-groups/{group_id}/deactivate")

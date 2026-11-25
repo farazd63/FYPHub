@@ -68,6 +68,22 @@ class RevisionAction(BaseModel):
     revision: StrictInt = Field(gt=0)
 
 
+class ManualSupervisorSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    academic_cycle_id: StrictInt = Field(gt=0)
+    supervisor_id: StrictInt = Field(gt=0)
+    submission_note: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("submission_note")
+    @classmethod
+    def normalize_submission_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+
 class DecisionAction(RevisionAction):
     action: str = Field(pattern="^(accept|reject|request_changes)$")
     comment: str | None = Field(default=None, max_length=2000)
@@ -569,6 +585,72 @@ def eligible_supervisors(
             }
         )
     return result
+
+
+@router.post("/manual", status_code=status.HTTP_201_CREATED)
+def create_manual_request(
+    payload: ManualSupervisorSelection,
+    request: Request,
+    actor: User = Depends(require_roles(UserRole.STUDENT)),
+    session: Session = Depends(get_db),
+):
+    """Create a supervisor request from a student's explicit selection.
+
+    This path intentionally does not inspect a proposal or call any AI service.
+    It keeps the normal cycle, duplicate, capacity, approval, and audit rules.
+    """
+    validate_mutating_origin(request)
+    try:
+        cycle = _cycle_for_request(session, payload.academic_cycle_id, lock=True)
+        team = _team_for_student(session, actor, lock=True)
+        if team is not None and team.academic_cycle_id != cycle.id:
+            raise failure("cycle_mismatch", "The student team does not belong to the selected cycle.")
+        duplicate = _active_request_for_owner(
+            session,
+            academic_cycle_id=cycle.id,
+            team_id=team.id if team else None,
+            requester_user_id=actor.id,
+        )
+        if duplicate is not None:
+            raise failure("duplicate_active_request", "This group already has an active supervisor request for this cycle. Resolve it before sending another request.")
+        supervisor, policy = _lock_capacity(session, payload.supervisor_id, cycle.id)
+        _ensure_capacity(session, supervisor.id, cycle.id, policy)
+        group_label = team.group_name if team and team.group_name else actor.full_name
+        row = SupervisorRequest(
+            academic_cycle_id=cycle.id,
+            requester_user_id=actor.id,
+            team_id=team.id if team else None,
+            supervisor_id=supervisor.id,
+            proposal_type="SHORT",
+            title=f"Supervisor request for {group_label}",
+            summary="Supervisor selected manually by the student.",
+            submission_note=payload.submission_note,
+            extraction_status=SupervisorRequestExtractionStatus.CONFIRMED.value,
+            extraction_confirmed_at=utc_now(),
+            extraction_confirmed_by_id=actor.id,
+            status=SupervisorRequestStatus.SUBMITTED.value,
+            revision=1,
+            submitted_at=utc_now(),
+        )
+        session.add(row)
+        session.flush()
+        _append_history(session, row, actor, row.status, "Supervisor selected manually by the student.")
+        if row.submission_note:
+            session.add(SupervisorRequestSubmissionNoteVersion(request_id=row.id, version=1, body=row.submission_note, created_by_id=actor.id))
+        _audit(session, actor, row, "supervisor_request_created_manual", selection_mode="manual")
+        session.commit()
+        session.refresh(row)
+        return _out(session, row)
+    except HTTPException:
+        session.rollback()
+        raise
+    except IntegrityError as error:
+        session.rollback()
+        raise failure("duplicate_active_request", "An active request already exists for this supervisor and cycle.") from error
+    except Exception as error:
+        session.rollback()
+        logger.exception("manual_supervisor_request.create_failed actor_id=%s cycle_id=%s supervisor_id=%s", actor.id, payload.academic_cycle_id, payload.supervisor_id)
+        raise failure("request_save_failed", "The supervisor request could not be created.", status.HTTP_500_INTERNAL_SERVER_ERROR) from error
 
 
 @router.get("/mine")

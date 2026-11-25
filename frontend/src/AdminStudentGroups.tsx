@@ -159,7 +159,6 @@ export function AdminStudentGroups({ api }: { api: string }) {
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [approvalTarget, setApprovalTarget] = useState<Group | null>(null);
-  const [approvalName, setApprovalName] = useState("");
   const [approvalError, setApprovalError] = useState("");
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [memberTarget, setMemberTarget] = useState<Group | null>(null);
@@ -409,7 +408,6 @@ export function AdminStudentGroups({ api }: { api: string }) {
   };
   const openApproval = (group: Group) => {
     setApprovalTarget(group);
-    setApprovalName(group.group_name_assigned ? group.group_name : "");
     setApprovalError("");
   };
   const openAddMember = (group: Group) => {
@@ -507,11 +505,6 @@ export function AdminStudentGroups({ api }: { api: string }) {
   const approveGroup = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!approvalTarget || approvalBusy) return;
-    const name = approvalName.trim();
-    if (!name) {
-      setApprovalError("Assign an official group name before approving.");
-      return;
-    }
     setApprovalBusy(true);
     setApprovalError("");
     try {
@@ -521,16 +514,16 @@ export function AdminStudentGroups({ api }: { api: string }) {
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ group_name: name }),
+          body: JSON.stringify({}),
         },
       );
       const body = await response.json().catch(() => ({}));
       if (!response.ok)
         throw new Error(errorText(body, "The group could not be approved."));
       setApprovalTarget(null);
-      setApprovalName("");
+      const generatedName = typeof body?.group_name === "string" ? body.group_name : approvalTarget.group_name;
       setNotice(
-        `${name} was approved and can now log in with its group credentials.`,
+        `${generatedName} was approved and can now log in with its group credentials.`,
       );
       setReloadToken((value) => value + 1);
     } catch (error) {
@@ -887,9 +880,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                               onClick={() => openApproval(group)}
                               className="rounded-lg border border-fy-border px-3 py-2 text-sm font-semibold text-fy-brand"
                             >
-                              {group.group_name_assigned
-                                ? "Edit group name"
-                                : "Assign group name"}
+                              "Refresh automatic name"
                             </button>
                             <button
                               type="button"
@@ -907,9 +898,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                             onClick={() => openApproval(group)}
                             className="rounded-lg border border-fy-border px-3 py-2 text-sm font-semibold text-fy-success"
                           >
-                            {group.group_name_assigned
-                              ? "Approve / activate"
-                              : "Approve signup"}
+                            "Approve group"
                           </button>
                         )}
                         {!group.is_active &&
@@ -1180,28 +1169,17 @@ export function AdminStudentGroups({ api }: { api: string }) {
               className="mt-1 text-xl font-bold text-fy-text"
             >
               {approvalTarget.is_active
-                ? approvalTarget.group_name_assigned
-                  ? "Edit official group name"
-                  : "Assign official group name"
+                ? "Refresh automatic group name"
                 : "Approve group access"}
             </h2>
             <p className="mt-2 text-sm text-fy-text-secondary">
               {approvalTarget.is_active
-                ? "This name is shown consistently across the group, supervisor, and archive portals."
-                : "Assign the official group name. The shared group account stays unable to log in until you approve it."}
+                ? "The official name is regenerated from the academic cycle session and group number."
+                : "The official name is generated automatically from the academic cycle session and group number. The shared group account stays unable to log in until you approve it."}
             </p>
-            <div className="mt-5 grid gap-1 text-sm font-semibold text-fy-text">
-              <label htmlFor="official-group-name">Official group name</label>
-              <input
-                id="official-group-name"
-                required
-                autoFocus
-                value={approvalName}
-                onChange={(event) => setApprovalName(event.target.value)}
-                placeholder="e.g. Team Phoenix"
-                maxLength={255}
-                className="rounded-lg border border-fy-border bg-fy-surface px-3 py-2.5 font-normal outline-none focus:border-fy-brand focus:ring-2 focus:ring-fy-brand/20"
-              />
+            <div className="mt-5 rounded-lg border border-fy-border bg-fy-surface px-3 py-3 text-sm">
+              <span className="block text-xs font-bold uppercase tracking-wide text-fy-text-secondary">Automatic group name</span>
+              <strong className="mt-1 block text-fy-text">{approvalTarget.group_name}</strong>
             </div>
             {approvalError && (
               <p
@@ -1228,7 +1206,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                 {approvalBusy
                   ? "Saving…"
                   : approvalTarget.is_active
-                    ? "Save group name"
+                    ? "Refresh name"
                     : "Approve group"}
               </button>
             </div>

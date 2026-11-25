@@ -175,11 +175,11 @@ class AdminStudentGroupMemberCreate(BaseModel):
 
 
 class AdminStudentGroupApproval(BaseModel):
-    """Administrator-assigned identity for a group portal approval."""
+    """Optional compatibility payload for automatic group-name assignment."""
 
     model_config = ConfigDict(extra="forbid")
 
-    group_name: str
+    group_name: str | None = None
 
     @field_validator("group_name")
     @classmethod
