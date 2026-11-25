@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from datetime import datetime, timezone
 import logging
+import os
 
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
@@ -22,11 +23,19 @@ SESSION_LIFETIME_HOURS = settings.session_lifetime_hours
 ALLOWED_BROWSER_ORIGIN = "http://127.0.0.1:5173"
 # Explicit local Vite origins. Credentials remain restricted; no wildcard is
 # permitted because the application uses cookie-backed sessions.
-ALLOWED_BROWSER_ORIGINS = (
+_BASE_ALLOWED_BROWSER_ORIGINS = (
     ALLOWED_BROWSER_ORIGIN,
     "http://localhost:5173",
     "http://127.0.0.1:5174",
     "http://localhost:5174",
+)
+ALLOWED_BROWSER_ORIGINS = (
+    *_BASE_ALLOWED_BROWSER_ORIGINS,
+    *tuple(
+        origin.strip().rstrip("/")
+        for origin in os.getenv("FYPHUB_LAN_ORIGINS", "").split(",")
+        if origin.strip()
+    ),
 )
 _TEMPORARY_DIAGNOSTIC_PATHS = {"/api/v1/auth/login", "/api/v1/auth/me", "/api/v1/admin/me"}
 
