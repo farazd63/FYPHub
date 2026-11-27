@@ -877,13 +877,6 @@ export function AdminStudentGroups({ api }: { api: string }) {
                           <>
                             <button
                               type="button"
-                              onClick={() => openApproval(group)}
-                              className="rounded-lg border border-fy-border px-3 py-2 text-sm font-semibold text-fy-brand"
-                            >
-                              "Refresh automatic name"
-                            </button>
-                            <button
-                              type="button"
                               onClick={() =>
                                 setConfirm({ group, action: "deactivate" })
                               }
