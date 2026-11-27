@@ -15,6 +15,7 @@ from .models import AcademicCycle, DocumentArchiveReviewQueue, DocumentRequireme
 from .schemas.document_requirements import RequirementWrite, RequirementPatch, RequirementOut, ReviewEventOut, SubmissionOut, VersionOut
 from .config import settings
 from .document_preview import DocumentPreviewError, render_document_preview
+from .notification_service import cycle_student_ids, notify, notify_admins, team_student_ids, team_supervisor_ids
 
 router = APIRouter(prefix="/api/v1/document-requirements", tags=["document-requirements"])
 student_router = APIRouter(tags=["document-requirements"])
@@ -225,12 +226,19 @@ def update_requirement(requirement_id: int, payload: RequirementPatch, _: object
     req = db.get(DocumentUploadRequirement, requirement_id)
     if not req: raise HTTPException(404, "Requirement not found.")
     if req.status == "ARCHIVED": raise HTTPException(409, "Archived requirements cannot be edited.")
+    previous_status = req.status
     changes = payload.model_dump(exclude_unset=True)
     if "module" in changes:
         section = _requirement_section(db, req.academic_cycle_id, changes["module"])
         req.section_id = section.id
         changes["module"] = section.name
     for key, value in changes.items(): setattr(req, key, value)
+    if previous_status in {"PUBLISHED", "CLOSED", "ACTIVE"}:
+        recipients = {req.assigned_user_id} if req.assigned_user_id is not None else team_student_ids(db, req.assigned_group_id) if req.assigned_group_id is not None else cycle_student_ids(db, req.academic_cycle_id)
+        requirement_payload = {"requirement_id": req.id, "cycle_id": req.academic_cycle_id, "group_id": req.assigned_group_id, "status": req.status}
+        notify(db, recipients, kind="DOCUMENT_REQUIREMENT_UPDATED", title="Required document updated", message=f"The required document '{req.title}' was updated by an administrator.", path="/student/documents", exclude={actor.id}, **requirement_payload)
+        if req.assigned_group_id is not None:
+            notify(db, team_supervisor_ids(db, req.assigned_group_id), kind="DOCUMENT_REQUIREMENT_UPDATED", title="Required document updated", message=f"The required document '{req.title}' for the assigned group was updated.", path=f"/supervisor/groups/{req.assigned_group_id}?tab=documents", exclude={actor.id}, **requirement_payload)
     _audit(db, actor, "document_requirement_updated", req.id, {"status": req.status}); db.commit(); db.refresh(req); return _out(req, db)
 
 def _state(requirement_id, action, actor, db, late=False):
@@ -238,8 +246,17 @@ def _state(requirement_id, action, actor, db, late=False):
     if not req: raise HTTPException(404, "Requirement not found.")
     if action == "PUBLISHED" and req.status == "ARCHIVED":
         raise HTTPException(409, "Archived requirements cannot be published.")
+    previous_status = req.status
     req.status = action
     if action == "PUBLISHED" and late: req.late_upload_allowed = True
+    if action != previous_status:
+        recipients = {req.assigned_user_id} if req.assigned_user_id is not None else team_student_ids(db, req.assigned_group_id) if req.assigned_group_id is not None else cycle_student_ids(db, req.academic_cycle_id)
+        labels = {"PUBLISHED": "Required document published", "CLOSED": "Required document closed", "ARCHIVED": "Required document archived", "DRAFT": "Required document unpublished"}
+        messages = {"PUBLISHED": "is now available for upload", "CLOSED": "is now closed for uploads", "ARCHIVED": "was archived", "DRAFT": "is no longer published"}
+        requirement_payload = {"requirement_id": req.id, "cycle_id": req.academic_cycle_id, "group_id": req.assigned_group_id, "status": action, "previous_status": previous_status}
+        notify(db, recipients, kind=f"DOCUMENT_REQUIREMENT_{action}", title=labels.get(action, "Required document changed"), message=f"'{req.title}' {messages.get(action, 'changed')}.", path="/student/documents", exclude={actor.id}, **requirement_payload)
+        if req.assigned_group_id is not None:
+            notify(db, team_supervisor_ids(db, req.assigned_group_id), kind=f"DOCUMENT_REQUIREMENT_{action}", title=labels.get(action, "Required document changed"), message=f"'{req.title}' for the assigned group {messages.get(action, 'changed')}.", path=f"/supervisor/groups/{req.assigned_group_id}?tab=documents", exclude={actor.id}, **requirement_payload)
     _audit(db, actor, {"PUBLISHED":"document_requirement_published", "CLOSED":"document_requirement_closed", "ARCHIVED":"document_requirement_archived", "DRAFT":"document_requirement_unpublished"}.get(action, "document_requirement_updated"), req.id, {"status": action}); db.commit(); db.refresh(req); return _out(req, db)
 
 @router.post("/{requirement_id}/publish", response_model=RequirementOut)
@@ -338,7 +355,13 @@ async def upload(requirement_id: int, file: UploadFile = File(...), _: object = 
     try:
         temporary.write_bytes(data); temporary.replace(path)
         version = DocumentSubmissionVersion(submission_id=row.id, version_number=previous + 1, original_filename=PurePath(file.filename or "upload").name, stored_filename=stored.rsplit("/", 1)[-1], mime_type=file.content_type or MIMES[suffix], file_size=len(data), storage_reference=stored, content=None, uploaded_by_id=actor.id)
-        db.add(version); db.flush(); _audit(db, actor, "document_late_upload" if late else ("document_file_replaced" if previous else "document_file_uploaded"), row.id, {"version": version.version_number, "file_size": len(data), "mime_type": version.mime_type}, actor.id if late else None); db.commit(); db.refresh(row); return _submission_out(row, db)
+        db.add(version); db.flush()
+        group_label = group.group_name or f"Group {group.group_number if group.group_number is not None else group.id}"
+        upload_payload = {"requirement_id": req.id, "submission_id": row.id, "version_id": version.id, "version": version.version_number, "group_id": group.id, "cycle_id": req.academic_cycle_id, "status": row.status}
+        upload_message = f"{group_label} uploaded {version.original_filename} for '{req.title}'."
+        notify(db, team_supervisor_ids(db, group.id), kind="DOCUMENT_SUBMISSION_UPLOADED", title="Student document uploaded", message=upload_message, path=f"/supervisor/groups/{group.id}?tab=documents", exclude={actor.id}, **upload_payload)
+        notify_admins(db, kind="DOCUMENT_SUBMISSION_UPLOADED", title="Student document uploaded", message=upload_message, path="/admin/document-requirements", exclude={actor.id}, **upload_payload)
+        _audit(db, actor, "document_late_upload" if late else ("document_file_replaced" if previous else "document_file_uploaded"), row.id, {"version": version.version_number, "file_size": len(data), "mime_type": version.mime_type}, actor.id if late else None); db.commit(); db.refresh(row); return _submission_out(row, db)
     except Exception:
         db.rollback()
         if path.exists(): path.unlink()
@@ -446,6 +469,16 @@ def _review(requirement_id, submission_id, decision, comment, actor, db):
     row.status = decision; row.review_comment = comment; row.reviewed_by_id = actor.id; row.reviewed_at = _now()
     latest_version = db.scalar(select(DocumentSubmissionVersion).where(DocumentSubmissionVersion.submission_id == row.id).order_by(DocumentSubmissionVersion.version_number.desc()).limit(1))
     db.add(DocumentSubmissionReviewEvent(submission_id=row.id, version_id=latest_version.id if latest_version else None, status=decision, reviewer_id=actor.id, comment=comment, created_at=row.reviewed_at))
+    group = db.get(Team, row.group_id) if row.group_id is not None else None
+    group_label = group.group_name if group and group.group_name else f"Group {row.group_id}" if row.group_id else "your group"
+    decision_labels = {"ACCEPTED": "Document accepted", "UNDER_REVIEW": "Document under review", "REJECTED": "Document rejected", "RESUBMISSION_REQUIRED": "Document changes requested"}
+    decision_messages = {"ACCEPTED": "was accepted", "UNDER_REVIEW": "is now under review", "REJECTED": "was rejected", "RESUBMISSION_REQUIRED": "needs changes before it can be accepted"}
+    review_payload = {"requirement_id": req.id, "submission_id": row.id, "version_id": latest_version.id if latest_version else None, "group_id": row.group_id, "cycle_id": req.academic_cycle_id, "status": decision}
+    review_message = f"Your document '{req.title}' {decision_messages.get(decision, 'was updated')}.{f' Comment: {comment.strip()}' if comment else ''}"
+    notify(db, {row.student_id} | (team_student_ids(db, row.group_id) if row.group_id is not None else set()), kind=f"DOCUMENT_SUBMISSION_{decision}", title=decision_labels.get(decision, "Document review updated"), message=review_message, path=f"/student/documents?requirement_id={req.id}&focus=requirement", exclude={actor.id}, **review_payload)
+    if row.group_id is not None:
+        notify(db, team_supervisor_ids(db, row.group_id), kind=f"DOCUMENT_SUBMISSION_{decision}", title=decision_labels.get(decision, "Document review updated"), message=f"Your review of '{req.title}' for {group_label} was recorded as {decision.replace('_', ' ').lower()}.", path=f"/supervisor/groups/{row.group_id}?tab=documents", exclude={actor.id}, **review_payload)
+    notify_admins(db, kind=f"DOCUMENT_SUBMISSION_{decision}", title=decision_labels.get(decision, "Document review updated"), message=f"{actor.full_name} marked '{req.title}' for {group_label} as {decision.replace('_', ' ').lower()}.", path="/admin/document-requirements", exclude={actor.id}, **review_payload)
     _audit(db, actor, "document_submission_" + decision.lower(), row.id, {"status": decision}, row.student_id); db.commit(); db.refresh(row); return _submission_out(row, db, include_student_hidden=True)
 
 @router.post("/{requirement_id}/submissions/{submission_id}/approve", response_model=SubmissionOut)

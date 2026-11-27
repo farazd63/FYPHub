@@ -35,6 +35,7 @@ from .models import (
     UserRole,
 )
 from .security import hash_password, hash_session_token, validate_password, verify_password
+from .notification_service import notify, notify_admins, team_student_ids
 
 router = APIRouter(prefix="/api/v1", tags=["module-2-private-collaboration"])
 
@@ -746,7 +747,42 @@ def send_collaboration_message(channel_id: int, payload: MessageWrite, request: 
     channel = _active_channel(session, channel_id); _authorize(session, channel, actor, write=True)
     member = _verified_member(session, channel, actor, request, payload.sender_member_id)
     message = CollaborationMessage(channel_id=channel.id, sender_user_id=actor.id, sender_team_member_id=member.id if member else None, message_text=payload.message_text, message_kind=payload.message_kind, message_payload=payload.message_payload, attachment_reference=payload.attachment_reference)
-    session.add(message); channel.updated_at = func.now(); session.commit(); session.refresh(message)
+    session.add(message); session.flush()
+    team = session.get(Team, channel.team_id)
+    group_label = team.group_name if team and team.group_name else f"Group {team.group_number if team and team.group_number is not None else channel.team_id}"
+    sender_label = member.full_name if member else actor.full_name
+    message_preview = payload.message_text.strip() or ("Shared an attachment." if payload.attachment_reference else "Sent a collaboration message.")
+    common = {"channel_id": channel.id, "group_id": channel.team_id, "message_id": message.id, "sender_id": actor.id}
+    notify(
+        session,
+        team_student_ids(session, channel.team_id),
+        kind="COLLABORATION_MESSAGE_RECEIVED",
+        title=f"New collaboration message · {group_label}",
+        message=f"{sender_label}: {message_preview}",
+        path="/student/collaboration",
+        exclude={actor.id},
+        **common,
+    )
+    notify(
+        session,
+        {channel.supervisor_id},
+        kind="COLLABORATION_MESSAGE_RECEIVED",
+        title=f"New collaboration message · {group_label}",
+        message=f"{sender_label}: {message_preview}",
+        path=f"/supervisor/groups/{channel.team_id}?tab=discussion",
+        exclude={actor.id},
+        **common,
+    )
+    notify_admins(
+        session,
+        kind="COLLABORATION_MESSAGE_RECEIVED",
+        title=f"Collaboration activity · {group_label}",
+        message=f"{sender_label} posted in {group_label}: {message_preview}",
+        path=f"/admin/student-groups?cycle_id={team.academic_cycle_id if team else ''}&group_id={channel.team_id}",
+        exclude={actor.id},
+        **common,
+    )
+    channel.updated_at = func.now(); session.commit(); session.refresh(message)
     return _message_out(session, message)
 
 
@@ -817,7 +853,41 @@ async def upload_collaboration_file(
             message_payload={"name": original, "mime_type": upload.content_type or "application/octet-stream", "size": len(data)},
             attachment_reference=f"/api/v1/collaboration/channels/{channel.id}/files/{stored}",
         )
-        session.add(message); channel.updated_at = func.now(); session.commit(); session.refresh(message)
+        session.add(message); session.flush()
+        team = session.get(Team, channel.team_id)
+        group_label = team.group_name if team and team.group_name else f"Group {team.group_number if team and team.group_number is not None else channel.team_id}"
+        sender_label = member.full_name if member else actor.full_name
+        common = {"channel_id": channel.id, "group_id": channel.team_id, "message_id": message.id, "sender_id": actor.id}
+        notify(
+            session,
+            team_student_ids(session, channel.team_id),
+            kind="COLLABORATION_FILE_RECEIVED",
+            title=f"New collaboration file · {group_label}",
+            message=f"{sender_label} shared {original} in {group_label}.",
+            path="/student/collaboration",
+            exclude={actor.id},
+            **common,
+        )
+        notify(
+            session,
+            {channel.supervisor_id},
+            kind="COLLABORATION_FILE_RECEIVED",
+            title=f"New collaboration file · {group_label}",
+            message=f"{sender_label} shared {original} in {group_label}.",
+            path=f"/supervisor/groups/{channel.team_id}?tab=discussion",
+            exclude={actor.id},
+            **common,
+        )
+        notify_admins(
+            session,
+            kind="COLLABORATION_FILE_RECEIVED",
+            title=f"Collaboration file activity · {group_label}",
+            message=f"{sender_label} shared {original} in {group_label}.",
+            path=f"/admin/student-groups?cycle_id={team.academic_cycle_id if team else ''}&group_id={channel.team_id}",
+            exclude={actor.id},
+            **common,
+        )
+        channel.updated_at = func.now(); session.commit(); session.refresh(message)
         return _message_out(session, message)
     except HTTPException:
         session.rollback()

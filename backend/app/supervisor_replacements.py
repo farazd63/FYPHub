@@ -32,6 +32,7 @@ from .models import (
 )
 from .schemas.supervisor_replacement import DepartureRestoreWrite, DepartureWrite, ReplacementAssignWrite, ReplacementCompleteWrite
 from .supervisor_matching import _ai_rank_candidates, rank_supervisors_for_fields
+from .notification_service import notify, notify_admins, team_student_ids
 
 router = APIRouter(prefix="/api/v1/admin/supervisor-replacements", tags=["supervisor-replacement"])
 OPEN_REPLACEMENT_STATUSES = ("UNSUPERVISED", "REPLACEMENT_PENDING", "REASSIGNED")
@@ -153,6 +154,43 @@ def mark_unavailable(supervisor_id: int, payload: DepartureWrite, request: Reque
             session.add(existing)
             session.flush()
             created_cases.append(existing)
+        group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
+        replacement_payload = {
+            "case_id": existing.id,
+            "team_id": team.id,
+            "cycle_id": team.academic_cycle_id,
+            "previous_supervisor_id": supervisor.id,
+            "status": existing.status,
+        }
+        notify(
+            session,
+            team_student_ids(session, team.id),
+            kind="SUPERVISOR_ASSIGNMENT_ENDED",
+            title="Supervisor assignment ended",
+            message=f"The supervisor assignment for {group_label} ended because {supervisor.full_name} was marked unavailable. An administrator will arrange replacement supervision.",
+            path="/student/supervisor-info",
+            exclude={actor.id},
+            **replacement_payload,
+        )
+        notify(
+            session,
+            {supervisor.id},
+            kind="SUPERVISOR_ASSIGNMENT_ENDED",
+            title="Your supervision assignments were ended",
+            message=f"An administrator ended your active assignment for {group_label}: {payload.reason}.",
+            path="/supervisor/assigned-groups",
+            exclude={actor.id},
+            **replacement_payload,
+        )
+        notify_admins(
+            session,
+            kind="SUPERVISOR_REPLACEMENT_OPENED",
+            title="Supervisor replacement required",
+            message=f"{group_label} is now unsupervised and requires a replacement supervisor.",
+            path="/admin/supervisor-replacement",
+            exclude={actor.id},
+            **replacement_payload,
+        )
         session.add(AdminAuditEvent(actor_id=actor.id, affected_user_id=supervisor.id, target_type="SUPERVISOR_REPLACEMENT", target_id=existing.id, action="supervisor_departure_recorded", changed_values={"team_id": team.id, "reason": payload.reason, "previous_supervisor_id": supervisor.id}))
     session.commit()
     return {"supervisor_id": supervisor.id, "reason": departure.reason, "affected_groups": [_case_list_item(session, case) for case in created_cases], "message": f"{len(created_cases)} group(s) moved to the unsupervised replacement workflow."}
@@ -189,11 +227,42 @@ def restore_supervisor(supervisor_id: int, payload: DepartureRestoreWrite, reque
         )
         .order_by(SupervisorReplacementCase.id)
     ).all()
-    _notify(
+    restore_payload = {"supervisor_id": supervisor.id, "status": "AVAILABLE"}
+    notify(
         session,
         {supervisor.id},
         kind="SUPERVISOR_DEPARTURE_RESTORED",
-        payload={"supervisor_id": supervisor.id, "path": "/supervisor/assigned-groups", "message": "An administrator restored your supervisor availability."},
+        title="Supervisor availability restored",
+        message="An administrator restored your supervisor availability. Affected groups still need explicit reassignment.",
+        path="/supervisor/assigned-groups",
+        exclude={actor.id},
+        **restore_payload,
+    )
+    for case in cases:
+        group_label = f"Group {case.team_id}"
+        team = session.get(Team, case.team_id)
+        if team is not None:
+            group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
+            notify(
+                session,
+                team_student_ids(session, team.id),
+                kind="SUPERVISOR_AVAILABILITY_RESTORED",
+                title="Previous supervisor is available again",
+                message=f"The previous supervisor for {group_label} is available again. An administrator must still complete any reassignment.",
+                path="/student/supervisor-info",
+                exclude={actor.id},
+                case_id=case.id,
+                team_id=team.id,
+                cycle_id=team.academic_cycle_id,
+            )
+    notify_admins(
+        session,
+        kind="SUPERVISOR_DEPARTURE_RESTORED",
+        title="Supervisor availability restored",
+        message=f"{supervisor.full_name}'s availability was restored by an administrator.",
+        path="/admin/supervisor-replacement",
+        exclude={actor.id},
+        **restore_payload,
     )
     session.add(
         AdminAuditEvent(
@@ -283,13 +352,58 @@ def reassign(case_id: int, payload: ReplacementAssignWrite, request: Request, ac
         case.notes = f"{case.notes}\n{payload.notes}" if case.notes else payload.notes
     from .collaboration_channels import ensure_collaboration_channel
     ensure_collaboration_channel(session, assignment, team)
-    assignment_payload = {"case_id": case.id, "team_id": team.id, "previous_supervisor_id": case.previous_supervisor_id, "new_supervisor_id": supervisor.id, "reason": case.reason, "message": "An administrator reassigned your supervision."}
+    assignment_payload = {"case_id": case.id, "team_id": team.id, "cycle_id": team.academic_cycle_id, "previous_supervisor_id": case.previous_supervisor_id, "new_supervisor_id": supervisor.id, "status": case.status}
     if case.previous_supervisor_id == supervisor.id:
-        _notify(session, {supervisor.id}, kind="SUPERVISOR_REASSIGNED", payload={**assignment_payload, "path": "/supervisor/assigned-groups"})
+        notify(
+            session,
+            {supervisor.id},
+            kind="SUPERVISOR_REASSIGNED",
+            title="Supervision reassigned to you",
+            message=f"An administrator restored your supervision of {team.group_name or f'Group {team.group_number or team.id}'}.",
+            path=f"/supervisor/groups/{team.id}?tab=overview",
+            exclude={actor.id},
+            **assignment_payload,
+        )
     else:
-        _notify(session, {case.previous_supervisor_id}, kind="SUPERVISOR_REASSIGNED", payload={**assignment_payload, "path": "/supervisor/assigned-groups"})
-        _notify(session, {supervisor.id}, kind="SUPERVISOR_REASSIGNED", payload={**assignment_payload, "path": f"/supervisor/groups/{team.id}?tab=overview"})
-    _notify(session, _student_recipient_ids(session, team), kind="SUPERVISOR_REASSIGNED", payload={**assignment_payload, "path": "/student/supervisor-info"})
+        notify(
+            session,
+            {case.previous_supervisor_id},
+            kind="SUPERVISOR_ASSIGNMENT_ENDED",
+            title="Supervision assignment changed",
+            message=f"An administrator moved {team.group_name or f'Group {team.group_number or team.id}'} to another supervisor.",
+            path="/supervisor/assigned-groups",
+            exclude={actor.id},
+            **assignment_payload,
+        )
+        notify(
+            session,
+            {supervisor.id},
+            kind="SUPERVISOR_REASSIGNED",
+            title="New group assigned to you",
+            message=f"An administrator assigned {team.group_name or f'Group {team.group_number or team.id}'} to you for supervision.",
+            path=f"/supervisor/groups/{team.id}?tab=overview",
+            exclude={actor.id},
+            **assignment_payload,
+        )
+    notify(
+        session,
+        team_student_ids(session, team.id),
+        kind="SUPERVISOR_REASSIGNED",
+        title="Supervisor reassigned",
+        message=f"An administrator reassigned {team.group_name or f'Group {team.group_number or team.id}'} to {supervisor.full_name}.",
+        path="/student/supervisor-info",
+        exclude={actor.id},
+        **assignment_payload,
+    )
+    notify_admins(
+        session,
+        kind="SUPERVISOR_REASSIGNED",
+        title="Supervisor reassignment recorded",
+        message=f"{team.group_name or f'Group {team.group_number or team.id}'} was reassigned to {supervisor.full_name}.",
+        path="/admin/supervisor-replacement",
+        exclude={actor.id},
+        **assignment_payload,
+    )
     session.add(AdminAuditEvent(actor_id=actor.id, affected_user_id=supervisor.id, target_type="SUPERVISOR_REPLACEMENT", target_id=case.id, action="supervisor_reassigned", changed_values={"team_id": team.id, "previous_supervisor_id": case.previous_supervisor_id, "new_supervisor_id": supervisor.id, "reason": case.reason, "notes": payload.notes}))
     try:
         session.commit()
@@ -314,6 +428,37 @@ def complete_replacement(case_id: int, payload: ReplacementCompleteWrite, reques
     team = session.get(Team, case.team_id)
     if team:
         team.supervision_status = "COMPLETED"
+        group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
+        completion_payload = {"case_id": case.id, "team_id": team.id, "cycle_id": team.academic_cycle_id, "status": case.status}
+        notify(
+            session,
+            team_student_ids(session, team.id),
+            kind="SUPERVISOR_REPLACEMENT_COMPLETED",
+            title="Supervisor replacement completed",
+            message=f"The supervisor replacement workflow for {group_label} is complete.",
+            path="/student/supervisor-info",
+            exclude={actor.id},
+            **completion_payload,
+        )
+        notify(
+            session,
+            {case.replacement_supervisor_id} if case.replacement_supervisor_id else set(),
+            kind="SUPERVISOR_REPLACEMENT_COMPLETED",
+            title="Supervisor replacement completed",
+            message=f"The replacement workflow for {group_label} is complete.",
+            path=f"/supervisor/groups/{team.id}?tab=overview",
+            exclude={actor.id},
+            **completion_payload,
+        )
+        notify_admins(
+            session,
+            kind="SUPERVISOR_REPLACEMENT_COMPLETED",
+            title="Supervisor replacement completed",
+            message=f"The supervisor replacement workflow for {group_label} is complete.",
+            path="/admin/supervisor-replacement",
+            exclude={actor.id},
+            **completion_payload,
+        )
     session.add(AdminAuditEvent(actor_id=actor.id, affected_user_id=case.replacement_supervisor_id, target_type="SUPERVISOR_REPLACEMENT", target_id=case.id, action="supervisor_replacement_completed", changed_values={"team_id": case.team_id, "notes": payload.notes}))
     session.commit()
     return _case_detail(session, case)

@@ -8,6 +8,7 @@ from .database import get_db
 from .models import AcademicCycle, CollaborationChannel, SupervisorAssignment, SupervisorCapacityPolicy, Team, User, UserRole
 from .team_lifecycle import lock_team
 from .schemas.supervisor_capacity import CapacitySession
+from .notification_service import notify, notify_admins, team_student_ids
 
 router = APIRouter(prefix="/api/v1/admin/supervisor-assignments")
 class AssignmentWrite(BaseModel):
@@ -88,6 +89,14 @@ def end(assignment_id: int, request: Request, actor: User = Depends(require_role
         row.ended_at = utc_now(); row.ended_by_id = actor.id
         for channel in session.scalars(select(CollaborationChannel).where(CollaborationChannel.assignment_id == row.id, CollaborationChannel.status == "ACTIVE").with_for_update()).all():
             channel.status = "ARCHIVED"
+        team = session.get(Team, row.team_id)
+        group_label = team.group_name if team and team.group_name else f"Group {row.team_id}"
+        if team is not None:
+            team.supervision_status = "UNSUPERVISED"
+        payload = {"assignment_id": row.id, "team_id": row.team_id, "cycle_id": row.academic_cycle_id, "supervisor_id": row.supervisor_id, "status": "ENDED"}
+        notify(session, team_student_ids(session, row.team_id), kind="SUPERVISOR_ASSIGNMENT_ENDED", title="Supervisor assignment ended", message=f"The supervisor assignment for {group_label} was ended by an administrator.", path="/student/supervisor-info", exclude={actor.id}, **payload)
+        notify(session, {row.supervisor_id}, kind="SUPERVISOR_ASSIGNMENT_ENDED", title="Supervisor assignment ended", message=f"Your assignment for {group_label} was ended by an administrator.", path="/supervisor/assigned-groups", exclude={actor.id}, **payload)
+        notify_admins(session, kind="SUPERVISOR_ASSIGNMENT_ENDED", title="Supervisor assignment ended", message=f"The assignment for {group_label} was ended.", path="/admin", exclude={actor.id}, **payload)
         add_admin_audit_event(session, actor_id=actor.id, affected_user_id=row.supervisor_id, target_type="SUPERVISOR_ASSIGNMENT", target_id=row.id, action="supervisor_assignment_ended", changed_values={"team_id": row.team_id, "academic_cycle_id": row.academic_cycle_id, "supervisor_id": row.supervisor_id})
         session.commit(); session.refresh(row); return out(row)
     except HTTPException:

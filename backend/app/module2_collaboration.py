@@ -8,6 +8,7 @@ from .auth import get_current_user, require_roles, utc_now, validate_mutating_or
 from .database import get_db
 from .group_channels import Channel
 from .models import AcademicDeadline, AcademicDeadlineVersion, AcademicGroupPolicy, GroupMessage, Module2ChannelRead, Module2Notification, ProposalComplianceReport, ProposalComplianceSubmission, ProjectTask, SupervisorAssignment, Team, TeamMember, User, UserRole
+from .notification_service import notify, notify_admins, team_student_ids, team_supervisor_ids
 from .team_lifecycle import cancel_open_team_requests, refresh_team_status
 
 router = APIRouter(prefix="/api/v1/module-2", tags=["module-2-collaboration"])
@@ -75,6 +76,11 @@ def transfer_leadership(team_id: int, payload: TransferLeadership, request: Requ
         raise HTTPException(400, "The leadership transfer target is not an active team member.")
     current.is_creator = False
     target.is_creator = True
+    group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
+    message = f"{actor.full_name} transferred leadership of {group_label} to {target.full_name}."
+    notify(session, team_student_ids(session, team.id), kind="GROUP_LEADERSHIP_TRANSFERRED", title="Group leadership changed", message=message, path="/student", exclude={actor.id}, team_id=team.id, cycle_id=team.academic_cycle_id, member_id=target.id)
+    notify(session, team_supervisor_ids(session, team.id), kind="GROUP_LEADERSHIP_TRANSFERRED", title="Group leadership changed", message=message, path=f"/supervisor/groups/{team.id}", exclude={actor.id}, team_id=team.id, cycle_id=team.academic_cycle_id, member_id=target.id)
+    notify_admins(session, kind="GROUP_LEADERSHIP_TRANSFERRED", title=f"Group leadership changed · {group_label}", message=message, path="/admin/student-groups", exclude={actor.id}, team_id=team.id, cycle_id=team.academic_cycle_id, member_id=target.id)
     session.commit()
     return {"team_id": team.id, "leader_member_id": target.id, "status": team.status}
 
@@ -85,10 +91,17 @@ def dissolve(team_id: int, request: Request, actor: User = Depends(get_current_u
     team = team_for_actor(session, actor, team_id, lock=True)
     if team.status == "locked":
         raise HTTPException(409, "A locked team cannot be dissolved.")
+    student_recipients = team_student_ids(session, team.id)
+    supervisor_recipients = team_supervisor_ids(session, team.id)
+    group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
     team.status = "dissolved"
     for member in session.scalars(select(TeamMember).where(TeamMember.team_id == team.id).with_for_update()).all():
         member.is_active = False
     cancel_open_team_requests(session, team.id)
+    message = f"{actor.full_name} dissolved {group_label}. The group is no longer active."
+    notify(session, student_recipients, kind="GROUP_DISSOLVED", title="Group dissolved", message=message, path="/student", exclude={actor.id}, team_id=team.id, cycle_id=team.academic_cycle_id)
+    notify(session, supervisor_recipients, kind="GROUP_DISSOLVED", title="Group dissolved", message=message, path=f"/supervisor/groups/{team.id}", exclude={actor.id}, team_id=team.id, cycle_id=team.academic_cycle_id)
+    notify_admins(session, kind="GROUP_DISSOLVED", title=f"Group dissolved · {group_label}", message=message, path="/admin/student-groups", exclude={actor.id}, team_id=team.id, cycle_id=team.academic_cycle_id)
     session.commit()
     return {"team_id": team.id, "status": team.status}
 
@@ -99,6 +112,9 @@ def leave_team(team_id: int, payload: LeaveTeam, request: Request, actor: User =
     team = team_for_actor(session, actor, team_id, lock=True)
     if team.status == "locked":
         raise HTTPException(409, "A locked team cannot change leadership.")
+    student_recipients = team_student_ids(session, team.id)
+    supervisor_recipients = team_supervisor_ids(session, team.id)
+    group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
     leader = session.scalar(select(TeamMember).where(TeamMember.team_id == team.id, TeamMember.is_creator.is_(True), TeamMember.is_active.is_(True)).with_for_update())
     active = session.scalars(select(TeamMember).where(TeamMember.team_id == team.id, TeamMember.is_active.is_(True)).with_for_update()).all()
     if leader is None or len(active) <= 1:
@@ -106,6 +122,10 @@ def leave_team(team_id: int, payload: LeaveTeam, request: Request, actor: User =
         for member in active:
             member.is_active = False
         cancel_open_team_requests(session, team.id)
+        message = f"{actor.full_name} left {group_label}; the group was dissolved because it had no remaining active member."
+        notify(session, student_recipients, kind="GROUP_DISSOLVED", title="Group dissolved", message=message, path="/student", exclude={actor.id}, team_id=team.id, cycle_id=team.academic_cycle_id)
+        notify(session, supervisor_recipients, kind="GROUP_DISSOLVED", title="Group dissolved", message=message, path=f"/supervisor/groups/{team.id}", exclude={actor.id}, team_id=team.id, cycle_id=team.academic_cycle_id)
+        notify_admins(session, kind="GROUP_DISSOLVED", title=f"Group dissolved · {group_label}", message=message, path="/admin/student-groups", exclude={actor.id}, team_id=team.id, cycle_id=team.academic_cycle_id)
         session.commit()
         return {"team_id": team.id, "status": team.status}
     target = session.scalar(select(TeamMember).where(TeamMember.id == payload.new_leader_member_id, TeamMember.team_id == team.id, TeamMember.is_active.is_(True)).with_for_update()) if payload.new_leader_member_id else None
@@ -115,6 +135,10 @@ def leave_team(team_id: int, payload: LeaveTeam, request: Request, actor: User =
     target.is_creator = True
     leader.is_active = False
     refresh_team_status(session, team)
+    message = f"{actor.full_name} left {group_label}; {target.full_name} is now the group leader."
+    notify(session, student_recipients, kind="GROUP_MEMBER_LEFT", title="Group membership changed", message=message, path="/student", exclude={actor.id}, team_id=team.id, cycle_id=team.academic_cycle_id, member_id=leader.id, new_leader_member_id=target.id)
+    notify(session, supervisor_recipients, kind="GROUP_MEMBER_LEFT", title="Group membership changed", message=message, path=f"/supervisor/groups/{team.id}", exclude={actor.id}, team_id=team.id, cycle_id=team.academic_cycle_id, member_id=leader.id, new_leader_member_id=target.id)
+    notify_admins(session, kind="GROUP_MEMBER_LEFT", title=f"Group membership changed · {group_label}", message=message, path="/admin/student-groups", exclude={actor.id}, team_id=team.id, cycle_id=team.academic_cycle_id, member_id=leader.id, new_leader_member_id=target.id)
     session.commit()
     return {"team_id": team.id, "status": team.status, "leader_member_id": target.id}
 

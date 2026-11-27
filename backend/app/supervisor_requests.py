@@ -19,6 +19,7 @@ from .collaboration_channels import ensure_collaboration_channel
 from .database import get_db
 from .config import settings
 from .pdf_extraction import EXTRACTION_RUNTIME, PdfExtractionError, extract_proposal_document
+from .notification_service import notify, notify_admins, team_student_ids
 from .models import (
     AcademicCycle,
     SupervisorAssignment,
@@ -638,6 +639,32 @@ def create_manual_request(
         if row.submission_note:
             session.add(SupervisorRequestSubmissionNoteVersion(request_id=row.id, version=1, body=row.submission_note, created_by_id=actor.id))
         _audit(session, actor, row, "supervisor_request_created_manual", selection_mode="manual")
+        request_payload = {
+            "request_id": row.id,
+            "team_id": row.team_id,
+            "cycle_id": row.academic_cycle_id,
+            "supervisor_id": supervisor.id,
+            "status": row.status,
+        }
+        notify(
+            session,
+            {supervisor.id},
+            kind="SUPERVISOR_REQUEST_SUBMITTED",
+            title="New supervisor request",
+            message=f"{group_label} sent you a supervisor request.",
+            path="/supervisor/requests",
+            exclude={actor.id},
+            **request_payload,
+        )
+        notify_admins(
+            session,
+            kind="SUPERVISOR_REQUEST_SUBMITTED",
+            title="New supervisor request submitted",
+            message=f"{group_label} sent a supervisor request to {supervisor.full_name}.",
+            path="/admin",
+            exclude={actor.id},
+            **request_payload,
+        )
         session.commit()
         session.refresh(row)
         return _out(session, row)
@@ -749,6 +776,35 @@ async def create_request(
         _audit_document(session, actor, row, "supervisor_request_document_uploaded", document)
         _audit_document(session, actor, row, "supervisor_request_extracted", document)
         _audit(session, actor, row, "supervisor_request_draft_created", supervisor_id=supervisor.id)
+        request_payload = {
+            "request_id": row.id,
+            "team_id": row.team_id,
+            "cycle_id": row.academic_cycle_id,
+            "supervisor_id": supervisor.id,
+            "document_id": document.id,
+            "document_version": document.version,
+            "status": row.status,
+        }
+        group_label = team.group_name if team and team.group_name else actor.full_name
+        notify(
+            session,
+            {supervisor.id},
+            kind="SUPERVISOR_REQUEST_DOCUMENT_UPLOADED",
+            title="Supervisor request proposal uploaded",
+            message=f"{group_label} uploaded a proposal for your supervisor request. It is waiting for student confirmation and submission.",
+            path="/supervisor/requests",
+            exclude={actor.id},
+            **request_payload,
+        )
+        notify_admins(
+            session,
+            kind="SUPERVISOR_REQUEST_DOCUMENT_UPLOADED",
+            title="Supervisor request proposal uploaded",
+            message=f"{group_label} uploaded a proposal for {supervisor.full_name}.",
+            path="/admin",
+            exclude={actor.id},
+            **request_payload,
+        )
         session.commit()
         session.refresh(row)
         return _out(session, row)
@@ -818,6 +874,36 @@ async def update_draft_document(
         row.revision += 1
         _audit_document(session, actor, row, "supervisor_request_document_uploaded", document)
         _audit_document(session, actor, row, "supervisor_request_extracted", document)
+        team = session.get(Team, row.team_id) if row.team_id is not None else None
+        group_label = team.group_name if team and team.group_name else actor.full_name
+        request_payload = {
+            "request_id": row.id,
+            "team_id": row.team_id,
+            "cycle_id": row.academic_cycle_id,
+            "supervisor_id": row.supervisor_id,
+            "document_id": document.id,
+            "document_version": document.version,
+            "status": row.status,
+        }
+        notify(
+            session,
+            {row.supervisor_id},
+            kind="SUPERVISOR_REQUEST_DOCUMENT_UPLOADED",
+            title="Supervisor request proposal updated",
+            message=f"{group_label} uploaded a replacement proposal document for your request.",
+            path="/supervisor/requests",
+            exclude={actor.id},
+            **request_payload,
+        )
+        notify_admins(
+            session,
+            kind="SUPERVISOR_REQUEST_DOCUMENT_UPLOADED",
+            title="Supervisor request proposal updated",
+            message=f"{group_label} uploaded a replacement proposal for supervisor request #{row.id}.",
+            path="/admin",
+            exclude={actor.id},
+            **request_payload,
+        )
         session.commit()
         session.refresh(row)
         return _out(session, row)
@@ -927,6 +1013,34 @@ def submit_request(
         row.revision += 1
         _append_history(session, row, actor, row.status)
         _audit(session, actor, row, "supervisor_request_resubmitted" if previous == SupervisorRequestStatus.CHANGES_REQUESTED.value else "supervisor_request_submitted", previous_status=previous)
+        team = session.get(Team, row.team_id) if row.team_id is not None else None
+        group_label = team.group_name if team and team.group_name else actor.full_name
+        request_payload = {
+            "request_id": row.id,
+            "team_id": row.team_id,
+            "cycle_id": row.academic_cycle_id,
+            "supervisor_id": row.supervisor_id,
+            "status": row.status,
+        }
+        notify(
+            session,
+            {row.supervisor_id},
+            kind="SUPERVISOR_REQUEST_SUBMITTED",
+            title="Supervisor request submitted",
+            message=f"{group_label} submitted a supervisor request for your review.",
+            path="/supervisor/requests",
+            exclude={actor.id},
+            **request_payload,
+        )
+        notify_admins(
+            session,
+            kind="SUPERVISOR_REQUEST_SUBMITTED",
+            title="Supervisor request submitted",
+            message=f"{group_label} submitted a supervisor request to {session.get(User, row.supervisor_id).full_name}.",
+            path="/admin",
+            exclude={actor.id},
+            **request_payload,
+        )
         session.commit()
         session.refresh(row)
         return _out(session, row)
@@ -962,6 +1076,35 @@ def withdraw_request(
         row.revision += 1
         _append_history(session, row, actor, row.status)
         _audit(session, actor, row, "supervisor_request_withdrawn", previous_status=previous)
+        team = session.get(Team, row.team_id) if row.team_id is not None else None
+        group_label = team.group_name if team and team.group_name else actor.full_name
+        request_payload = {
+            "request_id": row.id,
+            "team_id": row.team_id,
+            "cycle_id": row.academic_cycle_id,
+            "supervisor_id": row.supervisor_id,
+            "status": row.status,
+            "previous_status": previous,
+        }
+        notify(
+            session,
+            {row.supervisor_id},
+            kind="SUPERVISOR_REQUEST_WITHDRAWN",
+            title="Supervisor request withdrawn",
+            message=f"{group_label} withdrew supervisor request #{row.id}.",
+            path="/supervisor/requests",
+            exclude={actor.id},
+            **request_payload,
+        )
+        notify_admins(
+            session,
+            kind="SUPERVISOR_REQUEST_WITHDRAWN",
+            title="Supervisor request withdrawn",
+            message=f"{group_label} withdrew supervisor request #{row.id}.",
+            path="/admin",
+            exclude={actor.id},
+            **request_payload,
+        )
         session.commit()
         session.refresh(row)
         return _out(session, row)
@@ -1077,6 +1220,50 @@ def decide_request(
         row.revision += 1
         _append_history(session, row, actor, target, payload.comment)
         _audit(session, actor, row, {"accept": "supervisor_request_accepted", "reject": "supervisor_request_rejected", "request_changes": "supervisor_request_changes_requested"}[payload.action], previous_status=previous, comment=payload.comment)
+        notification_team = session.get(Team, row.team_id) if row.team_id is not None else None
+        group_label = notification_team.group_name if notification_team and notification_team.group_name else f"Group {row.team_id}" if row.team_id else session.get(User, row.requester_user_id).full_name
+        student_recipients = team_student_ids(session, row.team_id) if row.team_id is not None else {row.requester_user_id}
+        student_recipients.add(row.requester_user_id)
+        decision_title = {
+            "accept": "Supervisor request accepted",
+            "reject": "Supervisor request rejected",
+            "request_changes": "Supervisor requested changes",
+        }[payload.action]
+        decision_message = {
+            "accept": f"{actor.full_name} accepted {group_label}'s supervisor request. Your supervisor is now assigned.",
+            "reject": f"{actor.full_name} rejected {group_label}'s supervisor request.",
+            "request_changes": f"{actor.full_name} requested changes to {group_label}'s supervisor request.",
+        }[payload.action]
+        if payload.comment:
+            decision_message += f" Comment: {payload.comment.strip()}"
+        request_payload = {
+            "request_id": row.id,
+            "team_id": row.team_id,
+            "cycle_id": row.academic_cycle_id,
+            "supervisor_id": actor.id,
+            "assignment_id": row.assignment_id,
+            "status": row.status,
+            "previous_status": previous,
+        }
+        notify(
+            session,
+            student_recipients,
+            kind=f"SUPERVISOR_REQUEST_{target}",
+            title=decision_title,
+            message=decision_message,
+            path="/student/supervisor-info" if payload.action == "accept" else "/student/supervisor-matching",
+            exclude={actor.id},
+            **request_payload,
+        )
+        notify_admins(
+            session,
+            kind=f"SUPERVISOR_REQUEST_{target}",
+            title=decision_title,
+            message=f"{actor.full_name} {target.lower().replace('_', ' ')} {group_label}'s supervisor request.{f' Comment: {payload.comment.strip()}' if payload.comment else ''}",
+            path="/admin",
+            exclude={actor.id},
+            **request_payload,
+        )
         session.commit()
         session.refresh(row)
         return _out(session, row)

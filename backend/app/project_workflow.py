@@ -25,6 +25,7 @@ from .models import (
     UserRole,
 )
 from .schemas.project_workflow import EvaluationWrite, MeetingWrite, MilestoneWrite, ResolutionWrite, ScheduleReschedule, ScheduleWrite, TaskWrite
+from .notification_service import notify, notify_admins, team_student_ids, team_supervisor_ids
 
 router = APIRouter(prefix="/api/v1")
 WRITE_ROLES = (UserRole.STUDENT, UserRole.SUPERVISOR, UserRole.COORDINATOR, UserRole.ADMIN)
@@ -67,6 +68,19 @@ def _assigned_supervisor(session: Session, team_id: int) -> SupervisorAssignment
     return session.scalar(select(SupervisorAssignment).where(SupervisorAssignment.team_id == team_id, SupervisorAssignment.ended_at.is_(None)))
 
 
+def _panel_member_ids(session: Session, schedule_id: int) -> set[int]:
+    return set(session.scalars(select(DefensePanelMember.user_id).where(DefensePanelMember.schedule_id == schedule_id)).all())
+
+
+def _notify_schedule_change(session: Session, actor: User, schedule: DefenseSchedule, *, kind: str, title: str, message: str, panel_ids: set[int] | None = None) -> None:
+    team = _team(session, schedule.team_id)
+    recipients = panel_ids if panel_ids is not None else _panel_member_ids(session, schedule.id)
+    notify(session, team_student_ids(session, team.id), kind=kind, title=title, message=message, path="/student/progress", exclude={actor.id}, schedule_id=schedule.id, team_id=team.id, cycle_id=team.academic_cycle_id)
+    notify(session, team_supervisor_ids(session, team.id), kind=kind, title=title, message=message, path=f"/supervisor/groups/{team.id}?tab=defense", exclude={actor.id}, schedule_id=schedule.id, team_id=team.id, cycle_id=team.academic_cycle_id)
+    notify(session, recipients, kind=kind, title=title, message=message, path="/evaluator", exclude={actor.id}, schedule_id=schedule.id, team_id=team.id, cycle_id=team.academic_cycle_id)
+    notify_admins(session, kind=kind, title=title, message=message, path="/admin", exclude={actor.id}, schedule_id=schedule.id, team_id=team.id, cycle_id=team.academic_cycle_id)
+
+
 def _can_access_team(session: Session, team: Team, user: User, *, write: bool = False) -> bool:
     if user.role in (UserRole.ADMIN, UserRole.COORDINATOR):
         return True
@@ -87,6 +101,14 @@ def _audit(session: Session, actor: User, action: str, target_type: str, target_
     from .main import add_admin_audit_event
 
     add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type=target_type, target_id=target_id, action=action, changed_values=values)
+
+
+def _notify_team_change(session: Session, actor: User, team: Team, *, kind: str, title: str, message: str, entity_id: int, path_student: str | None = None) -> None:
+    payload = {"team_id": team.id, "cycle_id": team.academic_cycle_id, "entity_id": entity_id}
+    group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
+    notify(session, team_student_ids(session, team.id), kind=kind, title=title, message=message, path=path_student or "/student/progress", exclude={actor.id}, group_id=team.id, **payload)
+    notify(session, team_supervisor_ids(session, team.id), kind=kind, title=title, message=message, path=f"/supervisor/groups/{team.id}?tab=project", exclude={actor.id}, group_id=team.id, **payload)
+    notify_admins(session, kind=kind, title=f"{title} · {group_label}", message=message, path="/admin", exclude={actor.id}, group_id=team.id, **payload)
 
 
 def _milestone_out(row: ProjectMilestone) -> dict:
@@ -120,7 +142,7 @@ def create_milestone(team_id: int, payload: MilestoneWrite, request: Request, ac
     validate_mutating_origin(request)
     team = _require_team_access(session, team_id, actor, write=True)
     row = ProjectMilestone(team_id=team.id, created_by_id=actor.id, **payload.model_dump())
-    session.add(row); session.flush(); _audit(session, actor, "project_milestone_created", "PROJECT_MILESTONE", row.id, {"team_id": team.id, "title": row.title}); session.commit(); session.refresh(row)
+    session.add(row); session.flush(); _notify_team_change(session, actor, team, kind="PROJECT_MILESTONE_CREATED", title="Project milestone added", message=f"{actor.full_name} added milestone '{row.title}'.", entity_id=row.id); _audit(session, actor, "project_milestone_created", "PROJECT_MILESTONE", row.id, {"team_id": team.id, "title": row.title}); session.commit(); session.refresh(row)
     return _milestone_out(row)
 
 
@@ -131,7 +153,7 @@ def update_milestone(milestone_id: int, payload: MilestoneWrite, request: Reques
     if row is None: raise failure("milestone_not_found", "Milestone was not found.", 404)
     _require_team_access(session, row.team_id, actor, write=True)
     for key, value in payload.model_dump().items(): setattr(row, key, value)
-    session.flush(); _audit(session, actor, "project_milestone_updated", "PROJECT_MILESTONE", row.id, {"completion_percent": row.completion_percent, "due_at": row.due_at.isoformat() if row.due_at else None}); session.commit(); session.refresh(row)
+    session.flush(); team = _team(session, row.team_id); _notify_team_change(session, actor, team, kind="PROJECT_MILESTONE_UPDATED", title="Project milestone updated", message=f"{actor.full_name} updated milestone '{row.title}' ({row.completion_percent}% complete).", entity_id=row.id); _audit(session, actor, "project_milestone_updated", "PROJECT_MILESTONE", row.id, {"completion_percent": row.completion_percent, "due_at": row.due_at.isoformat() if row.due_at else None}); session.commit(); session.refresh(row)
     return _milestone_out(row)
 
 
@@ -144,7 +166,7 @@ def create_task(team_id: int, payload: TaskWrite, request: Request, actor: User 
     if payload.owner_user_id is not None and not session.scalar(select(TeamMember.id).where(TeamMember.team_id == team.id, TeamMember.is_active.is_(True), or_(TeamMember.registration_number == session.get(User, payload.owner_user_id).registration_number if session.get(User, payload.owner_user_id) else False, TeamMember.university_email == session.get(User, payload.owner_user_id).email if session.get(User, payload.owner_user_id) else False))):
         raise failure("task_owner_not_member", "Task owner must be an active team member.", 422)
     row = ProjectTask(team_id=team.id, created_by_id=actor.id, **payload.model_dump())
-    session.add(row); session.flush(); _audit(session, actor, "project_task_created", "PROJECT_TASK", row.id, {"team_id": team.id, "title": row.title}); session.commit(); session.refresh(row)
+    session.add(row); session.flush(); _notify_team_change(session, actor, team, kind="PROJECT_TASK_CREATED", title="Project task added", message=f"{actor.full_name} added task '{row.title}'.", entity_id=row.id); _audit(session, actor, "project_task_created", "PROJECT_TASK", row.id, {"team_id": team.id, "title": row.title}); session.commit(); session.refresh(row)
     return _task_out(row)
 
 
@@ -157,7 +179,7 @@ def update_task(task_id: int, payload: TaskWrite, request: Request, actor: User 
     if payload.milestone_id is not None and session.scalar(select(ProjectMilestone.id).where(ProjectMilestone.id == payload.milestone_id, ProjectMilestone.team_id == row.team_id)) is None:
         raise failure("milestone_not_found", "The selected milestone does not belong to this team.", 422)
     for key, value in payload.model_dump().items(): setattr(row, key, value)
-    session.flush(); _audit(session, actor, "project_task_updated", "PROJECT_TASK", row.id, {"completion_percent": row.completion_percent, "due_at": row.due_at.isoformat() if row.due_at else None}); session.commit(); session.refresh(row)
+    session.flush(); team = _team(session, row.team_id); _notify_team_change(session, actor, team, kind="PROJECT_TASK_UPDATED", title="Project task updated", message=f"{actor.full_name} updated task '{row.title}' ({row.completion_percent}% complete).", entity_id=row.id); _audit(session, actor, "project_task_updated", "PROJECT_TASK", row.id, {"completion_percent": row.completion_percent, "due_at": row.due_at.isoformat() if row.due_at else None}); session.commit(); session.refresh(row)
     return _task_out(row)
 
 
@@ -176,7 +198,7 @@ def create_meeting(team_id: int, payload: MeetingWrite, request: Request, actor:
     if assignment is None:
         raise failure("supervisor_assignment_required", "An active supervisor assignment is required before recording a meeting.")
     row = SupervisionMeeting(team_id=team.id, supervisor_id=assignment.supervisor_id, created_by_id=actor.id, held_at=_utc(payload.held_at), minutes=payload.minutes, decisions=payload.decisions, action_items=payload.action_items)
-    session.add(row); session.flush(); _audit(session, actor, "supervision_meeting_recorded", "SUPERVISION_MEETING", row.id, {"team_id": team.id}); session.commit(); session.refresh(row)
+    session.add(row); session.flush(); _notify_team_change(session, actor, team, kind="SUPERVISION_MEETING_RECORDED", title="Supervision meeting recorded", message=f"{actor.full_name} recorded a supervision meeting for {team.group_name or f'Group {team.group_number or team.id}'}.", entity_id=row.id); _audit(session, actor, "supervision_meeting_recorded", "SUPERVISION_MEETING", row.id, {"team_id": team.id}); session.commit(); session.refresh(row)
     return {"id": row.id, "held_at": row.held_at, "minutes": row.minutes, "decisions": row.decisions, "action_items": row.action_items, "supervisor_id": row.supervisor_id, "created_by_id": row.created_by_id, "created_at": row.created_at}
 
 
@@ -258,6 +280,8 @@ def create_schedule(payload: ScheduleWrite, request: Request, actor: User = Depe
     row = DefenseSchedule(team_id=team.id, academic_cycle_id=payload.academic_cycle_id, created_by_id=actor.id, start_at=_utc(payload.start_at), end_at=_utc(payload.end_at), room=payload.room, online_link=payload.online_link)
     session.add(row); session.flush()
     for user_id in payload.panel_member_ids: session.add(DefensePanelMember(schedule_id=row.id, user_id=user_id, assigned_by_id=actor.id))
+    session.flush()
+    _notify_schedule_change(session, actor, row, kind="DEFENSE_SCHEDULE_CREATED", title="Defense schedule created", message=f"A defense has been scheduled for Team {team.id} from {row.start_at.isoformat()} to {row.end_at.isoformat()}.")
     _audit(session, actor, "defense_schedule_created", "DEFENSE_SCHEDULE", row.id, {"team_id": row.team_id, "panel_member_ids": payload.panel_member_ids}); session.commit(); session.refresh(row)
     return _schedule_out(session, row)
 
@@ -267,12 +291,15 @@ def reschedule(schedule_id: int, payload: ScheduleReschedule, request: Request, 
     validate_mutating_origin(request)
     row = session.get(DefenseSchedule, schedule_id)
     if row is None: raise failure("schedule_not_found", "Defense schedule was not found.", 404)
+    previous_panel_ids = _panel_member_ids(session, row.id)
     write = ScheduleWrite(team_id=row.team_id, academic_cycle_id=row.academic_cycle_id, panel_member_ids=payload.panel_member_ids or list(session.scalars(select(DefensePanelMember.user_id).where(DefensePanelMember.schedule_id == row.id)).all()), start_at=payload.start_at, end_at=payload.end_at, room=payload.room, online_link=payload.online_link)
     _validate_panel_members(session, write.panel_member_ids); _check_schedule_conflicts(session, write, schedule_id=row.id)
     row.start_at, row.end_at, row.room, row.online_link, row.status = _utc(payload.start_at), _utc(payload.end_at), payload.room, payload.online_link, "RESCHEDULED"
     if payload.panel_member_ids is not None:
         session.query(DefensePanelMember).filter(DefensePanelMember.schedule_id == row.id).delete(synchronize_session=False)
         for user_id in payload.panel_member_ids: session.add(DefensePanelMember(schedule_id=row.id, user_id=user_id, assigned_by_id=actor.id))
+    session.flush()
+    _notify_schedule_change(session, actor, row, kind="DEFENSE_SCHEDULE_UPDATED", title="Defense schedule updated", message=f"The defense schedule for Team {row.team_id} changed to {row.start_at.isoformat()}–{row.end_at.isoformat()}.", panel_ids=previous_panel_ids | _panel_member_ids(session, row.id))
     _audit(session, actor, "defense_schedule_rescheduled", "DEFENSE_SCHEDULE", row.id, {"start_at": row.start_at.isoformat(), "end_at": row.end_at.isoformat()}); session.commit(); session.refresh(row)
     return _schedule_out(session, row)
 
@@ -313,6 +340,9 @@ def save_evaluation(payload: EvaluationWrite, request: Request, actor: User = De
     submitted = session.scalars(select(PanelEvaluation).where(PanelEvaluation.schedule_id == schedule.id, PanelEvaluation.status == "SUBMITTED")).all()
     disagreement = len({item.decision for item in submitted if item.decision}) > 1 or (len([item.overall_score for item in submitted if item.overall_score is not None]) > 1 and max(item.overall_score for item in submitted if item.overall_score is not None) - min(item.overall_score for item in submitted if item.overall_score is not None) >= 20)
     for item in submitted: item.disagreement_detected = disagreement
+    schedule_team = _team(session, schedule.team_id)
+    evaluation_action = "submitted" if payload.submit else "saved as a draft"
+    _notify_schedule_change(session, actor, schedule, kind="PANEL_EVALUATION_UPDATED", title="Defense evaluation updated", message=f"{actor.full_name} {evaluation_action} an evaluation for Team {schedule_team.id}.")
     _audit(session, actor, "panel_evaluation_submitted" if payload.submit else "panel_evaluation_saved", "PANEL_EVALUATION", row.id, {"schedule_id": schedule.id, "status": row.status}); session.commit(); session.refresh(row)
     return _evaluation_out(session, row)
 
@@ -324,5 +354,9 @@ def resolve_evaluation(evaluation_id: int, payload: ResolutionWrite, request: Re
     if row is None: raise failure("evaluation_not_found", "Evaluation was not found.", 404)
     if actor.role not in (UserRole.ADMIN, UserRole.COORDINATOR):
         if payload.status != "RECHECK_REQUESTED" or not _evaluation_access(session, row, actor): raise HTTPException(403, detail="Only the assigned team or authorized reviewer may request a recheck.")
-    row.status = payload.status; row.resolution_note = payload.note.strip(); _audit(session, actor, "panel_evaluation_resolution_updated", "PANEL_EVALUATION", row.id, {"status": row.status}); session.commit(); session.refresh(row)
+    row.status = payload.status; row.resolution_note = payload.note.strip()
+    schedule = session.get(DefenseSchedule, row.schedule_id)
+    if schedule is not None:
+        _notify_schedule_change(session, actor, schedule, kind="PANEL_EVALUATION_RESOLUTION_UPDATED", title="Defense evaluation status changed", message=f"{actor.full_name} changed the defense evaluation status to {row.status}.")
+    _audit(session, actor, "panel_evaluation_resolution_updated", "PANEL_EVALUATION", row.id, {"status": row.status}); session.commit(); session.refresh(row)
     return _evaluation_out(session, row)

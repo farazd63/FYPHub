@@ -11,6 +11,7 @@ from .auth import get_current_user, validate_mutating_origin
 from .database import get_db
 from .models import GroupMessage, SupervisorAssignment, Team, TeamMember, User, UserRole
 from .config import settings
+from .notification_service import notify, notify_admins, team_student_ids, team_supervisor_ids
 
 router = APIRouter(prefix="/api/v1/group-channels")
 class Channel(str, Enum):
@@ -81,7 +82,14 @@ def send(team_id: int, channel: Channel, payload: MessageWrite, request: Request
                 raise HTTPException(400, "The thread does not belong to this channel.")
         mentions = sorted(set(re.findall(r"@([A-Za-z0-9_.-]{2,80})", payload.body)))
         message = GroupMessage(team_id=team_id, channel=channel.value, author_id=actor.id, author_kind=kind, body=payload.body, thread_root_id=payload.thread_root_id, mentions=mentions, attachment_name=payload.attachment_name, attachment_url=payload.attachment_url)
-        session.add(message); session.flush(); session.commit(); session.refresh(message)
+        session.add(message); session.flush()
+        group_label = session.get(Team, team_id).group_name or f"Group {team_id}"
+        notification_message = f"{actor.full_name} posted in {group_label}'s {channel.value.replace('_', ' ')} channel: {payload.body[:240]}"
+        metadata = {"team_id": team_id, "group_id": team_id, "message_id": message.id, "channel": channel.value}
+        notify(session, team_student_ids(session, team_id), kind="COLLABORATION_MESSAGE_RECEIVED", title="New collaboration message", message=notification_message, path="/student/collaboration", exclude={actor.id}, **metadata)
+        notify(session, team_supervisor_ids(session, team_id), kind="COLLABORATION_MESSAGE_RECEIVED", title="New collaboration message", message=notification_message, path=f"/supervisor/groups/{team_id}?tab=discussion", exclude={actor.id}, **metadata)
+        notify_admins(session, kind="COLLABORATION_MESSAGE_RECEIVED", title=f"New collaboration message · {group_label}", message=notification_message, path="/admin/student-groups", exclude={actor.id}, **metadata)
+        session.commit(); session.refresh(message)
         return output(message)
     except HTTPException:
         session.rollback(); raise
@@ -104,6 +112,13 @@ async def upload_file(team_id: int, request: Request, upload: UploadFile = File(
     path.write_bytes(data)
     message = GroupMessage(team_id=team_id, channel=Channel.files_resources.value, author_id=actor.id, author_kind="TEAM" if actor.role == UserRole.STUDENT else actor.role.value, body=f"Uploaded resource: {original}", attachment_name=original, attachment_url=f"/api/v1/group-channels/{team_id}/files/{stored}")
     session.add(message)
+    session.flush()
+    group_label = session.get(Team, team_id).group_name or f"Group {team_id}"
+    notification_message = f"{actor.full_name} uploaded {original} to {group_label}'s files and resources."
+    metadata = {"team_id": team_id, "group_id": team_id, "message_id": message.id, "filename": original, "channel": Channel.files_resources.value}
+    notify(session, team_student_ids(session, team_id), kind="COLLABORATION_FILE_RECEIVED", title="New collaboration file", message=notification_message, path="/student/collaboration", exclude={actor.id}, **metadata)
+    notify(session, team_supervisor_ids(session, team_id), kind="COLLABORATION_FILE_RECEIVED", title="New collaboration file", message=notification_message, path=f"/supervisor/groups/{team_id}?tab=discussion", exclude={actor.id}, **metadata)
+    notify_admins(session, kind="COLLABORATION_FILE_RECEIVED", title=f"New collaboration file · {group_label}", message=notification_message, path="/admin/student-groups", exclude={actor.id}, **metadata)
     session.commit()
     session.refresh(message)
     return output(message)

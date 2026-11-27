@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from .auth import get_current_user, validate_mutating_origin
 from .database import get_db
 from .models import SupervisorRequest, SupervisorRequestMessage, Team, User, UserRole
+from .notification_service import notify, notify_admins, team_student_ids
 
 router = APIRouter(prefix="/api/v1/supervisor-requests")
 
@@ -61,12 +62,48 @@ def send_conversation_message(request_id: int, payload: RequestMessageWrite, req
     try:
         if actor.role not in (UserRole.STUDENT, UserRole.SUPERVISOR):
             raise HTTPException(status_code=403, detail="This conversation is read-only for your role.")
-        _request_for_actor(session, request_id, actor, lock=True)
+        row = _request_for_actor(session, request_id, actor, lock=True)
         message = SupervisorRequestMessage(request_id=request_id, sender_id=actor.id, body=payload.body)
         session.add(message)
         session.flush()
         from .main import add_admin_audit_event
         add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="SUPERVISOR_REQUEST", target_id=request_id, action="supervisor_request_message_sent", changed_values={"message_id": message.id})
+        team = session.get(Team, row.team_id) if row.team_id is not None else None
+        group_label = team.group_name if team and team.group_name else f"Group {row.team_id}" if row.team_id else "Student"
+        common = {"request_id": row.id, "message_id": message.id, "team_id": row.team_id, "cycle_id": row.academic_cycle_id}
+        if actor.role == UserRole.STUDENT:
+            notify(
+                session,
+                {row.supervisor_id},
+                kind="SUPERVISOR_REQUEST_MESSAGE_RECEIVED",
+                title="New supervisor request message",
+                message=f"{actor.full_name} sent a message about {group_label}: {payload.body}",
+                path="/supervisor/requests",
+                exclude={actor.id},
+                **common,
+            )
+        else:
+            student_recipients = team_student_ids(session, row.team_id) if row.team_id is not None else {row.requester_user_id}
+            student_recipients.add(row.requester_user_id)
+            notify(
+                session,
+                student_recipients,
+                kind="SUPERVISOR_REQUEST_MESSAGE_RECEIVED",
+                title="New supervisor request message",
+                message=f"{actor.full_name} sent a message about {group_label}: {payload.body}",
+                path="/student/supervisor-matching",
+                exclude={actor.id},
+                **common,
+            )
+        notify_admins(
+            session,
+            kind="SUPERVISOR_REQUEST_MESSAGE_RECEIVED",
+            title="Supervisor request conversation updated",
+            message=f"{actor.full_name} sent a message about {group_label}: {payload.body}",
+            path="/admin",
+            exclude={actor.id},
+            **common,
+        )
         session.commit()
         session.refresh(message)
         return _message_out(session, message)

@@ -55,6 +55,7 @@ from .auth import (
 from .institutions import router as institutions_router
 from .tenant import ensure_access_ready, is_platform_admin, issue_email_verification_token, primary_institution_id, resolve_registration_institution, send_email_verification, set_tenant_context
 from .team_naming import cycle_period, generated_group_name
+from .notification_service import notify, notify_admins, team_student_ids, team_supervisor_ids
 
 app = FastAPI(title="FYPHub API")
 settings.document_storage_root.mkdir(parents=True, exist_ok=True)
@@ -2555,6 +2556,11 @@ def add_student_group_member(
         )
         session.add(member)
         session.flush()
+        group_label = group.group_name or f"Group {group.group_number if group.group_number is not None else group.id}"
+        member_payload = {"team_id": group.id, "cycle_id": group.academic_cycle_id, "member_id": member.id}
+        notify(session, {account.id}, kind="GROUP_MEMBER_ADDED", title="New group member added", message=f"An administrator added {member.full_name} to {group_label}.", path="/student", exclude={actor.id}, **member_payload)
+        notify(session, team_supervisor_ids(session, group.id), kind="GROUP_MEMBER_ADDED", title="Group membership updated", message=f"An administrator added {member.full_name} to {group_label}.", path=f"/supervisor/groups/{group.id}?tab=members", exclude={actor.id}, **member_payload)
+        notify_admins(session, kind="GROUP_MEMBER_ADDED", title="Group membership updated", message=f"{member.full_name} was added to {group_label}.", path="/admin/student-groups", exclude={actor.id}, **member_payload)
         add_admin_audit_event(
             session,
             actor_id=actor.id,
@@ -2644,6 +2650,13 @@ def set_student_group_status(
     account.is_active = active
     if not active:
         revoke_user_sessions(session, account.id)
+    group_label = group.group_name or f"Group {group.group_number if group.group_number is not None else group.id}"
+    status_payload = {"team_id": group.id, "cycle_id": group.academic_cycle_id, "group_id": group.id, "status": "ACTIVE" if active else "INACTIVE"}
+    if active:
+        notify(session, team_student_ids(session, group.id), kind="STUDENT_GROUP_ACTIVATED", title="Group access approved", message=f"{group_label} was approved and is now active.", path="/student", exclude={actor.id}, **status_payload)
+    else:
+        notify(session, team_supervisor_ids(session, group.id), kind="STUDENT_GROUP_DEACTIVATED", title="Student group deactivated", message=f"{group_label} was deactivated by an administrator.", path=f"/supervisor/groups/{group.id}?tab=overview", exclude={actor.id}, **status_payload)
+    notify_admins(session, kind="STUDENT_GROUP_ACTIVATED" if active else "STUDENT_GROUP_DEACTIVATED", title="Student group status changed", message=f"{group_label} was {'activated' if active else 'deactivated'}.", path="/admin/student-groups", exclude={actor.id}, **status_payload)
     add_admin_audit_event(session, actor_id=actor.id, affected_user_id=account.id, target_type="STUDENT_GROUP", target_id=group.id, action="student_group_approved" if active else "student_group_deactivated", changed_values={"is_active": active, "group_name": group.group_name})
     session.commit()
     session.refresh(group)

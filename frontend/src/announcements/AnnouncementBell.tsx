@@ -103,6 +103,12 @@ export function AnnouncementBell({ api, role }: Props) {
       ]);
       const announcements = resultValue(results[0], [] as Announcement[]);
       const appNotifications = resultValue(results[1], [] as AppNotification[]);
+      const appCollaborationKeys = new Set(appNotifications.flatMap((row) => {
+        const payload = row.payload ?? {};
+        const channelId = Number(payload.channel_id);
+        const messageId = Number(payload.message_id);
+        return Number.isInteger(channelId) && Number.isInteger(messageId) ? [`${channelId}:${messageId}`] : [];
+      }));
       const channels = resultValue(results[2], [] as CollaborationChannel[]);
       const requirements = resultValue(results[3], [] as Requirement[]);
       const collaborationChannels = channels.filter((channel) => channel.unread_count > 0).slice(0, 20);
@@ -111,6 +117,7 @@ export function AnnouncementBell({ api, role }: Props) {
         const message = resultValue(result, [] as CollaborationMessage[]).at(-1);
         const channel = collaborationChannels[index];
         if (!message || !channel || !collaborationRole) return [];
+        if (appCollaborationKeys.has(`${channel.id}:${message.id}`)) return [];
         return [{
           id: `collaboration:${channel.id}:${message.id}`,
           source: "collaboration",
@@ -188,7 +195,7 @@ export function AnnouncementBell({ api, role }: Props) {
 
   useEffect(() => {
     const initial = window.setTimeout(() => void load(false), 0);
-    const timer = window.setInterval(() => void load(loadedAllRef.current), 30000);
+    const timer = window.setInterval(() => void load(loadedAllRef.current), 15000);
     return () => { window.clearTimeout(initial); window.clearInterval(timer); };
   }, [load]);
 
@@ -231,23 +238,6 @@ export function AnnouncementBell({ api, role }: Props) {
     if (row.href) window.location.assign(row.href);
   };
 
-  const markVisibleRead = useCallback(async (visibleRows: HeaderNotification[]) => {
-    if (!visibleRows.length) return;
-    const visibleIds = new Set(visibleRows.map((row) => row.id));
-    setReadOverrides((current) => ({ ...current, ...Object.fromEntries(visibleRows.map((row) => [row.id, true])) }));
-    setRows((current) => current.map((row) => visibleIds.has(row.id) ? { ...row, unread: false } : row));
-    setHighlightedId((current) => current && visibleIds.has(current) ? null : current);
-    await Promise.allSettled(visibleRows.map((row) => persistRead(row)));
-  }, [persistRead]);
-
-  useEffect(() => {
-    if (!open || loading) return;
-    const visibleUnreadRows = displayRows.filter((row) => row.unread);
-    if (!visibleUnreadRows.length) return;
-    const timer = window.setTimeout(() => void markVisibleRead(visibleUnreadRows), 0);
-    return () => window.clearTimeout(timer);
-  }, [displayRows, loading, markVisibleRead, open]);
-
   return <div className="announcement-bell" ref={rootRef}>
     <button type="button" className="announcement-bell__button" aria-label={unread ? `${unread} unread notifications` : "Notifications"} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}>
       <Bell size={17} strokeWidth={1.8} aria-hidden="true" />
@@ -259,7 +249,7 @@ export function AnnouncementBell({ api, role }: Props) {
       {!loading && error && <p className="announcement-bell__state announcement-bell__state--error">{error}</p>}
       {!loading && !error && !displayRows.length && <p className="announcement-bell__state">No new notifications.</p>}
       {!loading && !error && displayRows.length > 0 && <div className="announcement-bell__list">{displayRows.map((row) => <button type="button" key={row.id} className={`announcement-bell__item ${highlightedId === row.id && row.unread ? "announcement-bell__item--unread" : ""}`} onClick={() => void markRead(row)}><span className={`announcement-priority announcement-priority--${row.priority}`}>{row.source === "announcement" ? priorityLabel(row.priority) : row.source === "collaboration" ? "Collaboration" : row.source === "document" ? "Required document" : "Update"}</span><strong>{row.title}</strong><span>{row.message}</span><small>{dateLabel(row.createdAt)}{row.unread && <><Check size={12} aria-hidden="true" /> New</>}</small></button>)}</div>}
-      {loadedAll && displayRows.length > 0 && <p className="announcement-bell__footer">Showing announcements, updates, collaboration messages, and required-document alerts.</p>}
+      {loadedAll && displayRows.length > 0 && <p className="announcement-bell__footer">Showing announcements, workflow updates, collaboration messages, and document alerts. Click an item to mark it read.</p>}
     </div>}
   </div>;
 }
