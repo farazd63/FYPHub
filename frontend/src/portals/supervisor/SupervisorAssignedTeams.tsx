@@ -5,6 +5,7 @@ import { IconButton } from "../../ui/IconButton";
 import { SupervisorGroupDetails, type GroupWorkspace, type GroupTab, date } from "./SupervisorGroupDetails";
 import { pushPortalRoute, replacePortalRoute } from "../shared/portal-history";
 import { appPathname } from "../../platform-path";
+import { shortGroupLabel } from "../../lib/displayLabels";
 
 const projectStatusLabel = (value?: string | null) => ({
   IN_PROGRESS: "In progress",
@@ -32,7 +33,7 @@ export function SupervisorAssignedTeams({ api }: { api: string }) {
   const [groups, setGroups] = useState<GroupWorkspace[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [selected, setSelected] = useState<{ id: number; tab: GroupTab } | null>(groupSelectionFromLocation);
   const load = useCallback(async () => {
-    try { const response = await fetch(`${api}/api/v1/supervisor/assigned-groups`, { credentials: "include" }); if (!response.ok) throw new Error("Assigned groups could not be loaded."); setGroups(await response.json() as GroupWorkspace[]); setError(""); }
+    try { const response = await fetch(`${api}/api/v1/supervisor/assigned-groups`, { credentials: "include" }); if (!response.ok) throw new Error("Assigned groups could not be loaded."); const body = await response.json() as GroupWorkspace[]; setGroups(body.map((item) => ({ ...item, group: { ...item.group, name: shortGroupLabel(item.group.name, item.group.academic_cycle.name) } }))); setError(""); }
     catch (e) { setError(e instanceof Error ? e.message : "Assigned groups could not be loaded."); }
     finally { setLoading(false); }
   }, [api]);
@@ -52,7 +53,7 @@ export function SupervisorAssignedTeams({ api }: { api: string }) {
       <div className="supervisor-assignment-card__header"><div><span className="supervisor-section-kicker">ACTIVE ASSIGNMENT</span><h2>{data.group.name}</h2><p>{data.group.email} <span aria-hidden="true">·</span> {data.group.academic_cycle.name}</p></div><div className="supervisor-assignment-card__status"><span className="supervisor-status-pill supervisor-status-pill--neutral">{data.group.status.replaceAll("_", " ")}</span><span className="supervisor-status-pill supervisor-status-pill--blue">{data.assignment?.status?.replaceAll("_", " ") || "Awaiting decision"}</span></div></div>
       <div className="supervisor-assignment-highlights"><div><span>Supervisor</span><strong>{data.supervisor.name}</strong></div><div><span>Members</span><strong>{data.members.length} member{data.members.length === 1 ? "" : "s"}</strong></div><div><span>Completion</span><strong>{data.project?.completion_percentage == null ? "Not started" : `${data.project.completion_percentage}%`}</strong></div></div>
       <dl className="supervisor-assignment-details">{[
-        ["Academic cycle", `${data.group.academic_cycle.name} · ${data.group.academic_cycle.year || "Year not set"} · ${data.group.academic_cycle.session || "Session not set"}`], ["Project title", projectTitleLabel(data)],
+        ["Project title", projectTitleLabel(data)],
         ["Proposal", data.proposal?.status || "Not submitted yet"], ["Project", projectStatusLabel(data.project?.status)],
         ["Assigned", date(data.assignment?.assigned_at)], ["Last activity", date(data.group.last_activity_at)]
       ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>

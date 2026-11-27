@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { BackButton, StatusBadge } from "./ui";
+import { shortGroupLabel } from "./lib/displayLabels";
 
 type Cycle = {
   id: number;
@@ -601,15 +602,15 @@ export function AdminStudentGroups({ api }: { api: string }) {
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-fy-text-secondary">
-            {selectedCycle ? "Selected cycle" : "FYP Groups"}
+            FYP Groups
           </p>
           <h1
             id="student-groups-heading"
             className="text-2xl font-bold tracking-tight"
           >
-            {selectedCycle ? selectedCycle.display_name : "FYP Cycles"}
+            {selectedCycle ? "Student groups" : "FYP Cycles"}
           </h1>
-          <p className="mt-1 text-sm text-fy-text-secondary">
+          <p className={selectedCycle ? "hidden" : "mt-1 text-sm text-fy-text-secondary"}>
             {selectedCycle ? (
               <>
                 Viewing groups and document history for{" "}
@@ -639,7 +640,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
               <option value="">Choose a cycle</option>
               {cycles.map((cycle) => (
                 <option key={cycle.id} value={cycle.id}>
-                  {cycle.display_name} ({cycle.code})
+                  {cycle.display_name}
                 </option>
               ))}
             </select>
@@ -689,7 +690,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                 <strong className="mt-1 block text-lg text-fy-text">
                   {cycle.display_name}
                 </strong>
-                <span className="mt-1 block text-sm text-fy-text-secondary">
+                <span className="hidden">
                   {cycle.code}
                   {cycle.academic_year ? ` · ${cycle.academic_year}` : ""}
                   {cycle.session ? ` · ${cycle.session}` : ""}
@@ -717,9 +718,6 @@ export function AdminStudentGroups({ api }: { api: string }) {
               >
                 {selectedCycle.display_name}
               </h2>
-              <p className="text-sm text-fy-text-secondary">
-                {selectedCycle.code}
-              </p>
             </div>
             <p className="text-sm font-semibold text-fy-text-secondary">
               {groupState === "ready"
@@ -729,7 +727,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
           </div>
           {groupState === "loading" && (
             <div className="rounded-xl border border-fy-border bg-fy-surface p-5 text-sm text-fy-text-secondary">
-              Loading groups for {selectedCycle.display_name}...
+              Loading groups...
             </div>
           )}
           {groupState === "error" && (
@@ -742,7 +740,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
           )}
           {groupState === "ready" && !groups.length && (
             <div className="rounded-xl border border-dashed border-fy-border bg-fy-surface p-5 text-sm text-fy-text-secondary">
-              No FYP groups belong to {selectedCycle.display_name}.
+              No FYP groups are available in the selected cycle.
             </div>
           )}
           {groupState === "ready" && groups.length > 0 && (
@@ -763,12 +761,12 @@ export function AdminStudentGroups({ api }: { api: string }) {
                         onClick={() => openGroup(group.id)}
                         className="text-left"
                       >
-                        <span className="text-xs font-bold uppercase tracking-wide text-fy-text-secondary">
+                        <span className="hidden">
                           Group {group.group_number ?? "—"} ·{" "}
                           {selectedCycle.display_name}
                         </span>
                         <h3 className="mt-1 text-lg font-bold text-fy-text">
-                          {group.group_name}
+                          {shortGroupLabel(group.group_name, selectedCycle)}
                         </h3>
                         <p className="text-sm text-fy-text-secondary">
                           {group.group_email}
@@ -929,14 +927,14 @@ export function AdminStudentGroups({ api }: { api: string }) {
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-fy-text-secondary">
+                  <p className="hidden">
                     Selected group · {selectedCycle.display_name}
                   </p>
                   <h2
                     id="selected-group-heading"
                     className="mt-1 text-xl font-bold text-fy-text"
                   >
-                    {selectedGroup.group_name}
+                    {shortGroupLabel(selectedGroup.group_name, selectedCycle)}
                   </h2>
                   <p className="text-sm text-fy-text-secondary">
                     {selectedGroup.group_email}

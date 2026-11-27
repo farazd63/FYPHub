@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { localInputToIso } from "../../../../lib/localInputToIso";
+import { cycleLabel as formatCycleLabel } from "../../../../lib/displayLabels";
 
 type Option = { id: number; name?: string; email?: string; code?: string; academic_cycle_id?: number; academic_year?: number | null; session?: string | null };
 type Schedule = { id: number; team_id: number; academic_cycle_id: number; start_at: string; end_at: string; room: string | null; online_link: string | null; status: string; panel_members: Option[]; conflict_note: string | null };
@@ -13,11 +14,7 @@ function toLocalInput(iso: string): string {
 }
 
 function cycleLabel(cycle: Option): string {
-  const year = cycle.academic_year ? String(cycle.academic_year) : "";
-  const session = cycle.session ? String(cycle.session) : "";
-  const code = cycle.code ? ` · ${cycle.code}` : "";
-  const base = [session, year].filter(Boolean).join(" ") || cycle.name || `Cycle ${cycle.id}`;
-  return `${base}${code} (#${cycle.id})`;
+  return formatCycleLabel(cycle);
 }
 
 export function PanelScheduling({ api }: { api: string }) {

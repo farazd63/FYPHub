@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BackButton, StatusBadge } from "./ui";
 import { AdminAddButton } from "./ui/AdminAddButton";
 import { appPathname } from "./platform-path";
+import { shortGroupLabel } from "./lib/displayLabels";
 import "./admin-document-archive.css";
 
 type Cycle = {
@@ -641,7 +642,7 @@ export function AdminDocumentArchive({ api }: { api: string }) {
             <option value="">Select a cycle</option>
             {cycles.map((cycle) => (
               <option key={cycle.id} value={cycle.id}>
-                {cycle.display_name || cycle.name} ({cycle.code})
+                {cycle.display_name || cycle.name}
               </option>
             ))}
           </select>
@@ -684,9 +685,6 @@ export function AdminDocumentArchive({ api }: { api: string }) {
                 <h2 className="text-xl font-bold text-fy-text">
                   {selectedCycle.display_name || selectedCycle.name}
                 </h2>
-                <p className="text-sm text-fy-text-secondary">
-                  {selectedCycle.code}
-                </p>
               </div>
               <AdminAddButton
                 open={showCreate}
@@ -900,8 +898,7 @@ export function AdminDocumentArchive({ api }: { api: string }) {
           {!detailOnly && <>
           {groupState === "loading" && (
             <p className="mt-6 rounded-xl border bg-fy-surface p-5 text-sm">
-              Loading groups for{" "}
-              {selectedCycle.display_name || selectedCycle.name}...
+              Loading groups...
             </p>
           )}
           {groupState === "error" && (
@@ -920,7 +917,7 @@ export function AdminDocumentArchive({ api }: { api: string }) {
           {groupState === "ready" && groups.length > 0 && (
             <section className="mt-6 rounded-xl border border-fy-border bg-fy-surface p-5">
               <h2 className="text-lg font-semibold">
-                Groups in {selectedCycle.display_name || selectedCycle.name}
+                Groups in the selected cycle
               </h2>
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[1100px] text-left text-sm">
@@ -1082,7 +1079,6 @@ export function AdminDocumentArchive({ api }: { api: string }) {
                     <table className="admin-document-archive__table w-full text-left text-xs">
                       <thead className="border-b bg-fy-surface-muted uppercase tracking-wide text-fy-text-secondary">
                         <tr>
-                          <th className="px-2 py-3">Cycle</th>
                           <th className="px-2 py-3">Group</th>
                           <th className="px-2 py-3">Section</th>
                           <th className="px-2 py-3">Requirement</th>
@@ -1101,7 +1097,6 @@ export function AdminDocumentArchive({ api }: { api: string }) {
                       <tbody className="admin-document-archive__body">
                         {archive.requirements.map((row) => (
                           <tr key={row.id} className="align-top">
-                            <td data-label="Cycle" className="px-2 py-3">{row.cycle_name}</td>
                             <td data-label="Group" className="px-2 py-3 font-semibold">
                               {row.group_code}
                             </td>
@@ -1116,7 +1111,7 @@ export function AdminDocumentArchive({ api }: { api: string }) {
                             </td>
                             <td data-label="Group / uploader" className="px-2 py-3">
                               <strong>
-                                {display(row.group_name, row.group_code)}
+                                {display(shortGroupLabel(row.group_name, row.cycle_name), row.group_code)}
                               </strong>
                               <span className="block text-fy-text-secondary">
                                 Uploaded by: {display(row.uploader_name, "-")}

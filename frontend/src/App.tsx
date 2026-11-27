@@ -88,12 +88,11 @@ const isLandingPath = (pathname: string) => pathname === "/" || pathname === "/w
 const welcomePublicPath = () => (appPathname() === "/welcome" ? "/welcome" : "/");
 const formatCycleLabel = (cycle: Cycle) => {
   const named = cycle.display_name?.trim();
-  const code = cycle.code?.trim();
   const base = named
     || (cycle.session && cycle.academic_year
       ? `${cycle.session === "FALL" || cycle.session === "Fall" ? "Fall" : cycle.session === "SPRING" || cycle.session === "Spring" ? "Spring" : cycle.session} ${cycle.academic_year}`
       : cycle.session?.trim() || (cycle.academic_year ? String(cycle.academic_year) : `Cycle #${cycle.id}`));
-  return code && !base.includes(code) ? `${base} (${code})` : base;
+  return base;
 };
 const configuredApi = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 // Production is served with an nginx /api proxy. Keeping the API same-origin

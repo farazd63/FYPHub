@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BackButton, StatusBadge } from "./ui";
+import { shortGroupLabel } from "./lib/displayLabels";
 import "./AdminOverview.css";
 
 type Person = { id: number; name: string; full_name?: string; email: string; registration_number?: string | null };
@@ -58,10 +59,14 @@ export function AdminCycleDetails({ api, cycleId, onBack }: { api: string; cycle
 }
 
 function CycleDetailWorkspace({ detail }: { detail: CycleDetail }) {
+  const displayGroups = detail.groups.map((group) => ({
+    ...group,
+    name: shortGroupLabel(group.name, detail.cycle.display_name),
+  }));
   return <>
     <div className="cycle-detail__summary">{[["Groups", detail.summary.groups], ["Students", detail.summary.students], ["Supervisors", detail.summary.supervisors], ["Projects", detail.summary.projects], ["Pending reviews", detail.summary.pending_reviews], ["Required documents", detail.summary.required_documents]].map(([label, value]) => <div key={String(label)}><strong>{value}</strong><span>{label}</span></div>)}</div>
     <div className="cycle-detail__columns">
-      <article className="cycle-detail__section"><h2>Groups</h2>{!detail.groups.length ? <p className="cycle-detail__empty">No groups are registered in this cycle.</p> : <div className="cycle-detail__list">{detail.groups.map((group) => <div className="cycle-detail__list-item" key={group.id}><div><strong>{group.name}</strong><span>{group.project_title || "No project proposal"}</span><small>{group.members.length} member(s) · Leader: {personName(group.leader)}</small></div><em>{group.assigned_supervisor ? personName(group.assigned_supervisor) : "Unassigned"}</em></div>)}</div>}</article>
+      <article className="cycle-detail__section"><h2>Groups</h2>{!detail.groups.length ? <p className="cycle-detail__empty">No groups are registered in this cycle.</p> : <div className="cycle-detail__list">{displayGroups.map((group) => <div className="cycle-detail__list-item" key={group.id}><div><strong>{group.name}</strong><span>{group.project_title || "No project proposal"}</span><small>{group.members.length} member(s) · Leader: {personName(group.leader)}</small></div><em>{group.assigned_supervisor ? personName(group.assigned_supervisor) : "Unassigned"}</em></div>)}</div>}</article>
       <article className="cycle-detail__section"><h2>Supervisors</h2>{!detail.supervisors.length ? <p className="cycle-detail__empty">No supervisor activity is recorded for this cycle.</p> : <div className="cycle-detail__list">{detail.supervisors.map((supervisor) => <div className="cycle-detail__list-item" key={supervisor.id}><div><strong>{personName(supervisor)}</strong><span>{supervisor.email}</span><small>{supervisor.assigned_groups} group(s) · {supervisor.assigned_students} student(s)</small></div><em>{supervisor.available_capacity == null ? "Capacity not set" : `${supervisor.available_capacity} remaining`}</em></div>)}</div>}</article>
       <article className="cycle-detail__section"><h2>Coordinators</h2>{!detail.coordinators.length ? <p className="cycle-detail__empty">No active coordinator accounts found.</p> : <div className="cycle-detail__list">{detail.coordinators.map((coordinator) => <div className="cycle-detail__list-item" key={coordinator.id}><div><strong>{personName(coordinator)}</strong><span>{coordinator.email}</span></div><em>Cycle access</em></div>)}</div>}</article>
     </div>

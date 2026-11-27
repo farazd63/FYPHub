@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "../student-supervisor-info.css";
+import { shortGroupLabel } from "../../../lib/displayLabels";
 
 type Group = {
   group_name: string;
@@ -48,7 +49,7 @@ export function StudentSupervisorInfo({ api }: { api: string }) {
       <article className="student-request-card student-supervisor-info__card">
         <h2>Shared group identity</h2>
         <dl className="student-supervisor-info__identity">
-          <div><dt>Workspace</dt><dd className="student-stat-value-clamp" title={group.group_name}>{group.group_name}</dd></div>
+          <div><dt>Workspace</dt><dd className="student-stat-value-clamp" title={group.group_name}>{shortGroupLabel(group.group_name, group.academic_cycle)}</dd></div>
           <div><dt>Shared email</dt><dd>{group.group_email || "Not recorded"}</dd></div>
           <div><dt>Academic cycle</dt><dd>{group.academic_cycle || "Not recorded"}</dd></div>
         </dl>
