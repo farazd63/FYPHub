@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { sortCyclesDesc } from "../../../lib/displayLabels";
 import "./supervisor-selection/supervisor-selection.css";
 import "./supervisor-matching.css";
 
-type Cycle = { id: number; code: string; display_name: string };
+type Cycle = { id: number; code: string; display_name: string; academic_year?: number | string | null; session?: string | null; created_at?: string | null; updated_at?: string | null };
 type Supervisor = {
   id: number;
   name: string;
@@ -64,6 +65,7 @@ export function SupervisorMatching({ api }: { api: string }) {
   const cycle = useMemo(() => cycles.find((item) => String(item.id) === cycleId), [cycles, cycleId]);
   const activeRequest = requests.find((item) => activeStatuses.has(item.status));
   const locked = lock.locked;
+  const visibleSupervisors = cycleId ? supervisors : [];
 
   const loadBase = useCallback(async () => {
     setLoading(true);
@@ -79,10 +81,11 @@ export function SupervisorMatching({ api }: { api: string }) {
         readJson<RequestRecord[]>(requestsResponse, "Supervisor requests could not be loaded."),
         readJson<MatchingLock>(lockResponse, "Supervisor status could not be loaded."),
       ]);
-      setCycles(availableCycles);
+      const orderedCycles = sortCyclesDesc(availableCycles);
+      setCycles(orderedCycles);
       setRequests(mine);
       setLock(currentLock);
-      setCycleId((current) => current || String(availableCycles[0]?.id ?? ""));
+      setCycleId((current) => current || String(orderedCycles[0]?.id ?? ""));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Supervisor selection data could not be loaded.");
     } finally {
@@ -91,14 +94,12 @@ export function SupervisorMatching({ api }: { api: string }) {
   }, [api]);
 
   useEffect(() => {
-    void loadBase();
+    const timer = window.setTimeout(() => void loadBase(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadBase]);
 
   useEffect(() => {
-    if (!cycleId) {
-      setSupervisors([]);
-      return;
-    }
+    if (!cycleId) return;
     const controller = new AbortController();
     void (async () => {
       try {
@@ -155,7 +156,7 @@ export function SupervisorMatching({ api }: { api: string }) {
             <h2>Available supervisors</h2>
             <label>Academic cycle<select className="student-request-input" value={cycleId} onChange={(event) => { setCycleId(event.target.value); setSelected(null); }} disabled={busy || locked || Boolean(activeRequest)}><option value="">Select a cycle</option>{cycles.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}</select></label>
           </div>
-          {!cycles.length ? <p className="student-request-muted">No active academic cycles are available.</p> : !supervisors.length ? <p className="student-request-muted">No supervisors are available for this cycle.</p> : <div className="student-supervisor-list">{supervisors.map((item) => <button key={item.id} type="button" className={`student-supervisor-option ${selected?.id === item.id ? "student-supervisor-option--selected" : ""}`} disabled={!item.available || busy || locked || Boolean(activeRequest)} onClick={() => setSelected(item)}><span><strong>{item.name}</strong><small>{item.assigned_count} assigned · {item.remaining_capacity} remaining</small></span><span className={`student-status ${item.available ? "student-status--partial" : "student-status--future"}`}>{item.available ? "Available" : "Full"}</span></button>)}</div>}
+          {!cycles.length ? <p className="student-request-muted">No active academic cycles are available.</p> : !visibleSupervisors.length ? <p className="student-request-muted">No supervisors are available for this cycle.</p> : <div className="student-supervisor-list">{visibleSupervisors.map((item) => <button key={item.id} type="button" className={`student-supervisor-option ${selected?.id === item.id ? "student-supervisor-option--selected" : ""}`} disabled={!item.available || busy || locked || Boolean(activeRequest)} onClick={() => setSelected(item)}><span><strong>{item.name}</strong><small>{item.assigned_count} assigned · {item.remaining_capacity} remaining</small></span><span className={`student-status ${item.available ? "student-status--partial" : "student-status--future"}`}>{item.available ? "Available" : "Full"}</span></button>)}</div>}
         </article>
         <article className="student-request-card">
           <h2>Generate request</h2>

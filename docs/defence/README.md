@@ -1,6 +1,6 @@
 # FYPHub defence preparation documents
 
-Prepared on 11 November 2026 (Asia/Karachi) from the working repository and read-only inspection of the running database/API.
+Prepared on 27 November 2026 (Asia/Karachi) from the working repository and read-only inspection of the running database/API.
 
 - **FYPHub_Complete_Defence_Guide.pdf** — 145 pages, with 609 PDF bookmarks for chapters, tables, APIs and source files. Best for reading and printing.
 - **FYPHub_Complete_Defence_Guide.docx** — editable Word version with heading navigation, page numbering and repeating table headers.
@@ -8,19 +8,19 @@ Prepared on 11 November 2026 (Asia/Karachi) from the working repository and read
 - **technical-inventory.json** — database catalog, ORM mappings, route handlers/guards, source symbols, imports, migrations and test names. Contains metadata, not student/account records.
 - **preview-cover.png / preview-schema.png** — sample exported PDF pages checked for readability.
 
-The guide contains 20 explanatory chapters plus a reading map and six generated appendices. The inventory covers 352 source/configuration files, 70 installed database tables and 264 registered route entries (including aliases/framework routes). It documents active and older alternatives separately, explains algorithms and data flows, and provides viva questions, a demonstration sequence and read-only SQL examples.
+The guide contains 20 explanatory chapters plus a reading map and six generated appendices. The latest inventory is generated from the current source and database snapshot, including active routes, database tables, migrations, source symbols, imports and tests. It documents active and older alternatives separately, explains algorithms and data flows, and provides viva questions, a demonstration sequence and read-only SQL examples.
 
-Important findings are explained in the guide: multiple Alembic heads, historical tables, incomplete upload-format signatures, frontend navigation gaps, separate proposal/evaluation stores, and deterministic rather than vector-based archive search. Existing runtime health does not prove a clean installation or a passing full test suite.
+Important findings are explained in the guide: historical migration branches and tables, incomplete upload-format signatures, frontend navigation gaps, separate proposal/evaluation stores, and deterministic rather than vector-based archive search. The current database snapshot has one Alembic head; runtime health does not prove a clean installation or a passing full test suite.
 
 ## Verification performed
 
 - No source parsing errors in the indexed Python files.
 - Actual PostgreSQL types, columns, foreign keys, checks, unique constraints and indexes collected in a read-only transaction.
-- PDF opened successfully: 145 pages, no empty content pages, no detected horizontal text clipping.
-- Word document opened successfully: 448 tables / 3,015 table rows; ZIP integrity valid.
+- PDF opened successfully after the current regeneration, with no empty content pages or detected horizontal text clipping.
+- Word document opened successfully after the current regeneration; ZIP integrity valid.
 - Sample pages visually inspected.
 - Private .env values, passwords, session-token values, personal records and student-uploaded documents were not exported.
-- Application behavior and database contents were not changed for this documentation task.
+- The guide generator performs read-only database inspection; cleanup migrations and application changes are tracked separately in the repository.
 
 ## Regenerate after changes
 

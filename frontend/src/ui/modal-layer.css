@@ -1,0 +1,35 @@
+/* Every workflow dialog must sit above the fixed shell and use the viewport
+   as its containing block. The page-entry animation otherwise creates a
+   transformed containing block, which pins inline dialogs below the header. */
+body.fy-modal-open .admin-enter,
+body.fy-modal-open .portal-content__inner,
+body.fy-modal-open .student-content__inner {
+  animation: none !important;
+  transform: none !important;
+}
+
+body.fy-modal-open .admin-shell__header,
+body.fy-modal-open .admin-sidebar,
+body.fy-modal-open .role-sidebar {
+  pointer-events: none !important;
+}
+
+:where(
+  [role="dialog"][aria-modal="true"].fixed.inset-0,
+  .fixed.inset-0[role="presentation"]:has(> [role="dialog"][aria-modal="true"])
+) {
+  z-index: 1000 !important;
+}
+
+:where([role="dialog"][aria-modal="true"]:not(.portal-document-preview)) {
+  isolation: isolate;
+}
+
+:where([role="dialog"][aria-modal="true"]:not(.portal-document-preview)):focus-within {
+  outline: 2px solid var(--fy-brand, #1d4ed8);
+  outline-offset: 4px;
+}
+
+.fy-modal {
+  z-index: 1000;
+}

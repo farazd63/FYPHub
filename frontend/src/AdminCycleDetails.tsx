@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { BackButton, StatusBadge } from "./ui";
-import { shortGroupLabel } from "./lib/displayLabels";
+import { StatusBadge } from "./ui";
+import { shortGroupLabel, sortGroupsDesc } from "./lib/displayLabels";
 import "./AdminOverview.css";
 
 type Person = { id: number; name: string; full_name?: string; email: string; registration_number?: string | null };
@@ -17,34 +17,36 @@ type CycleDetail = {
 const dateText = (value: string | null | undefined) => value ? new Date(value).toLocaleDateString() : "Not recorded";
 const personName = (person: Person | null | undefined) => person?.name || person?.full_name || "Not assigned";
 
-export function AdminCycleDetails({ api, cycleId, onBack }: { api: string; cycleId: number; onBack: () => void }) {
+export function AdminCycleDetails({ api, cycleId }: { api: string; cycleId: number }) {
   const [detail, setDetail] = useState<CycleDetail | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    setState("loading");
-    setDetail(null);
-    setError("");
-    void fetch(`${api}/api/v1/academic-cycles/${cycleId}/overview`, { credentials: "include" })
-      .then(async (response) => {
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Cycle details could not be loaded.");
-        return body as CycleDetail;
-      })
-      .then((body) => {
-        if (!cancelled) { setDetail(body); setState("ready"); }
-      })
-      .catch((reason: unknown) => {
-        if (!cancelled) { setError(reason instanceof Error ? reason.message : "Cycle details could not be loaded."); setState("error"); }
-      });
-    return () => { cancelled = true; };
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      setState("loading");
+      setDetail(null);
+      setError("");
+      void fetch(`${api}/api/v1/academic-cycles/${cycleId}/overview`, { credentials: "include" })
+        .then(async (response) => {
+          const body = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Cycle details could not be loaded.");
+          return body as CycleDetail;
+        })
+        .then((body) => {
+          if (!cancelled) { setDetail(body); setState("ready"); }
+        })
+        .catch((reason: unknown) => {
+          if (!cancelled) { setError(reason instanceof Error ? reason.message : "Cycle details could not be loaded."); setState("error"); }
+        });
+    }, 0);
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, [api, cycleId]);
 
   return <section className="cycle-detail-page" aria-labelledby="cycle-detail-page-heading">
     <div className="cycle-detail-page__topbar">
-      <BackButton className="cycle-detail-page__back" onClick={onBack}>Back to cycle overview</BackButton>
       {detail && <StatusBadge status={detail.cycle.registration_open ? "OPEN" : "CLOSED"} />}
     </div>
     <div className="cycle-detail-page__heading">
@@ -59,7 +61,7 @@ export function AdminCycleDetails({ api, cycleId, onBack }: { api: string; cycle
 }
 
 function CycleDetailWorkspace({ detail }: { detail: CycleDetail }) {
-  const displayGroups = detail.groups.map((group) => ({
+  const displayGroups = sortGroupsDesc(detail.groups.map((group) => ({ ...group, academic_cycle: detail.cycle.display_name }))).map((group) => ({
     ...group,
     name: shortGroupLabel(group.name, detail.cycle.display_name),
   }));

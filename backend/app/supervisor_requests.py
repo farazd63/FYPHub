@@ -10,16 +10,19 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
-from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy import and_, case, desc, func, or_, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .auth import get_current_user, require_roles, utc_now, validate_mutating_origin
+from .academic_cycle_lifecycle import close_expired_cycle, close_expired_cycles
+from .cycle_ordering import sort_cycles_desc
 from .collaboration_channels import ensure_collaboration_channel
 from .database import get_db
 from .config import settings
 from .pdf_extraction import EXTRACTION_RUNTIME, PdfExtractionError, extract_proposal_document
 from .notification_service import notify, notify_admins, team_student_ids
+from .group_display import visible_group_name, visible_group_number
 from .models import (
     AcademicCycle,
     SupervisorAssignment,
@@ -42,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/supervisor-requests")
 proposal_router = APIRouter(prefix="/api/v1/proposals")
+matching_router = APIRouter(prefix="/api/v1/supervisor-matching", tags=["supervisor-selection"])
 
 ACTIVE_REQUEST_STATUSES = (
     SupervisorRequestStatus.DRAFT.value,
@@ -227,6 +231,30 @@ def _team_for_student(session: Session, actor: User, *, lock: bool = False) -> T
     return session.execute(statement).scalars().first()
 
 
+@matching_router.get("/lock-status")
+def supervisor_selection_lock_status(actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)) -> dict[str, object]:
+    """Expose only the lock needed by the active manual supervisor-selection UI."""
+
+    team = _team_for_student(session, actor)
+    ownership = or_(SupervisorRequest.requester_user_id == actor.id, SupervisorRequest.team_id == team.id) if team else SupervisorRequest.requester_user_id == actor.id
+    accepted = session.scalar(
+        select(SupervisorRequest)
+        .where(ownership, SupervisorRequest.status == SupervisorRequestStatus.ACCEPTED.value)
+        .order_by(desc(SupervisorRequest.reviewed_at), desc(SupervisorRequest.id))
+        .limit(1)
+    )
+    supervisor = session.get(User, accepted.supervisor_id) if accepted is not None else None
+    return {
+        "locked": accepted is not None,
+        "request_id": accepted.id if accepted is not None else None,
+        "assignment_id": accepted.assignment_id if accepted is not None else None,
+        "supervisor_id": accepted.supervisor_id if accepted is not None else None,
+        "supervisor_name": supervisor.full_name if supervisor is not None else None,
+        "accepted_at": accepted.reviewed_at if accepted is not None else None,
+        "message": "Supervisor selection is locked because your supervisor request was accepted." if accepted is not None else None,
+    }
+
+
 def _active_request_for_owner(
     session: Session,
     *,
@@ -281,6 +309,7 @@ def _cycle_for_request(session: Session, cycle_id: int, *, lock: bool = False, r
         raise failure("academic_cycle_not_found", "Academic cycle was not found.", status.HTTP_404_NOT_FOUND)
     if cycle.academic_year is None or not cycle.session:
         raise failure("academic_cycle_metadata_missing", "Ask an administrator to configure this academic cycle's year and session before sending a supervisor request.", status.HTTP_422_UNPROCESSABLE_CONTENT)
+    close_expired_cycle(session, cycle, commit=True)
     if require_open and not cycle.registration_open:
         raise failure("academic_cycle_closed", "This academic cycle is not accepting supervisor requests.")
     return cycle
@@ -290,9 +319,11 @@ def _lock_capacity(session: Session, supervisor_id: int, cycle_id: int) -> tuple
     supervisor = session.execute(
         select(User).where(User.id == supervisor_id).with_for_update()
     ).scalar_one_or_none()
-    if supervisor is None or supervisor.role != UserRole.SUPERVISOR or not supervisor.is_active:
-        raise failure("supervisor_ineligible", "The selected supervisor is not active.")
     cycle = session.get(AcademicCycle, cycle_id)
+    if supervisor is None or supervisor.role not in (UserRole.SUPERVISOR, UserRole.COORDINATOR) or not supervisor.is_active:
+        raise failure("supervisor_ineligible", "The selected supervisor is not active.")
+    if supervisor.role == UserRole.COORDINATOR and (cycle is None or cycle.coordinator_id != supervisor.id):
+        raise failure("supervisor_ineligible", "This coordinator is assigned to a different academic cycle.")
     policy = session.execute(
         select(SupervisorCapacityPolicy)
         .where(
@@ -497,6 +528,8 @@ def _out(session: Session, row: SupervisorRequest, *, include_history: bool = Tr
         "requester_name": requester.full_name if requester else None,
         "requester_registration_number": requester.registration_number if requester else None,
         "team_id": team.id if team else None,
+        "group_number": visible_group_number(session, team) if team else None,
+        "group_name": visible_group_name(session, team, cycle) if team else None,
         "group_email": shared_user.email if shared_user else None,
         "group_members": [{"id": member.id, "name": member.full_name, "registration_number": member.registration_number, "email": member.university_email} for member in members],
         "supervisor_id": row.supervisor_id,
@@ -525,10 +558,6 @@ def _out(session: Session, row: SupervisorRequest, *, include_history: bool = Tr
         "extraction_status": row.extraction_status,
         "proposal_submission_id": row.proposal_submission_id,
         "proposal_version_number": row.proposal_version_number,
-        "match_result_id": row.match_result_id,
-        "match_score": row.match_score,
-        "match_explanation": row.match_explanation,
-        "matching_algorithm_version": row.matching_algorithm_version,
         "document": _document_out(session, row),
     }
     if include_history:
@@ -546,9 +575,8 @@ def _load_for_view(session: Session, request_id: int) -> SupervisorRequest:
 @router.get("/cycles")
 @proposal_router.get("/cycles")
 def active_cycles(_: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
-    cycles = session.scalars(
-        select(AcademicCycle).where(AcademicCycle.registration_open.is_(True)).order_by(AcademicCycle.display_name, AcademicCycle.id)
-    ).all()
+    close_expired_cycles(session)
+    cycles = sort_cycles_desc(session.scalars(select(AcademicCycle).where(AcademicCycle.registration_open.is_(True))).all())
     return [{"id": cycle.id, "code": cycle.code, "display_name": cycle.display_name} for cycle in cycles]
 
 
@@ -565,7 +593,7 @@ def eligible_supervisors(
         .join(User, User.id == SupervisorCapacityPolicy.supervisor_id)
         .where(
             or_(SupervisorCapacityPolicy.academic_year == cycle.academic_year, SupervisorCapacityPolicy.academic_cycle_id == cycle.id) if cycle.academic_year is not None else SupervisorCapacityPolicy.academic_cycle_id == cycle.id,
-            User.role == UserRole.SUPERVISOR,
+            or_(User.role == UserRole.SUPERVISOR, and_(User.role == UserRole.COORDINATOR, User.id == cycle.coordinator_id)),
             User.is_active.is_(True),
         )
         .order_by(User.full_name, User.id)
@@ -616,7 +644,7 @@ def create_manual_request(
             raise failure("duplicate_active_request", "This group already has an active supervisor request for this cycle. Resolve it before sending another request.")
         supervisor, policy = _lock_capacity(session, payload.supervisor_id, cycle.id)
         _ensure_capacity(session, supervisor.id, cycle.id, policy)
-        group_label = team.group_name if team and team.group_name else actor.full_name
+        group_label = visible_group_name(session, team) if team else actor.full_name
         row = SupervisorRequest(
             academic_cycle_id=cycle.id,
             requester_user_id=actor.id,
@@ -785,7 +813,7 @@ async def create_request(
             "document_version": document.version,
             "status": row.status,
         }
-        group_label = team.group_name if team and team.group_name else actor.full_name
+        group_label = visible_group_name(session, team) if team else actor.full_name
         notify(
             session,
             {supervisor.id},
@@ -875,7 +903,7 @@ async def update_draft_document(
         _audit_document(session, actor, row, "supervisor_request_document_uploaded", document)
         _audit_document(session, actor, row, "supervisor_request_extracted", document)
         team = session.get(Team, row.team_id) if row.team_id is not None else None
-        group_label = team.group_name if team and team.group_name else actor.full_name
+        group_label = visible_group_name(session, team) if team else actor.full_name
         request_payload = {
             "request_id": row.id,
             "team_id": row.team_id,
@@ -1014,7 +1042,7 @@ def submit_request(
         _append_history(session, row, actor, row.status)
         _audit(session, actor, row, "supervisor_request_resubmitted" if previous == SupervisorRequestStatus.CHANGES_REQUESTED.value else "supervisor_request_submitted", previous_status=previous)
         team = session.get(Team, row.team_id) if row.team_id is not None else None
-        group_label = team.group_name if team and team.group_name else actor.full_name
+        group_label = visible_group_name(session, team) if team else actor.full_name
         request_payload = {
             "request_id": row.id,
             "team_id": row.team_id,
@@ -1077,7 +1105,7 @@ def withdraw_request(
         _append_history(session, row, actor, row.status)
         _audit(session, actor, row, "supervisor_request_withdrawn", previous_status=previous)
         team = session.get(Team, row.team_id) if row.team_id is not None else None
-        group_label = team.group_name if team and team.group_name else actor.full_name
+        group_label = visible_group_name(session, team) if team else actor.full_name
         request_payload = {
             "request_id": row.id,
             "team_id": row.team_id,
@@ -1119,7 +1147,7 @@ def withdraw_request(
 @router.get("/supervisor/queue")
 def supervisor_queue(
     status_filter: str | None = Query(None, alias="status"),
-    actor: User = Depends(require_roles(UserRole.SUPERVISOR)),
+    actor: User = Depends(require_roles(UserRole.SUPERVISOR, UserRole.COORDINATOR)),
     session: Session = Depends(get_db),
 ):
     statement = select(SupervisorRequest).where(SupervisorRequest.supervisor_id == actor.id)
@@ -1149,7 +1177,7 @@ def decide_request(
     request_id: int,
     payload: DecisionAction,
     request: Request,
-    actor: User = Depends(require_roles(UserRole.SUPERVISOR)),
+    actor: User = Depends(require_roles(UserRole.SUPERVISOR, UserRole.COORDINATOR)),
     session: Session = Depends(get_db),
 ):
     validate_mutating_origin(request)
@@ -1164,9 +1192,9 @@ def decide_request(
         if row.revision != payload.revision:
             raise failure("stale_request", "This request changed elsewhere; reload it before deciding.")
         if payload.action == "accept":
-            # Closing registration blocks new submissions, not a supervisor's
-            # decision on an already submitted, owned request.
-            cycle = _cycle_for_request(session, row.academic_cycle_id, lock=True, require_open=False)
+            # Acceptance is part of the registration workflow and is closed at
+            # the same deadline as new submissions.
+            cycle = _cycle_for_request(session, row.academic_cycle_id, lock=True)
             team = session.execute(
                 select(Team)
                 .where(Team.id == row.team_id, Team.academic_cycle_id == cycle.id)
@@ -1221,7 +1249,7 @@ def decide_request(
         _append_history(session, row, actor, target, payload.comment)
         _audit(session, actor, row, {"accept": "supervisor_request_accepted", "reject": "supervisor_request_rejected", "request_changes": "supervisor_request_changes_requested"}[payload.action], previous_status=previous, comment=payload.comment)
         notification_team = session.get(Team, row.team_id) if row.team_id is not None else None
-        group_label = notification_team.group_name if notification_team and notification_team.group_name else f"Group {row.team_id}" if row.team_id else session.get(User, row.requester_user_id).full_name
+        group_label = visible_group_name(session, notification_team) if notification_team else session.get(User, row.requester_user_id).full_name
         student_recipients = team_student_ids(session, row.team_id) if row.team_id is not None else {row.requester_user_id}
         student_recipients.add(row.requester_user_id)
         decision_title = {

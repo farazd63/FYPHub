@@ -18,6 +18,8 @@ class AdminUserResponse(BaseModel):
     role: UserRole
     is_active: bool
     created_at: datetime
+    coordinator_academic_cycle_id: int | None = None
+    coordinator_academic_cycle_name: str | None = None
     verification_token: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -38,6 +40,7 @@ class AdminUserCreate(BaseModel):
     password: str
     role: UserRole
     registration_number: str | None = None
+    coordinator_academic_cycle_id: int | None = None
 
     @field_validator("email", mode="before")
     @classmethod
@@ -72,6 +75,10 @@ class AdminUserCreate(BaseModel):
     def student_has_registration(self) -> "AdminUserCreate":
         if self.role == UserRole.STUDENT and self.registration_number is None:
             raise ValueError("registration_number is required for STUDENT accounts.")
+        if self.role == UserRole.COORDINATOR and self.coordinator_academic_cycle_id is None:
+            raise ValueError("coordinator_academic_cycle_id is required for COORDINATOR accounts.")
+        if self.role != UserRole.COORDINATOR and self.coordinator_academic_cycle_id is not None:
+            raise ValueError("coordinator_academic_cycle_id is only valid for COORDINATOR accounts.")
         return self
 
 
@@ -84,6 +91,7 @@ class AdminUserUpdate(BaseModel):
     email: EmailStr
     registration_number: str | None = None
     role: UserRole
+    coordinator_academic_cycle_id: int | None = None
 
     @field_validator("email", mode="before")
     @classmethod
@@ -109,6 +117,10 @@ class AdminUserUpdate(BaseModel):
     def student_has_registration(self) -> "AdminUserUpdate":
         if self.role == UserRole.STUDENT and self.registration_number is None:
             raise ValueError("registration_number is required for STUDENT accounts.")
+        if self.role == UserRole.COORDINATOR and self.coordinator_academic_cycle_id is None:
+            raise ValueError("coordinator_academic_cycle_id is required for COORDINATOR accounts.")
+        if self.role != UserRole.COORDINATOR and self.coordinator_academic_cycle_id is not None:
+            raise ValueError("coordinator_academic_cycle_id is only valid for COORDINATOR accounts.")
         return self
 
 

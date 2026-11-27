@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from sqlalchemy import delete, func, or_, select, text, update
+from sqlalchemy import case, delete, func, or_, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -55,6 +55,9 @@ from .auth import (
 from .institutions import router as institutions_router
 from .tenant import ensure_access_ready, is_platform_admin, issue_email_verification_token, primary_institution_id, resolve_registration_institution, send_email_verification, set_tenant_context
 from .team_naming import cycle_period, generated_group_name
+from .group_display import visible_group_name, visible_group_number
+from .cycle_ordering import sort_cycles_desc
+from .academic_cycle_lifecycle import close_expired_cycle, close_expired_cycles, deadline_has_passed
 from .notification_service import notify, notify_admins, team_student_ids, team_supervisor_ids
 
 app = FastAPI(title="FYPHub API")
@@ -273,10 +276,12 @@ def normalize_team_member(member: TeamMemberInput, path: str) -> dict[str, str |
 
 @app.get("/api/v1/academic-cycles",response_model=list[CycleOut])
 def list_cycles(session:Session=Depends(get_db))->list[AcademicCycle]:
- return list(session.query(AcademicCycle).order_by(AcademicCycle.id).all())
+ close_expired_cycles(session)
+ return sort_cycles_desc(session.query(AcademicCycle).all())
 
 @app.get("/api/v1/academic-cycles/{cycle_id}/group-policy",response_model=PolicyOut)
 def get_group_policy(cycle_id:int,session:Session=Depends(get_db))->AcademicGroupPolicy:
+ close_expired_cycles(session, cycle_id=cycle_id)
  cycle=session.get(AcademicCycle,cycle_id)
  if cycle is None: raise HTTPException(status_code=404,detail="Academic cycle not found.")
  if cycle.group_policy is None: raise HTTPException(status_code=404,detail="Academic group policy not configured.")
@@ -889,6 +894,7 @@ def create_cycle(payload: CycleCreate, request: Request, actor: User = Depends(r
 def update_cycle(cycle_id: int, payload: CycleUpdate, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> AcademicCycle:
     validate_mutating_origin(request)
     cycle, policy = locked_cycle_and_policy(session, cycle_id)
+    close_expired_cycle(session, cycle, policy=policy, commit=True)
     values = payload.model_dump(exclude_unset=True)
     if "session" in values:
         values["session"] = payload.session.value
@@ -898,6 +904,8 @@ def update_cycle(cycle_id: int, payload: CycleUpdate, request: Request, actor: U
         raise cycle_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "academic_cycle_metadata_missing", "Set the academic year and session before opening registration.")
     if values.get("registration_open") and policy is None:
         raise cycle_error(status.HTTP_409_CONFLICT, "group_policy_required", "Registration cannot open without a group-size policy.")
+    if values.get("registration_open") and policy is not None and deadline_has_passed(policy.formation_deadline):
+        raise cycle_error(status.HTTP_409_CONFLICT, "registration_deadline_passed", "Registration cannot be reopened after the formation deadline has passed. Extend the deadline first.")
     if not values:
         return cycle
     before = {key: getattr(cycle, key) for key in values}
@@ -951,6 +959,8 @@ def set_group_policy(cycle_id: int, payload: PolicyUpdate, request: Request, act
         policy = AcademicGroupPolicy(academic_cycle_id=cycle.id, max_group_size=payload.max_group_size, min_group_size=payload.min_group_size, formation_deadline=payload.formation_deadline, matching_weights=payload.matching_weights); session.add(policy); session.flush()
     else:
         previous = policy.max_group_size; policy.max_group_size = payload.max_group_size; policy.min_group_size = payload.min_group_size; policy.formation_deadline = payload.formation_deadline; policy.matching_weights = payload.matching_weights
+    if cycle.registration_open and deadline_has_passed(policy.formation_deadline):
+        cycle.registration_open = False
     add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="ACADEMIC_GROUP_POLICY", target_id=policy.id, action="group_policy_created" if created else "group_policy_updated", changed_values={"academic_cycle_id": cycle.id, "max_group_size": payload.max_group_size, "previous_max_group_size": None if created else previous})
     session.commit(); session.refresh(policy)
     return policy
@@ -962,6 +972,7 @@ def delete_group_policy(cycle_id: int, request: Request, actor: User = Depends(r
     cycle, policy = locked_cycle_and_policy(session, cycle_id)
     if policy is None:
         raise cycle_error(status.HTTP_404_NOT_FOUND, "group_policy_not_found", "No group-size policy exists for this academic cycle.")
+    close_expired_cycle(session, cycle, policy=policy, commit=True)
     if cycle.registration_open:
         raise cycle_error(status.HTTP_409_CONFLICT, "group_policy_in_use", "Close registration before deleting the group-size policy.")
     if largest_active_team_size(session, cycle.id) > 0:
@@ -1117,7 +1128,7 @@ def account_response(session: Session, user: User) -> dict[str, object]:
     ).scalars().all() if team is not None else []
     visible_group_number = cycle_group_number(session, team) if team is not None else None
     group_name = (
-        team.group_name or f"Group {visible_group_number or '—'}"
+        visible_group_name(session, team, cycle)
         if team is not None
         else None
     )
@@ -1218,6 +1229,57 @@ def add_admin_audit_event(
 
 def shared_team_account(session: Session, user_id: int) -> bool:
     return session.execute(select(Team.id).where(Team.shared_user_id == user_id)).scalar_one_or_none() is not None
+
+
+def lock_coordinator_cycle(
+    session: Session,
+    cycle_id: int,
+    *,
+    coordinator_id: int | None = None,
+    require_open: bool = True,
+) -> AcademicCycle:
+    """Lock and validate the single cycle assignment for a coordinator."""
+    cycle = session.execute(
+        select(AcademicCycle).where(AcademicCycle.id == cycle_id).with_for_update()
+    ).scalar_one_or_none()
+    if cycle is None:
+        raise admin_user_error(status.HTTP_404_NOT_FOUND, "academic_cycle_not_found", "Academic cycle was not found.")
+    if require_open and not cycle.registration_open:
+        raise admin_user_error(
+            status.HTTP_409_CONFLICT,
+            "academic_cycle_closed",
+            "A coordinator can only be assigned to an academic cycle while registration is open.",
+        )
+    if cycle.coordinator_id is not None and cycle.coordinator_id != coordinator_id:
+        raise admin_user_error(
+            status.HTTP_409_CONFLICT,
+            "cycle_coordinator_exists",
+            "This academic cycle already has a coordinator.",
+        )
+    if coordinator_id is not None:
+        other_cycle = session.execute(
+            select(AcademicCycle)
+            .where(AcademicCycle.coordinator_id == coordinator_id, AcademicCycle.id != cycle_id)
+            .with_for_update()
+        ).scalar_one_or_none()
+        if other_cycle is not None:
+            raise admin_user_error(
+                status.HTTP_409_CONFLICT,
+                "coordinator_cycle_exists",
+                "A coordinator can be assigned to only one academic cycle.",
+            )
+    return cycle
+
+
+def admin_user_response(session: Session, user: User) -> AdminUserResponse:
+    result = AdminUserResponse.model_validate(user)
+    cycle = session.scalar(select(AcademicCycle).where(AcademicCycle.coordinator_id == user.id))
+    return result.model_copy(
+        update={
+            "coordinator_academic_cycle_id": cycle.id if cycle else None,
+            "coordinator_academic_cycle_name": cycle.display_name if cycle else None,
+        }
+    )
 
 
 def lock_and_protect_last_active_admin(session: Session, user: User, *, will_remain_active_admin: bool) -> None:
@@ -1383,12 +1445,12 @@ def list_admin_users(
             select(Team).where(Team.shared_user_id.in_(student_ids)).order_by(Team.id)
         ).all()
         group_names = {
-            team.shared_user_id: team.group_name or f"Group {team.group_number or '—'}"
+            team.shared_user_id: visible_group_name(session, team)
             for team in teams
         }
     items = []
     for user in users:
-        item = AdminUserResponse.model_validate(user).model_dump()
+        item = admin_user_response(session, user).model_dump()
         if user.role == UserRole.STUDENT:
             item["group_name"] = group_names.get(user.id, "Student group")
         items.append(item)
@@ -1413,6 +1475,11 @@ def create_admin_user(
         raise admin_user_error(status.HTTP_422_UNPROCESSABLE_CONTENT, "institution_domain_invalid", str(error.detail)) from error
     if not is_platform_admin(actor) and institution.id != actor.institution_id:
         raise admin_user_error(status.HTTP_403_FORBIDDEN, "institution_scope", "You can only create accounts in your own institution.")
+    coordinator_cycle = (
+        lock_coordinator_cycle(session, payload.coordinator_academic_cycle_id)
+        if payload.role == UserRole.COORDINATOR and payload.coordinator_academic_cycle_id is not None
+        else None
+    )
     approved_at = utc_now()
     user = User(
         full_name=payload.full_name,
@@ -1427,6 +1494,8 @@ def create_admin_user(
     session.add(user)
     try:
         session.flush()
+        if coordinator_cycle is not None:
+            coordinator_cycle.coordinator_id = user.id
         session.add(
             InstitutionMembership(
                 institution_id=institution.id,
@@ -1452,7 +1521,7 @@ def create_admin_user(
         session.rollback()
         raise admin_user_error(status.HTTP_409_CONFLICT, "duplicate_account", "An account with that email or registration number already exists.") from error
     send_email_verification(user.email, verification_token)
-    result = AdminUserResponse.model_validate(user)
+    result = admin_user_response(session, user)
     if settings.app_env in {"dev", "development", "local"}:
         result.verification_token = verification_token
     return result
@@ -1587,11 +1656,34 @@ def update_admin_user(
         raise admin_user_error(status.HTTP_409_CONFLICT, "shared_team_account", "Shared team account roles cannot be changed here.")
     if user.role == UserRole.ADMIN and payload.role != UserRole.ADMIN:
         lock_and_protect_last_active_admin(session, user, will_remain_active_admin=False)
+    current_coordinator_cycle = session.execute(
+        select(AcademicCycle)
+        .where(AcademicCycle.coordinator_id == user.id)
+        .with_for_update()
+    ).scalar_one_or_none()
+    previous_coordinator_cycle_id = current_coordinator_cycle.id if current_coordinator_cycle else None
+    target_coordinator_cycle = None
+    if payload.role == UserRole.COORDINATOR and payload.coordinator_academic_cycle_id is not None:
+        target_coordinator_cycle = lock_coordinator_cycle(
+            session,
+            payload.coordinator_academic_cycle_id,
+            coordinator_id=user.id,
+            require_open=not (
+                current_coordinator_cycle is not None
+                and current_coordinator_cycle.id == payload.coordinator_academic_cycle_id
+            ),
+        )
+        if current_coordinator_cycle is not None and current_coordinator_cycle.id != target_coordinator_cycle.id:
+            current_coordinator_cycle.coordinator_id = None
+        target_coordinator_cycle.coordinator_id = user.id
+    elif current_coordinator_cycle is not None:
+        current_coordinator_cycle.coordinator_id = None
     previous = {
         "full_name": user.full_name,
         "email": user.email,
         "registration_number": user.registration_number,
         "role": user.role.value,
+        "coordinator_academic_cycle_id": previous_coordinator_cycle_id,
     }
     new_email = str(payload.email).strip().lower()
     verification_token = None
@@ -1625,6 +1717,7 @@ def update_admin_user(
         "email": user.email,
         "registration_number": user.registration_number,
         "role": user.role.value,
+        "coordinator_academic_cycle_id": target_coordinator_cycle.id if target_coordinator_cycle else None,
     }
     changed = {key: value for key, value in current.items() if previous[key] != value}
     if not changed:
@@ -1648,7 +1741,7 @@ def update_admin_user(
         raise
     if verification_token is not None:
         send_email_verification(user.email, verification_token)
-    result = AdminUserResponse.model_validate(user)
+    result = admin_user_response(session, user)
     if verification_token is not None and settings.app_env in {"dev", "development", "local"}:
         result.verification_token = verification_token
     return result
@@ -1790,13 +1883,13 @@ def list_supervisor_capacities(
 
 @app.get("/api/v1/supervisor/capacity")
 def supervisor_capacity_workspace(
-    actor: User = Depends(require_roles(UserRole.SUPERVISOR)), session: Session = Depends(get_db)
+    actor: User = Depends(require_roles(UserRole.SUPERVISOR, UserRole.COORDINATOR)), session: Session = Depends(get_db)
 ) -> list[dict[str, object]]:
     """Return the signed-in supervisor's read-only annual capacity and assignment detail."""
     policies = session.scalars(
         select(SupervisorCapacityPolicy)
         .where(SupervisorCapacityPolicy.supervisor_id == actor.id)
-        .order_by(SupervisorCapacityPolicy.academic_year, SupervisorCapacityPolicy.id)
+        .order_by(SupervisorCapacityPolicy.academic_year.desc().nullslast(), SupervisorCapacityPolicy.id.desc())
     ).all()
     result: list[dict[str, object]] = []
     for policy in policies:
@@ -1812,12 +1905,14 @@ def supervisor_capacity_workspace(
                 (SupervisorAssignment.academic_year == academic_year)
                 | ((SupervisorAssignment.academic_year.is_(None)) & (AcademicCycle.academic_year == academic_year)),
             )
-            .order_by(AcademicCycle.academic_year, AcademicCycle.session, Team.id)
+            .order_by(AcademicCycle.academic_year.desc().nullslast(), case((AcademicCycle.session == "FALL", 2), (AcademicCycle.session == "SPRING", 1), else_=0).desc(), Team.updated_at.desc(), Team.group_number.desc().nullslast(), Team.id.desc())
         ).all() if academic_year is not None else []
         item["assignments"] = [
             {
                 "assignment_id": assignment.id,
                 "team_id": team.id,
+                "group_number": visible_group_number(session, team),
+                "group_name": visible_group_name(session, team, cycle),
                 "academic_cycle_id": cycle.id,
                 "academic_cycle": cycle.display_name,
                 "academic_year": assignment.academic_year or cycle.academic_year,
@@ -2084,6 +2179,18 @@ def register_team(
                 "Academic cycle was not found.",
                 "academic_cycle_id",
             )
+        policy = session.execute(
+            select(AcademicGroupPolicy)
+            .where(AcademicGroupPolicy.academic_cycle_id == cycle.id)
+            .with_for_update()
+        ).scalar_one_or_none()
+        if close_expired_cycle(session, cycle, policy=policy, commit=True):
+            raise registration_error(
+                status.HTTP_409_CONFLICT,
+                "registration_deadline_passed",
+                "Registration is closed because the formation deadline has passed.",
+                "academic_cycle_id",
+            )
         if not cycle.registration_open:
             raise registration_error(
                 status.HTTP_409_CONFLICT,
@@ -2091,12 +2198,6 @@ def register_team(
                 "Registration is not open for this academic cycle.",
                 "academic_cycle_id",
             )
-
-        policy = session.execute(
-            select(AcademicGroupPolicy)
-            .where(AcademicGroupPolicy.academic_cycle_id == cycle.id)
-            .with_for_update()
-        ).scalar_one_or_none()
         if policy is None:
             raise registration_error(
                 status.HTTP_409_CONFLICT,
@@ -2308,15 +2409,8 @@ def register_student_group(
 
 
 def cycle_group_number(session: Session, team: Team) -> int | None:
-    """Return the stable visible number, with a legacy-row fallback."""
-    if team.group_number is not None:
-        return team.group_number
-    if team.created_at is None:
-        return None
-    return session.scalar(select(func.count(Team.id)).where(
-        Team.academic_cycle_id == team.academic_cycle_id,
-        or_(Team.created_at < team.created_at, (Team.created_at == team.created_at) & (Team.id <= team.id)),
-    )) or None
+    """Compatibility wrapper for the shared cycle-local display number."""
+    return visible_group_number(session, team)
 
 
 def student_group_detail(session: Session, team: Team) -> dict[str, object]:
@@ -2353,7 +2447,7 @@ def student_group_detail(session: Session, team: Team) -> dict[str, object]:
         "group_id": team.id,
         "group_number": visible_group_number,
         "group_code": f"{cycle.code}-{visible_group_number}" if cycle and visible_group_number is not None else None,
-        "group_name": team.group_name or generated_group_name(cycle, visible_group_number),
+        "group_name": visible_group_name(session, team, cycle),
         "group_name_assigned": True,
         "group_email": account.email if account else None,
         "academic_cycle_id": team.academic_cycle_id,
@@ -2556,7 +2650,7 @@ def add_student_group_member(
         )
         session.add(member)
         session.flush()
-        group_label = group.group_name or f"Group {group.group_number if group.group_number is not None else group.id}"
+        group_label = visible_group_name(session, group)
         member_payload = {"team_id": group.id, "cycle_id": group.academic_cycle_id, "member_id": member.id}
         notify(session, {account.id}, kind="GROUP_MEMBER_ADDED", title="New group member added", message=f"An administrator added {member.full_name} to {group_label}.", path="/student", exclude={actor.id}, **member_payload)
         notify(session, team_supervisor_ids(session, group.id), kind="GROUP_MEMBER_ADDED", title="Group membership updated", message=f"An administrator added {member.full_name} to {group_label}.", path=f"/supervisor/groups/{group.id}?tab=members", exclude={actor.id}, **member_payload)
@@ -2650,7 +2744,7 @@ def set_student_group_status(
     account.is_active = active
     if not active:
         revoke_user_sessions(session, account.id)
-    group_label = group.group_name or f"Group {group.group_number if group.group_number is not None else group.id}"
+    group_label = visible_group_name(session, group)
     status_payload = {"team_id": group.id, "cycle_id": group.academic_cycle_id, "group_id": group.id, "status": "ACTIVE" if active else "INACTIVE"}
     if active:
         notify(session, team_student_ids(session, group.id), kind="STUDENT_GROUP_ACTIVATED", title="Group access approved", message=f"{group_label} was approved and is now active.", path="/student", exclude={actor.id}, **status_payload)
@@ -2721,16 +2815,6 @@ def _delete_student_group_records(session: Session, group_id: int, account_id: i
            )
     """), params)
 
-    # Agent runs and request children reference requests with RESTRICT.
-    session.execute(text("""
-        DELETE FROM supervision_agent_runs
-        WHERE team_id = :group_id
-           OR created_by_id = :account_id
-           OR proposal_request_id IN (
-                SELECT id FROM supervisor_requests
-                WHERE team_id = :group_id OR requester_user_id = :account_id
-           )
-    """), params)
     session.execute(text("""
         UPDATE supervisor_requests
         SET document_id = NULL
@@ -2773,10 +2857,6 @@ def _delete_student_group_records(session: Session, group_id: int, account_id: i
         DELETE FROM collaboration_channels
         WHERE team_id = :group_id
     """), params)
-    session.execute(text("DELETE FROM group_messages WHERE team_id = :group_id OR author_id = :account_id"), params)
-    session.execute(text("DELETE FROM module2_channel_reads WHERE team_id = :group_id OR user_id = :account_id"), params)
-    session.execute(text("DELETE FROM module2_chatbot_sessions WHERE team_id = :group_id OR user_id = :account_id"), params)
-
     # Assignments, projects, schedules, and proposals have their own child
     # rows and therefore must be cleared in dependency order.
     session.execute(text("DELETE FROM supervisor_replacement_cases WHERE team_id = :group_id"), params)
@@ -2789,10 +2869,6 @@ def _delete_student_group_records(session: Session, group_id: int, account_id: i
         WHERE schedule_id IN (SELECT id FROM defense_schedules WHERE team_id = :group_id)
     """), params)
     session.execute(text("DELETE FROM defense_schedules WHERE team_id = :group_id"), params)
-    session.execute(text("""
-        DELETE FROM proposal_versions
-        WHERE proposal_id IN (SELECT id FROM proposals WHERE team_id = :group_id)
-    """), params)
     session.execute(text("DELETE FROM proposals WHERE team_id = :group_id"), params)
 
     # Evaluation corrections restrict deletion of the evaluation record.
@@ -3030,10 +3106,6 @@ app.include_router(audit_history_router)
 from .supervisor_assignments import router as supervisor_assignments_router
 app.include_router(supervisor_assignments_router)
 
-from .group_channels import router as group_channels_router
-app.include_router(group_channels_router)
-from .module2_collaboration import router as module2_collaboration_router
-app.include_router(module2_collaboration_router)
 from .collaboration_channels import router as collaboration_channels_router
 app.include_router(collaboration_channels_router)
 from .group_ai import router as group_ai_router
@@ -3044,12 +3116,10 @@ app.include_router(notifications_router)
 from .announcements import router as announcements_router
 app.include_router(announcements_router)
 
-from .supervisor_requests import proposal_router, router as supervisor_requests_router
+from .supervisor_requests import matching_router as supervisor_selection_router, proposal_router, router as supervisor_requests_router
 app.include_router(supervisor_requests_router)
 app.include_router(proposal_router)
-
-from .supervisor_matching import router as supervisor_matching_router
-app.include_router(supervisor_matching_router)
+app.include_router(supervisor_selection_router)
 from .supervisor_replacements import router as supervisor_replacements_router
 app.include_router(supervisor_replacements_router)
 
@@ -3058,9 +3128,6 @@ app.include_router(proposal_reference_router)
 
 from .supervisor_request_conversations import router as supervisor_request_conversations_router
 app.include_router(supervisor_request_conversations_router)
-from .agent_supervision import router as agent_supervision_router
-app.include_router(agent_supervision_router)
-
 from .archived_projects import admin_archive_router, router as archived_projects_router
 app.include_router(archived_projects_router)
 app.include_router(admin_archive_router)
@@ -3072,5 +3139,7 @@ app.include_router(project_workflow_router)
 app.include_router(evaluations_router)
 from .supervisor_workspace import router as supervisor_workspace_router
 app.include_router(supervisor_workspace_router)
+from .supervisor_review import router as supervisor_review_router
+app.include_router(supervisor_review_router)
 from .document_archive import router as document_archive_router
 app.include_router(document_archive_router)

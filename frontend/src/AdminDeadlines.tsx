@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminAddButton } from "./ui/AdminAddButton";
+import { sortCyclesDesc } from "./lib/displayLabels";
 
-type Cycle = { id: number; code: string; display_name: string };
+type Cycle = { id: number; code: string; display_name: string; academic_year?: number | string | null; session?: string | null; created_at?: string | null; updated_at?: string | null };
 type Preview = { local_due_at: string; time_zone: string; utc_offset: string; due_at_utc: string };
 type Summary = Preview & { id: number; academic_cycle_id: number; academic_cycle_name: string; name: string; description: string | null; latest_version_number: number };
 type Version = Preview & { id: number; version_number: number; name: string; description: string | null; created_at: string };
@@ -46,7 +47,7 @@ export function AdminDeadlines({ api }: { api: string }) {
         fetch(`${api}/api/v1/admin/time-zones`, { credentials: "include" }),
       ]);
       if (!cycleResponse.ok || !zoneResponse.ok) throw new Error();
-      setCycles(await cycleResponse.json() as Cycle[]);
+      setCycles(sortCyclesDesc(await cycleResponse.json() as Cycle[]));
       setZones(await zoneResponse.json() as string[]);
       await loadDeadlines("");
       setState("ready");

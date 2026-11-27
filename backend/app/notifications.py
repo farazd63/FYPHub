@@ -7,8 +7,31 @@ from sqlalchemy.orm import Session
 from .auth import get_current_user, utc_now, validate_mutating_origin
 from .database import get_db
 from .models import Module2Notification, User
+from .group_display import visible_group_name
+from .models import Team
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
+
+
+def _payload_for_display(session: Session, row: Module2Notification) -> dict[str, object]:
+    payload = dict(row.payload or {})
+    reference = payload.get("group_id") or payload.get("team_id")
+    try:
+        group_id = int(reference) if reference is not None else 0
+    except (TypeError, ValueError):
+        group_id = 0
+    team = session.get(Team, group_id) if group_id > 0 else None
+    if team is None:
+        return payload
+    label = visible_group_name(session, team)
+    payload["group_label"] = label
+    message = payload.get("message")
+    if isinstance(message, str):
+        for old_label in {team.group_name, f"Group {team.id}", f"Team {team.id}"}:
+            if old_label:
+                message = message.replace(old_label, label)
+        payload["message"] = message
+    return payload
 
 
 @router.get("")
@@ -17,7 +40,7 @@ def notifications(unread_only: bool = False, actor: User = Depends(get_current_u
     if unread_only:
         query = query.where(Module2Notification.read_at.is_(None))
     rows = session.scalars(query.order_by(Module2Notification.id.desc()).limit(100)).all()
-    return [{"id": row.id, "kind": row.kind, "payload": row.payload, "read_at": row.read_at, "created_at": row.created_at} for row in rows]
+    return [{"id": row.id, "kind": row.kind, "payload": _payload_for_display(session, row), "read_at": row.read_at, "created_at": row.created_at} for row in rows]
 
 
 @router.post("/{notification_id}/read")

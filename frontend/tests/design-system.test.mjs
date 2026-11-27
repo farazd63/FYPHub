@@ -8,9 +8,9 @@ test("shared design system is loaded after the base styles", () => {
   const main = read("main.tsx");
   assert.match(main, /import "\.\/index\.css";/);
   assert.match(main, /import "\.\/design-system\.css";/);
-  assert.match(main, /@fontsource\/ibm-plex-sans\/400\.css/);
-  assert.match(main, /@fontsource\/ibm-plex-sans\/600\.css/);
-  assert.match(main, /@fontsource\/ibm-plex-sans\/700\.css/);
+  assert.match(main, /@fontsource\/inter\/400\.css/);
+  assert.match(main, /@fontsource\/inter\/600\.css/);
+  assert.match(main, /@fontsource\/inter\/700\.css/);
   assert.match(main, /ThemeProvider/);
   assert.doesNotMatch(fs.readFileSync(new URL("../index.html", import.meta.url), "utf8"), /fonts\.googleapis\.com/);
   assert.ok(main.indexOf('import "./index.css";') < main.indexOf('import "./design-system.css";'));

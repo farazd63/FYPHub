@@ -9,6 +9,7 @@ from .models import AcademicCycle, CollaborationChannel, SupervisorAssignment, S
 from .team_lifecycle import lock_team
 from .schemas.supervisor_capacity import CapacitySession
 from .notification_service import notify, notify_admins, team_student_ids
+from .group_display import visible_group_name, visible_group_number
 
 router = APIRouter(prefix="/api/v1/admin/supervisor-assignments")
 class AssignmentWrite(BaseModel):
@@ -20,15 +21,16 @@ class AssignmentWrite(BaseModel):
     session: CapacitySession | None = None
 def failure(code, message, status=409):
     return HTTPException(status_code=status, detail={"code": code, "message": message})
-def out(row):
-    return {"id": row.id, "team_id": row.team_id, "academic_cycle_id": row.academic_cycle_id, "academic_year": row.academic_year, "session": row.session, "supervisor_id": row.supervisor_id, "assigned_by_id": row.assigned_by_id, "created_at": row.created_at, "ended_at": row.ended_at, "ended_by_id": row.ended_by_id}
+def out(row, session: Session):
+    team = session.get(Team, row.team_id)
+    return {"id": row.id, "team_id": row.team_id, "group_name": visible_group_name(session, team), "group_number": visible_group_number(session, team) if team else None, "academic_cycle_id": row.academic_cycle_id, "academic_year": row.academic_year, "session": row.session, "supervisor_id": row.supervisor_id, "assigned_by_id": row.assigned_by_id, "created_at": row.created_at, "ended_at": row.ended_at, "ended_by_id": row.ended_by_id}
 @router.get("/teams")
 def teams(academic_cycle_id: int = Query(gt=0), _: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
     rows = session.execute(select(Team, User.full_name).join(User, Team.shared_user_id == User.id).where(Team.academic_cycle_id == academic_cycle_id).order_by(Team.id)).all()
-    return [{"id": team.id, "academic_cycle_id": team.academic_cycle_id, "creator_name": name} for team, name in rows]
+    return [{"id": team.id, "academic_cycle_id": team.academic_cycle_id, "group_name": visible_group_name(session, team), "group_number": visible_group_number(session, team), "creator_name": name} for team, name in rows]
 @router.get("")
 def listing(academic_cycle_id: int = Query(gt=0), _: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
-    return [out(row) for row in session.scalars(select(SupervisorAssignment).where(SupervisorAssignment.academic_cycle_id == academic_cycle_id).order_by(SupervisorAssignment.created_at, SupervisorAssignment.id)).all()]
+    return [out(row, session) for row in session.scalars(select(SupervisorAssignment).where(SupervisorAssignment.academic_cycle_id == academic_cycle_id).order_by(SupervisorAssignment.created_at, SupervisorAssignment.id)).all()]
 @router.post("", status_code=201)
 def assign(payload: AssignmentWrite, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)):
     raise HTTPException(status_code=410, detail={"code": "manual_assignment_retired", "message": "Manual supervisor assignment is retired. Assignments are created when a supervisor accepts a student group request."})
@@ -70,7 +72,7 @@ def assign(payload: AssignmentWrite, request: Request, actor: User = Depends(req
             # Channel opens once the cycle has year/session; assignment still succeeds.
             pass
         add_admin_audit_event(session, actor_id=actor.id, affected_user_id=payload.supervisor_id, target_type="SUPERVISOR_ASSIGNMENT", target_id=assignment.id, action="supervisor_assignment_created", changed_values=payload.model_dump())
-        session.commit(); session.refresh(assignment); return out(assignment)
+        session.commit(); session.refresh(assignment); return out(assignment, session)
     except HTTPException:
         session.rollback(); raise
     except IntegrityError as exc:
@@ -90,7 +92,7 @@ def end(assignment_id: int, request: Request, actor: User = Depends(require_role
         for channel in session.scalars(select(CollaborationChannel).where(CollaborationChannel.assignment_id == row.id, CollaborationChannel.status == "ACTIVE").with_for_update()).all():
             channel.status = "ARCHIVED"
         team = session.get(Team, row.team_id)
-        group_label = team.group_name if team and team.group_name else f"Group {row.team_id}"
+        group_label = visible_group_name(session, team)
         if team is not None:
             team.supervision_status = "UNSUPERVISED"
         payload = {"assignment_id": row.id, "team_id": row.team_id, "cycle_id": row.academic_cycle_id, "supervisor_id": row.supervisor_id, "status": "ENDED"}
@@ -98,7 +100,7 @@ def end(assignment_id: int, request: Request, actor: User = Depends(require_role
         notify(session, {row.supervisor_id}, kind="SUPERVISOR_ASSIGNMENT_ENDED", title="Supervisor assignment ended", message=f"Your assignment for {group_label} was ended by an administrator.", path="/supervisor/assigned-groups", exclude={actor.id}, **payload)
         notify_admins(session, kind="SUPERVISOR_ASSIGNMENT_ENDED", title="Supervisor assignment ended", message=f"The assignment for {group_label} was ended.", path="/admin", exclude={actor.id}, **payload)
         add_admin_audit_event(session, actor_id=actor.id, affected_user_id=row.supervisor_id, target_type="SUPERVISOR_ASSIGNMENT", target_id=row.id, action="supervisor_assignment_ended", changed_values={"team_id": row.team_id, "academic_cycle_id": row.academic_cycle_id, "supervisor_id": row.supervisor_id})
-        session.commit(); session.refresh(row); return out(row)
+        session.commit(); session.refresh(row); return out(row, session)
     except HTTPException:
         session.rollback(); raise
     except Exception as exc:

@@ -5,13 +5,14 @@ from ..database import Base
 
 class AcademicCycle(Base):
     __tablename__="academic_cycles"
-    __table_args__=(CheckConstraint("code = upper(btrim(code)) AND code <> ''",name="ck_academic_cycles_code_normalized"),CheckConstraint("display_name = btrim(display_name) AND display_name <> ''",name="ck_academic_cycles_display_name_nonblank"),CheckConstraint("academic_year IS NULL OR academic_year BETWEEN 1900 AND 2200",name="ck_academic_cycles_year_valid"),CheckConstraint("session IS NULL OR session IN ('FALL','SPRING')",name="ck_academic_cycles_session_valid"),Index("uq_academic_cycles_code_normalized",text("lower(code)"),unique=True),Index("uq_academic_cycles_year_session", "academic_year", "session", unique=True, postgresql_where=text("academic_year IS NOT NULL AND session IS NOT NULL")))
+    __table_args__=(CheckConstraint("code = upper(btrim(code)) AND code <> ''",name="ck_academic_cycles_code_normalized"),CheckConstraint("display_name = btrim(display_name) AND display_name <> ''",name="ck_academic_cycles_display_name_nonblank"),CheckConstraint("academic_year IS NULL OR academic_year BETWEEN 1900 AND 2200",name="ck_academic_cycles_year_valid"),CheckConstraint("session IS NULL OR session IN ('FALL','SPRING')",name="ck_academic_cycles_session_valid"),Index("uq_academic_cycles_code_normalized",text("lower(code)"),unique=True),Index("uq_academic_cycles_year_session", "academic_year", "session", unique=True, postgresql_where=text("academic_year IS NOT NULL AND session IS NOT NULL")),Index("uq_academic_cycles_coordinator_id", "coordinator_id", unique=True))
     id:Mapped[int]=mapped_column(primary_key=True)
     code:Mapped[str]=mapped_column(String(100),nullable=False)
     display_name:Mapped[str]=mapped_column(String(255),nullable=False)
     academic_year:Mapped[int | None]=mapped_column(Integer,nullable=True)
     session:Mapped[str | None]=mapped_column(String(16),nullable=True)
     registration_open:Mapped[bool]=mapped_column(Boolean,nullable=False,default=False,server_default="false")
+    coordinator_id:Mapped[int | None]=mapped_column(ForeignKey("users.id",ondelete="SET NULL"),nullable=True)
     created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False,server_default=func.now())
     updated_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False,server_default=func.now(),onupdate=func.now())
     group_policy:Mapped["AcademicGroupPolicy | None"]=relationship(back_populates="academic_cycle",uselist=False)

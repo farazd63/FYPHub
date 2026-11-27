@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { localInputToIso } from "../../../../lib/localInputToIso";
 import { cycleLabel as formatCycleLabel } from "../../../../lib/displayLabels";
 
-type Option = { id: number; name?: string; email?: string; code?: string; academic_cycle_id?: number; academic_year?: number | null; session?: string | null };
-type Schedule = { id: number; team_id: number; academic_cycle_id: number; start_at: string; end_at: string; room: string | null; online_link: string | null; status: string; panel_members: Option[]; conflict_note: string | null };
+type Option = { id: number; name?: string; group_name?: string | null; group_number?: number | null; email?: string; code?: string; academic_cycle_id?: number; academic_year?: number | null; session?: string | null };
+type Schedule = { id: number; team_id: number; team_label?: string | null; group_name?: string | null; group_number?: number | null; academic_cycle_id: number; start_at: string; end_at: string; room: string | null; online_link: string | null; status: string; panel_members: Option[]; conflict_note: string | null };
 const input = "fy-input w-full";
 
 function toLocalInput(iso: string): string {
@@ -160,7 +160,7 @@ export function PanelScheduling({ api }: { api: string }) {
               >
                 <option value="">Select team</option>
                 {options.teams.map((team) => (
-                  <option key={team.id} value={team.id}>Team {team.id}{team.name ? ` · ${team.name}` : ""}</option>
+                  <option key={team.id} value={team.id}>{team.name || team.group_name || "Group"}</option>
                 ))}
               </select>
             </label>
@@ -225,7 +225,7 @@ export function PanelScheduling({ api }: { api: string }) {
             {!rows.length && <p className="student-request-muted">No defense schedules have been created.</p>}
             {rows.map((row) => (
               <article key={row.id} className="border-b border-[#e8ede9] py-3">
-                <strong>Team {row.team_id}</strong>
+                <strong>{row.team_label || row.group_name || "Group"}</strong>
                 <p>{new Date(row.start_at).toLocaleString()} – {new Date(row.end_at).toLocaleString()}</p>
                 <small>{row.room ?? row.online_link ?? "Location pending"} · {row.panel_members.map((item) => item.name).join(", ") || "No Evaluators assigned"}</small>
                 <div>
@@ -242,7 +242,7 @@ export function PanelScheduling({ api }: { api: string }) {
       {rescheduleRow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-fy-page/75 p-4" role="dialog" aria-modal="true" aria-labelledby="reschedule-heading">
           <form className="w-full max-w-md rounded-2xl border border-fy-border bg-fy-surface p-5 shadow-xl grid gap-3" onSubmit={(event) => void submitReschedule(event)}>
-            <h2 id="reschedule-heading" className="text-lg font-bold text-fy-text">Reschedule Team {rescheduleRow.team_id}</h2>
+            <h2 id="reschedule-heading" className="text-lg font-bold text-fy-text">Reschedule {rescheduleRow.team_label || rescheduleRow.group_name || "Group"}</h2>
             <label className="student-upload-label">
               New start
               <input className={input} required type="datetime-local" value={rescheduleForm.start_at} onChange={(event) => setRescheduleForm({ ...rescheduleForm, start_at: event.target.value })} />

@@ -8,7 +8,7 @@ class AcademicSession(str, Enum):
  SPRING = "SPRING"
 
 class CycleOut(BaseModel):
- id:int; code:str; display_name:str; academic_year:int|None = None; session:AcademicSession|None = None; registration_open:bool; created_at:datetime; updated_at:datetime
+ id:int; code:str; display_name:str; academic_year:int|None = None; session:AcademicSession|None = None; registration_open:bool; coordinator_id:int|None = None; created_at:datetime; updated_at:datetime
  model_config=ConfigDict(from_attributes=True)
 class PolicyOut(BaseModel):
  id:int; academic_cycle_id:int; max_group_size:int; min_group_size:int = 1; formation_deadline:datetime|None = None; matching_weights:dict = {}; created_at:datetime; updated_at:datetime

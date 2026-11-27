@@ -15,6 +15,15 @@ type User = {
   registration_number: string | null;
   role: Role;
   is_active: boolean;
+  coordinator_academic_cycle_id?: number | null;
+  coordinator_academic_cycle_name?: string | null;
+};
+type AcademicCycle = {
+  id: number;
+  code: string;
+  display_name: string;
+  registration_open: boolean;
+  coordinator_id?: number | null;
 };
 type Page = { items: User[]; page: number; page_size: number; total: number };
 const roles: Role[] = [
@@ -58,8 +67,9 @@ export function AdminUsersRoles({ api }: { api: string }) {
   const [passwordForm, setPasswordForm] = useState({ new_password: "", confirm_password: "" });
   const [passwordError, setPasswordError] = useState("");
   const [editUser, setEditUser] = useState<User | null>(null);
-  const [editForm, setEditForm] = useState({ full_name: "", email: "", registration_number: "", role: "SUPERVISOR" as Role });
+  const [editForm, setEditForm] = useState({ full_name: "", email: "", registration_number: "", role: "SUPERVISOR" as Role, coordinator_academic_cycle_id: "" });
   const [editError, setEditError] = useState("");
+  const [academicCycles, setAcademicCycles] = useState<AcademicCycle[]>([]);
   const [confirm, setConfirm] = useState<{
     user: User;
     type: "status" | "delete" | "permanent";
@@ -71,9 +81,17 @@ export function AdminUsersRoles({ api }: { api: string }) {
     password: "",
     role: "SUPERVISOR" as Role,
     registration_number: "",
+    coordinator_academic_cycle_id: "",
   });
   const [fieldError, setFieldError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const availableCoordinatorCycles = academicCycles.filter((cycle) =>
+    cycle.registration_open && !cycle.coordinator_id,
+  );
+  const editCycleId = editForm.coordinator_academic_cycle_id ? Number(editForm.coordinator_academic_cycle_id) : null;
+  const editCoordinatorCycles = academicCycles.filter((cycle) =>
+    (cycle.registration_open && (!cycle.coordinator_id || cycle.coordinator_id === editUser?.id)) || cycle.id === editCycleId,
+  );
   const emailError = emailTouched && form.email.trim()
     ? emailValidationMessage(form.email)
     : undefined;
@@ -100,6 +118,20 @@ export function AdminUsersRoles({ api }: { api: string }) {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`${api}/api/v1/academic-cycles`, { credentials: "include" })
+      .then((response) => (response.ok ? response.json() : []))
+      .then((rows: AcademicCycle[]) => {
+        if (!cancelled) setAcademicCycles(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {
+        if (!cancelled) setAcademicCycles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
     if (busy) return;
@@ -118,6 +150,10 @@ export function AdminUsersRoles({ api }: { api: string }) {
       setFieldError("Registration number is required for STUDENT accounts.");
       return;
     }
+    if (form.role === "COORDINATOR" && !form.coordinator_academic_cycle_id) {
+      setFieldError("Select an open academic cycle for this coordinator.");
+      return;
+    }
     setBusy("create");
     setFieldError("");
     try {
@@ -133,6 +169,9 @@ export function AdminUsersRoles({ api }: { api: string }) {
           ...(form.role === "STUDENT"
             ? { registration_number: form.registration_number.trim() }
             : {}),
+          ...(form.role === "COORDINATOR"
+            ? { coordinator_academic_cycle_id: Number(form.coordinator_academic_cycle_id) }
+            : {}),
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -146,6 +185,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
         password: "",
         role: "SUPERVISOR",
         registration_number: "",
+        coordinator_academic_cycle_id: "",
       });
       setEmailTouched(false);
       setShowCreate(false);
@@ -239,6 +279,10 @@ export function AdminUsersRoles({ api }: { api: string }) {
       setEditError("Registration number is required for STUDENT accounts.");
       return;
     }
+    if (editForm.role === "COORDINATOR" && !editForm.coordinator_academic_cycle_id) {
+      setEditError("Select an open academic cycle for this coordinator.");
+      return;
+    }
     setBusy(editUser.id);
     setEditError("");
     try {
@@ -251,6 +295,9 @@ export function AdminUsersRoles({ api }: { api: string }) {
           email: normalizeEmail(editForm.email),
           registration_number: editForm.registration_number.trim() || null,
           role: editForm.role,
+          ...(editForm.role === "COORDINATOR"
+            ? { coordinator_academic_cycle_id: Number(editForm.coordinator_academic_cycle_id) }
+            : {}),
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -402,6 +449,9 @@ export function AdminUsersRoles({ api }: { api: string }) {
                         <span className="inline-flex rounded-full bg-[#eef0ff] px-2 py-1 text-xs font-bold text-[#263fae]">
                           {roleLabel[user.role]}
                         </span>
+                        {user.role === "COORDINATOR" && user.coordinator_academic_cycle_name && (
+                          <p className="mt-1 text-xs text-[#60716b]">{user.coordinator_academic_cycle_name}</p>
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         <span
@@ -419,7 +469,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                           <IconButton label={user.is_active ? "Deactivate account" : "Activate account"} size="sm" variant="secondary" disabled={busy === user.id} onClick={() => setConfirm({ user, type: "status", value: String(!user.is_active) })}><Power size={15} strokeWidth={1.8} aria-hidden /></IconButton>
                           <IconButton label={user.is_active ? "Remove portal access" : "Allow portal access"} size="sm" variant={user.is_active ? "danger" : "secondary"} disabled={busy === user.id} onClick={() => user.is_active ? setConfirm({ user, type: "delete", value: "delete" }) : setConfirm({ user, type: "status", value: "true" })}>{user.is_active ? <ShieldOff size={15} strokeWidth={1.8} aria-hidden /> : <ShieldCheck size={15} strokeWidth={1.8} aria-hidden />}</IconButton>
                           <IconButton label="Change password" size="sm" variant="secondary" disabled={busy === user.id} onClick={() => { setPasswordUser(user); setPasswordForm({ new_password: "", confirm_password: "" }); setPasswordError(""); }}><KeyRound size={15} strokeWidth={1.8} aria-hidden /></IconButton>
-                          <IconButton label="Edit account" size="sm" variant="secondary" disabled={busy === user.id} onClick={() => { setEditUser(user); setEditForm({ full_name: user.full_name, email: user.email, registration_number: user.registration_number ?? "", role: user.role }); setEditError(""); }}><Pencil size={15} strokeWidth={1.8} aria-hidden /></IconButton>
+                          <IconButton label="Edit account" size="sm" variant="secondary" disabled={busy === user.id} onClick={() => { setEditUser(user); setEditForm({ full_name: user.full_name, email: user.email, registration_number: user.registration_number ?? "", role: user.role, coordinator_academic_cycle_id: user.coordinator_academic_cycle_id ? String(user.coordinator_academic_cycle_id) : "" }); setEditError(""); }}><Pencil size={15} strokeWidth={1.8} aria-hidden /></IconButton>
                           <IconButton label="Delete permanently" size="sm" variant="danger" disabled={busy === user.id} onClick={() => setConfirm({ user, type: "permanent", value: "delete" })}><Trash2 size={15} strokeWidth={1.8} aria-hidden /></IconButton>
                         </div>
                       </td>
@@ -505,6 +555,7 @@ export function AdminUsersRoles({ api }: { api: string }) {
                   setForm({
                     ...form,
                     role: nextRole,
+                    coordinator_academic_cycle_id: nextRole === "COORDINATOR" ? form.coordinator_academic_cycle_id : "",
                     ...(nextRole === "STUDENT" ? {} : { registration_number: "" }),
                   });
                 }}
@@ -514,6 +565,27 @@ export function AdminUsersRoles({ api }: { api: string }) {
                 ))}
               </select>
             </label>
+            {form.role === "COORDINATOR" && (
+              <label className="grid gap-1 text-sm font-semibold">
+                Coordinator cycle <span className="text-[#a43a33]">(required)</span>
+                <select
+                  required
+                  className={input}
+                  value={form.coordinator_academic_cycle_id}
+                  onChange={(event) => {
+                    setForm({ ...form, coordinator_academic_cycle_id: event.target.value });
+                    setFieldError("");
+                  }}
+                >
+                  <option value="">Select an open academic cycle</option>
+                  {availableCoordinatorCycles.map((cycle) => (
+                    <option key={cycle.id} value={cycle.id}>{cycle.display_name} ({cycle.code})</option>
+                  ))}
+                </select>
+                <span className="text-xs font-normal text-[#60716b]">Each cycle can have one coordinator, and a coordinator can be assigned to one cycle.</span>
+                {!availableCoordinatorCycles.length && <span className="text-xs font-normal text-[#a43a33]">No unassigned cycle currently has registration open.</span>}
+              </label>
+            )}
             {form.role === "STUDENT" && (
               <label className="grid gap-1 text-sm font-semibold">
                 Registration number <span className="text-[#a43a33]">(required)</span>
@@ -602,7 +674,19 @@ export function AdminUsersRoles({ api }: { api: string }) {
               <label className="grid gap-1 text-sm font-semibold">Full name<input required className={input} value={editForm.full_name} onChange={(event) => setEditForm({ ...editForm, full_name: event.target.value })} /></label>
               <label className="grid gap-1 text-sm font-semibold">Email<input required type="email" className={input} value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} /></label>
               <label className="grid gap-1 text-sm font-semibold">Registration number<input className={input} value={editForm.registration_number} onChange={(event) => setEditForm({ ...editForm, registration_number: event.target.value })} placeholder={editForm.role === "STUDENT" ? "Required for group account" : "Optional"} /></label>
-              <label className="grid gap-1 text-sm font-semibold">Role<select className={input} value={editForm.role} onChange={(event) => setEditForm({ ...editForm, role: event.target.value as Role })}>{(editForm.role === "STUDENT" ? ["STUDENT"] : roles.filter((item) => item !== "STUDENT")).map((item) => <option key={item} value={item}>{roleLabel[item as Role]}</option>)}</select></label>
+              <label className="grid gap-1 text-sm font-semibold">Role<select className={input} value={editForm.role} onChange={(event) => { const nextRole = event.target.value as Role; setEditForm({ ...editForm, role: nextRole, coordinator_academic_cycle_id: nextRole === "COORDINATOR" ? editForm.coordinator_academic_cycle_id : "" }); }}>{(editForm.role === "STUDENT" ? ["STUDENT"] : roles.filter((item) => item !== "STUDENT")).map((item) => <option key={item} value={item}>{roleLabel[item as Role]}</option>)}</select></label>
+              {editForm.role === "COORDINATOR" && (
+                <label className="grid gap-1 text-sm font-semibold">
+                  Coordinator cycle <span className="text-[#a43a33]">(required)</span>
+                  <select required className={input} value={editForm.coordinator_academic_cycle_id} onChange={(event) => { setEditForm({ ...editForm, coordinator_academic_cycle_id: event.target.value }); setEditError(""); }}>
+                    <option value="">Select an open academic cycle</option>
+                    {editCoordinatorCycles.map((cycle) => (
+                      <option key={cycle.id} value={cycle.id}>{cycle.display_name} ({cycle.code}){!cycle.registration_open ? " — current assignment" : ""}</option>
+                    ))}
+                  </select>
+                  <span className="text-xs font-normal text-[#60716b]">A coordinator can supervise groups, but remains assigned to one cycle only.</span>
+                </label>
+              )}
               {editError && <p role="alert" className="text-sm text-[#a43a33]">{editError}</p>}
             </div>
             <div className="mt-5 flex justify-end gap-3">

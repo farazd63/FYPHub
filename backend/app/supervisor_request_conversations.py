@@ -9,6 +9,7 @@ from .auth import get_current_user, validate_mutating_origin
 from .database import get_db
 from .models import SupervisorRequest, SupervisorRequestMessage, Team, User, UserRole
 from .notification_service import notify, notify_admins, team_student_ids
+from .group_display import visible_group_name
 
 router = APIRouter(prefix="/api/v1/supervisor-requests")
 
@@ -36,7 +37,7 @@ def _request_for_actor(session: Session, request_id: int, actor: User, *, lock: 
     team = session.scalar(select(Team).where(Team.shared_user_id == actor.id)) if actor.role == UserRole.STUDENT else None
     allowed = (
         actor.role in (UserRole.ADMIN, UserRole.COORDINATOR)
-        or (actor.role == UserRole.SUPERVISOR and row.supervisor_id == actor.id)
+        or (actor.role in (UserRole.SUPERVISOR, UserRole.COORDINATOR) and row.supervisor_id == actor.id)
         or (actor.role == UserRole.STUDENT and (row.requester_user_id == actor.id or (team is not None and row.team_id == team.id)))
     )
     if not allowed:
@@ -60,7 +61,7 @@ def conversation_history(request_id: int, actor: User = Depends(get_current_user
 def send_conversation_message(request_id: int, payload: RequestMessageWrite, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     validate_mutating_origin(request)
     try:
-        if actor.role not in (UserRole.STUDENT, UserRole.SUPERVISOR):
+        if actor.role not in (UserRole.STUDENT, UserRole.SUPERVISOR, UserRole.COORDINATOR):
             raise HTTPException(status_code=403, detail="This conversation is read-only for your role.")
         row = _request_for_actor(session, request_id, actor, lock=True)
         message = SupervisorRequestMessage(request_id=request_id, sender_id=actor.id, body=payload.body)
@@ -69,7 +70,7 @@ def send_conversation_message(request_id: int, payload: RequestMessageWrite, req
         from .main import add_admin_audit_event
         add_admin_audit_event(session, actor_id=actor.id, affected_user_id=None, target_type="SUPERVISOR_REQUEST", target_id=request_id, action="supervisor_request_message_sent", changed_values={"message_id": message.id})
         team = session.get(Team, row.team_id) if row.team_id is not None else None
-        group_label = team.group_name if team and team.group_name else f"Group {row.team_id}" if row.team_id else "Student"
+        group_label = visible_group_name(session, team) if team else "Student"
         common = {"request_id": row.id, "message_id": message.id, "team_id": row.team_id, "cycle_id": row.academic_cycle_id}
         if actor.role == UserRole.STUDENT:
             notify(

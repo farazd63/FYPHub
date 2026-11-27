@@ -10,14 +10,13 @@ from urllib.request import HTTPRedirectHandler, Request as UrlRequest, build_ope
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from .auth import get_current_user, validate_mutating_origin
 from .config import settings
 from .database import SessionLocal, get_db
-from .group_channels import MessageWrite
 from .models import StudentAIConversation, StudentAIMessage, User, UserRole
 
 router = APIRouter(prefix="/api/v1/group-ai", tags=["student-ai"])
@@ -47,6 +46,19 @@ class ConversationWrite(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str | None = Field(default=None, max_length=200)
+
+
+class ChatMessageWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    body: str = Field(min_length=1, max_length=4000, strict=True)
+
+    @field_validator("body")
+    @classmethod
+    def nonblank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Message cannot be blank.")
+        return value
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -204,31 +216,6 @@ def _request(question: str, recent_messages: list[StudentAIMessage] | None = Non
     )
 
 
-def generate(question: str, recent_messages: list[StudentAIMessage] | None = None) -> str:
-    """Send only the question and optional chatbot history to Llama 3.1 8B."""
-
-    request = _request(question, recent_messages)
-    try:
-        with build_opener(NoRedirect()).open(request, timeout=CHAT_TIMEOUT_SECONDS) as response:
-            content = ""
-            for line in response:
-                if not line.strip():
-                    continue
-                data = json.loads(line)
-                content += str(data.get("message", {}).get("content", ""))
-                if data.get("done"):
-                    break
-                if len(content) > 16000:
-                    raise ValueError("response too large")
-        if not content.strip():
-            raise ValueError("invalid response")
-        return content.strip()
-    except HTTPException:
-        raise
-    except (ValueError, KeyError, TypeError, UnicodeError, URLError, HTTPError, TimeoutError, OSError):
-        raise unavailable() from None
-
-
 def _create_conversation(session: Session, actor: User, title: str | None = None) -> StudentAIConversation:
     conversation = StudentAIConversation(user_id=actor.id, title=(title or "New chat").strip() or "New chat")
     session.add(conversation)
@@ -237,7 +224,7 @@ def _create_conversation(session: Session, actor: User, title: str | None = None
     return conversation
 
 
-def _stream_chat(payload: MessageWrite, actor: User, conversation: StudentAIConversation, recent: list[StudentAIMessage]):
+def _stream_chat(payload: ChatMessageWrite, actor: User, conversation: StudentAIConversation, recent: list[StudentAIMessage]):
     def events():
         question = StudentAIMessage(
             user_id=actor.id,
@@ -368,7 +355,7 @@ def delete_conversation(
 @router.post("/conversations/{conversation_id}/messages", status_code=200)
 def conversation_chat(
     conversation_id: int,
-    payload: MessageWrite,
+    payload: ChatMessageWrite,
     request: Request,
     actor: User = Depends(get_current_user),
     session: Session = Depends(get_db),
@@ -390,7 +377,7 @@ def history(actor: User = Depends(get_current_user), session: Session = Depends(
 
 @router.post("", status_code=200)
 def chat(
-    payload: MessageWrite,
+    payload: ChatMessageWrite,
     request: Request,
     actor: User = Depends(get_current_user),
     session: Session = Depends(get_db),

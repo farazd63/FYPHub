@@ -1,10 +1,10 @@
 # FYPHub module inventory
 
-This inventory was generated from the current repository before structural moves. It records the existing implementation boundaries and keeps build-tool locations centralized.
+This inventory describes the current repository after the retired collaboration flows were removed. It records the active implementation boundaries and keeps build-tool locations centralized.
 
 ## Module 01 — governance and academic configuration
 
-- Frontend entry points: `frontend/src/AdminPortal.tsx`, `AdminUsersRoles.tsx`, `AdminCycleManager.tsx`, `AdminSupervisorCapacity.tsx`, `AdminDeadlines.tsx`, `AdminReminderRules.tsx`, `AdminDocumentRequirementManager*.tsx`.
+- Frontend entry points: `frontend/src/AdminPortal.tsx`, `AdminUsersRoles.tsx`, `AdminCycleManager.tsx`, `AdminSupervisorCapacity.tsx`, `AdminDeadlines.tsx`, `AdminReminderRules.tsx`, and `AdminDocumentArchive.tsx`.
 - Backend routes/services: `backend/app/main.py`, `academic_cycle_overview.py`, `coordinator_operations.py`, `dashboard_requirements.py`, `document_requirements.py`, `registration_policy.py`.
 - Models: `backend/app/models/academic.py`, `academic_deadline.py`, `dashboard_requirement.py`, `document_requirement.py`, `reminder_rule.py`, `audit_event.py`.
 - Schemas: `backend/app/schemas/academic.py`, `academic_deadlines.py`, `dashboard_requirements.py`, `document_requirements.py`, `reminder_rules.py`, `admin_users.py`, `supervisor_capacity.py`.
@@ -13,18 +13,18 @@ This inventory was generated from the current repository before structural moves
 
 ## Module 02 — student teams and collaboration
 
-- Frontend entry points: `frontend/src/portals/student/modules/Module2Workspace.tsx`, `frontend/src/GroupChannels.tsx`, student portal/sidebar files.
-- Backend routes/services: `backend/app/module2_collaboration.py`, `group_channels.py`, `group_ai.py`, `team_lifecycle.py`, `team_compatibility.py`, `agent_supervision.py`.
-- Models: `backend/app/models/team.py`, `module2_collaboration.py`, `group_message.py`, `agent_supervision.py`, `supervisor_assignment.py`.
-- Tests: `backend/tests/test_team_registration.py`, `test_team_constraints.py`, `test_team_compatibility.py`, `test_group_channels.py`, `test_group_ai.py`.
-- API prefix: `/api/v1/module-2` plus group-channel and team-registration endpoints.
+- Frontend entry points: `frontend/src/portals/student/modules/StudentCollaborationChannel.tsx`, `GroupAIChat.tsx`, `StudentProgressDashboard.tsx`, and the student portal/sidebar files.
+- Backend routes/services: `backend/app/collaboration_channels.py`, `group_ai.py`, `project_workflow.py`, `team_lifecycle.py`, and `supervisor_assignments.py`.
+- Models: `backend/app/models/team.py`, `module2_collaboration.py` (the active private-channel and notification records), `student_ai.py`, `project_workflow.py`, and `supervisor_assignment.py`.
+- Tests: `backend/tests/test_collaboration_channels.py`, `test_collaboration_channel_access.py`, `test_project_workflow.py`, `test_team_registration.py`, and `test_team_constraints.py`.
+- API prefixes: `/api/v1/student/collaboration/channels`, `/api/v1/supervisor/collaboration/channels`, `/api/v1/group-ai`, and `/api/v1/project-progress`.
 
 ## Module 03 — proposal, review, workflow, and archive
 
 - Frontend entry points: `frontend/src/modules/module-3/`, `frontend/src/portals/student/modules/supervisor-selection/`, `frontend/src/portals/supervisor/modules/supervisor-requests/`, `frontend/src/portals/admin/modules/supervisor-requests/`, `frontend/src/portals/admin/modules/archive/`.
 - Backend routes/services: `backend/app/modules/module_03_proposal/`, `project_workflow.py`, `proposal_reference.py`, `supervisor_requests.py`, `supervisor_request_conversations.py`, `archived_projects.py`, `evaluations.py`.
 - Models: `proposal.py`, `proposal_compliance.py`, `proposal_reference.py`, `proposal_ai_review.py`, `project_workflow.py`, `supervisor_request.py`, `supervisor_request_conversation.py`, `archived_project.py`, `evaluation.py`, `evaluation_rubric.py`, `template_reference.py`.
-- Tests: `test_module3_compliance_engine.py`, `test_project_workflow.py`, `test_proposal_foundation.py`, `test_proposal_reference_and_conversation.py`, `test_supervisor_requests.py`, `test_archived_projects.py`, `test_evaluations.py`, `test_evaluation_rubrics.py`, `test_template_references.py`.
+- Tests: `test_module3_compliance_engine.py`, `test_project_workflow.py`, `test_proposal_reference_and_conversation.py`, `test_supervisor_requests.py`, `test_archived_projects.py`, `test_evaluations.py`, `test_evaluation_rubrics.py`, and `test_template_references.py`.
 
 ## Shared/core code
 
@@ -37,7 +37,7 @@ This inventory was generated from the current repository before structural moves
 - Initialization SQL: `database/init/001_extensions.sql`.
 - Runtime schema: SQLAlchemy models under `backend/app/models/`.
 - Migrations: all revisions remain in `backend/alembic/versions/`; no migration files were moved.
-- The live repository currently has multiple Alembic heads; this is pre-existing and is reported by `alembic check`.
+- The live repository is at one Alembic head after the retired collaboration and AI-matching cleanup migrations.
 
 ## Tests and documentation
 

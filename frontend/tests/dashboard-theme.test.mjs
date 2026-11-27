@@ -6,7 +6,7 @@ const sourceRoot = new URL("../src/", import.meta.url);
 const main = fs.readFileSync(new URL("main.tsx", sourceRoot), "utf8");
 const scroll = fs.readFileSync(new URL("portal-scroll.css", sourceRoot), "utf8");
 const theme = fs.readFileSync(new URL("dashboard-theme.css", sourceRoot), "utf8");
-const navigation = fs.readFileSync(new URL("portals/shared/dashboard-nav.css", sourceRoot), "utf8");
+const academicPro = fs.readFileSync(new URL("academic-pro.css", sourceRoot), "utf8");
 const roleSidebar = fs.readFileSync(new URL("portals/shared/role-sidebar.css", sourceRoot), "utf8");
 const brand = fs.readFileSync(new URL("portals/shared/FypHubBrand.tsx", sourceRoot), "utf8");
 
@@ -25,8 +25,8 @@ test("all dashboards load the shared reference-inspired theme after base styles"
 });
 
 test("shared dashboard navigation keeps the rail, panel, active state, and mobile drawer contract", () => {
-  assert.match(navigation, /width: 236px/);
-  assert.match(navigation, /width: 70px/);
+  assert.match(academicPro, /--fy-shell-sidebar-width:\s*248px/);
+  assert.match(academicPro, /--fy-shell-sidebar-collapsed-width:\s*72px/);
   assert.match(roleSidebar, /student-sidebar--collapsed/);
   assert.match(roleSidebar, /aria-current="page"|\[aria-current="page"\]/);
   assert.match(roleSidebar, /student-sidebar__overlay--open/);

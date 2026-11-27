@@ -39,7 +39,7 @@ assert.match(app, /setRecoveryIdentifier\(""\)/);
 assert.doesNotMatch(app, /No local development reset link is available/);
 assert.match(app, /Open reset link/);
 assert.match(app, /Password recovery email delivery is not configured for this project/);
-assert.match(app, /No account was found with this email address/);
+assert.match(app, /If an account exists for that email, a reset link will be sent/);
 assert.match(app, /body\.detail\?\.message/);
 assert.match(app, /Back to Login/);
 assert.match(app, /type="submit"/);

@@ -32,6 +32,20 @@
   outline-offset: 2px;
 }
 
+/* Keep an opened add form at the top of the page on narrow screens. The
+   button itself stays in the page header; the editor moves before the list. */
+.admin-shell .admin-enter > section:has(.admin-add-button[aria-expanded="true"]) {
+  scroll-margin-top: calc(var(--fy-shell-header, 4rem) + 1rem);
+}
+
+section[aria-labelledby="users-heading"] > div.grid:has(> form) > form:last-child,
+section.academic-cycles > div.grid:has(> .academic-cycles__create) > .academic-cycles__create,
+section[aria-labelledby="capacity-heading"] .admin-capacity-layout.has-editor > form,
+section[aria-labelledby="deadlines-heading"] > div.grid:has(> form) > form:last-child,
+section[aria-labelledby="rules-heading"] > div.grid:has(> form) > form:last-child {
+  order: -1;
+}
+
 section[aria-labelledby="deadlines-heading"]:has(.admin-add-button[aria-expanded="false"]) > div.grid,
 section[aria-labelledby="rules-heading"]:has(.admin-add-button[aria-expanded="false"]) > div.grid {
   grid-template-columns: minmax(0, 1fr) !important;

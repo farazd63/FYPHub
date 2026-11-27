@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from io import BytesIO
 from statistics import median
 from typing import Iterable
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -97,10 +95,6 @@ def _actor_can_access_group(session: Session, actor: User, group_id: int) -> boo
     return False
 
 
-def _record_target(record: EvaluationRecord) -> int:
-    return record.group_id or record.student_id or 0
-
-
 def _record_out(record: EvaluationRecord) -> EvaluationOut:
     return EvaluationOut.model_validate(record)
 
@@ -127,10 +121,6 @@ def _resolve_target(session: Session, payload: EvaluationWrite) -> tuple[int | N
     if session.scalar(select(User.id).where(User.id == payload.student_id, User.role == UserRole.STUDENT)) is None:
         raise _error("student_not_found", "The selected student was not found.", status.HTTP_404_NOT_FOUND)
     return payload.student_id, None
-
-
-def _target_filter(record: EvaluationRecord, student_id: int | None, group_id: int | None):
-    return or_(and_(student_id is not None, record.student_id == student_id), and_(group_id is not None, record.group_id == group_id))
 
 
 def _assignment_out(session: Session, team: Team, categories: Iterable[str]) -> EvaluationAssignmentOut:

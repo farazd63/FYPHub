@@ -96,7 +96,7 @@ export function KnowledgeSearch({ api }: { api: string }) {
     } finally {
       if (id === requestId.current) setLoading(false);
     }
-  }, [api, query, filters, searchNonce]);
+  }, [api, query, filters]);
 
   useEffect(() => {
     const timer = window.setTimeout(
@@ -113,7 +113,6 @@ export function KnowledgeSearch({ api }: { api: string }) {
       <ArchivedProjectDetail
         api={api}
         projectId={selected}
-        onBack={() => window.location.assign("/student/search")}
       />
     );
   return (

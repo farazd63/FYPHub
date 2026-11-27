@@ -26,8 +26,8 @@ test("admin group navigation is cycle-first and keeps the selected state in the 
 test("group signup names are assigned during admin approval", () => {
   assert.match(source, /group_name_assigned/);
   assert.match(source, /Approve group access/);
-  assert.match(source, /official-group-name/);
-  assert.match(source, /group_name: name/);
+  assert.match(source, /official name is generated automatically/);
+  assert.match(source, /const generatedName/);
   assert.match(source, /Reject group signup/);
   assert.match(source, /The group will not be able to log in/);
 });

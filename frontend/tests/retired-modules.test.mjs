@@ -11,8 +11,8 @@ test("retired registry, roster and workflow pages are absent from admin navigati
 });
 
 test("retired collaboration verification UI is no longer rendered", () => {
-  const channels = read("GroupChannels.tsx");
-  const workspace = read("portals/student/modules/Module2Workspace.tsx");
+  const channels = read("portals/student/modules/StudentCollaborationChannel.tsx");
+  const workspace = read("portals/student/StudentPortal.tsx");
   for (const source of [channels, workspace]) {
     assert.doesNotMatch(source, /TeamInvitations|TeamJoinRequests|TeamMatching|JoinRequestForm|InviteeResponse/);
   }

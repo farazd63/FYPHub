@@ -48,7 +48,7 @@ export function StudentProgressDashboard({ api }: { api: string }) {
   const loadTeams = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const response = await fetch(`${api}/api/v1/group-channels/teams`, { credentials: "include" });
+      const response = await fetch(`${api}/api/v1/project-progress/teams`, { credentials: "include" });
       if (!response.ok) throw new Error("Your project plan could not be loaded.");
       const rows = await response.json() as Team[];
       setTeams(rows);

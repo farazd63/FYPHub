@@ -80,6 +80,8 @@ class AnnouncementOut(BaseModel):
     cycle_id: int | None
     group_id: int | None
     project_id: int | None
+    group_number: int | None = None
+    group_name: str | None = None
     published_at: datetime | None
     expires_at: datetime | None
     created_at: datetime

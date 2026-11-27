@@ -6,6 +6,7 @@ import { StudentPhasePlaceholder } from "./modules/StudentPhasePlaceholder";
 import { StudentRequiredDocumentsDashboard } from "./modules/StudentRequiredDocumentsDashboard";
 import { KnowledgeSearch } from "./modules/knowledge-search/KnowledgeSearch";
 import { ProposalComplianceWorkspace } from "../../modules/module-3/ProposalComplianceWorkspace";
+import { ProposalReviewWorkspace } from "../../modules/module-6/ProposalReviewWorkspace";
 import { GroupMembers } from "./components/GroupMembers";
 import { StudentSupervisorInfo } from "./modules/StudentSupervisorInfo";
 import { FypHubBrand } from "../shared/FypHubBrand";
@@ -155,6 +156,13 @@ export const STUDENT_PHASES: readonly StudentPhase[] = [
     icon: icon("compliance"),
   },
   {
+    id: "supervisor-review",
+    name: "Supervisor Feedback & Revisions",
+    route: "/student/supervisor-review",
+    status: "Implemented",
+    icon: icon("review"),
+  },
+  {
     id: "supervisor-info",
     name: "Supervisor Information",
     route: "/student/supervisor-info",
@@ -201,6 +209,7 @@ export const STUDENT_PHASES: readonly StudentPhase[] = [
 function initialStudentPage() {
   const path = appPathname();
   if (path.startsWith("/student/search")) return "search";
+  if (path.startsWith("/student/supervisor-review")) return "supervisor-review";
   if (path.startsWith("/student/group-ai")) return "group-ai";
   if (
     path.startsWith("/student/supervisor-matching") ||
@@ -224,7 +233,6 @@ export function StudentPortal({
   const [collapsed, setCollapsed] = usePersistentSidebarCollapse("student");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatHistoryCollapsed, setChatHistoryCollapsed] = useState(false);
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -268,6 +276,8 @@ export function StudentPortal({
       <StudentRequiredDocumentsDashboard api={api} />
     ) : phase?.id === "proposal" ? (
       <ProposalComplianceWorkspace api={api} />
+    ) : phase?.id === "supervisor-review" ? (
+      <ProposalReviewWorkspace api={api} role="student" />
     ) : phase?.id === "supervisor-info" ? (
       <StudentSupervisorInfo api={api} />
     ) : phase?.id === "supervisor-matching" ? (
@@ -360,11 +370,9 @@ export function StudentPortal({
             api={api}
             floating
             open={chatOpen}
-            historyCollapsed={chatHistoryCollapsed}
             onClose={() => {
               setChatOpen(false);
             }}
-            onToggleHistory={() => setChatHistoryCollapsed((value) => !value)}
           />
         )}
       </div>

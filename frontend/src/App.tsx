@@ -17,6 +17,7 @@ import { Stepper } from "./ui/Stepper";
 import { Button } from "./ui/Button";
 import { Card } from "./ui/Card";
 import { WelcomeLanding } from "./pages/WelcomeLanding";
+import { sortCyclesDesc } from "./lib/displayLabels";
 import { appPath, appPathname } from "./platform-path";
 import "./auth.css";
 
@@ -27,6 +28,8 @@ type Cycle = {
   display_name: string;
   academic_year?: number | null;
   session?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
   registration_open: boolean;
 };
 type Policy = { min_group_size: number; max_group_size: number };
@@ -74,6 +77,87 @@ type DashboardPage = "account" | "admin-portal";
 const STEPS = ["Academic Cycle", "Group Members", "Group Credentials"];
 const SIGNUP_STEP_IDS = ["cycle", "members", "credentials"] as const;
 const AUTH_SWITCH_DURATION = 760;
+const MODAL_FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+
+function useModalFocusManager() {
+  const activeDialog = useRef<HTMLElement | null>(null);
+  const restoreFocus = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const getDialog = () => {
+      const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]'));
+      return dialogs[dialogs.length - 1] ?? null;
+    };
+    const focusFirst = (dialog: HTMLElement) => {
+      const target = dialog.querySelector<HTMLElement>(`[autofocus], ${MODAL_FOCUSABLE}`) ?? dialog;
+      if (target === dialog && !dialog.hasAttribute("tabindex")) dialog.setAttribute("tabindex", "-1");
+      target.focus({ preventScroll: true });
+    };
+    const sync = () => {
+      const nextDialog = getDialog();
+      if (nextDialog === activeDialog.current) return;
+      if (nextDialog) {
+        if (!activeDialog.current) {
+          const current = document.activeElement;
+          restoreFocus.current = current instanceof HTMLElement ? current : null;
+        }
+        activeDialog.current = nextDialog;
+        document.body.classList.add("fy-modal-open");
+        window.requestAnimationFrame(() => {
+          if (activeDialog.current === nextDialog && !nextDialog.contains(document.activeElement)) focusFirst(nextDialog);
+        });
+        return;
+      }
+      activeDialog.current = null;
+      document.body.classList.remove("fy-modal-open");
+      const previous = restoreFocus.current;
+      restoreFocus.current = null;
+      if (previous?.isConnected) window.requestAnimationFrame(() => previous.focus({ preventScroll: true }));
+    };
+    const onFocusIn = (event: FocusEvent) => {
+      const dialog = activeDialog.current ?? getDialog();
+      if (dialog && event.target instanceof Node && !dialog.contains(event.target)) {
+        event.stopPropagation();
+        focusFirst(dialog);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const dialog = activeDialog.current ?? getDialog();
+      if (!dialog) return;
+      const nodes = Array.from(dialog.querySelectorAll<HTMLElement>(MODAL_FOCUSABLE));
+      if (!nodes.length) {
+        event.preventDefault();
+        focusFirst(dialog);
+        return;
+      }
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    const observer = new MutationObserver(sync);
+    observer.observe(document.body, { childList: true, subtree: true });
+    document.addEventListener("focusin", onFocusIn, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    sync();
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("focusin", onFocusIn, true);
+      document.removeEventListener("keydown", onKeyDown, true);
+      document.body.classList.remove("fy-modal-open");
+    };
+  }, []);
+}
+
 const createClientId = () => {
   const browserCrypto = globalThis.crypto;
   if (typeof browserCrypto?.randomUUID === "function") return browserCrypto.randomUUID();
@@ -446,6 +530,7 @@ function FirstAdminSetup({ api, onComplete, onBack }: FirstAdminSetupProps) {
 }
 
 export default function App() {
+  useModalFocusManager();
   const [page, setPage] = useState<string>("in");
   const [authMode, setAuthMode] = useState<AuthMode>(() => appPathname() === "/signup" ? "signup" : "signin");
   const [authTransitioning, setAuthTransitioning] = useState(false);
@@ -510,7 +595,7 @@ export default function App() {
   >("idle");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<{
-    teamId: number;
+    groupNumber: number | null;
     cycle: string;
   } | null>(null);
   const publicNavigationRef = useRef<(route: PublicRoute, mode?: "push" | "replace" | "pop") => void>(() => undefined);
@@ -547,7 +632,7 @@ export default function App() {
         const data: Cycle[] = await response.json();
         if (!controller.signal.aborted) {
           const seen = new Set<string>();
-          const openCycles = data.filter((cycle) => {
+          const openCycles = sortCyclesDesc(data).filter((cycle) => {
             if (!cycle.registration_open) return false;
             const key = `${cycle.academic_year ?? ""}|${(cycle.session ?? "").toUpperCase()}|${(cycle.code ?? "").trim().toLowerCase()}|${(cycle.display_name ?? "").trim().toLowerCase()}`;
             if (seen.has(key)) return false;
@@ -947,7 +1032,7 @@ export default function App() {
         return;
       }
       setSuccess({
-        teamId: data.team.id as number,
+        groupNumber: (data.team.group_number as number | null | undefined) ?? null,
         cycle: data.cycle.display_name as string,
       });
       setLogin((current) => ({ ...current, password: "", confirm: "" }));
@@ -1282,7 +1367,7 @@ export default function App() {
               {[
                 "Overview",
                 "Users & Roles",
-                "Academic Cycles & Policies",
+                "Academic Cycles",
                 "Supervisor Capacity",
                 "Deadlines",
                 "Reminders & Escalations",
@@ -1396,8 +1481,8 @@ export default function App() {
               Student group account created successfully.
             </h1>
             <p className="mt-3 text-sm text-[#4f6470]">
-              Group ID: {success.teamId}. Academic cycle: {success.cycle}. Your group login is ready.
-              {success.teamId}.
+              {success.groupNumber ? `Group ${success.groupNumber}. ` : "Your group has been assigned. "}
+              Academic cycle: {success.cycle}. Your group login is ready.
             </p>
             <button
               type="button"

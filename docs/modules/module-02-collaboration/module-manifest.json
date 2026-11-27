@@ -1,11 +1,11 @@
 {
   "module_id": "module-02",
   "name": "student teams and collaboration",
-  "frontend_entrypoints": ["frontend/src/portals/student/modules/Module2Workspace.tsx", "frontend/src/GroupChannels.tsx"],
-  "backend_routes": ["/api/v1/module-2", "/api/v1/group-channels", "/api/v1/team-registration"],
-  "database_tables": ["teams", "team_members", "group_messages", "module2_channel_reads", "module2_notifications", "supervisor_assignments"],
+  "frontend_entrypoints": ["frontend/src/portals/student/modules/StudentCollaborationChannel.tsx", "frontend/src/GroupAIChat.tsx", "frontend/src/portals/student/modules/StudentProgressDashboard.tsx"],
+  "backend_routes": ["/api/v1/student/collaboration/channels", "/api/v1/supervisor/collaboration/channels", "/api/v1/group-ai", "/api/v1/project-progress", "/api/v1/team-registration"],
+  "database_tables": ["teams", "team_members", "collaboration_channels", "collaboration_participants", "collaboration_messages", "collaboration_member_credentials", "collaboration_member_sessions", "collaboration_password_reset_requests", "module2_notifications", "supervisor_assignments", "project_milestones", "project_tasks", "supervision_meetings"],
   "roles": ["STUDENT", "SUPERVISOR", "COORDINATOR", "ADMIN"],
   "permissions": ["Existing team ownership and role-scoped API dependencies"],
-  "tests": ["backend/tests/test_team_registration.py", "backend/tests/test_team_constraints.py", "backend/tests/test_group_channels.py", "backend/tests/test_group_ai.py"],
+  "tests": ["backend/tests/test_team_registration.py", "backend/tests/test_team_constraints.py", "backend/tests/test_collaboration_channels.py", "backend/tests/test_collaboration_channel_access.py", "backend/tests/test_project_workflow.py"],
   "status": "implemented"
 }

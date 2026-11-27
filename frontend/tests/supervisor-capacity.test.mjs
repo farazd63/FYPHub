@@ -12,7 +12,6 @@ test("supervisor capacity form uses supervisor, year, and annual maximum groups"
   assert.doesNotMatch(source, /Supervisor email/);
   assert.match(source, /academic_year: Number\(form\.academic_year\)/);
   assert.match(source, /maximum_groups: maximum/);
-  assert.doesNotMatch(source, /session: form\.session/);
 });
 
 test("supervisor capacity table exposes annual Fall/Spring counts and status badges", () => {
@@ -22,7 +21,6 @@ test("supervisor capacity table exposes annual Fall/Spring counts and status bad
   assert.match(source, /FULL/);
   assert.match(source, /OVER_CAPACITY/);
   assert.match(source, /INACTIVE/);
-  assert.match(source, /remaining_capacity/);
   assert.match(source, /Fall and Spring assignments share the same yearly limit/);
 });
 

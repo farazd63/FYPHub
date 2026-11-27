@@ -11,6 +11,7 @@ const adminUsers = readFileSync(join(here, "../src/AdminUsersRoles.tsx"), "utf8"
 const shell = readFileSync(join(here, "../src/portals/student/student.css"), "utf8");
 const supervisor = readFileSync(join(here, "../src/portals/supervisor/SupervisorPortal.tsx"), "utf8");
 const supervisorSidebar = readFileSync(join(here, "../src/portals/supervisor/SupervisorSidebar.tsx"), "utf8");
+const roleSidebar = readFileSync(join(here, "../src/portals/shared/RoleSidebar.tsx"), "utf8");
 const coordinator = readFileSync(join(here, "../src/portals/coordinator/CoordinatorPortal.tsx"), "utf8");
 const evaluator = readFileSync(join(here, "../src/portals/evaluator/EvaluatorPortal.tsx"), "utf8");
 const evaluatorSidebar = readFileSync(join(here, "../src/portals/evaluator/EvaluatorSidebar.tsx"), "utf8");
@@ -26,20 +27,18 @@ assert.match(policy, /special character/i);
 assert.match(field, /from "\.\/passwordPolicy"/);
 assert.match(field, /type=\{visible \? "text" : "password"\}/);
 assert.match(field, /Show.*Hide|Hide.*Show/);
-assert.match(app, /passwordPolicyError\(single\.password\)/);
-assert.match(app, /autoComplete="current-password"\s+guidance/);
+assert.match(app, /passwordPolicyError\(form\.password\)/);
+assert.match(app, /autoComplete="current-password"/);
+assert.match(app, /guidance/);
 assert.match(adminUsers, /passwordPolicyError\(form\.password\)/);
 assert.match(shell, /#10244a/);
 assert.match(shell, /student-sidebar__item\[aria-current=page\]/);
 assert.match(shell, /prefers-reduced-motion/);
 assert.match(supervisor, /Escape/);
-for (const portal of [supervisorSidebar, coordinator]) {
-  assert.match(portal, /student-sidebar__collapse/);
-  assert.match(portal, /student-sidebar__overlay/);
-}
+assert.match(roleSidebar, /student-sidebar__collapse/);
+assert.match(roleSidebar, /student-sidebar__overlay/);
 assert.match(coordinator, /Escape/);
-assert.match(evaluatorSidebar, /student-sidebar__collapse/);
-assert.match(evaluatorSidebar, /student-sidebar__overlay/);
+assert.match(evaluatorSidebar, /RoleSidebar/);
 assert.match(evaluator, /Escape/);
 assert.match(app, /authUser\?\.role === "PANEL_MEMBER"/);
 assert.doesNotMatch(field, /Medium/);

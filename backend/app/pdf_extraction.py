@@ -388,11 +388,6 @@ def _fitz_pdf_text(data: bytes, *, ocr_fallback: bool = False) -> str:
         document.close()
 
 
-def extract_pdf_text_for_summary(data: bytes) -> str:
-    """Return readable PDF text, using OCR only for damaged/unreadable pages."""
-    return _normalize_text(_fitz_pdf_text(data, ocr_fallback=True))
-
-
 def _heading(line: str) -> tuple[str, str | None] | None:
     match = _FIELD_HEADING.match(line)
     if not match:

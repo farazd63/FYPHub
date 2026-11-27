@@ -27,7 +27,9 @@ def supervisor_capacity(_: User = Depends(require_roles(*COORDINATOR_ROLES)), se
         spring_assigned = sum(1 for assignment, cycle_session in assignments if (assignment.session or cycle_session) == "SPRING")
         assigned = len(assignments)
         remaining = max(policy.max_group_capacity - assigned, 0)
-        eligible = user.is_active and user.role == UserRole.SUPERVISOR
+        eligible = user.is_active and user.role in (UserRole.SUPERVISOR, UserRole.COORDINATOR)
+        if eligible and user.role == UserRole.COORDINATOR:
+            eligible = cycle is not None and cycle.coordinator_id == user.id
         status = "INACTIVE" if not eligible else "OVER_CAPACITY" if assigned > policy.max_group_capacity else "FULL" if assigned == policy.max_group_capacity else "NEARLY_FULL" if assigned * 100 >= policy.max_group_capacity * 80 else "AVAILABLE"
         result.append({
         "id": policy.id,

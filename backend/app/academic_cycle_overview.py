@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .auth import require_roles
+from .academic_cycle_lifecycle import close_expired_cycle
 from .database import get_db
 from .models import (
     AcademicCycle,
@@ -22,6 +23,7 @@ from .models import (
     User,
     UserRole,
 )
+from .group_display import visible_group_name, visible_group_number
 
 router = APIRouter(prefix="/api/v1/academic-cycles", tags=["academic-cycles"])
 COORDINATOR_ROLES = (UserRole.ADMIN, UserRole.COORDINATOR)
@@ -63,10 +65,11 @@ def cycle_overview(cycle_id: int, _: User = Depends(require_roles(*COORDINATOR_R
     if cycle is None:
         logger.info("academic_cycle_overview cycle_id=%s lookup_status=missing response_status=404", cycle_id)
         raise HTTPException(status_code=404, detail="Academic cycle not found.")
+    close_expired_cycle(db, cycle, commit=True)
 
     users = {user.id: user for user in db.scalars(select(User)).all()}
-    coordinators = db.scalars(select(User).where(User.role == UserRole.COORDINATOR, User.is_active.is_(True)).order_by(User.full_name, User.id)).all()
-    teams = db.scalars(select(Team).where(Team.academic_cycle_id == cycle_id).order_by(Team.id)).all()
+    coordinators = db.scalars(select(User).where(User.id == cycle.coordinator_id, User.role == UserRole.COORDINATOR, User.is_active.is_(True)).order_by(User.full_name, User.id)).all()
+    teams = db.scalars(select(Team).where(Team.academic_cycle_id == cycle_id).order_by(Team.updated_at.desc(), Team.group_number.desc().nullslast(), Team.id.desc())).all()
     team_ids = [team.id for team in teams]
     members = db.scalars(select(TeamMember).where(TeamMember.academic_cycle_id == cycle_id, TeamMember.is_active.is_(True)).order_by(TeamMember.team_id, TeamMember.id)).all()
     assignments = db.scalars(select(SupervisorAssignment).where(SupervisorAssignment.academic_cycle_id == cycle_id, SupervisorAssignment.ended_at.is_(None)).order_by(SupervisorAssignment.id)).all()
@@ -109,13 +112,13 @@ def cycle_overview(cycle_id: int, _: User = Depends(require_roles(*COORDINATOR_R
         team = next((row for row in teams if row.id == item.team_id), None)
         requester = users.get(item.requester_user_id)
         supervisor = users.get(item.supervisor_id)
-        project_rows.append({"id": item.id, "title": item.title or f"Proposal {item.id}", "student_or_group": team.id if team else (requester.full_name if requester else "Unassigned"), "team_id": team.id if team else None, "supervisor": _user(supervisor), "proposal_type": item.proposal_type, "proposal_status": item.status, "project_stage": item.status, "submission_date": item.submitted_at, "last_updated": item.updated_at, "review_status": item.status, "related_documents_count": 1 if item.document_id else 0, "requester": _user(requester)})
+        project_rows.append({"id": item.id, "title": item.title or f"Proposal {item.id}", "student_or_group": visible_group_name(db, team) if team else (requester.full_name if requester else "Unassigned"), "team_id": team.id if team else None, "supervisor": _user(supervisor), "proposal_type": item.proposal_type, "proposal_status": item.status, "project_stage": item.status, "submission_date": item.submitted_at, "last_updated": item.updated_at, "review_status": item.status, "related_documents_count": 1 if item.document_id else 0, "requester": _user(requester)})
 
     group_rows = []
     for team in teams:
         assignment = assignment_by_team.get(team.id)
         project = project_request_by_team.get(team.id)
-        group_rows.append({"id": team.id, "group_id": team.id, "group_number": team.group_number, "name": f"Group {team.group_number or '—'}", "leader": _user(users.get(team.shared_user_id)), "members": [{"id": member.id, "name": member.full_name, "registration_number": member.registration_number, "email": member.university_email} for member in members_by_team.get(team.id, [])], "assigned_supervisor": _user(users.get(assignment.supervisor_id)) if assignment else None, "project_title": project.title if project else None, "status": "ACTIVE", "created_at": team.created_at})
+        group_rows.append({"id": team.id, "group_id": team.id, "group_number": visible_group_number(db, team), "name": visible_group_name(db, team, cycle), "leader": _user(users.get(team.shared_user_id)), "members": [{"id": member.id, "name": member.full_name, "registration_number": member.registration_number, "email": member.university_email} for member in members_by_team.get(team.id, [])], "assigned_supervisor": _user(users.get(assignment.supervisor_id)) if assignment else None, "project_title": project.title if project else None, "status": "ACTIVE", "created_at": team.created_at})
 
     active_requirements = [item for item in requirements if item.status != "ARCHIVED"]
     student_rows = []

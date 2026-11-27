@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { History as HistoryIcon, MessageSquarePlus, PanelLeftClose, PanelLeftOpen, Square, Trash2 } from "lucide-react";
+import { Square } from "lucide-react";
 import "./group-ai.css";
 import { sendsOnEnter } from "./portals/student/modules/collaboration-message";
 import "./portals/shared/conversation-layout.css";
@@ -25,9 +25,7 @@ type GroupAIChatProps = {
   api: string;
   floating?: boolean;
   open?: boolean;
-  historyCollapsed?: boolean;
   onClose?: () => void;
-  onToggleHistory?: () => void;
 };
 
 type StreamEvent = {
@@ -61,9 +59,7 @@ export function GroupAIChat({
   api,
   floating = false,
   open = true,
-  historyCollapsed = false,
   onClose,
-  onToggleHistory,
 }: GroupAIChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -74,9 +70,7 @@ export function GroupAIChat({
   const [loading, setLoading] = useState(!floating);
   const [conversationLoading, setConversationLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [deletingConversationId, setDeletingConversationId] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const [localHistoryCollapsed, setLocalHistoryCollapsed] = useState(false);
   const history = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const activeRequest = useRef<AbortController | null>(null);
@@ -193,40 +187,11 @@ export function GroupAIChat({
     stickToLatest.current = true;
   };
 
-  const deleteConversation = async (conversation: Conversation) => {
-    if (busy || deletingConversationId !== null) {
-      if (busy) setError("Stop the current response before deleting this chat.");
-      return;
-    }
-    if (!window.confirm(`Delete “${conversation.title}”? This cannot be undone.`)) return;
-    setDeletingConversationId(conversation.id);
-    setError("");
-    try {
-      const response = await fetch(`${conversationsUrl}/${conversation.id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error(await messageError(response, "This chat could not be deleted."));
-      setConversations((current) => current.filter((item) => item.id !== conversation.id));
-      if (selectedConversationId === conversation.id) startNewChat();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "This chat could not be deleted.");
-    } finally {
-      setDeletingConversationId(null);
-    }
-  };
-
   const updateConversation = (conversation: Conversation) => {
     setConversations((current) => [
       conversation,
       ...current.filter((item) => item.id !== conversation.id),
     ]);
-  };
-
-  const historyIsCollapsed = onToggleHistory ? historyCollapsed : localHistoryCollapsed;
-  const toggleHistory = () => {
-    if (onToggleHistory) onToggleHistory();
-    else setLocalHistoryCollapsed((current) => !current);
   };
 
   const stop = () => {
@@ -381,111 +346,6 @@ export function GroupAIChat({
     }
   };
 
-  const historyRail = (
-    <aside
-      className={`group-ai-history${historyIsCollapsed ? " group-ai-history--collapsed" : ""}`}
-      aria-label="Chat history"
-    >
-      <div className="group-ai-history__header">
-        <div>
-          <span>Chats</span>
-          <strong>History</strong>
-        </div>
-        <div className="group-ai-history__actions">
-          {!historyIsCollapsed && (
-            <button
-              type="button"
-              className="group-ai-new-chat"
-              onClick={startNewChat}
-              aria-label="Start a new chat"
-              title="Start a new chat"
-            >
-              +
-            </button>
-          )}
-          <button
-            type="button"
-            className="group-ai-history__toggle"
-            onClick={toggleHistory}
-            aria-label={historyIsCollapsed ? "Show chat history" : "Hide chat history"}
-            title={historyIsCollapsed ? "Show chat history" : "Hide chat history"}
-            aria-expanded={!historyIsCollapsed}
-          >
-            {historyIsCollapsed ? <PanelLeftOpen size={16} strokeWidth={1.8} aria-hidden="true" /> : <PanelLeftClose size={16} strokeWidth={1.8} aria-hidden="true" />}
-          </button>
-        </div>
-      </div>
-      {historyIsCollapsed && (
-        <nav className="group-ai-history__rail" aria-label="Chat history shortcuts">
-          <button
-            type="button"
-            className={`group-ai-history__rail-button${selectedConversationId === null ? " is-active" : ""}`}
-            onClick={startNewChat}
-            aria-label="Start a new chat"
-            title="Start a new chat"
-            aria-pressed={selectedConversationId === null}
-          >
-            <MessageSquarePlus size={19} strokeWidth={1.8} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="group-ai-history__rail-button"
-            onClick={toggleHistory}
-            aria-label="Show chat history"
-            title="Show chat history"
-          >
-            <HistoryIcon size={19} strokeWidth={1.8} aria-hidden="true" />
-          </button>
-        </nav>
-      )}
-      {!historyIsCollapsed && <button
-        type="button"
-        className={`group-ai-history__new${selectedConversationId === null ? " is-active" : ""}`}
-        onClick={startNewChat}
-      >
-        <span className="group-ai-history__new-icon">+</span>
-        <span>New chat</span>
-      </button>}
-      {!historyIsCollapsed && <div className="group-ai-history__list">
-        {loading && <p className="group-ai-history__empty">Loading chats...</p>}
-        {!loading && !conversations.length && (
-          <p className="group-ai-history__empty">
-            Your previous chats will appear here.
-          </p>
-        )}
-        {conversations.map((conversation) => (
-          <div key={conversation.id} className="group-ai-history__item-row">
-            <button
-              type="button"
-              className={`group-ai-history__item${selectedConversationId === conversation.id ? " is-active" : ""}`}
-              onClick={() => void loadConversation(conversation.id)}
-              aria-current={
-                selectedConversationId === conversation.id ? "page" : undefined
-              }
-            >
-              <strong title={conversation.title}>{conversation.title}</strong>
-              <span>
-                {conversation.message_count
-                  ? `${conversation.message_count} messages`
-                  : "New chat"}
-              </span>
-            </button>
-            <button
-              type="button"
-              className="group-ai-history__delete"
-              aria-label={`Delete ${conversation.title}`}
-              title="Delete chat"
-              disabled={busy || deletingConversationId !== null}
-              onClick={() => void deleteConversation(conversation)}
-            >
-              <Trash2 size={15} strokeWidth={1.8} aria-hidden="true" />
-            </button>
-          </div>
-        ))}
-      </div>}
-    </aside>
-  );
-
   const conversation = (
     <div className="group-ai-card group-ai-conversation">
       <div
@@ -589,7 +449,6 @@ export function GroupAIChat({
 
   const workspace = (
     <div className="group-ai-workspace">
-      {historyRail}
       {conversation}
     </div>
   );
@@ -609,6 +468,9 @@ export function GroupAIChat({
               <p>Llama 3.1 8B</p>
             </div>
           </div>
+          <button type="button" className="group-ai-floating-panel__new-chat" onClick={startNewChat}>
+            New chat
+          </button>
           <button
             type="button"
             className="group-ai-floating-panel__close"
@@ -649,6 +511,7 @@ export function GroupAIChat({
             <p>Ask any question and get a direct response from Llama 3.1 8B.</p>
           </div>
         </div>
+        <button type="button" className="group-ai-secondary" onClick={startNewChat}>New chat</button>
       </div>
       {error && (
         <p role="alert" className="group-ai-alert">

@@ -12,8 +12,8 @@ const migration = readFileSync(new URL("../../backend/alembic/versions/y6n7o8p9q
 
 test("announcement dashboard UI supports latest, detail, read, and scoped creation", () => {
   for (const value of ["/api/v1/announcements/latest", "/api/v1/announcements/permissions", "/read`, { method: \"POST\"", "cycles: AnnouncementScopeOption[]", "groups: AnnouncementScopeOption[]", "projects: AnnouncementScopeOption[]", "View details", "View all", "Create announcement"]) assert.match(section, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(section, /latest\?limit=1/);
-  assert.match(section, /announcementRows\.slice\(0, 1\)/);
+  assert.match(section, /latest\?limit=\$\{resultLimit\}/);
+  assert.match(section, /announcementRows\.slice\(0, resultLimit\)/);
   assert.match(section, /announcement-card--expanded/);
   assert.match(section, /mostRecentUnreadId/);
   assert.match(section, /highlightedId/);

@@ -1,0 +1,505 @@
+/*
+ * FYPHub Academic Pro
+ *
+ * The shared visual layer for every role portal. Feature styles remain in
+ * their own modules; this file owns the final theme, shell, control and
+ * surface decisions so portals stay visually consistent.
+ */
+
+:root {
+  --fy-font: "Inter", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --fy-text-display: 2.5rem;
+  --fy-text-display-lh: 3rem;
+  --fy-text-h1: 1.75rem;
+  --fy-text-h1-lh: 2.25rem;
+  --fy-text-h2: 1.25rem;
+  --fy-text-h2-lh: 1.75rem;
+  --fy-text-h3: 1rem;
+  --fy-text-h3-lh: 1.5rem;
+  --fy-text-page: 1.75rem;
+  --fy-text-section: 1.25rem;
+  --fy-text-body: 0.875rem;
+  --fy-text-body-lh: 1.375rem;
+  --fy-text-small: 0.8125rem;
+  --fy-text-small-lh: 1.25rem;
+  --fy-text-label: 0.75rem;
+  --fy-text-label-lh: 1rem;
+  --fy-weight-regular: 400;
+  --fy-weight-medium: 500;
+  --fy-weight-semibold: 600;
+  --fy-weight-bold: 700;
+
+  --fy-radius-control: 0.5rem;
+  --fy-radius-card: 0.75rem;
+  --fy-radius-nav: 0.75rem;
+  --fy-radius-footer: 1rem;
+  --fy-shell-sidebar-width: 248px;
+  --fy-shell-sidebar-collapsed-width: 72px;
+  --fy-sidebar-bg: #ffffff;
+  --fy-sidebar-fg: #172b4d;
+  --fy-sidebar-muted: #64748b;
+  --fy-sidebar-active: #2563eb;
+  --fy-header-bg: #ffffff;
+}
+
+:root,
+:root[data-theme="light"] {
+  --fy-page: #f5f7fb;
+  --fy-bg: #f5f7fb;
+  --fy-bg-subtle: #edf2f8;
+  --fy-surface: #ffffff;
+  --fy-surface-2: #ffffff;
+  --fy-surface-raised: #ffffff;
+  --fy-surface-muted: #edf2f8;
+  --fy-surface-hover: #e8eef7;
+  --fy-border: #e2e8f0;
+  --fy-border-strong: #cbd5e1;
+  --fy-input-border: #cbd5e1;
+  --fy-text: #172b4d;
+  --fy-text-primary: #172b4d;
+  --fy-text-secondary: #64748b;
+  --fy-text-muted: #64748b;
+  --fy-text-subtle: #94a3b8;
+  --fy-text-inverse: #ffffff;
+  --fy-text-on-brand: #ffffff;
+  --fy-brand: #2563eb;
+  --fy-primary: #2563eb;
+  --fy-brand-hover: #1d4ed8;
+  --fy-primary-hover: #1d4ed8;
+  --fy-brand-soft: #e8f0ff;
+  --fy-primary-soft: #e8f0ff;
+  --fy-brand-ring: rgb(37 99 235 / 0.28);
+  --fy-success: #15803d;
+  --fy-success-soft: #e8f7ed;
+  --fy-warning: #b45309;
+  --fy-warning-soft: #fff4df;
+  --fy-danger: #dc2626;
+  --fy-danger-soft: #fef0f0;
+  --fy-info: #0369a1;
+  --fy-info-soft: #e4f4fb;
+  --fy-neutral: #64748b;
+  --fy-neutral-soft: #edf2f8;
+  --fy-disabled-bg: #edf2f8;
+  --fy-disabled-fg: #64748b;
+  --fy-disabled-border: #cbd5e1;
+  --fy-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.04);
+  --fy-shadow-md: 0 4px 12px rgb(15 23 42 / 0.06);
+  --fy-shadow-nav: 0 8px 24px rgb(15 23 42 / 0.12);
+  --fy-shadow: var(--fy-shadow-sm);
+  --fy-focus-ring: 0 0 0 2px var(--fy-surface), 0 0 0 4px var(--fy-brand-ring);
+  --fy-header-bg: #ffffff;
+}
+
+:root[data-theme="dark"] {
+  --fy-page: #0d1117;
+  --fy-bg: #0d1117;
+  --fy-bg-subtle: #101722;
+  --fy-surface: #161f2c;
+  --fy-surface-2: #161f2c;
+  --fy-surface-raised: #131b26;
+  --fy-surface-muted: #1c2736;
+  --fy-surface-hover: #223149;
+  --fy-border: #293548;
+  --fy-border-strong: #3a4b62;
+  --fy-input-border: #3a4b62;
+  --fy-text: #f1f5f9;
+  --fy-text-primary: #f1f5f9;
+  --fy-text-secondary: #94a3b8;
+  --fy-text-muted: #94a3b8;
+  --fy-text-subtle: #64748b;
+  --fy-text-inverse: #0d1117;
+  --fy-text-on-brand: #0d1117;
+  --fy-brand: #60a5fa;
+  --fy-primary: #60a5fa;
+  --fy-brand-hover: #93c5fd;
+  --fy-primary-hover: #93c5fd;
+  --fy-brand-soft: #1e3a5f;
+  --fy-primary-soft: #1e3a5f;
+  --fy-brand-ring: rgb(96 165 250 / 0.34);
+  --fy-success: #4ade80;
+  --fy-success-soft: #163d2a;
+  --fy-warning: #fbbf24;
+  --fy-warning-soft: #3b2d12;
+  --fy-danger: #f87171;
+  --fy-danger-soft: #42202a;
+  --fy-info: #38bdf8;
+  --fy-info-soft: #12354a;
+  --fy-neutral: #94a3b8;
+  --fy-neutral-soft: #1c2736;
+  --fy-disabled-bg: #1c2736;
+  --fy-disabled-fg: #94a3b8;
+  --fy-disabled-border: #3a4b62;
+  --fy-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.16);
+  --fy-shadow-md: 0 4px 12px rgb(0 0 0 / 0.22);
+  --fy-shadow-nav: 0 8px 24px rgb(0 0 0 / 0.28);
+  --fy-shadow: var(--fy-shadow-sm);
+  --fy-focus-ring: 0 0 0 2px var(--fy-surface), 0 0 0 4px var(--fy-brand-ring);
+  --fy-sidebar-bg: #101722;
+  --fy-sidebar-fg: #dbeafe;
+  --fy-sidebar-muted: #94a3b8;
+  --fy-sidebar-active: #1e3a5f;
+  --fy-header-bg: #131b26;
+}
+
+html,
+body {
+  background: var(--fy-page);
+  color: var(--fy-text);
+  font-family: var(--fy-font);
+}
+
+body {
+  font-size: var(--fy-text-body);
+  line-height: var(--fy-text-body-lh);
+}
+
+/* Shared application shell */
+.admin-shell > header,
+.student-header,
+.portal-header,
+main:has(.admin-sidebar) > header {
+  background: var(--fy-header-bg) !important;
+  border-bottom: 1px solid var(--fy-border) !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04) !important;
+  backdrop-filter: none !important;
+}
+
+.admin-shell .admin-shell__content,
+.student-shell .student-content,
+.portal-shell .portal-content {
+  color: var(--fy-text);
+}
+
+.student-sidebar.role-sidebar,
+.student-sidebar.role-sidebar.admin-sidebar,
+main:has(.admin-sidebar) .admin-sidebar,
+main:has(.admin-sidebar) .student-sidebar.role-sidebar,
+main:has(.admin-sidebar) .student-sidebar.role-sidebar.admin-sidebar {
+  background: var(--fy-sidebar-bg) !important;
+  background-color: var(--fy-sidebar-bg) !important;
+  color: var(--fy-sidebar-fg) !important;
+}
+
+@media (min-width: 768px) {
+  .student-sidebar.role-sidebar,
+  .admin-shell .student-sidebar.role-sidebar,
+  main:has(.admin-sidebar) .student-sidebar.role-sidebar {
+    width: var(--fy-shell-sidebar-width) !important;
+    flex-basis: var(--fy-shell-sidebar-width) !important;
+    border: 0 !important;
+    border-radius: var(--fy-radius-card) !important;
+    background: var(--fy-sidebar-bg) !important;
+    background-color: var(--fy-sidebar-bg) !important;
+    box-shadow: 0 4px 14px rgb(15 23 42 / 0.12) !important;
+  }
+
+  .student-sidebar.role-sidebar.student-sidebar--collapsed,
+  .admin-shell .student-sidebar.role-sidebar.student-sidebar--collapsed {
+    width: var(--fy-shell-sidebar-collapsed-width) !important;
+    flex-basis: var(--fy-shell-sidebar-collapsed-width) !important;
+  }
+
+  .admin-shell .admin-shell__content,
+  main:has(.admin-sidebar) > div > section {
+    margin-left: calc(var(--fy-shell-pad) + var(--fy-shell-sidebar-width) + 24px) !important;
+  }
+
+  .admin-shell:has(.student-sidebar.role-sidebar.student-sidebar--collapsed) .admin-shell__content,
+  main:has(.admin-sidebar.student-sidebar--collapsed) > div > section {
+    margin-left: calc(var(--fy-shell-pad) + var(--fy-shell-sidebar-collapsed-width) + 24px) !important;
+  }
+
+  .student-shell .student-content,
+  .portal-shell .portal-content {
+    margin-left: calc(var(--fy-shell-pad) + var(--fy-shell-sidebar-width) + 24px) !important;
+  }
+
+  .student-shell:has(.student-sidebar.role-sidebar.student-sidebar--collapsed) .student-content,
+  .portal-shell:has(.student-sidebar.role-sidebar.student-sidebar--collapsed) .portal-content {
+    margin-left: calc(var(--fy-shell-pad) + var(--fy-shell-sidebar-collapsed-width) + 24px) !important;
+  }
+}
+
+.role-sidebar .role-sidebar__panel,
+.role-sidebar .student-sidebar__nav {
+  background: var(--fy-sidebar-bg) !important;
+}
+
+.role-sidebar .role-sidebar__menu-section {
+  border: 1px solid var(--fy-border) !important;
+  border-radius: var(--fy-radius-control) !important;
+  background: var(--fy-surface) !important;
+}
+
+.role-sidebar .role-sidebar__menu-section-head {
+  min-height: 44px !important;
+  border-radius: var(--fy-radius-control) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-sidebar-muted) !important;
+}
+
+.role-sidebar .role-sidebar__menu-section-head:hover,
+.role-sidebar .role-sidebar__menu-section-head:focus-visible {
+  background: var(--fy-surface-hover) !important;
+  color: var(--fy-sidebar-fg) !important;
+}
+
+.role-sidebar .role-sidebar__menu-section.is-selected .role-sidebar__menu-section-head,
+.role-sidebar .role-sidebar__menu-section.is-selected .role-sidebar__menu-section-head:hover,
+.role-sidebar .role-sidebar__menu-section.is-selected .role-sidebar__menu-section-head:focus-visible {
+  background: var(--fy-sidebar-active) !important;
+  color: #ffffff !important;
+  box-shadow: 0 5px 12px rgb(37 99 235 / 0.2) !important;
+}
+
+.role-sidebar .role-sidebar__menu-section.is-selected .role-sidebar__menu-section-icon {
+  border-color: rgb(255 255 255 / 0.7) !important;
+  background: #ffffff !important;
+  color: var(--fy-sidebar-active) !important;
+}
+
+.role-sidebar .student-sidebar__item {
+  min-height: 44px !important;
+  border: 0 !important;
+  border-radius: var(--fy-radius-control) !important;
+  color: var(--fy-sidebar-muted) !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+}
+
+.role-sidebar .student-sidebar__item:hover:not(:disabled):not([aria-current="page"]) {
+  background: var(--fy-surface-hover) !important;
+  color: var(--fy-sidebar-fg) !important;
+}
+
+.role-sidebar .student-sidebar__item[aria-current="page"],
+.role-sidebar .student-sidebar__item[aria-current="page"]:hover,
+.role-sidebar .student-sidebar__item[aria-current="page"]:focus-visible {
+  border-left: 3px solid var(--fy-brand) !important;
+  border-radius: 0 var(--fy-radius-control) var(--fy-radius-control) 0 !important;
+  background: var(--fy-sidebar-active) !important;
+  color: #ffffff !important;
+}
+
+.role-sidebar .student-sidebar__item[aria-current="page"]::before {
+  display: none !important;
+}
+
+.role-sidebar .student-sidebar__icon,
+.role-sidebar .student-sidebar__item[aria-current="page"] .student-sidebar__icon {
+  width: 28px !important;
+  height: 28px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: currentColor !important;
+}
+
+.role-sidebar .role-sidebar__collapse {
+  width: 36px !important;
+  height: 36px !important;
+  border: 1px solid var(--fy-border-strong) !important;
+  border-radius: var(--fy-radius-control) !important;
+  background: #ffffff !important;
+  color: var(--fy-sidebar-fg) !important;
+  box-shadow: none !important;
+}
+
+.role-sidebar .role-sidebar__collapse:hover {
+  background: var(--fy-brand-soft) !important;
+  color: var(--fy-brand) !important;
+}
+
+/* Surfaces: compact, readable and information-first. */
+.fy-card,
+.fy-table-scroll,
+.fy-modal,
+.student-phase-card,
+.student-request-card,
+.supervisor-card,
+.group-ai-card,
+.proposal-ai-summary,
+.cycle-overview__card,
+.academic-cycle-dashboard__card,
+.announcement-section,
+.announcement-composer,
+.announcement-detail {
+  border-radius: var(--fy-radius-card) !important;
+  box-shadow: none !important;
+}
+
+.fy-card,
+.fy-table-scroll,
+.student-phase-card,
+.student-request-card,
+.supervisor-card,
+.group-ai-card,
+.proposal-ai-summary,
+.announcement-section,
+.announcement-composer,
+.announcement-detail {
+  border-color: var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+}
+
+.fy-btn,
+.fy-icon-btn,
+.portal-content button,
+.admin-shell button {
+  border-radius: var(--fy-radius-control);
+  font-family: inherit;
+}
+
+.fy-btn {
+  min-height: 42px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.fy-icon-btn {
+  border-radius: var(--fy-radius-control) !important;
+}
+
+.fy-input,
+.admin-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.admin-shell select,
+.admin-shell textarea,
+.student-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.student-shell select,
+.student-shell textarea,
+.portal-content input,
+.portal-content select,
+.portal-content textarea {
+  min-height: 42px;
+  border-radius: var(--fy-radius-control) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-text) !important;
+}
+
+.fy-table-scroll,
+.admin-shell table,
+.student-shell table {
+  border: 1px solid var(--fy-border);
+  background: var(--fy-surface);
+}
+
+.fy-table__th,
+.admin-shell thead th,
+.student-shell thead th {
+  background: var(--fy-surface-muted) !important;
+  color: var(--fy-text-secondary) !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Admin overview: remove decorative hero treatment and keep cards in a fluid grid. */
+.cycle-overview {
+  width: 100% !important;
+  max-width: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.cycle-overview::before,
+.cycle-overview__hero::before,
+.cycle-overview__hero::after {
+  display: none !important;
+}
+
+.cycle-overview__hero {
+  border: 1px solid var(--fy-border) !important;
+  border-radius: var(--fy-radius-card) !important;
+  background: var(--fy-surface) !important;
+  box-shadow: none !important;
+  color: var(--fy-text) !important;
+  animation: none !important;
+}
+
+.cycle-overview__hero h1,
+.cycle-overview__hero .fy-page-header__title {
+  color: var(--fy-text) !important;
+}
+
+.cycle-overview__grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)) !important;
+  gap: 20px !important;
+}
+
+.cycle-overview__card {
+  min-height: 240px !important;
+  border: 1px solid var(--fy-border) !important;
+  border-top: 3px solid var(--fy-brand) !important;
+  border-left: 1px solid var(--fy-border) !important;
+  border-radius: var(--fy-radius-card) !important;
+  background: var(--fy-surface) !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+
+.cycle-overview__card:hover {
+  transform: none !important;
+  border-color: var(--fy-brand) !important;
+  background: var(--fy-surface-hover) !important;
+  box-shadow: none !important;
+}
+
+.cycle-overview__card::before {
+  display: none !important;
+}
+
+.announcement-section {
+  border: 1px solid var(--fy-border) !important;
+  background: var(--fy-surface) !important;
+}
+
+.announcement-button,
+.cycle-overview__detail-button {
+  border-radius: var(--fy-radius-control) !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+}
+
+/* Neutralize the most prominent decorative effects across role pages. */
+.student-overview__hero,
+.supervisor-page-heading,
+.progress-hero,
+.module3-hero,
+.group-ai-heading,
+.expertise-heading,
+.evaluator-placeholder {
+  border-radius: var(--fy-radius-card) !important;
+  background: var(--fy-surface) !important;
+  box-shadow: none !important;
+}
+
+.student-overview__hero::before,
+.student-overview__hero::after,
+.progress-hero::before,
+.progress-hero::after {
+  display: none !important;
+}
+
+@media (max-width: 767px) {
+  .admin-shell .admin-shell__content,
+  .student-shell .student-content,
+  .portal-shell .portal-content {
+    margin-left: 0 !important;
+  }
+
+  .student-sidebar.role-sidebar {
+    width: min(84vw, 304px) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

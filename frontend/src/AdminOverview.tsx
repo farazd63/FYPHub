@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader, StatusBadge } from "./ui";
 import { AnnouncementSection } from "./announcements/AnnouncementSection";
+import { sortCyclesDesc } from "./lib/displayLabels";
 import "./AdminOverview.css";
 
-type Cycle = { id: number; code: string; display_name: string; registration_open: boolean };
+type Cycle = { id: number; code: string; display_name: string; academic_year?: number | string | null; session?: string | null; created_at?: string | null; updated_at?: string | null; registration_open: boolean };
 type Policy = { max_group_size: number };
 type Row = Cycle & { policy: Policy | null; policyError: boolean };
 
@@ -16,7 +17,7 @@ export function AdminOverview({ api, onManage, onCycleDetails }: { api: string; 
     try {
       const response = await fetch(`${api}/api/v1/academic-cycles`, { credentials: "include" });
       if (!response.ok) throw new Error();
-      const cycles = await response.json() as Cycle[];
+      const cycles = sortCyclesDesc(await response.json() as Cycle[]);
       const values = await Promise.all(cycles.map(async (cycle) => {
         try {
           const policy = await fetch(`${api}/api/v1/academic-cycles/${cycle.id}/group-policy`, { credentials: "include" });

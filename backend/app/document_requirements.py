@@ -10,12 +10,14 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from .auth import get_current_user, require_roles, validate_mutating_origin
+from .academic_cycle_lifecycle import close_expired_cycle, close_expired_cycles
 from .database import get_db
 from .models import AcademicCycle, DocumentArchiveReviewQueue, DocumentRequirementSection, DocumentSubmission, DocumentSubmissionReviewEvent, DocumentSubmissionVersion, DocumentUploadRequirement, SupervisorAssignment, SupervisorRequest, Team, TeamMember, User, UserRole
 from .schemas.document_requirements import RequirementWrite, RequirementPatch, RequirementOut, ReviewEventOut, SubmissionOut, VersionOut
 from .config import settings
 from .document_preview import DocumentPreviewError, render_document_preview
 from .notification_service import cycle_student_ids, notify, notify_admins, team_student_ids, team_supervisor_ids
+from .group_display import visible_group_name
 
 router = APIRouter(prefix="/api/v1/document-requirements", tags=["document-requirements"])
 student_router = APIRouter(tags=["document-requirements"])
@@ -62,6 +64,7 @@ def _student_group(user, db):
 
 
 def _current_active_cycle_id(db):
+    close_expired_cycles(db)
     return db.scalar(select(AcademicCycle.id).where(AcademicCycle.registration_open.is_(True)).order_by(AcademicCycle.id).limit(1))
 
 
@@ -82,7 +85,7 @@ def _visible(req, user, db=None):
 
 def _supervisor_can_review(row, req, user, db):
     """Allow a supervisor to review only submissions from their active group."""
-    if user.role != UserRole.SUPERVISOR or row.group_id is None or req is None:
+    if user.role not in (UserRole.SUPERVISOR, UserRole.COORDINATOR) or row.group_id is None or req is None:
         return False
     assigned = db.scalar(select(SupervisorAssignment.id).where(
         SupervisorAssignment.team_id == row.group_id,
@@ -337,6 +340,10 @@ async def upload(requirement_id: int, file: UploadFile = File(...), _: object = 
     req = db.get(DocumentUploadRequirement, requirement_id)
     if not req or req.status not in {"PUBLISHED", "CLOSED", "ACTIVE"}: raise HTTPException(404, "Requirement is not available.")
     if req.status == "CLOSED": raise HTTPException(409, "This requirement is closed and cannot accept uploads.")
+    cycle = db.get(AcademicCycle, req.academic_cycle_id)
+    if cycle is None: raise HTTPException(404, "Academic cycle not found.")
+    if close_expired_cycle(db, cycle, commit=True) or not cycle.registration_open:
+        raise HTTPException(409, "This academic cycle is closed; document uploads are no longer accepted.")
     if not _visible(req, actor, db): raise HTTPException(403, "You are not authorized for this requirement.")
     late = _now() > req.due_at
     if late and not req.late_upload_allowed: raise HTTPException(409, "The deadline has passed; late uploads are closed.")
@@ -345,7 +352,10 @@ async def upload(requirement_id: int, file: UploadFile = File(...), _: object = 
     if group is None or group.academic_cycle_id != req.academic_cycle_id: raise HTTPException(409, "Your group is not assigned to this academic cycle.")
     project = _project_for_group(db, group.id, req.academic_cycle_id)
     if project is None: raise HTTPException(409, "Your group does not have a project record for this academic cycle yet.")
-    row = db.scalar(select(DocumentSubmission).where(DocumentSubmission.requirement_id == req.id, DocumentSubmission.group_id == group.id))
+    # Keep one shared group submission per requirement. The requirement ID is
+    # intentionally part of this lookup, so a Video upload can never become a
+    # version of a PDF, report, or any other requirement in the same cycle.
+    row = db.scalar(select(DocumentSubmission).where(DocumentSubmission.requirement_id == req.id, DocumentSubmission.group_id == group.id).order_by(DocumentSubmission.updated_at.desc(), DocumentSubmission.id.desc()).limit(1))
     if row is None: row = DocumentSubmission(requirement_id=req.id, student_id=actor.id, group_id=group.id, academic_cycle_id=req.academic_cycle_id, project_id=project.id, requirement_section_id=req.section_id, uploaded_by_id=actor.id, status="UPLOADED", is_late=late); db.add(row); db.flush()
     else: row.status = "UPLOADED"; row.is_late = row.is_late or late; row.project_id = row.project_id or project.id; row.requirement_section_id = row.requirement_section_id or req.section_id
     row.uploaded_by_id = actor.id
@@ -356,7 +366,7 @@ async def upload(requirement_id: int, file: UploadFile = File(...), _: object = 
         temporary.write_bytes(data); temporary.replace(path)
         version = DocumentSubmissionVersion(submission_id=row.id, version_number=previous + 1, original_filename=PurePath(file.filename or "upload").name, stored_filename=stored.rsplit("/", 1)[-1], mime_type=file.content_type or MIMES[suffix], file_size=len(data), storage_reference=stored, content=None, uploaded_by_id=actor.id)
         db.add(version); db.flush()
-        group_label = group.group_name or f"Group {group.group_number if group.group_number is not None else group.id}"
+        group_label = visible_group_name(db, group)
         upload_payload = {"requirement_id": req.id, "submission_id": row.id, "version_id": version.id, "version": version.version_number, "group_id": group.id, "cycle_id": req.academic_cycle_id, "status": row.status}
         upload_message = f"{group_label} uploaded {version.original_filename} for '{req.title}'."
         notify(db, team_supervisor_ids(db, group.id), kind="DOCUMENT_SUBMISSION_UPLOADED", title="Student document uploaded", message=upload_message, path=f"/supervisor/groups/{group.id}?tab=documents", exclude={actor.id}, **upload_payload)
@@ -464,13 +474,17 @@ def preview(submission_id: int, version_id: int, actor: User = Depends(get_curre
 def _review(requirement_id, submission_id, decision, comment, actor, db):
     req = db.get(DocumentUploadRequirement, requirement_id); row = db.get(DocumentSubmission, submission_id)
     if not req or not row or row.requirement_id != req.id: raise HTTPException(404, "Submission not found.")
+    cycle = db.get(AcademicCycle, req.academic_cycle_id)
+    if cycle is None: raise HTTPException(404, "Academic cycle not found.")
+    if close_expired_cycle(db, cycle, commit=True) or not cycle.registration_open:
+        raise HTTPException(409, "This academic cycle is closed; document acceptance is no longer available.")
     if not _supervisor_can_review(row, req, actor, db): raise HTTPException(403, "Only the assigned supervisor can review this document.")
     _ensure_review_transition(row.status, decision)
     row.status = decision; row.review_comment = comment; row.reviewed_by_id = actor.id; row.reviewed_at = _now()
     latest_version = db.scalar(select(DocumentSubmissionVersion).where(DocumentSubmissionVersion.submission_id == row.id).order_by(DocumentSubmissionVersion.version_number.desc()).limit(1))
     db.add(DocumentSubmissionReviewEvent(submission_id=row.id, version_id=latest_version.id if latest_version else None, status=decision, reviewer_id=actor.id, comment=comment, created_at=row.reviewed_at))
     group = db.get(Team, row.group_id) if row.group_id is not None else None
-    group_label = group.group_name if group and group.group_name else f"Group {row.group_id}" if row.group_id else "your group"
+    group_label = visible_group_name(db, group) if group else "your group"
     decision_labels = {"ACCEPTED": "Document accepted", "UNDER_REVIEW": "Document under review", "REJECTED": "Document rejected", "RESUBMISSION_REQUIRED": "Document changes requested"}
     decision_messages = {"ACCEPTED": "was accepted", "UNDER_REVIEW": "is now under review", "REJECTED": "was rejected", "RESUBMISSION_REQUIRED": "needs changes before it can be accepted"}
     review_payload = {"requirement_id": req.id, "submission_id": row.id, "version_id": latest_version.id if latest_version else None, "group_id": row.group_id, "cycle_id": req.academic_cycle_id, "status": decision}

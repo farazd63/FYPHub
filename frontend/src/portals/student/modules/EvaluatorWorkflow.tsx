@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type Schedule = { id: number; team_id: number; start_at: string; end_at: string; room: string | null; online_link: string | null; status: string };
+type Schedule = { id: number; team_id: number | string; team_label?: string | null; group_name?: string | null; group_number?: number | null; start_at: string; end_at: string; room: string | null; online_link: string | null; status: string };
 type Score = { criterion_key: string; score: string; max_score: string; feedback: string };
 type Evaluation = { id: number; status: string; overall_feedback: string | null; disagreement_detected: boolean; decision?: string | null; created_at?: string; overall_score?: number | null };
 const input = "w-full rounded-lg border border-[#dce4de] bg-white px-3 py-2 text-sm text-[#243746]";
+const groupLabel = (row: Schedule | null) => row?.team_label || row?.group_name || (row?.group_number ? `Group ${row.group_number}` : "Group");
 
 export function EvaluatorWorkflow({ api, view }: { api: string; view: string }) {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -107,7 +108,7 @@ export function EvaluatorWorkflow({ api, view }: { api: string; view: string }) 
           <div className="student-overview__grid evaluator-workflow-grid">
             {list.map((row) => (
               <article key={row.id} className="student-request-card">
-                <strong>Team {row.team_id}</strong>
+                <strong>{groupLabel(row)}</strong>
                 <p>{new Date(row.start_at).toLocaleString()} – {new Date(row.end_at).toLocaleString()}</p>
                 <small>{row.room ?? row.online_link ?? "Location pending"} · {row.status}</small>
               </article>
@@ -136,14 +137,14 @@ export function EvaluatorWorkflow({ api, view }: { api: string; view: string }) 
               <div className="grid gap-2">
                 {schedules.map((row) => (
                   <button type="button" key={row.id} className="student-phase-card text-left" onClick={() => setSelected(row)}>
-                    <strong>Team {row.team_id}</strong>
+                    <strong>{groupLabel(row)}</strong>
                     <span>{new Date(row.start_at).toLocaleString()}</span>
                   </button>
                 ))}
               </div>
             </div>
             <div className="student-request-card">
-              <h2>Decision history{selected ? ` · Team ${selected.team_id}` : ""}</h2>
+              <h2>Decision history{selected ? ` · ${groupLabel(selected)}` : ""}</h2>
               {!selected && <p className="student-request-muted">Choose a defense to view submitted decisions.</p>}
               {selected && !historyRows.length && <p className="student-request-muted">No submitted evaluations yet for this defense.</p>}
               {historyRows.map((item) => (
@@ -177,7 +178,7 @@ export function EvaluatorWorkflow({ api, view }: { api: string; view: string }) 
             <h2>Assigned defenses</h2>
             {schedules.map((row) => (
               <button type="button" key={row.id} className="student-phase-card" onClick={() => setSelected(row)}>
-                <strong>Team {row.team_id}</strong>
+                <strong>{groupLabel(row)}</strong>
                 <span>{new Date(row.start_at).toLocaleString()} – {new Date(row.end_at).toLocaleString()}</span>
                 <small>{row.room ?? row.online_link ?? "Location pending"} · {row.status}</small>
               </button>
@@ -185,7 +186,7 @@ export function EvaluatorWorkflow({ api, view }: { api: string; view: string }) 
           </div>
           {selected && (
             <div className="student-request-card">
-              <h2>Evaluation for Team {selected.team_id}</h2>
+              <h2>Evaluation for {groupLabel(selected)}</h2>
               {scores.map((item, index) => (
                 <div key={`${item.criterion_key}-${index}`} className="grid gap-2 border-b border-[#e8ede9] py-3">
                   <input className={input} aria-label={`Criterion ${index + 1}`} placeholder="Criterion" value={item.criterion_key} onChange={(event) => setScores(scores.map((row, rowIndex) => rowIndex === index ? { ...row, criterion_key: event.target.value } : row))} />

@@ -26,6 +26,7 @@ from .models import (
 )
 from .schemas.project_workflow import EvaluationWrite, MeetingWrite, MilestoneWrite, ResolutionWrite, ScheduleReschedule, ScheduleWrite, TaskWrite
 from .notification_service import notify, notify_admins, team_student_ids, team_supervisor_ids
+from .group_display import visible_group_name, visible_group_number
 
 router = APIRouter(prefix="/api/v1")
 WRITE_ROLES = (UserRole.STUDENT, UserRole.SUPERVISOR, UserRole.COORDINATOR, UserRole.ADMIN)
@@ -74,6 +75,8 @@ def _panel_member_ids(session: Session, schedule_id: int) -> set[int]:
 
 def _notify_schedule_change(session: Session, actor: User, schedule: DefenseSchedule, *, kind: str, title: str, message: str, panel_ids: set[int] | None = None) -> None:
     team = _team(session, schedule.team_id)
+    group_label = visible_group_name(session, team)
+    message = message.replace(f"Team {team.id}", group_label).replace(f"Group {team.id}", group_label)
     recipients = panel_ids if panel_ids is not None else _panel_member_ids(session, schedule.id)
     notify(session, team_student_ids(session, team.id), kind=kind, title=title, message=message, path="/student/progress", exclude={actor.id}, schedule_id=schedule.id, team_id=team.id, cycle_id=team.academic_cycle_id)
     notify(session, team_supervisor_ids(session, team.id), kind=kind, title=title, message=message, path=f"/supervisor/groups/{team.id}?tab=defense", exclude={actor.id}, schedule_id=schedule.id, team_id=team.id, cycle_id=team.academic_cycle_id)
@@ -105,7 +108,7 @@ def _audit(session: Session, actor: User, action: str, target_type: str, target_
 
 def _notify_team_change(session: Session, actor: User, team: Team, *, kind: str, title: str, message: str, entity_id: int, path_student: str | None = None) -> None:
     payload = {"team_id": team.id, "cycle_id": team.academic_cycle_id, "entity_id": entity_id}
-    group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
+    group_label = visible_group_name(session, team)
     notify(session, team_student_ids(session, team.id), kind=kind, title=title, message=message, path=path_student or "/student/progress", exclude={actor.id}, group_id=team.id, **payload)
     notify(session, team_supervisor_ids(session, team.id), kind=kind, title=title, message=message, path=f"/supervisor/groups/{team.id}?tab=project", exclude={actor.id}, group_id=team.id, **payload)
     notify_admins(session, kind=kind, title=f"{title} · {group_label}", message=message, path="/admin", exclude={actor.id}, group_id=team.id, **payload)
@@ -135,6 +138,22 @@ def project_progress(team_id: int, user: User = Depends(require_roles(*READ_ROLE
     tasks = session.scalars(select(ProjectTask).where(ProjectTask.team_id == team.id).order_by(ProjectTask.due_at, ProjectTask.id)).all()
     meetings = session.scalars(select(SupervisionMeeting).where(SupervisionMeeting.team_id == team.id).order_by(SupervisionMeeting.held_at.desc(), SupervisionMeeting.id.desc())).all()
     return {"team_id": team.id, "health": _health(milestones, tasks), "milestones": [_milestone_out(row) for row in milestones], "tasks": [_task_out(row) for row in tasks], "meetings": [{"id": row.id, "held_at": row.held_at, "minutes": row.minutes, "decisions": row.decisions, "action_items": row.action_items, "supervisor_id": row.supervisor_id, "created_by_id": row.created_by_id, "created_at": row.created_at} for row in meetings]}
+
+
+@router.get("/project-progress/teams")
+def project_progress_teams(actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)) -> list[dict]:
+    member_match = select(TeamMember.id).where(
+        TeamMember.team_id == Team.id,
+        TeamMember.academic_cycle_id == Team.academic_cycle_id,
+        TeamMember.is_active.is_(True),
+        (TeamMember.registration_number == actor.registration_number) | (TeamMember.university_email == actor.email),
+    ).exists()
+    teams = session.scalars(
+        select(Team)
+        .where(Team.status != "dissolved", (Team.shared_user_id == actor.id) | member_match)
+        .order_by(Team.id)
+    ).all()
+    return [{"id": team.id, "academic_cycle_id": team.academic_cycle_id} for team in teams]
 
 
 @router.post("/project-progress/{team_id}/milestones", status_code=201)
@@ -198,7 +217,7 @@ def create_meeting(team_id: int, payload: MeetingWrite, request: Request, actor:
     if assignment is None:
         raise failure("supervisor_assignment_required", "An active supervisor assignment is required before recording a meeting.")
     row = SupervisionMeeting(team_id=team.id, supervisor_id=assignment.supervisor_id, created_by_id=actor.id, held_at=_utc(payload.held_at), minutes=payload.minutes, decisions=payload.decisions, action_items=payload.action_items)
-    session.add(row); session.flush(); _notify_team_change(session, actor, team, kind="SUPERVISION_MEETING_RECORDED", title="Supervision meeting recorded", message=f"{actor.full_name} recorded a supervision meeting for {team.group_name or f'Group {team.group_number or team.id}'}.", entity_id=row.id); _audit(session, actor, "supervision_meeting_recorded", "SUPERVISION_MEETING", row.id, {"team_id": team.id}); session.commit(); session.refresh(row)
+    session.add(row); session.flush(); _notify_team_change(session, actor, team, kind="SUPERVISION_MEETING_RECORDED", title="Supervision meeting recorded", message=f"{actor.full_name} recorded a supervision meeting for {visible_group_name(session, team)}.", entity_id=row.id); _audit(session, actor, "supervision_meeting_recorded", "SUPERVISION_MEETING", row.id, {"team_id": team.id}); session.commit(); session.refresh(row)
     return {"id": row.id, "held_at": row.held_at, "minutes": row.minutes, "decisions": row.decisions, "action_items": row.action_items, "supervisor_id": row.supervisor_id, "created_by_id": row.created_by_id, "created_at": row.created_at}
 
 
@@ -206,7 +225,7 @@ def _schedule_out(session: Session, row: DefenseSchedule) -> dict:
     team = session.get(Team, row.team_id)
     members = session.execute(select(DefensePanelMember, User.full_name, User.email).join(User, User.id == DefensePanelMember.user_id).where(DefensePanelMember.schedule_id == row.id).order_by(DefensePanelMember.id)).all()
     assignment = _assigned_supervisor(session, row.team_id)
-    return {"id": row.id, "team_id": row.team_id, "academic_cycle_id": row.academic_cycle_id, "start_at": row.start_at, "end_at": row.end_at, "room": row.room, "online_link": row.online_link, "status": row.status, "conflict_note": row.conflict_note, "team_label": f"Team {row.team_id}", "supervisor_id": assignment.supervisor_id if assignment else None, "panel_members": [{"id": item.user_id, "name": name, "email": email} for item, name, email in members], "created_at": row.created_at, "updated_at": row.updated_at}
+    return {"id": row.id, "team_id": row.team_id, "academic_cycle_id": row.academic_cycle_id, "start_at": row.start_at, "end_at": row.end_at, "room": row.room, "online_link": row.online_link, "status": row.status, "conflict_note": row.conflict_note, "team_label": visible_group_name(session, team), "group_name": visible_group_name(session, team), "group_number": visible_group_number(session, team) if team else None, "supervisor_id": assignment.supervisor_id if assignment else None, "panel_members": [{"id": item.user_id, "name": name, "email": email} for item, name, email in members], "created_at": row.created_at, "updated_at": row.updated_at}
 
 
 def _schedule_access(session: Session, row: DefenseSchedule, user: User) -> bool:
@@ -259,7 +278,7 @@ def schedule_options(actor: User = Depends(require_roles(UserRole.ADMIN, UserRol
     teams = session.scalars(select(Team).order_by(Team.id)).all()
     evaluators = session.scalars(select(User).where(User.role == UserRole.PANEL_MEMBER, User.is_active.is_(True)).order_by(User.full_name, User.id)).all()
     cycles = session.scalars(select(AcademicCycle).order_by(AcademicCycle.id.desc())).all()
-    return {"teams": [{"id": team.id, "academic_cycle_id": team.academic_cycle_id} for team in teams], "evaluators": [{"id": user.id, "name": user.full_name, "email": user.email} for user in evaluators], "cycles": [{"id": cycle.id, "name": cycle.display_name} for cycle in cycles]}
+    return {"teams": [{"id": team.id, "academic_cycle_id": team.academic_cycle_id, "name": visible_group_name(session, team), "group_name": visible_group_name(session, team), "group_number": visible_group_number(session, team)} for team in teams], "evaluators": [{"id": user.id, "name": user.full_name, "email": user.email} for user in evaluators], "cycles": [{"id": cycle.id, "name": cycle.display_name} for cycle in cycles]}
 
 
 @router.get("/panel-schedules/{schedule_id}")
@@ -281,7 +300,7 @@ def create_schedule(payload: ScheduleWrite, request: Request, actor: User = Depe
     session.add(row); session.flush()
     for user_id in payload.panel_member_ids: session.add(DefensePanelMember(schedule_id=row.id, user_id=user_id, assigned_by_id=actor.id))
     session.flush()
-    _notify_schedule_change(session, actor, row, kind="DEFENSE_SCHEDULE_CREATED", title="Defense schedule created", message=f"A defense has been scheduled for Team {team.id} from {row.start_at.isoformat()} to {row.end_at.isoformat()}.")
+    _notify_schedule_change(session, actor, row, kind="DEFENSE_SCHEDULE_CREATED", title="Defense schedule created", message=f"A defense has been scheduled for {visible_group_name(session, team)} from {row.start_at.isoformat()} to {row.end_at.isoformat()}.")
     _audit(session, actor, "defense_schedule_created", "DEFENSE_SCHEDULE", row.id, {"team_id": row.team_id, "panel_member_ids": payload.panel_member_ids}); session.commit(); session.refresh(row)
     return _schedule_out(session, row)
 
@@ -342,7 +361,7 @@ def save_evaluation(payload: EvaluationWrite, request: Request, actor: User = De
     for item in submitted: item.disagreement_detected = disagreement
     schedule_team = _team(session, schedule.team_id)
     evaluation_action = "submitted" if payload.submit else "saved as a draft"
-    _notify_schedule_change(session, actor, schedule, kind="PANEL_EVALUATION_UPDATED", title="Defense evaluation updated", message=f"{actor.full_name} {evaluation_action} an evaluation for Team {schedule_team.id}.")
+    _notify_schedule_change(session, actor, schedule, kind="PANEL_EVALUATION_UPDATED", title="Defense evaluation updated", message=f"{actor.full_name} {evaluation_action} an evaluation for {visible_group_name(session, schedule_team)}.")
     _audit(session, actor, "panel_evaluation_submitted" if payload.submit else "panel_evaluation_saved", "PANEL_EVALUATION", row.id, {"schedule_id": schedule.id, "status": row.status}); session.commit(); session.refresh(row)
     return _evaluation_out(session, row)
 

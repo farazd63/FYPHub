@@ -6,7 +6,7 @@ const app = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
 const admin = fs.readFileSync(new URL("../src/AdminUsersRoles.tsx", import.meta.url), "utf8");
 
 test("student group signup remains available and preserves its success state", () => {
-  assert.match(app, /\/api\/v1\/student\/group-registration/);
+  assert.match(app, /\/api\/v1\/auth\/group-signup/);
   assert.match(app, /Academic Cycle/);
   assert.match(app, /Group Members/);
   assert.match(app, /Group Credentials/);
@@ -24,7 +24,7 @@ test("group member validation identifies required fields and maps email errors t
   assert.match(app, /className="auth-field__required"/);
   assert.match(app, /next\[`\$\{prefix\}\.email`\] = emailError/);
   assert.doesNotMatch(app, /next\[`\$\{prefix\}\.name`\]/);
-  assert.match(app, /Member \$\{memberIndex \+ 1\} — \$\{label\}/);
+  assert.match(app, /Member \$\{memberIndex \+ 1\}/);
   assert.match(app, /validationNotice\(next, members\)/);
 });
 

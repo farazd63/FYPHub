@@ -15,7 +15,6 @@ from .models import (
     AcademicCycle,
     AdminAuditEvent,
     CollaborationChannel,
-    Module2Notification,
     ProjectMilestone,
     ProjectTask,
     ProposalComplianceSubmission,
@@ -31,8 +30,9 @@ from .models import (
     UserRole,
 )
 from .schemas.supervisor_replacement import DepartureRestoreWrite, DepartureWrite, ReplacementAssignWrite, ReplacementCompleteWrite
-from .supervisor_matching import _ai_rank_candidates, rank_supervisors_for_fields
+from .supervisor_replacement_matching import rank_supervisors_for_replacement
 from .notification_service import notify, notify_admins, team_student_ids
+from .group_display import visible_group_name, visible_group_number
 
 router = APIRouter(prefix="/api/v1/admin/supervisor-replacements", tags=["supervisor-replacement"])
 OPEN_REPLACEMENT_STATUSES = ("UNSUPERVISED", "REPLACEMENT_PENDING", "REASSIGNED")
@@ -57,21 +57,6 @@ def _group_members(session: Session, team: Team) -> list[dict]:
     return [{"id": row.id, "name": row.full_name, "registration_number": row.registration_number, "email": row.university_email, "designation": "LEADER" if row.is_creator else "MEMBER", "is_active": row.is_active} for row in rows]
 
 
-def _student_recipient_ids(session: Session, team: Team) -> set[int]:
-    recipients = {team.shared_user_id}
-    members = session.scalars(select(TeamMember).where(TeamMember.team_id == team.id, TeamMember.is_active.is_(True))).all()
-    for member in members:
-        user = session.scalar(select(User).where(User.role == UserRole.STUDENT, or_(User.registration_number == member.registration_number, User.email == member.university_email)).limit(1))
-        if user is not None:
-            recipients.add(user.id)
-    return recipients
-
-
-def _notify(session: Session, recipients: set[int], *, kind: str, payload: dict) -> None:
-    for user_id in recipients:
-        session.add(Module2Notification(recipient_user_id=user_id, kind=kind, payload=payload))
-
-
 def _case_detail(session: Session, case: SupervisorReplacementCase) -> dict:
     team = session.get(Team, case.team_id)
     cycle = session.get(AcademicCycle, case.academic_cycle_id)
@@ -88,7 +73,7 @@ def _case_detail(session: Session, case: SupervisorReplacementCase) -> dict:
         "opened_at": case.opened_at,
         "reassigned_at": case.reassigned_at,
         "completed_at": case.completed_at,
-        "group": {"id": team.id, "name": f"Group {team.group_number or team.id}", "group_number": team.group_number, "status": team.status, "supervision_status": team.supervision_status, "academic_cycle_id": team.academic_cycle_id, "academic_cycle": cycle.display_name if cycle else None, "academic_cycle_code": cycle.code if cycle else None, "academic_year": cycle.academic_year if cycle else None, "session": cycle.session if cycle else None, "members": members} if team else None,
+        "group": {"id": team.id, "name": visible_group_name(session, team, cycle), "group_number": visible_group_number(session, team), "status": team.status, "supervision_status": team.supervision_status, "academic_cycle_id": team.academic_cycle_id, "academic_cycle": cycle.display_name if cycle else None, "academic_cycle_code": cycle.code if cycle else None, "academic_year": cycle.academic_year if cycle else None, "session": cycle.session if cycle else None, "members": members} if team else None,
         "project": {"title": submission.title, "submission_id": submission.id, "version": submission.version, "status": submission.status, "filename": submission.filename, "uploaded_at": submission.created_at, "extracted_fields": submission.extracted_fields or {}} if submission else None,
         "previous_supervisor": {"id": previous.id, "name": previous.full_name, "email": previous.email} if previous else None,
         "replacement_supervisor": {"id": replacement.id, "name": replacement.full_name, "email": replacement.email} if replacement else None,
@@ -154,7 +139,7 @@ def mark_unavailable(supervisor_id: int, payload: DepartureWrite, request: Reque
             session.add(existing)
             session.flush()
             created_cases.append(existing)
-        group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
+        group_label = visible_group_name(session, team)
         replacement_payload = {
             "case_id": existing.id,
             "team_id": team.id,
@@ -239,10 +224,10 @@ def restore_supervisor(supervisor_id: int, payload: DepartureRestoreWrite, reque
         **restore_payload,
     )
     for case in cases:
-        group_label = f"Group {case.team_id}"
+        group_label = "Group"
         team = session.get(Team, case.team_id)
         if team is not None:
-            group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
+            group_label = visible_group_name(session, team)
             notify(
                 session,
                 team_student_ids(session, team.id),
@@ -302,7 +287,7 @@ def replacement_case(case_id: int, _: User = Depends(require_roles(UserRole.ADMI
 
 
 @router.post("/cases/{case_id}/recommendations")
-async def replacement_recommendations(case_id: int, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> dict:
+def replacement_recommendations(case_id: int, request: Request, _: User = Depends(require_roles(UserRole.ADMIN)), session: Session = Depends(get_db)) -> dict:
     validate_mutating_origin(request)
     case = session.get(SupervisorReplacementCase, case_id, with_for_update=True)
     if case is None:
@@ -318,9 +303,8 @@ async def replacement_recommendations(case_id: int, request: Request, actor: Use
     if team:
         team.supervision_status = "REPLACEMENT_PENDING"
     session.commit()
-    candidates = rank_supervisors_for_fields(session, session.get(AcademicCycle, case.academic_cycle_id), fields, excluded_supervisor_ids={case.previous_supervisor_id}, limit=30)
-    ranked, ranking_meta = await _ai_rank_candidates(candidates, fields, rate_key=f"supervisor-matching-replacement:{actor.id}", limit=10)
-    return {"case_id": case.id, "status": case.status, **ranking_meta, "results": ranked}
+    candidates = rank_supervisors_for_replacement(session, session.get(AcademicCycle, case.academic_cycle_id), fields, excluded_supervisor_ids={case.previous_supervisor_id}, limit=10)
+    return {"case_id": case.id, "status": case.status, "ranking_method": "deterministic", "results": candidates}
 
 
 @router.post("/cases/{case_id}/reassign")
@@ -359,7 +343,7 @@ def reassign(case_id: int, payload: ReplacementAssignWrite, request: Request, ac
             {supervisor.id},
             kind="SUPERVISOR_REASSIGNED",
             title="Supervision reassigned to you",
-            message=f"An administrator restored your supervision of {team.group_name or f'Group {team.group_number or team.id}'}.",
+            message=f"An administrator restored your supervision of {visible_group_name(session, team)}.",
             path=f"/supervisor/groups/{team.id}?tab=overview",
             exclude={actor.id},
             **assignment_payload,
@@ -370,7 +354,7 @@ def reassign(case_id: int, payload: ReplacementAssignWrite, request: Request, ac
             {case.previous_supervisor_id},
             kind="SUPERVISOR_ASSIGNMENT_ENDED",
             title="Supervision assignment changed",
-            message=f"An administrator moved {team.group_name or f'Group {team.group_number or team.id}'} to another supervisor.",
+            message=f"An administrator moved {visible_group_name(session, team)} to another supervisor.",
             path="/supervisor/assigned-groups",
             exclude={actor.id},
             **assignment_payload,
@@ -380,7 +364,7 @@ def reassign(case_id: int, payload: ReplacementAssignWrite, request: Request, ac
             {supervisor.id},
             kind="SUPERVISOR_REASSIGNED",
             title="New group assigned to you",
-            message=f"An administrator assigned {team.group_name or f'Group {team.group_number or team.id}'} to you for supervision.",
+            message=f"An administrator assigned {visible_group_name(session, team)} to you for supervision.",
             path=f"/supervisor/groups/{team.id}?tab=overview",
             exclude={actor.id},
             **assignment_payload,
@@ -390,7 +374,7 @@ def reassign(case_id: int, payload: ReplacementAssignWrite, request: Request, ac
         team_student_ids(session, team.id),
         kind="SUPERVISOR_REASSIGNED",
         title="Supervisor reassigned",
-        message=f"An administrator reassigned {team.group_name or f'Group {team.group_number or team.id}'} to {supervisor.full_name}.",
+        message=f"An administrator reassigned {visible_group_name(session, team)} to {supervisor.full_name}.",
         path="/student/supervisor-info",
         exclude={actor.id},
         **assignment_payload,
@@ -399,7 +383,7 @@ def reassign(case_id: int, payload: ReplacementAssignWrite, request: Request, ac
         session,
         kind="SUPERVISOR_REASSIGNED",
         title="Supervisor reassignment recorded",
-        message=f"{team.group_name or f'Group {team.group_number or team.id}'} was reassigned to {supervisor.full_name}.",
+        message=f"{visible_group_name(session, team)} was reassigned to {supervisor.full_name}.",
         path="/admin/supervisor-replacement",
         exclude={actor.id},
         **assignment_payload,
@@ -428,7 +412,7 @@ def complete_replacement(case_id: int, payload: ReplacementCompleteWrite, reques
     team = session.get(Team, case.team_id)
     if team:
         team.supervision_status = "COMPLETED"
-        group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
+        group_label = visible_group_name(session, team)
         completion_payload = {"case_id": case.id, "team_id": team.id, "cycle_id": team.academic_cycle_id, "status": case.status}
         notify(
             session,

@@ -15,14 +15,14 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from sqlalchemy import delete, desc, or_, select, update
+from sqlalchemy import delete, desc, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from ...auth import get_current_user, require_roles, utc_now, validate_mutating_origin
 from ...config import settings
 from ...database import get_db
 from ...knowledge_documents import register_knowledge_document
-from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, ProposalVersionComparison, SupervisorAssignment, Team, TeamMember, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
+from ...models import AcademicRuleVersion, ProposalComplianceReport, ProposalComplianceSubmission, ProposalRevisionRequest, ProposalVersionComparison, SupervisorAssignment, Team, TeamMember, TemplateReference, TemplateReferenceVersion, TemplateType, User, UserRole
 from ...pdf_extraction import PdfExtractionError, extract_proposal_document
 from ...document_preview import DocumentPreviewError, render_document_preview
 from .compliance_engine import build_change_summary, build_compliance_report, build_document_difference_issues
@@ -646,6 +646,30 @@ def update_submission_status(submission_id: int, payload: ProposalStatusUpdate, 
         raise _error("submission_not_found", "The proposal submission was not found.", 404)
     if row.status == "WITHDRAWN":
         raise _error("invalid_submission_state", "A withdrawn proposal cannot be reviewed.", 409)
+    if desired == "APPROVED" and row.team_id is not None:
+        open_revisions = session.scalar(
+            select(func.count(ProposalRevisionRequest.id)).where(
+                ProposalRevisionRequest.team_id == row.team_id,
+                ProposalRevisionRequest.proposal_key == row.proposal_key,
+                ProposalRevisionRequest.status.in_(
+                    (
+                        "OPEN",
+                        "IN_PROGRESS",
+                        "SUBMITTED_FOR_REVIEW",
+                        "AI_ASSESSMENT_PENDING",
+                        "AWAITING_SUPERVISOR_VERIFICATION",
+                        "REOPENED",
+                        "CHANGES_REQUIRED",
+                    )
+                ),
+            )
+        ) or 0
+        if open_revisions:
+            raise _error(
+                "mandatory_revisions_open",
+                "This proposal cannot be approved while mandatory supervisor revisions remain open.",
+                409,
+            )
     row.status = desired
     row.processing_status = "COMPLETED"
     fields = dict(row.extracted_fields or {})
@@ -851,34 +875,6 @@ def download_report_pdf(submission_id: int, actor: User = Depends(get_current_us
     return Response(content=data, media_type="application/pdf", headers=_inline_headers(f"compliance-report-{submission_id}.pdf", 1))
 
 
-def _render_pdf_legacy(report: dict[str, Any]) -> bytes:
-    from io import BytesIO
-    from xml.sax.saxutils import escape
-
-    stream = BytesIO()
-    document = SimpleDocTemplate(stream, pagesize=A4, rightMargin=16 * mm, leftMargin=16 * mm, topMargin=16 * mm, bottomMargin=16 * mm)
-    styles = getSampleStyleSheet()
-    summary = report.get("reportSummary", {})
-    story = [Paragraph("FYPHub Compliance Report", styles["Title"]), Paragraph(f"{report.get('proposal', {}).get('title', 'Proposal')} · Score {summary.get('score', 0)}% · {summary.get('status', 'Review Required')}", styles["Normal"]), Spacer(1, 8)]
-    story.append(Table([["Passed", "Failed", "Partial", "Total"], [summary.get("metrics", {}).get("passed", 0), summary.get("metrics", {}).get("failed", 0), summary.get("metrics", {}).get("partial", 0), summary.get("metrics", {}).get("total", 0)]], colWidths=[38 * mm] * 4, style=TableStyle([["BACKGROUND", (0, 0), (-1, 0), "#1E2436"], ["TEXTCOLOR", (0, 0), (-1, 0), "white"], ["GRID", (0, 0), (-1, -1), 0.25, "#D8E0EA"], ["ALIGN", (0, 0), (-1, -1), "CENTER"], ["BACKGROUND", (0, 1), (-1, 1), "#F5F8FC"]])))
-    story.append(Spacer(1, 12))
-    story.append(Paragraph("Checks needing attention (including partial and unverifiable)", styles["Heading2"]))
-    for category in report.get("categories", []):
-        for check in category.get("checks", []):
-            if check.get("status") == "PASS":
-                continue
-            story.append(Paragraph(escape(f"{category.get('name')} / {check.get('name')} — {check.get('status')}"), styles["Heading3"]))
-            for label, key in (("Expected", "expected"), ("Detected", "actual"), ("Location", "location"), ("Evidence / reason", "evidence")):
-                value = check.get(key)
-                story.append(Paragraph(escape(f"{label}: {value if value is not None else 'Not available'}"), styles["BodyText"]))
-            story.append(Spacer(1, 6))
-    story.append(Paragraph("Detailed Violations", styles["Heading2"]))
-    for violation in report.get("violations", []):
-        story.extend([Paragraph(f"{violation.get('id')} · {violation.get('severity')} · {violation.get('title')}", styles["Heading3"]), Paragraph(f"Location: {violation.get('location', 'Document')} · Requirement: {violation.get('requirement')} · Detected: {violation.get('detected')}", styles["BodyText"]), Paragraph(str(violation.get("evidence", "")), styles["BodyText"]), Spacer(1, 6)])
-    document.build(story)
-    return stream.getvalue()
-
-
 def _page_label(pages: list[int] | None, page_count: int) -> str:
     normalized = sorted({int(page) for page in (pages or []) if int(page) > 0})
     if not normalized:
@@ -965,57 +961,6 @@ def _render_pdf(report: dict[str, Any]) -> bytes:
     story.append(Paragraph("Strict Rule: Page count, page numbering, page size, and approved template structure are mandatory. Every violation must show the exact affected page.", styles["BodyText"]))
     document.build(story)
     return stream.getvalue()
-
-
-def _render_annotated_document_legacy(data: bytes, content_type: str, filename: str, report: dict[str, Any]) -> bytes:
-    """Annotate each affected page with red issue callouts and append full evidence."""
-    from io import BytesIO
-    try:
-        import fitz
-    except ImportError as error:
-        raise PdfExtractionError("pdf_annotation_unavailable", "PDF annotation is unavailable on this server.") from error
-    if not filename.casefold().endswith(".pdf") or not content_type.casefold().endswith("pdf"):
-        raise PdfExtractionError("pdf_annotation_unavailable", "Annotated preview is currently available for PDF proposals only.")
-    try:
-        document = fitz.open(stream=data, filetype="pdf")
-    except Exception as error:
-        raise PdfExtractionError("invalid_pdf", "The proposal PDF could not be opened for annotation.") from error
-    violations = report.get("violations", [])
-    by_page: dict[int, list[dict[str, Any]]] = {}
-    for violation in violations:
-        page_number = violation.get("pageNumber") or (violation.get("location", {}).get("page") if isinstance(violation.get("location"), dict) else None) or 1
-        by_page.setdefault(max(1, int(page_number)), []).append(violation)
-    for page_number, page_violations in by_page.items():
-        if page_number > document.page_count:
-            continue
-        page = document[page_number - 1]
-        for index, violation in enumerate(page_violations[:6]):
-            top = 24 + index * 43
-            rect = fitz.Rect(24, top, page.rect.width - 24, top + 35)
-            page.draw_rect(rect, color=(0.88, 0.08, 0.14), fill=(1, 0.93, 0.94), width=1.6, overlay=True)
-            label = f"{violation.get('id', 'Issue')} | {violation.get('title', 'Compliance issue')} | Expected: {display_value(violation.get('requirement'))} | Detected: {display_value(violation.get('detected'))}"
-            page.insert_textbox(rect + (5, 4, -5, -4), label[:300], fontsize=8, color=(0.55, 0.05, 0.08), overlay=True)
-    appendix = document.new_page()
-    appendix.insert_text((36, 45), "FYPHub - Annotated Compliance Findings", fontsize=16, color=(0.1, 0.18, 0.3))
-    y = 75
-    for violation in violations:
-        text = f"{violation.get('id', 'Issue')} | {violation.get('severity', 'Review')} | {violation.get('title', 'Compliance issue')}\nLocation: {violation.get('location', 'Document')}\nExpected: {display_value(violation.get('requirement'))}\nDetected: {display_value(violation.get('detected'))}\nEvidence: {violation.get('evidence', '')}"
-        box = fitz.Rect(36, y, appendix.rect.width - 36, y + 70)
-        appendix.draw_rect(box, color=(0.88, 0.08, 0.14), fill=(1, 0.95, 0.95), width=1.2, overlay=True)
-        appendix.insert_textbox(box + (8, 7, -8, -7), text[:700], fontsize=8, color=(0.18, 0.2, 0.25), overlay=True)
-        y += 82
-        if y > appendix.rect.height - 90:
-            appendix = document.new_page(); y = 45
-    output = BytesIO()
-    document.save(output, garbage=4, deflate=True)
-    document.close()
-    return output.getvalue()
-
-
-def display_value(value: Any) -> str:
-    if isinstance(value, list):
-        return ", ".join(str(item) for item in value)
-    return "Not available" if value is None or value == "" else str(value)
 
 
 def _render_annotated_document(data: bytes, content_type: str, filename: str, report: dict[str, Any]) -> bytes:

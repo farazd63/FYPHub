@@ -3,9 +3,9 @@ import { RefreshCw } from "lucide-react";
 import { Alert } from "../../ui";
 import { IconButton } from "../../ui/IconButton";
 import { SupervisorGroupDetails, type GroupWorkspace, type GroupTab, date } from "./SupervisorGroupDetails";
-import { pushPortalRoute, replacePortalRoute } from "../shared/portal-history";
+import { pushPortalRoute } from "../shared/portal-history";
 import { appPathname } from "../../platform-path";
-import { shortGroupLabel } from "../../lib/displayLabels";
+import { shortGroupLabel, sortGroupsDesc } from "../../lib/displayLabels";
 
 const projectStatusLabel = (value?: string | null) => ({
   IN_PROGRESS: "In progress",
@@ -33,14 +33,14 @@ export function SupervisorAssignedTeams({ api }: { api: string }) {
   const [groups, setGroups] = useState<GroupWorkspace[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [selected, setSelected] = useState<{ id: number; tab: GroupTab } | null>(groupSelectionFromLocation);
   const load = useCallback(async () => {
-    try { const response = await fetch(`${api}/api/v1/supervisor/assigned-groups`, { credentials: "include" }); if (!response.ok) throw new Error("Assigned groups could not be loaded."); const body = await response.json() as GroupWorkspace[]; setGroups(body.map((item) => ({ ...item, group: { ...item.group, name: shortGroupLabel(item.group.name, item.group.academic_cycle.name) } }))); setError(""); }
+    try { const response = await fetch(`${api}/api/v1/supervisor/assigned-groups`, { credentials: "include" }); if (!response.ok) throw new Error("Assigned groups could not be loaded."); const body = await response.json() as GroupWorkspace[]; const mapped = body.map((item) => ({ ...item, group: { ...item.group, name: shortGroupLabel(item.group.name, item.group.academic_cycle.name) } })); setGroups(sortGroupsDesc(mapped.map((item) => ({ ...item.group, item }))).map(({ item }) => item)); setError(""); }
     catch (e) { setError(e instanceof Error ? e.message : "Assigned groups could not be loaded."); }
     finally { setLoading(false); }
   }, [api]);
   useEffect(() => { const initial = window.setTimeout(() => void load(), 0); const timer = window.setInterval(() => void load(), 10000); const focus = () => void load(); window.addEventListener("focus", focus); return () => { window.clearTimeout(initial); window.clearInterval(timer); window.removeEventListener("focus", focus); }; }, [load]);
   useEffect(() => { const syncFromHistory = () => { const selection = groupSelectionFromLocation(); setSelected(selection); if (!selection) void load(); }; window.addEventListener("popstate", syncFromHistory); return () => window.removeEventListener("popstate", syncFromHistory); }, [load]);
   const open = (id: number, tab: GroupTab) => { setSelected({ id, tab }); pushPortalRoute(`/supervisor/groups/${id}?tab=${tab}`); };
-  if (selected) return <SupervisorGroupDetails key={selected.id} api={api} groupId={selected.id} initialTab={selected.tab} onBack={() => { setSelected(null); replacePortalRoute("/supervisor/assigned-groups"); void load(); }} />;
+  if (selected) return <SupervisorGroupDetails key={selected.id} api={api} groupId={selected.id} initialTab={selected.tab} />;
   return <section className="supervisor-page" aria-labelledby="supervisor-assigned-heading">
     <div className="supervisor-page-heading"><h1 id="supervisor-assigned-heading">Assigned Students &amp; Teams</h1><span>Group members, proposals, documents and project progress for your active assignments.</span></div>
     {error && (

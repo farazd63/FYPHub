@@ -44,36 +44,6 @@ main:has(.admin-sidebar) .admin-brand .portal-home-button svg {
   align-items: center;
   gap: 10px;
 }
-.admin-history-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 0;
-}
-.admin-history-controls button {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border: 1px solid var(--fy-border, #d8dee6);
-  border-radius: 6px;
-  background: var(--fy-surface, #ffffff);
-  color: var(--fy-brand, #1d4ed8);
-  padding: 0;
-}
-.admin-brand .admin-history-controls button svg {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-}
-.admin-history-controls button:hover {
-  border-color: color-mix(in srgb, var(--fy-brand, #1d4ed8) 28%, white);
-  background: var(--fy-brand-soft, #e8eefc);
-}
-.admin-history-controls button:focus-visible {
-  outline: none;
-  box-shadow: var(--fy-focus-ring, 0 0 0 3px rgb(29 78 216 / 0.28));
-}
 .admin-avatar {
   display: grid;
   place-items: center;

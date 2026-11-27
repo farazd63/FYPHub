@@ -422,7 +422,6 @@
 @media (max-width: 767px) {
   .module3-workspace,
   .module3-admin-page,
-  .matching-page,
   .expertise-page,
   .supervisor-page,
   .archive-knowledge-page {
@@ -439,8 +438,6 @@
   }
 
   .module3-panel,
-  .matching-card,
-  .matching-results,
   .expertise-card {
     padding: 0.9rem;
     border-radius: 0.9rem;
@@ -453,7 +450,6 @@
   .module3-template-row__top,
   .module3-issue-group__heading,
   .module3-friendly-report__header,
-  .matching-card__heading,
   .expertise-card__title {
     align-items: flex-start;
     flex-wrap: wrap;
@@ -503,43 +499,11 @@
     padding: 0.75rem;
   }
 
-  .matching-page {
-    gap: 0.85rem;
-    padding-block: 0.25rem 1.25rem;
-  }
-
-  .matching-hero {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 1rem;
-    padding: 1rem;
-  }
-
-  .matching-hero__mark {
-    align-self: flex-end;
-  }
-
-  .matching-layout,
-  .matching-result-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .matching-card,
-  .matching-results {
-    min-width: 0;
-  }
-
-  .matching-actions,
-  .matching-actions > button,
   .expertise-actions,
   .expertise-actions > button,
   .supervisor-actions,
   .supervisor-actions > button {
     width: 100%;
-  }
-
-  .matching-upload__fields {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .supervisor-monitor-summary {
@@ -647,10 +611,6 @@
   .module3-final-metrics,
   .supervisor-monitor-summary {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .matching-hero__mark {
-    align-self: center;
   }
 
   .student-content,

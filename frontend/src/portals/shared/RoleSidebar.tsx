@@ -108,15 +108,20 @@ export function RoleSidebar({ ariaLabel, workspaceLabel, items, active, collapse
   };
 
   useEffect(() => {
-    if (activeSection) setSelectedSection(activeSection);
-  }, [active, activeSection]);
+    if (!activeSection) return;
+    const timer = window.setTimeout(() => setSelectedSection(activeSection), 0);
+    return () => window.clearTimeout(timer);
+  }, [activeSection]);
 
   useEffect(() => {
     if (onToggleSection) return;
     const activeItem = items.find((item) => item.id === active);
     const section = activeItem?.section ?? "";
     if (!section) return;
-    setInternalExpanded((current) => (current[section] ? current : { ...current, [section]: true }));
+    const timer = window.setTimeout(() => {
+      setInternalExpanded((current) => (current[section] ? current : { ...current, [section]: true }));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [active, items, onToggleSection]);
 
   const railSections = sections.filter(Boolean);
@@ -153,7 +158,7 @@ export function RoleSidebar({ ariaLabel, workspaceLabel, items, active, collapse
                   if (selected) toggleSection(section);
                   else if (!isSectionOpen(section)) {
                     if (onToggleSection) onToggleSection(section, true);
-                    else setInternalExpanded((current) => Object.fromEntries(sections.map((item) => [item, item === section])));
+                    else setInternalExpanded(Object.fromEntries(sections.map((item) => [item, item === section])));
                   }
                 }}>
                   <span className="role-sidebar__menu-section-name"><span className="role-sidebar__menu-section-icon" aria-hidden="true">{sectionIconFor(section, sectionItems[0]?.icon)}</span><span>{section}</span></span>

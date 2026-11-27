@@ -16,28 +16,6 @@ class Module2Notification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
-class Module2ChannelRead(Base):
-    __tablename__ = "module2_channel_reads"
-    __table_args__ = (UniqueConstraint("user_id", "team_id", "channel", name="uq_module2_channel_read"),)
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
-    channel: Mapped[str] = mapped_column(String(32), nullable=False)
-    last_read_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
-
-
-class Module2ChatbotSession(Base):
-    __tablename__ = "module2_chatbot_sessions"
-    __table_args__ = (Index("ix_module2_chatbot_sessions_team_created", "team_id", "created_at"),)
-    id: Mapped[int] = mapped_column(primary_key=True)
-    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
-    title: Mapped[str] = mapped_column(String(200), nullable=False, default="Group assistant", server_default="Group assistant")
-    context: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
-
 class CollaborationChannel(Base):
     __tablename__ = "collaboration_channels"
     __table_args__ = (

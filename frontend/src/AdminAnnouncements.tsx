@@ -4,6 +4,7 @@ import { AnnouncementComposer, type Announcement, type AnnouncementPermissions }
 import { PageHeader } from "./ui";
 import { IconButton } from "./ui/IconButton";
 import { AdminAddButton } from "./ui/AdminAddButton";
+import { sortCyclesDesc, sortGroupsDesc } from "./lib/displayLabels";
 import "./AdminAnnouncements.css";
 
 type Props = { api: string };
@@ -24,11 +25,15 @@ export function AdminAnnouncements({ api }: Props) {
     try {
       const [listResponse, permissionResponse] = await Promise.all([fetch(`${api}/api/v1/announcements/admin?include_archived=true`, { credentials: "include" }), fetch(`${api}/api/v1/announcements/permissions`, { credentials: "include" })]);
       if (!listResponse.ok || !permissionResponse.ok) throw new Error();
-      setRows(await listResponse.json() as Announcement[]);
-      setPermissions(await permissionResponse.json() as AnnouncementPermissions);
+      setRows((await listResponse.json() as Announcement[]).sort((left, right) => new Date(right.published_at ?? right.created_at).getTime() - new Date(left.published_at ?? left.created_at).getTime()));
+      const permissionData = await permissionResponse.json() as AnnouncementPermissions;
+      setPermissions({ ...permissionData, cycles: sortCyclesDesc(permissionData.cycles), groups: sortGroupsDesc(permissionData.groups) });
     } catch { setError("Announcements could not be loaded."); }
   }, [api]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   const action = async (id: number, method: string, suffix = "") => {
     setError("");

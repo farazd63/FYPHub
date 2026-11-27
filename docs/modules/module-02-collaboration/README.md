@@ -1,7 +1,7 @@
-# Module 2: Student Team & Collaboration Hub
+# Module 2: Student collaboration
 
-Scope is the Long Proposal section 9.3, pages 9?10. See [proposal coverage](proposal-coverage.md) for requirement-level evidence and status. The collaboration and student matching checkpoint is included in local commit `13c90e8`; see Git status for subsequent working-tree changes and do not assume the remote has been checked.
+This document covers the current Module 2 implementation. See [proposal coverage](proposal-coverage.md) for the requirement boundary.
 
-Team registration and duplicate protection, seven message channels, team preferences and deterministic team suggestions, temporary match chat, requests, invitations, and roster-bound OTP flows exist. Roster-verified individuals can compare eight answers with opted-in teams in the same cycle; proposal-required AI compatibility matching remains incomplete. Group AI has a local runtime integration, but live operation has not been verified. Membership verification is partial: initial registration checks the roster but does not establish each member's individual consent.
+The active product supports registered teams, one assignment-scoped collaboration channel per active supervisor assignment, project progress tracking, and the student AI assistant. Retired compatibility matching, invitations, join requests, temporary match chat, and seven-channel collaboration code are not part of the current application.
 
-See [source map](source-map.md), [workflow](workflow.md), [verification](verification.md), and [pending](pending.md). The recorded creator alone can authorize team-side decisions after roster OTP; invitees verify their own roster email. Closing match chat retains the existing fresh mutual re-consent behavior.
+See [source map](source-map.md) and [workflow](workflow.md) for the active files and request flow.

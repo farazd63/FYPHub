@@ -106,7 +106,7 @@ def source_index():
                                     entry[target.id] = ast.literal_eval(node.value)
                 except (SyntaxError, ValueError) as error:
                     entry["parse_error"] = str(error)
-            elif p.suffix in (".tsx", ".ts", ".mjs"):
+            elif p.suffix in (".tsx", ".ts", ".mjs", ".css"):
                 text = re.sub(r"/\*[\s\S]*?\*/", lambda match: "\n" * match.group(0).count("\n"), text)
                 text = re.sub(r"^\s*//[^\n]*", "", text, flags=re.MULTILINE)
                 entry["symbols"] = [{"name":m.group(1),"line":text[:m.start()].count("\n")+1,"kind":"export","description":""} for m in re.finditer(r"export\s+(?:default\s+)?(?:async\s+)?(?:function|const|class)\s+(\w+)",text)]
@@ -162,7 +162,7 @@ def snapshot():
     live["git_status"]=command(["git","status","--short"])
     live["migration_heads"]=command(["docker","exec","fyphub-p1-backend-1","alembic","heads"]).strip().splitlines()
     live["services"]=command(["docker","compose","ps","-a"])
-    live["inspection_date"]="2026-11-11 (Asia/Karachi)"
+    live["inspection_date"]="2026-11-27 (Asia/Karachi)"
     out=ROOT/"docs/defence"
     out.mkdir(parents=True,exist_ok=True)
     (out/"technical-inventory.json").write_text(json.dumps(live,indent=2,ensure_ascii=False),encoding="utf-8")
@@ -240,7 +240,8 @@ def build(live):
     add("The machine-readable companion `technical-inventory.json` contains the full inspected schema, ORM metadata, endpoint ownership, source symbols, frontend imports and test names. `scripts/build_defence_guide.py` rebuilds it using read-only database catalog queries. `FYPHub_Defence_Guide_Source.md` is the authored explanatory part. Generated documents are snapshots and should be regenerated after code/schema changes.\n")
     out=ROOT/"docs/defence"
     md=out/"FYPHub_Complete_Defence_Guide.md"
-    md.write_text("".join(parts),encoding="utf-8")
+    markdown = "\n".join(line.rstrip() for line in "".join(parts).splitlines()) + "\n"
+    md.write_text(markdown,encoding="utf-8")
     return md
 
 
@@ -257,7 +258,7 @@ def render(directory):
     directory=Path(directory)
     md=(directory/"FYPHub_Complete_Defence_Guide.md").read_text(encoding="utf-8")
     doc=Document(); section=doc.sections[0]
-    section.header.paragraphs[0].text="FYPHub | Technical Defence Preparation | 11 November 2026"
+    section.header.paragraphs[0].text="FYPHub | Technical Defence Preparation | 27 November 2026"
     section.top_margin=Inches(.7); section.bottom_margin=Inches(.7)
     normal=doc.styles['Normal']; normal.font.name='Calibri'; normal.font.size=Pt(10)
     for n in ['Title','Heading 1','Heading 2','Heading 3']:

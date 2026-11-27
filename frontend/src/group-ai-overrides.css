@@ -40,6 +40,36 @@
   margin-left: auto;
 }
 
+/* The chatbot is a single focused conversation; keep chat history out of the
+   visible workspace and let the conversation use the full available width. */
+.group-ai-workspace,
+.group-ai-page > .group-ai-workspace,
+.group-ai-floating-panel .group-ai-workspace {
+  display: block;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.group-ai-workspace > .group-ai-conversation {
+  width: 100%;
+}
+
+.group-ai-floating-panel__new-chat {
+  align-self: center;
+  border: 1px solid #cbd6e5;
+  border-radius: 9px;
+  background: #fff;
+  color: #315db4;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.group-ai-floating-panel__new-chat:hover {
+  border-color: #4663ff;
+  background: #eef4ff;
+}
+
 /* The dedicated page is a viewport workspace: only messages should scroll. */
 .student-shell:has(.group-ai-page) .student-content {
   min-width: 0;
@@ -967,4 +997,16 @@ html[data-theme="dark"] .group-ai-floating-panel__close {
   border-color: var(--noir-border) !important;
   background: var(--noir-surface) !important;
   color: var(--noir-text-secondary) !important;
+}
+
+/* Final layout override: history is no longer rendered, so the conversation
+   must occupy the complete chatbot workspace at every breakpoint. */
+.group-ai-page > .group-ai-workspace,
+.group-ai-floating-panel .group-ai-workspace {
+  display: block !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.group-ai-workspace > .group-ai-conversation {
+  width: 100% !important;
 }

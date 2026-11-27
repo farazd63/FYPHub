@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import delete, select
+from sqlalchemy import case, delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -22,6 +22,7 @@ from .models import (
     UserRole,
 )
 from .schemas.announcements import AnnouncementOut, AnnouncementPatch, AnnouncementPermissions, AnnouncementScopeOption, AnnouncementWrite
+from .group_display import visible_group_name, visible_group_number
 
 router = APIRouter(prefix="/api/v1/announcements", tags=["announcements"])
 
@@ -72,13 +73,14 @@ def _allowed_permissions(session: Session, actor: User) -> AnnouncementPermissio
     else:
         team_ids, cycle_ids, _ = _scope_ids(session, actor)
 
-    cycle_rows = session.scalars(select(AcademicCycle).where(AcademicCycle.id.in_(cycle_ids)).order_by(AcademicCycle.display_name, AcademicCycle.id)).all() if cycle_ids else []
-    group_rows = session.execute(select(Team, AcademicCycle).join(AcademicCycle, AcademicCycle.id == Team.academic_cycle_id).where(Team.id.in_(team_ids), Team.status != "dissolved").order_by(AcademicCycle.display_name, Team.group_number, Team.id)).all() if team_ids else []
-    project_rows = session.execute(select(Proposal, Team, AcademicCycle).join(Team, Team.id == Proposal.team_id).join(AcademicCycle, AcademicCycle.id == Team.academic_cycle_id).where(Team.id.in_(team_ids), Team.status != "dissolved").order_by(AcademicCycle.display_name, Team.group_number, Proposal.id)).all() if team_ids else []
+    session_rank = case((AcademicCycle.session == "FALL", 2), (AcademicCycle.session == "SPRING", 1), else_=0)
+    cycle_rows = session.scalars(select(AcademicCycle).where(AcademicCycle.id.in_(cycle_ids)).order_by(AcademicCycle.academic_year.desc().nullslast(), session_rank.desc(), AcademicCycle.created_at.desc(), AcademicCycle.id.desc())).all() if cycle_ids else []
+    group_rows = session.execute(select(Team, AcademicCycle).join(AcademicCycle, AcademicCycle.id == Team.academic_cycle_id).where(Team.id.in_(team_ids), Team.status != "dissolved").order_by(AcademicCycle.academic_year.desc().nullslast(), session_rank.desc(), AcademicCycle.created_at.desc(), Team.updated_at.desc(), Team.group_number.desc().nullslast(), Team.id.desc())).all() if team_ids else []
+    project_rows = session.execute(select(Proposal, Team, AcademicCycle).join(Team, Team.id == Proposal.team_id).join(AcademicCycle, AcademicCycle.id == Team.academic_cycle_id).where(Team.id.in_(team_ids), Team.status != "dissolved").order_by(AcademicCycle.academic_year.desc().nullslast(), session_rank.desc(), AcademicCycle.created_at.desc(), Team.updated_at.desc(), Team.group_number.desc().nullslast(), Proposal.id.desc())).all() if team_ids else []
 
     base.cycles = [AnnouncementScopeOption(id=row.id, label=f"{row.display_name} ({row.code})", cycle_id=row.id) for row in cycle_rows]
-    base.groups = [AnnouncementScopeOption(id=team.id, label=f"Group {team.group_number or team.id} — {cycle.display_name}", cycle_id=team.academic_cycle_id, group_id=team.id) for team, cycle in group_rows]
-    base.projects = [AnnouncementScopeOption(id=proposal.id, label=f"Project #{proposal.id} — Group {team.group_number or team.id} — {cycle.display_name}", cycle_id=team.academic_cycle_id, group_id=team.id, project_id=proposal.id) for proposal, team, cycle in project_rows]
+    base.groups = [AnnouncementScopeOption(id=team.id, label=f"{visible_group_name(session, team, cycle)} - {cycle.display_name}", cycle_id=team.academic_cycle_id, group_id=team.id) for team, cycle in group_rows]
+    base.projects = [AnnouncementScopeOption(id=proposal.id, label=f"Project #{proposal.id} - {visible_group_name(session, team, cycle)} - {cycle.display_name}", cycle_id=team.academic_cycle_id, group_id=team.id, project_id=proposal.id) for proposal, team, cycle in project_rows]
     return base
 
 
@@ -189,6 +191,7 @@ def _display_status(row: Announcement, now: datetime) -> str:
 
 def _serialize(row: Announcement, author: User, actor: User, session: Session, now: datetime, *, admin_view: bool = False) -> dict:
     read_at = _read_at(session, row.id, actor.id)
+    group = session.get(Team, row.group_id) if row.group_id is not None else None
     owner = row.author_id == actor.id
     can_edit = _role(actor) == UserRole.ADMIN.value or (owner and row.status not in {"ARCHIVED", "EXPIRED"})
     can_archive = _role(actor) == UserRole.ADMIN.value or (owner and row.status == "PUBLISHED")
@@ -196,6 +199,8 @@ def _serialize(row: Announcement, author: User, actor: User, session: Session, n
         id=row.id, title=row.title, message=row.message, author_id=row.author_id, author_name=author.full_name,
         author_role=row.author_role, priority=row.priority, status=_display_status(row, now), target_type=row.target_type,
         target_role=row.target_role, cycle_id=row.cycle_id, group_id=row.group_id, project_id=row.project_id,
+        group_number=visible_group_number(session, group) if group else None,
+        group_name=visible_group_name(session, group) if group else None,
         published_at=row.published_at, expires_at=row.expires_at, created_at=row.created_at, updated_at=row.updated_at,
         archived_at=row.archived_at, read_at=read_at, is_read=read_at is not None, can_edit=can_edit, can_archive=can_archive,
     ).model_dump(mode="json")

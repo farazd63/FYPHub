@@ -1,17 +1,13 @@
-# Long Proposal Module 2 coverage
+# Current Module 2 coverage
 
-Source: `D:/FYP Project/long proposal.pdf`, section 9.3, pages 9?10, read directly on 23 October 2026. Status describes implementation, with limitations stated; tests are evidence, not proof of live delivery or browser behavior.
+This document describes the current implementation boundary. Retired proposal-era matching and multi-channel code is not part of the current product flow.
 
-| Proposal requirement | Status | Evidence and limitation |
+| Current requirement | Status | Evidence |
 | --- | --- | --- |
-| Group creation, leader/member rules, group-size enforcement and verified membership | Partial | `backend/app/main.py`, `models/team.py`, `schemas/team_registration.py`; `tests/test_team_registration.py`, `test_team_constraints.py`, `test_cycle_concurrency.py`. Registration checks roster and configured size; creator authority exists for requests and invitations, but initial members' individual consent is not established and further leader/member lifecycle rules are unspecified. |
-| Prevent duplicate active group membership using student ID/registration number and current cycle | Complete | `backend/app/models/team.py`, `main.py`, `join_requests.py`, `invitations.py`; `tests/test_team_constraints.py`, `test_team_registration.py`, `test_join_requests.py`, `test_invitations.py`. |
-| AI teammate compatibility matching using 8?10 questions across skills, domain, availability, working style, preferred role and commitment | Partial | `backend/app/team_matching.py`, `team_compatibility.py`, `frontend/src/TeamMatching.tsx`; `tests/test_team_matching.py`, `test_team_compatibility.py`. Eight team-level fields cover the six topics, but matching is deterministic between teams, not AI-assisted teammate discovery. AI work is deferred by the user. |
-| Join requests and accept/reject | Complete | `backend/app/join_requests.py`, `frontend/src/JoinRequests.tsx`, `tests/test_join_requests.py`; roster OTP binds submission and creator decision. Live SMTP and browser checks remain unverified. |
-| Invitations and accept/reject | Complete | `backend/app/invitations.py`, `frontend/src/Invitations.tsx`, `tests/test_invitations.py`; creator and invitee use their own action-bound roster proofs. Live SMTP and browser checks remain unverified. |
-| Student-to-group matching | Complete | `backend/app/team_matching.py`, `backend/app/anonymous_verification.py`, `frontend/src/StudentMatching.tsx`, `backend/tests/test_student_matching.py`. A roster-verified individual compares answers with same-cycle opted-in teams, using the existing deterministic comparison as approved by the user. AI-assisted matching remains partial separately. |
-| Temporary match chat | Complete | `backend/app/match_chat.py`, `frontend/src/MatchChat.tsx`, `tests/test_match_chat.py`, `frontend/tests/match-chat.test.mjs`. Existing chat is team-to-team; close and fresh mutual re-consent are preserved. |
-| Seven named collaboration channels | Complete | `backend/app/group_channels.py`, `frontend/src/GroupChannels.tsx`, `tests/test_group_channels.py`. The seven named channels support messages. |
-| Group AI chatbot | Partial | `backend/app/group_ai.py`, `frontend/src/GroupAI.tsx`, `tests/test_group_ai.py` implement a local runtime integration with mocked tests; a configured live model has not been verified. |
+| Registered teams, membership and cycle-scoped ownership | Complete | `backend/app/main.py`, `backend/app/models/team.py`, team-registration schemas and tests. |
+| Assignment-scoped group collaboration | Complete | `backend/app/collaboration_channels.py`, `frontend/src/portals/student/modules/StudentCollaborationChannel.tsx`, supervisor workspace components, and collaboration access tests. One active channel is created per team-supervisor assignment; reassignment archives the previous channel. |
+| Student AI assistant | Partial | `backend/app/group_ai.py`, `backend/app/models/student_ai.py`, and `frontend/src/GroupAIChat.tsx`. The local Ollama integration is implemented; live model availability remains environment-dependent. |
+| Project progress and supervision records | Complete | `backend/app/project_workflow.py`, `frontend/src/portals/student/modules/StudentProgressDashboard.tsx`, supervisor workspace, and `backend/tests/test_project_workflow.py`. |
+| AI teammate compatibility matching, invitations, join requests and temporary match chat | Retired | These flows are not mounted by the current frontend and their routes/components/models/tests were removed. |
 
-The proposal also describes the primary output as a verified, compatible team with a shared collaboration workspace. The partial and missing items above prevent claiming that outcome fully verified. It does not specify upload, notifications, task integrations, automatic expiry, individual contribution tracking, or an LLM explanation requirement.
+The current product therefore has one assignment-scoped collaboration channel, not the former seven named group channels.

@@ -10,7 +10,6 @@ from email.message import EmailMessage
 from threading import Lock
 from urllib.parse import urlencode
 
-from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -25,7 +24,6 @@ from .security import generate_session_token, hash_password, hash_session_token
 router = APIRouter(prefix="/api/v1/auth")
 
 PASSWORD_RESET_GENERIC_MESSAGE = "If an account exists, a password reset link will be sent."
-PASSWORD_RESET_DEVELOPMENT_UNKNOWN_MESSAGE = "No account was found with this email address."
 PASSWORD_RESET_SUCCESS_MESSAGE = "Password reset successful. Please log in again."
 PASSWORD_RESET_TOKEN_MINUTES = 15
 MAX_REQUESTS_PER_HOUR = 5
@@ -46,18 +44,6 @@ def _smtp_configured() -> bool:
 
 def _development_mode() -> bool:
     return getattr(settings, "app_env", "production").lower() in {"dev", "development", "local"}
-
-
-def _development_or_demo_mode() -> bool:
-    return _development_mode() or getattr(settings, "registration_mode", "restricted").lower() == "demo"
-
-
-def _is_valid_email(value: str) -> bool:
-    try:
-        validate_email(value, check_deliverability=False)
-    except EmailNotValidError:
-        return False
-    return True
 
 
 def _rate_limit_allows(ip: str) -> bool:

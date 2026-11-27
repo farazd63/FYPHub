@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { groupDisplayLabel, sortCyclesDesc, sortGroupsDesc } from "../lib/displayLabels";
 import "./announcements.css";
 
 export type Announcement = {
@@ -14,6 +15,8 @@ export type Announcement = {
   target_role: string | null;
   cycle_id: number | null;
   group_id: number | null;
+  group_number?: number | null;
+  group_name?: string | null;
   project_id: number | null;
   published_at: string | null;
   expires_at: string | null;
@@ -48,7 +51,7 @@ const targetLabel = (row: Announcement) => {
   if (row.target_type === "ASSIGNED_STUDENTS") return "Assigned students";
   if (row.target_type === "ASSIGNED_PANEL") return "Assigned panel members";
   if (row.target_type === "CYCLE") return `Academic cycle${row.cycle_id ? ` #${row.cycle_id}` : ""}`;
-  if (row.target_type === "GROUP") return `Group${row.group_id ? ` #${row.group_id}` : ""}`;
+  if (row.target_type === "GROUP") return groupDisplayLabel(row);
   if (row.target_type === "PROJECT") return `Project${row.project_id ? ` #${row.project_id}` : ""}`;
   return roleLabel(row.target_type);
 };
@@ -73,23 +76,24 @@ export function AnnouncementSection({ api, onManage, showComposer = true, limit 
 
   const load = useCallback(async () => {
     setState("loading");
+    const resultLimit = Math.max(1, Math.floor(limit));
     try {
       const [announcementResponse, permissionResponse] = await Promise.all([
-        fetch(`${api}/api/v1/announcements/latest?limit=1`, { credentials: "include" }),
+        fetch(`${api}/api/v1/announcements/latest?limit=${resultLimit}`, { credentials: "include" }),
         fetch(`${api}/api/v1/announcements/permissions`, { credentials: "include" }),
       ]);
       const [announcementRows, permissionData] = await Promise.all([
         readJson<Announcement[]>(announcementResponse),
         readJson<AnnouncementPermissions>(permissionResponse),
       ]);
-      const nextRows = Array.isArray(announcementRows) ? announcementRows.slice(0, 1) : [];
-      setRows(nextRows);
+      const nextRows = Array.isArray(announcementRows) ? announcementRows.slice(0, resultLimit) : [];
+      setRows([...nextRows].sort((left, right) => new Date(right.published_at ?? right.created_at).getTime() - new Date(left.published_at ?? left.created_at).getTime()));
       setHighlightedId((current) => {
         if (highlightInitialized.current) return current;
         highlightInitialized.current = true;
         return mostRecentUnreadId(nextRows);
       });
-      setPermissions(permissionData);
+      setPermissions({ ...permissionData, cycles: sortCyclesDesc(permissionData.cycles), groups: sortGroupsDesc(permissionData.groups) });
       setShowAll(false);
       setState("ready");
     } catch {
@@ -117,7 +121,7 @@ export function AnnouncementSection({ api, onManage, showComposer = true, limit 
     if (showAll) { await load(); return; }
     try {
       const all = await readJson<Announcement[]>(await fetch(`${api}/api/v1/announcements?limit=100`, { credentials: "include" }));
-      setRows(Array.isArray(all) ? all : []);
+      setRows((Array.isArray(all) ? all : []).sort((left, right) => new Date(right.published_at ?? right.created_at).getTime() - new Date(left.published_at ?? left.created_at).getTime()));
       setShowAll(true);
     } catch { setState("error"); }
   };

@@ -9,7 +9,6 @@ test("portal shells unlock document scroll when content is taller than the viewp
   const design = read("design-system.css");
   const tokens = read("design-tokens.css");
   const student = read("portals/student/student.css");
-  const portal = read("portals/shared/portal-shell.css");
   const scroll = read("portal-scroll.css");
 
   // Document-level scroll must be enabled for authenticated shells.
@@ -25,7 +24,6 @@ test("portal shells unlock document scroll when content is taller than the viewp
   assert.match(index, /\.student-shell \.student-body[\s\S]*overflow:\s*visible/);
   assert.match(design, /\.admin-shell__content[\s\S]*overflow:\s*visible\s*!important/);
   assert.match(design, /\.student-shell \.student-content[\s\S]*overflow:\s*visible\s*!important/);
-  assert.match(portal, /\.portal-content\s*\{[^}]*overflow:\s*visible/);
   assert.match(scroll, /overflow-y:\s*auto\s*!important/);
   assert.match(scroll, /\.student-shell \.student-content[\s\S]*height:\s*auto\s*!important/);
   assert.match(scroll, /supervisor-page\):not\(:has\(\.student-collab\)\)/);
@@ -57,11 +55,9 @@ test("portal shells unlock document scroll when content is taller than the viewp
 test("mobile collapsed sidebar does not reserve layout width", () => {
   const design = read("design-system.css");
   const role = read("portals/shared/role-sidebar.css");
-  const nav = read("portals/shared/dashboard-nav.css");
 
   assert.match(design, /@media \(max-width: 767px\)[\s\S]*flex:\s*0 0 0\s*!important/);
   assert.match(role, /@media \(max-width: 767px\)[\s\S]*flex:\s*0 0 0\s*!important/);
-  assert.match(nav, /@media \(max-width: 767px\)[\s\S]*flex:\s*0 0 0\s*!important/);
 });
 
 test("sidebar uses one shared top offset with content padding", () => {

@@ -14,8 +14,7 @@ test("demo registration status is fetched only by the authenticated admin shell"
 
 test("registration form behavior remains unchanged and public pages do not fetch mode", async () => {
   const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
-  assert.match(app, /\/api\/v1\/auth\/register/);
-  assert.match(app, /\/api\/v1\/team-registration/);
+  assert.match(app, /\/api\/v1\/auth\/group-signup/);
   assert.doesNotMatch(app, /registration-mode/);
   assert.match(app, /emailValidationMessage/);
   assert.match(app, /type=\"submit\"/);

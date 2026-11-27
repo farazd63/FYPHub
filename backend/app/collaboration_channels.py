@@ -36,6 +36,7 @@ from .models import (
 )
 from .security import hash_password, hash_session_token, validate_password, verify_password
 from .notification_service import notify, notify_admins, team_student_ids
+from .group_display import visible_group_name, visible_group_number
 
 router = APIRouter(prefix="/api/v1", tags=["module-2-private-collaboration"])
 
@@ -241,7 +242,7 @@ def _authorize(session: Session, channel: CollaborationChannel, actor: User, *, 
     if actor.role == UserRole.STUDENT:
         if team.shared_user_id != actor.id and _student_member(session, actor, team.id) is None:
             raise HTTPException(403, "This collaboration channel is not available to your group.")
-    elif actor.role == UserRole.SUPERVISOR:
+    elif actor.role in (UserRole.SUPERVISOR, UserRole.COORDINATOR):
         assignment = session.scalar(select(SupervisorAssignment).where(SupervisorAssignment.id == channel.assignment_id, SupervisorAssignment.team_id == channel.team_id, SupervisorAssignment.supervisor_id == actor.id, SupervisorAssignment.ended_at.is_(None)))
         if assignment is None:
             raise HTTPException(403, "This collaboration channel is not assigned to you.")
@@ -293,7 +294,7 @@ def ensure_channels_for_actor(session: Session, actor: User) -> None:
                 continue
         session.commit()
         return
-    if actor.role == UserRole.SUPERVISOR:
+    if actor.role in (UserRole.SUPERVISOR, UserRole.COORDINATOR):
         rows = session.scalars(select(SupervisorAssignment).where(SupervisorAssignment.supervisor_id == actor.id, SupervisorAssignment.ended_at.is_(None))).all()
         for assignment in rows:
             team = session.get(Team, assignment.team_id)
@@ -315,7 +316,9 @@ def _channel_out(session: Session, channel: CollaborationChannel, actor: User) -
     last_read = session.scalar(select(CollaborationParticipant.last_read_message_id).where(CollaborationParticipant.channel_id == channel.id, CollaborationParticipant.user_id == actor.id)) or 0
     unread = session.scalar(select(func.count()).select_from(CollaborationMessage).where(CollaborationMessage.channel_id == channel.id, CollaborationMessage.deleted_at.is_(None), CollaborationMessage.sender_user_id != actor.id, CollaborationMessage.id > last_read)) or 0
     leader = next((member for member in members if member.is_creator), None)
-    return {"id": channel.id, "group_id": channel.team_id, "group_name": team.group_name if team and team.group_name else f"Group {team.group_number if team and team.group_number is not None else '—'}", "assignment_status": "ACCEPTED", "supervisor_id": channel.supervisor_id, "assignment_id": channel.assignment_id, "academic_year": channel.academic_year, "session": channel.session, "status": channel.status, "project_title": request.title if request else None, "group_leader": {"name": leader.full_name, "registration_number": leader.registration_number} if leader else None, "members": [{"id": member.id, "name": member.full_name, "registration_number": member.registration_number, "email": member.university_email, "is_creator": member.is_creator} for member in members], "supervisor": {"id": supervisor.id, "name": supervisor.full_name, "email": supervisor.email} if supervisor else None, "cycle_name": cycle.display_name if cycle else None, "unread_count": unread, "last_read_message_id": last_read}
+    if team is not None:
+        team.group_name = visible_group_name(session, team, cycle)
+    return {"id": channel.id, "group_id": channel.team_id, "group_name": team.group_name if team else "Group", "assignment_status": "ACCEPTED", "supervisor_id": channel.supervisor_id, "assignment_id": channel.assignment_id, "academic_year": channel.academic_year, "session": channel.session, "status": channel.status, "project_title": request.title if request else None, "group_leader": {"name": leader.full_name, "registration_number": leader.registration_number} if leader else None, "members": [{"id": member.id, "name": member.full_name, "registration_number": member.registration_number, "email": member.university_email, "is_creator": member.is_creator} for member in members], "supervisor": {"id": supervisor.id, "name": supervisor.full_name, "email": supervisor.email} if supervisor else None, "cycle_name": cycle.display_name if cycle else None, "unread_count": unread, "last_read_message_id": last_read}
 
 
 def _message_out(session: Session, message: CollaborationMessage) -> dict:
@@ -332,7 +335,7 @@ def _selected_member(session: Session, channel: CollaborationChannel, actor: Use
     If an individual student principal is used in the future, it can only
     select its own matching member record.
     """
-    if actor.role == UserRole.SUPERVISOR:
+    if actor.role in (UserRole.SUPERVISOR, UserRole.COORDINATOR):
         if member_id is not None:
             raise HTTPException(422, "A supervisor message cannot select a group member.")
         return None
@@ -353,7 +356,7 @@ def _selected_member(session: Session, channel: CollaborationChannel, actor: Use
 
 def _verified_member(session: Session, channel: CollaborationChannel, actor: User, request: Request, member_id: int | None) -> TeamMember | None:
     member = _selected_member(session, channel, actor, member_id)
-    if member is None or actor.role == UserRole.SUPERVISOR:
+    if member is None or actor.role in (UserRole.SUPERVISOR, UserRole.COORDINATOR):
         return member
     auth_session = _browser_auth_session(session, request, actor)
     binding = session.scalar(
@@ -476,7 +479,9 @@ def request_member_identity_reset(channel_id: int, payload: MemberPasswordResetR
     )
     team = session.get(Team, channel.team_id)
     cycle = session.get(AcademicCycle, team.academic_cycle_id) if team else None
-    group_label = team.group_name if team and team.group_name else f"Group {team.group_number if team and team.group_number is not None else channel.team_id}"
+    if team is not None:
+        team.group_name = visible_group_name(session, team, cycle)
+    group_label = team.group_name if team else "Group"
     new_request = pending is None
     if new_request:
         session.add(
@@ -547,6 +552,7 @@ def admin_collaboration_credentials_list(
         if channel is None:
             continue
         cycle = session.get(AcademicCycle, team.academic_cycle_id)
+        team.group_name = visible_group_name(session, team, cycle)
         group_user = session.get(User, team.shared_user_id)
         members = session.scalars(
             select(TeamMember)
@@ -571,7 +577,8 @@ def admin_collaboration_credentials_list(
         items.append(
             {
                 "group_id": team.id,
-                "group_name": team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}",
+                "group_name": team.group_name,
+                "group_number": visible_group_number(session, team),
                 "group_email": group_user.email if group_user else None,
                 "shared_user_id": team.shared_user_id,
                 "cycle_id": team.academic_cycle_id,
@@ -674,7 +681,8 @@ def admin_reset_collaboration_credential(group_id: int, member_id: int, cycle_id
         pending.status = "RESOLVED"
         pending.resolved_at = utc_now()
         pending.resolved_by_user_id = actor.id
-    group_label = team.group_name or f"Group {team.group_number if team.group_number is not None else team.id}"
+    team.group_name = visible_group_name(session, team)
+    group_label = team.group_name
     session.add(
         Module2Notification(
             recipient_user_id=team.shared_user_id,
@@ -714,7 +722,7 @@ def student_channels(actor: User = Depends(require_roles(UserRole.STUDENT)), ses
 
 
 @router.get("/supervisor/collaboration/channels")
-def supervisor_channels(actor: User = Depends(require_roles(UserRole.SUPERVISOR)), session: Session = Depends(get_db)):
+def supervisor_channels(actor: User = Depends(require_roles(UserRole.SUPERVISOR, UserRole.COORDINATOR)), session: Session = Depends(get_db)):
     ensure_channels_for_actor(session, actor)
     return _list_channels(session, actor)
 
@@ -749,7 +757,9 @@ def send_collaboration_message(channel_id: int, payload: MessageWrite, request: 
     message = CollaborationMessage(channel_id=channel.id, sender_user_id=actor.id, sender_team_member_id=member.id if member else None, message_text=payload.message_text, message_kind=payload.message_kind, message_payload=payload.message_payload, attachment_reference=payload.attachment_reference)
     session.add(message); session.flush()
     team = session.get(Team, channel.team_id)
-    group_label = team.group_name if team and team.group_name else f"Group {team.group_number if team and team.group_number is not None else channel.team_id}"
+    if team is not None:
+        team.group_name = visible_group_name(session, team)
+    group_label = team.group_name if team else "Group"
     sender_label = member.full_name if member else actor.full_name
     message_preview = payload.message_text.strip() or ("Shared an attachment." if payload.attachment_reference else "Sent a collaboration message.")
     common = {"channel_id": channel.id, "group_id": channel.team_id, "message_id": message.id, "sender_id": actor.id}
@@ -855,7 +865,9 @@ async def upload_collaboration_file(
         )
         session.add(message); session.flush()
         team = session.get(Team, channel.team_id)
-        group_label = team.group_name if team and team.group_name else f"Group {team.group_number if team and team.group_number is not None else channel.team_id}"
+        if team is not None:
+            team.group_name = visible_group_name(session, team)
+        group_label = team.group_name if team else "Group"
         sender_label = member.full_name if member else actor.full_name
         common = {"channel_id": channel.id, "group_id": channel.team_id, "message_id": message.id, "sender_id": actor.id}
         notify(

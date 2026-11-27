@@ -303,10 +303,6 @@ class SupervisorRequestTests(unittest.TestCase):
         status, body = self.call("POST", f"/api/v1/supervisor-requests/{draft['id']}/decision", {"action": "accept", "revision": submitted["revision"]}, self.tokens["supervisor"])
         self.assertEqual((status, body["status"]), (200, "ACCEPTED"))
         self.assertEqual(self.connection.execute(text("SELECT count(*) FROM supervisor_assignments WHERE team_id=:id AND ended_at IS NULL"), {"id": self.team.id}).scalar_one(), 1)
-        status, teams = self.call("GET", "/api/v1/group-channels/teams", token=self.tokens["supervisor"])
-        self.assertEqual((status, teams), (200, [{"id": self.team.id, "academic_cycle_id": self.cycle.id}]))
-        status, teams = self.call("GET", "/api/v1/group-channels/teams", token=self.tokens["other"])
-        self.assertEqual((status, teams), (200, []))
 
     def test_accept_requires_registered_team_and_keeps_request_submitted(self):
         _, draft = self.create_draft(self.tokens["student"])

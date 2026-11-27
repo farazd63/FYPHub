@@ -1,7 +1,6 @@
 export { ThemeProvider, useTheme, applyTheme, type Theme } from "./theme";
 export { ThemeToggle } from "./ThemeToggle";
 export { Button, type ButtonVariant, type ButtonSize } from "./Button";
-export { BackButton } from "./BackButton";
 export { IconButton, type IconButtonVariant, type IconButtonSize } from "./IconButton";
 export { Link } from "./Link";
 export { Card } from "./Card";

@@ -6,6 +6,7 @@ const index = fs.readFileSync(new URL("index.css", root), "utf8");
 const student = fs.readFileSync(new URL("portals/student/student.css", root), "utf8");
 const placeholder = fs.readFileSync(new URL("portals/student/modules/StudentPhasePlaceholder.tsx", root), "utf8");
 const design = fs.readFileSync(new URL("design-system.css", root), "utf8");
+const academicPro = fs.readFileSync(new URL("academic-pro.css", root), "utf8");
 const shells = [
   "portals/student/StudentPortal.tsx",
   "portals/supervisor/SupervisorPortal.tsx",
@@ -25,7 +26,7 @@ assert.match(index, /var\(--fy-brand/);
 assert.match(index, /\.student-supervisor-option:disabled/);
 assert.match(index, /opacity: 1/);
 assert.doesNotMatch(index, /student-status[^}]*opacity:\s*0\.[0-7]/);
-assert.match(design, /\.cycle-overview__hero h1[\s\S]*color:\s*#fff/);
+assert.match(`${design}\n${academicPro}`, /\.cycle-overview__hero h1[\s\S]*color:\s*#ffffff/);
 assert.match(design, /\[aria-current="page"\]:hover/);
-assert.match(design, /--fy-brand:\s*#e0a85c/);
+assert.match(academicPro, /--fy-brand:\s*#2563eb/);
 console.log("portal-contrast.test.mjs: all assertions passed");

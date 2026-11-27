@@ -19,8 +19,9 @@ test("Module 3 renders compliance findings and version change summaries", () => 
   assert.match(workspace, /changeSummary/);
   assert.match(workspace, /View Annotated PDF/);
   assert.match(workspace, /View Original/);
-  assert.match(workspace, /Document Preview/);
-  assert.match(workspace, /Detailed Violation Report/);
+  assert.match(workspace, /University Template vs Student Document/);
+  assert.match(workspace, /Passed Checks/);
+  assert.match(workspace, /View Evidence/);
   assert.doesNotMatch(workspace, /module3-mini-lines/);
 });
 

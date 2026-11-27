@@ -1,8 +1,6 @@
-AcademicCycleDashboard.css
 AdminCycleManager.css
 AdminCycleManager.tsx
 AdminDeadlines.tsx
-AdminDocumentRequirementManagerClean.tsx
 AdminOverview.css
 AdminReminderRules.tsx
 AdminSidebar.css
@@ -18,9 +16,7 @@ portals/admin/modules/archive/OldProjectArchiveImport.tsx
 portals/coordinator/modules/supervisor-requests/PanelScheduling.tsx
 portals/coordinator/modules/supervisor-requests/coordinator-requests.css
 portals/evaluator/evaluator.css
-portals/shared/dashboard-nav.css
 portals/shared/portal-dark.css
-portals/shared/portal-shell.css
 portals/shared/role-sidebar.css
 portals/student/components/GroupMembers.tsx
 portals/student/modules/EvaluatorWorkflow.tsx

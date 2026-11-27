@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminAddButton } from "./ui/AdminAddButton";
+import { sortCyclesDesc } from "./lib/displayLabels";
 
-type Cycle = { id: number; code: string; display_name: string };
+type Cycle = { id: number; code: string; display_name: string; academic_year?: number | string | null; session?: string | null; created_at?: string | null; updated_at?: string | null };
 type Deadline = { id: number; name: string };
 type DeadlineVersion = { id: number; version_number: number; name: string; due_at_utc: string };
 type DeadlineDetail = { id: number; versions: DeadlineVersion[] };
@@ -22,7 +23,7 @@ export function AdminReminderRules({ api }: { api: string }) {
   const previewToken = useRef(0), deadlineToken = useRef(0), listToken = useRef(0), detailToken = useRef(0), saveLock = useRef(false);
   const get = useCallback((path: string) => fetch(`${api}${path}`, { credentials: "include" }).then(read), [api]);
   const loadRules = useCallback(async (cycle: string) => { const token = ++listToken.current; const data = await get(`/api/v1/admin/reminder-rules${cycle ? `?academic_cycle_id=${encodeURIComponent(cycle)}` : ""}`) as Rule[]; if (token === listToken.current) setRules(data); }, [get]);
-  const load = useCallback(async () => { setLoading(true); setError(false); try { const [data] = await Promise.all([get("/api/v1/academic-cycles"), loadRules("")]); setCycles(data as Cycle[]); setMessage(""); } catch { setError(true); setMessage("Rule configuration could not be loaded."); } finally { setLoading(false); } }, [get, loadRules]);
+  const load = useCallback(async () => { setLoading(true); setError(false); try { const [data] = await Promise.all([get("/api/v1/academic-cycles"), loadRules("")]); setCycles(sortCyclesDesc(data as Cycle[])); setMessage(""); } catch { setError(true); setMessage("Rule configuration could not be loaded."); } finally { setLoading(false); } }, [get, loadRules]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
   const loadDeadlines = async (cycle: string) => { const token = ++deadlineToken.current; setDeadlines([]); if (!cycle) return; try { const rows = await get(`/api/v1/admin/academic-deadlines?academic_cycle_id=${encodeURIComponent(cycle)}`) as Deadline[]; const details = await Promise.all(rows.map(row => get(`/api/v1/admin/academic-deadlines/${row.id}`))) as DeadlineDetail[]; if (token === deadlineToken.current) setDeadlines(details); } catch { if (token === deadlineToken.current) { setError(true); setMessage("Deadline versions could not be loaded."); } } };
   const invalidate = (changes: Partial<Form>) => { previewToken.current++; setPreviewing(false); setPreview(null); setForm(current => ({ ...current, ...changes })); setMessage(""); };

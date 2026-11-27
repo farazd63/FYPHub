@@ -144,7 +144,7 @@ export function AdminProposalTemplates({ api }: { api: string }) {
     <div className="module3-page-heading module3-admin-page-heading"><div><h1 id="module3-templates-heading">Proposal Templates</h1><p>Upload the official university PDF or DOCX. Rules are measured from that file only; unclear values remain Not detected. “Not detected” means the source file did not contain machine-readable evidence for that rule; it is not an empty requirement.</p></div><AdminAddButton open={showCreate} label="proposal template" onClick={() => setShowCreate((value) => !value)} /></div>
     {message && <p className="module3-alert module3-alert--success" role="status">{message}</p>}
     {error && <p className="module3-alert module3-alert--error" role="alert">{error}</p>}
-    <div className="module3-admin-grid">
+    <div className={`module3-admin-grid ${showCreate ? "has-upload" : ""}`}>
       {showCreate && <form className="module3-panel module3-template-upload" onSubmit={(event) => void upload(event)}>
         <div className="module3-panel-heading"><div><h2>Upload and parse</h2></div></div>
         <p className="module3-muted">PDF uses PyMuPDF; DOCX uses python-docx. OCR is used only when a PDF has no readable text.</p>

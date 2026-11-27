@@ -726,7 +726,7 @@ export function CollaborationChannel({ api, userId, role = "student", groupId, c
                 {isEditing ? <form className="student-collab__message-edit" onSubmit={event => { event.preventDefault(); void saveEdit(message.id); }}>
                   <textarea aria-label="Edit message text" value={editDraft} maxLength={COLLABORATION_MESSAGE_LIMIT} onChange={event => setEditDraft(event.target.value)} autoFocus />
                   <div className="student-collab__message-edit-actions">
-                    <button type="submit" disabled={isMutating}>{isMutating ? "Savingâ€¦" : "Save"}</button>
+                    <button type="submit" disabled={isMutating}>{isMutating ? "Saving…" : "Save"}</button>
                     <button type="button" disabled={isMutating} onClick={cancelEdit}>Cancel</button>
                   </div>
                 </form> : <>{!isRich && !hasAttachment && <pre>{message.message_text}</pre>}{renderMessageContent(message)}{message.updated_at && message.updated_at !== message.created_at && <small className="student-collab__message-edited">Edited</small>}</>}

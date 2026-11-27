@@ -17,7 +17,6 @@ from app.models import (
     DocumentRequirementSection,
     DocumentUploadRequirement,
     EvaluationRecord,
-    GroupMessage,
     ProjectMilestone,
     ProjectTask,
     ProposalComplianceSubmission,
@@ -109,7 +108,6 @@ class StudentGroupDeleteTests(unittest.TestCase):
         self.session.add(ProjectMilestone(team_id=group.id, created_by_id=self.admin.id, title="Delete milestone"))
         self.session.add(ProjectTask(team_id=group.id, created_by_id=self.admin.id, title="Delete task"))
         self.session.add(SupervisionMeeting(team_id=group.id, supervisor_id=self.admin.id, created_by_id=self.admin.id, held_at=utc_now(), minutes="Delete meeting"))
-        self.session.add(GroupMessage(team_id=group.id, author_id=account.id, author_kind="STUDENT", channel="General", body="Delete message"))
         channel = CollaborationChannel(team_id=group.id, supervisor_id=self.admin.id, academic_year=self.cycle.academic_year or 2027, session=self.cycle.session or "SPRING", assignment_id=assignment.id)
         self.session.add(channel)
         self.session.flush()

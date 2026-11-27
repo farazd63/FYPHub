@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const API = process.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "http://127.0.0.1:8010";
 const APP = process.env.FYPHUB_APP_URL || "http://127.0.0.1:5173";
@@ -78,7 +79,7 @@ async function applyTheme(page, theme) {
 }
 
 test("source CSS no longer hard-codes navy form-label #344b6b", () => {
-  const root = new URL("../src/", import.meta.url);
+  const root = fileURLToPath(new URL("../src/", import.meta.url));
   const walk = (dir, out = []) => {
     for (const name of fs.readdirSync(dir)) {
       const p = `${dir}/${name}`;
@@ -88,7 +89,7 @@ test("source CSS no longer hard-codes navy form-label #344b6b", () => {
     }
     return out;
   };
-  const hits = walk(root.pathname).filter((file) => fs.readFileSync(file, "utf8").includes("#344b6b"));
+  const hits = walk(root).filter((file) => fs.readFileSync(file, "utf8").includes("#344b6b"));
   assert.deepEqual(hits, [], `leftover #344b6b in ${hits.join(", ")}`);
 });
 

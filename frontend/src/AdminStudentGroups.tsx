@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { BackButton, StatusBadge } from "./ui";
-import { shortGroupLabel } from "./lib/displayLabels";
+import { StatusBadge } from "./ui";
+import { groupDisplayLabel, sortCyclesDesc, sortGroupsDesc } from "./lib/displayLabels";
 
 type Cycle = {
   id: number;
@@ -8,6 +8,8 @@ type Cycle = {
   display_name: string;
   academic_year?: number | null;
   session?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 type Member = {
   id: number;
@@ -29,10 +31,15 @@ type Group = {
   approval_status?: string;
   is_active: boolean;
   member_count?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+  last_activity_at?: string | null;
+  supervisor_assignment?: { assigned_at?: string | null } | null;
+  assignment?: { assigned_at?: string | null } | null;
   min_group_size?: number | null;
   max_group_size?: number | null;
   group_policy?: { min_group_size: number; max_group_size: number } | null;
-  project?: { title?: string | null } | null;
+  project?: { title?: string | null; updated_at?: string | null } | null;
   supervisor?: { name?: string | null } | null;
   members: Member[];
 };
@@ -137,7 +144,7 @@ const groupCapacity = (group: Group) =>
   group.max_group_size ?? group.group_policy?.max_group_size ?? null;
 
 export function groupsForCycle(groups: Group[], selectedCycleId: number) {
-  return groups.filter((group) => group.academic_cycle_id === selectedCycleId);
+  return sortGroupsDesc(groups.filter((group) => group.academic_cycle_id === selectedCycleId));
 }
 
 export function AdminStudentGroups({ api }: { api: string }) {
@@ -198,7 +205,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
         const body = await response.json().catch(() => null);
         if (!response.ok)
           throw new Error(errorText(body, "FYP cycles could not be loaded."));
-        const available = Array.isArray(body) ? (body as Cycle[]) : [];
+        const available = sortCyclesDesc(Array.isArray(body) ? (body as Cycle[]) : []);
         setCycles(available);
         const requestedCycleId = readPositiveId("cycle_id");
         if (
@@ -706,9 +713,6 @@ export function AdminStudentGroups({ api }: { api: string }) {
         <section aria-labelledby="selected-cycle-heading">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-fy-border bg-fy-brand-soft p-4">
             <div>
-              <BackButton onClick={() => selectCycle(null)}>
-                Back to FYP cycles
-              </BackButton>
               <p className="mt-2 text-xs font-bold uppercase tracking-wide text-fy-text-secondary">
                 Selected cycle
               </p>
@@ -725,25 +729,33 @@ export function AdminStudentGroups({ api }: { api: string }) {
                 : ""}
             </p>
           </div>
-          {groupState === "loading" && (
-            <div className="rounded-xl border border-fy-border bg-fy-surface p-5 text-sm text-fy-text-secondary">
-              Loading groups...
-            </div>
-          )}
-          {groupState === "error" && (
-            <div
-              role="alert"
-              className="rounded-xl border border-fy-danger bg-fy-danger-soft p-5 text-sm text-fy-danger"
-            >
-              {groupError || "Groups for this cycle could not be loaded."}
-            </div>
-          )}
-          {groupState === "ready" && !groups.length && (
-            <div className="rounded-xl border border-dashed border-fy-border bg-fy-surface p-5 text-sm text-fy-text-secondary">
-              No FYP groups are available in the selected cycle.
-            </div>
-          )}
-          {groupState === "ready" && groups.length > 0 && (
+          <div
+            aria-label="Student groups and selected group details"
+            className={`grid items-start gap-4 ${
+              selectedGroup
+                ? "lg:grid-cols-[minmax(17rem,0.8fr)_minmax(0,1.55fr)]"
+                : ""
+            }`}
+          >
+            {groupState === "loading" && (
+              <div className="rounded-xl border border-fy-border bg-fy-surface p-5 text-sm text-fy-text-secondary">
+                Loading groups...
+              </div>
+            )}
+            {groupState === "error" && (
+              <div
+                role="alert"
+                className="rounded-xl border border-fy-danger bg-fy-danger-soft p-5 text-sm text-fy-danger"
+              >
+                {groupError || "Groups for this cycle could not be loaded."}
+              </div>
+            )}
+            {groupState === "ready" && !groups.length && (
+              <div className="rounded-xl border border-dashed border-fy-border bg-fy-surface p-5 text-sm text-fy-text-secondary">
+                No FYP groups are available in the selected cycle.
+              </div>
+            )}
+            {groupState === "ready" && groups.length > 0 && (
             <div className="grid gap-4">
               {groups.map((group) => {
                 const count = activeMemberCount(group);
@@ -766,7 +778,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                           {selectedCycle.display_name}
                         </span>
                         <h3 className="mt-1 text-lg font-bold text-fy-text">
-                          {shortGroupLabel(group.group_name, selectedCycle)}
+                          {groupDisplayLabel(group, selectedCycle)}
                         </h3>
                         <p className="text-sm text-fy-text-secondary">
                           {group.group_email}
@@ -800,7 +812,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                         </p>
                       </div>
                     </div>
-                    <div className="mt-4 overflow-x-auto">
+                    {!selectedGroup && <div className="mt-4 overflow-x-auto">
                       <table className="w-full min-w-[900px] text-left text-sm">
                         <thead className="border-b border-fy-border text-xs uppercase tracking-wide text-fy-text-secondary">
                           <tr>
@@ -852,7 +864,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                           )}
                         </tbody>
                       </table>
-                    </div>
+                    </div>}
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-xs text-fy-text-secondary">
                         {capacity !== null && count < capacity
@@ -919,11 +931,11 @@ export function AdminStudentGroups({ api }: { api: string }) {
                 );
               })}
             </div>
-          )}
-          {selectedGroup && (
+            )}
+            {selectedGroup && (
             <section
               aria-labelledby="selected-group-heading"
-              className="mt-6 rounded-xl border border-fy-border bg-fy-surface p-5"
+              className="min-w-0 rounded-xl border border-fy-border bg-fy-surface p-5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -934,7 +946,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                     id="selected-group-heading"
                     className="mt-1 text-xl font-bold text-fy-text"
                   >
-                    {shortGroupLabel(selectedGroup.group_name, selectedCycle)}
+                    {groupDisplayLabel(selectedGroup, selectedCycle)}
                   </h2>
                   <p className="text-sm text-fy-text-secondary">
                     {selectedGroup.group_email}
@@ -953,15 +965,6 @@ export function AdminStudentGroups({ api }: { api: string }) {
                         Add member
                       </button>
                     )}
-                  <BackButton
-                    onClick={() => {
-                      setSelectedGroupId(null);
-                      setArchive(null);
-                      writeSelection(selectedCycle.id);
-                    }}
-                  >
-                    Back to groups
-                  </BackButton>
                 </div>
               </div>
               <div className="mt-4 rounded-lg bg-fy-surface-muted px-3 py-3 text-sm font-semibold text-fy-text">
@@ -1051,7 +1054,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                     {collaborationState === "ready" && collaborationCredentials?.channel_id && collaborationCredentials.members.every((credential) => !credential.reset_requested) && <p className="mt-3 rounded-lg border border-dashed border-fy-border bg-fy-surface px-3 py-3 text-sm text-fy-text-secondary">No pending collaboration password reset requests.</p>}
                     {collaborationState === "ready" && collaborationCredentials?.channel_id && collaborationCredentials.members.some((credential) => credential.reset_requested) && <div className="mt-3 grid gap-2">
                       {collaborationCredentials.members.filter((credential) => credential.reset_requested).map((credential) => <div id={`collaboration-reset-member-${credential.member_id}`} key={credential.member_id} className="flex scroll-mt-6 flex-wrap items-center justify-between gap-3 rounded-lg border border-fy-border bg-fy-surface px-3 py-3">
-                        <div><strong className="text-sm text-fy-text">{credential.name}</strong><p className="text-xs text-fy-text-secondary">{credential.registration_number} Â· {credential.password_set ? "Password configured" : "Password not configured"}{credential.reset_requested ? " Â· Reset requested" : ""}</p></div>
+                        <div><strong className="text-sm text-fy-text">{credential.name}</strong><p className="text-xs text-fy-text-secondary">{credential.registration_number} · {credential.password_set ? "Password configured" : "Password not configured"}{credential.reset_requested ? " · Reset requested" : ""}</p></div>
                         <div className="flex items-center gap-2"><StatusBadge status="RESET REQUESTED" /><button type="button" disabled={collaborationBusyMemberId !== null} onClick={() => void resetCollaborationCredential(credential)} className="rounded-lg border border-fy-brand px-3 py-2 text-xs font-semibold text-fy-brand">{collaborationBusyMemberId === credential.member_id ? "Removing..." : "Remove old password"}</button></div>
                       </div>)}
                     </div>}
@@ -1138,7 +1141,8 @@ export function AdminStudentGroups({ api }: { api: string }) {
                 </>
               )}
             </section>
-          )}
+            )}
+          </div>
         </section>
       )}
       {approvalTarget && (
@@ -1170,7 +1174,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
             </p>
             <div className="mt-5 rounded-lg border border-fy-border bg-fy-surface px-3 py-3 text-sm">
               <span className="block text-xs font-bold uppercase tracking-wide text-fy-text-secondary">Automatic group name</span>
-              <strong className="mt-1 block text-fy-text">{approvalTarget.group_name}</strong>
+              <strong className="mt-1 block text-fy-text">{groupDisplayLabel(approvalTarget, selectedCycle)}</strong>
             </div>
             {approvalError && (
               <p
@@ -1221,10 +1225,10 @@ export function AdminStudentGroups({ api }: { api: string }) {
             </h2>
             <p className="mt-2 text-sm text-[#60716b]">
               {confirm.action === "delete"
-                ? `Permanently delete ${confirm.group.group_name}? This cannot be undone.`
+                ? `Permanently delete ${groupDisplayLabel(confirm.group, selectedCycle)}? This cannot be undone.`
                 : confirm.action === "reject"
-                  ? `Reject ${confirm.group.group_name}'s signup? The group will not be able to log in.`
-                  : `Deactivate ${confirm.group.group_name}?`}
+                  ? `Reject ${groupDisplayLabel(confirm.group, selectedCycle)}'s signup? The group will not be able to log in.`
+                  : `Deactivate ${groupDisplayLabel(confirm.group, selectedCycle)}?`}
             </p>
             <div className="mt-5 flex justify-end gap-3">
               <button
@@ -1267,7 +1271,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                   id="add-member-heading"
                   className="mt-1 text-xl font-bold text-fy-text"
                 >
-                  Add member to {memberTarget.group_name}
+                  Add member to {groupDisplayLabel(memberTarget, selectedCycle)}
                 </h2>
                 <p className="mt-2 text-sm text-fy-text-secondary">
                   Add the member’s details within the cycle limit. The group is

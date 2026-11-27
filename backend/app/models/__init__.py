@@ -22,15 +22,13 @@ from .supervisor_assignment import SupervisorAssignment
 from .supervisor_replacement import SupervisorDeparture, SupervisorReplacementCase
 __all__.extend(["SupervisorDeparture", "SupervisorReplacementCase"])
 
-from .group_message import GroupMessage
-from .group_ai import GroupAIDocumentChunk, GroupAIResponse
 from .student_ai import StudentAIConversation, StudentAIMessage
-__all__.extend(["GroupMessage", "GroupAIDocumentChunk", "GroupAIResponse", "StudentAIConversation", "StudentAIMessage"])
+__all__.extend(["StudentAIConversation", "StudentAIMessage"])
 from .announcement import Announcement, AnnouncementRead
 __all__.extend(["Announcement", "AnnouncementRead"])
 
 from .supervisor_request import SupervisorRequest, SupervisorRequestDocument, SupervisorRequestExtractionStatus, SupervisorRequestStatus, SupervisorRequestStatusHistory, SupervisorRequestSubmissionNoteVersion
-from .proposal import Proposal, ProposalVersion
+from .proposal import Proposal
 from .proposal_ai_review import ProposalAIReviewRun
 from .proposal_reference import ProposalReference, ProposalReferenceDocument
 from .proposal_compliance import ProposalComplianceSubmission, ProposalComplianceReport, ProposalVersionComparison
@@ -40,8 +38,6 @@ from .archive_import_batch import ArchiveImportBatch
 from .project_workflow import ProjectMilestone, ProjectTask, SupervisionMeeting, DefenseSchedule, DefensePanelMember, PanelEvaluation, PanelEvaluationScore
 from .module2_collaboration import (
     Module2Notification,
-    Module2ChannelRead,
-    Module2ChatbotSession,
     CollaborationChannel,
     CollaborationParticipant,
     CollaborationMessage,
@@ -49,27 +45,27 @@ from .module2_collaboration import (
     CollaborationMemberSession,
     CollaborationPasswordResetRequest,
 )
-from .agent_supervision import SupervisionAgentRun
-from .supervisor_matching import (
-    MatchingAuditLog,
-    MatchingConfiguration,
-    KnowledgeDocument,
-    KnowledgeDocumentChunk,
-    ProfileVerificationRecord,
-    ProposalAnalysis,
-    ProposalAnalysisVersion,
+from .knowledge_document import KnowledgeDocument
+from .supervisor_profile import (
     SupervisedProjectHistory,
     SupervisorAvailability,
-    SupervisorDocument,
     SupervisorExpertise,
-    SupervisorMatchResult,
     SupervisorProfile,
     SupervisorResearchInterest,
     SupervisorSkill,
 )
+from .supervisor_review import (
+    ProposalReviewFeedback,
+    ProposalRevisionAssessment,
+    ProposalRevisionDecision,
+    ProposalRevisionMessage,
+    ProposalRevisionRequest,
+)
+from .proposal_review_annotation import ProposalReviewAnnotation
 __all__.extend([
     "SupervisorProfile", "SupervisorExpertise", "SupervisorSkill", "SupervisorResearchInterest",
-    "SupervisorDocument", "SupervisedProjectHistory", "SupervisorAvailability", "ProposalAnalysis",
-    "ProposalAnalysisVersion", "SupervisorMatchResult", "MatchingConfiguration", "ProfileVerificationRecord",
-    "MatchingAuditLog", "KnowledgeDocument", "KnowledgeDocumentChunk",
+    "SupervisedProjectHistory", "SupervisorAvailability", "KnowledgeDocument",
+    "ProposalReviewFeedback", "ProposalRevisionRequest", "ProposalRevisionMessage",
+    "ProposalRevisionAssessment", "ProposalRevisionDecision",
+    "ProposalReviewAnnotation",
 ])

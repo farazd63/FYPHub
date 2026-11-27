@@ -143,7 +143,8 @@ type CheckboxProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
 };
 
 export function Checkbox({ label, className, id: propId, ...rest }: CheckboxProps) {
-  const id = propId ?? useId();
+  const generatedId = useId();
+  const id = propId ?? generatedId;
   return (
     <label className={["fy-check", className].filter(Boolean).join(" ")} htmlFor={id}>
       <input type="checkbox" id={id} className="fy-check__input" {...rest} />
@@ -158,7 +159,8 @@ type RadioProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
 };
 
 export function Radio({ label, className, id: propId, ...rest }: RadioProps) {
-  const id = propId ?? useId();
+  const generatedId = useId();
+  const id = propId ?? generatedId;
   return (
     <label className={["fy-radio", className].filter(Boolean).join(" ")} htmlFor={id}>
       <input type="radio" id={id} className="fy-radio__input" {...rest} />
@@ -185,7 +187,8 @@ export function Switch({
   id: propId,
   className,
 }: SwitchProps) {
-  const id = propId ?? useId();
+  const generatedId = useId();
+  const id = propId ?? generatedId;
   return (
     <label
       className={["fy-switch", className].filter(Boolean).join(" ")}

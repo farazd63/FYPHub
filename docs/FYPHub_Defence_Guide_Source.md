@@ -158,9 +158,9 @@ The same-origin API base and Nginx/Vite proxies allow the browser to call /api r
 | Password recovery | App.tsx recovery views | password_reset.py | password_reset_tokens, auth_sessions, users, admin_audit_events |
 | Users, roles and account activation | AdminUsersRoles.tsx | main.py admin user handlers | users, auth_sessions, admin_audit_events |
 | Student group administration | AdminStudentGroups.tsx | main.py student_group_detail and admin group endpoints | teams, team_members, users, supervisor_assignments, supervisor_requests |
-| Academic cycles and group policy | AdminCycleManager.tsx, AcademicCycleDashboard.tsx | main.py, academic_cycle_overview.py | academic_cycles, academic_group_policies |
+| Academic cycles and group policy | AdminCycleManager.tsx, AdminCycleDetails.tsx | main.py, academic_cycle_overview.py | academic_cycles, academic_group_policies |
 | Supervisor capacity | AdminSupervisorCapacity.tsx, SupervisorCapacity.tsx | main.py, coordinator_operations.py, supervisor_requests.py | supervisor_capacity_policies, supervisor_assignments |
-| Document requirements and submission list | AdminDocumentRequirementManagerClean.tsx | document_requirements.py | document_upload_requirements, document_submissions, document_submission_versions; file volume |
+| Document requirements and submission list | AdminDocumentArchive.tsx, StudentRequiredDocumentsDashboard.tsx | document_requirements.py | document_upload_requirements, document_submissions, document_submission_versions; file volume |
 | Student required-document upload/history | StudentRequiredDocumentsDashboard.tsx | document_requirements.py | Same requirement/submission/version tables |
 | Proposal template administration | modules/module-3/AdminProposalTemplates.tsx | modules/module_03_proposal/router.py, template_extractor.py | template_references, template_reference_versions, academic_rule_versions; file volume |
 | Student proposal compliance | modules/module-3/ProposalComplianceWorkspace.tsx | modules/module_03_proposal/router.py, compliance_engine.py, pdf_extraction.py | proposal_compliance_submissions, proposal_compliance_reports |
@@ -169,12 +169,12 @@ The same-origin API base and Nginx/Vite proxies allow the browser to call /api r
 | Assigned group details | SupervisorAssignedTeams.tsx, SupervisorGroupDetails.tsx | supervisor_workspace.py | No new snapshot table; joins existing feature tables |
 | Request conversations | RequestConversation.tsx (shared re-exports) | supervisor_request_conversations.py | supervisor_request_messages |
 | Assignment-scoped group discussion | SupervisorGroupDetails.tsx, shared/CollaborationChannels.tsx where mounted | collaboration_channels.py | collaboration_channels, collaboration_participants, collaboration_messages |
-| Earlier group channels / moderation | group-channel clients and module helpers | group_channels.py, module2_collaboration.py | group_messages, module2_channel_reads, module2_notifications |
+| Assignment-scoped group discussion | StudentCollaborationChannel.tsx and supervisor workspace | collaboration_channels.py | collaboration_channels, collaboration_participants, collaboration_messages; one active channel per assignment |
 | Project progress and meetings | StudentProgressDashboard.tsx, supervisor project tab | project_workflow.py, supervisor_workspace.py | project_milestones, project_tasks, supervision_meetings |
 | Historic Excel project import | OldProjectArchiveImport.tsx, AdminArchiveProjects.tsx | archived_projects.py | archive_import_batches, archived_projects JSONB source data |
 | Archive search and project detail | student/modules/knowledge-search/KnowledgeSearch.tsx and detail | archived_projects.py | archived_projects, archived_project_documents |
 | Proposal reference search | ProposalReferenceSearch variants if mounted | proposal_reference.py | proposal_references, proposal_reference_documents |
-| Academic deadlines | AdminDeadlines.tsx when mounted; dashboard deadline components | main.py deadline handlers, module2_collaboration.py | academic_deadlines, academic_deadline_versions |
+| Academic deadlines | AdminDeadlines.tsx when mounted; dashboard deadline components | main.py deadline handlers | academic_deadlines, academic_deadline_versions |
 | Reminder configuration | AdminReminderRules.tsx when mounted | main.py reminder handlers | reminder_rules, reminder_rule_versions |
 | Dashboard requirements | components/DashboardDeadlinesRequirements.tsx where mounted | dashboard_requirements.py | dashboard_requirements |
 | Defense schedules and panel scoring | EvaluatorWorkflow.tsx, PanelScheduling.tsx if mounted | project_workflow.py | defense_schedules, defense_panel_members, panel_evaluations, panel_evaluation_scores |
@@ -182,7 +182,7 @@ The same-origin API base and Nginx/Vite proxies allow the browser to call /api r
 | Audit history | API / governance screens | audit_history.py, main.py add_admin_audit_event | admin_audit_events; separate evaluation audit table |
 | Group AI helper | Supporting backend/UI if mounted | group_ai.py | module2_chatbot_sessions |
 | Advisory proposal AI review | Supporting API; not current supervisor compliance screen | ai_provider.py, supervisor_requests.py | proposal_ai_review_runs |
-| Agentic supervision foundation | Supervisor navigation removed; backend still registered | agent_supervision.py | supervision_agent_runs, then milestones/tasks only after permitted execution |
+| Agentic supervision foundation | Retired and removed from the current flow | No active route or frontend entry point | The old `agent_supervision.py` service and `supervision_agent_runs` table were removed; current progress uses explicit milestones, tasks and meetings. |
 
 # 5. Database design in depth
 
@@ -432,7 +432,7 @@ ai_provider.py supports configured Ollama and Groq clients, explicit model selec
 
 Invalid configuration, timeouts, provider errors or invalid JSON produce explicit UNAVAILABLE/RATE_LIMITED or deterministic fallback metadata. Ollama can attempt a configured fallback model. API keys remain backend environment settings. Do not promise that a model is available simply because the Ollama container is running; the selected model must be downloaded and responding.
 
-The agent-supervision backend persists plans and requires appropriate human approval before tool execution. Its supervisor navigation/module was removed at the user's request, but the backend router and supervision_agent_runs table remain. Hiding a UI feature does not delete its API or schema.
+The former agent-supervision backend and its `supervision_agent_runs` table are not part of the current product. They were removed because no current frontend route or backend caller uses them. The active project-progress workflow uses explicit milestones, tasks and meetings instead.
 
 # 11. Previous-project Excel archive and knowledge search
 
@@ -480,7 +480,7 @@ Meetings record held_at, supervisor, minutes, decisions and optional action item
 
 - supervisor_request_messages is a request-specific conversation used before/after request decisions.
 - collaboration_channels/participants/messages is an assignment-specific group discussion. It links to assignment_id, team_id and supervisor_id, so reassignment can archive an older channel instead of merging unrelated histories.
-- group_messages and module2_* helpers are an earlier/general group communication and notification foundation. Check which frontend imports/API path the demonstration uses.
+- The former `group_messages` and `module2_channel_reads` tables belonged to the retired seven-channel implementation and were removed. `module2_notifications` remains because the current notification service and collaboration reset workflow use it.
 
 The explicit student/supervisor collaboration-message routes are now registered separately. An earlier invalid route pattern had caused 404 errors and was corrected. Backend authorization verifies group/assignment access independently of the URL role prefix.
 
@@ -488,7 +488,7 @@ Student group discussion navigation was intentionally removed earlier. The backe
 
 ## 12.3 Notifications
 
-notifications.py lists recipient-scoped module2_notifications and marks individual notifications read. module2_collaboration.py contains supporting deadline/channel data. Read status is stored; polling is used by relevant UI components. A notification table is not an external email/push service and should be described separately from SMTP password recovery.
+notifications.py lists recipient-scoped module2_notifications and marks individual notifications read. The active collaboration model file contains assignment-channel records and notification storage; the old module-2 route file is removed. Read status is stored; polling is used by relevant UI components. A notification table is not an external email/push service and should be described separately from SMTP password recovery.
 
 # 13. Evaluations, defence scheduling and results
 

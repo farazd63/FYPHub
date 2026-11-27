@@ -23,11 +23,9 @@
   min-height: 0;
 }
 
-/* Shared chrome scale: the same header controls appear on every portal. */
+/* Shared chrome scale for the portal home control. */
 .student-shell .portal-home-button,
-.admin-shell .portal-home-button,
-.student-shell .portal-history-controls button,
-.admin-shell .admin-history-controls button {
+.admin-shell .portal-home-button {
   box-sizing: border-box;
   width: 36px !important;
   height: 36px !important;
@@ -36,9 +34,7 @@
 }
 
 .student-shell .portal-home-button svg,
-.admin-shell .portal-home-button svg,
-.student-shell .portal-history-controls button svg,
-.admin-shell .admin-history-controls button svg {
+.admin-shell .portal-home-button svg {
   width: 16px;
   height: 16px;
 }

@@ -8,8 +8,10 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from .auth import require_roles
+from .cycle_ordering import sort_cycles_desc
 from .database import get_db
 from .document_requirements import _project_for_group
+from .group_display import visible_group_code, visible_group_name, visible_group_number
 from .models import (
     AcademicCycle,
     DocumentArchiveReviewQueue,
@@ -44,12 +46,12 @@ def _cycle(db: Session, cycle_id: int) -> AcademicCycle:
     return cycle
 
 
-def _group_code(cycle: AcademicCycle, group: Team) -> str:
-    return f"{cycle.code}-{group.group_number if group.group_number is not None else 'UNASSIGNED'}"
+def _group_code(db: Session, cycle: AcademicCycle, group: Team) -> str:
+    return visible_group_code(db, group, cycle) or f"{cycle.code}-UNASSIGNED"
 
 
-def _group_name(group: Team, members: list[TeamMember]) -> str:
-    return group.group_name or f"Group {group.group_number or '—'}"
+def _group_name(db: Session, cycle: AcademicCycle, group: Team) -> str:
+    return visible_group_name(db, group, cycle)
 
 
 def _members(db: Session, group_id: int, cycle_id: int) -> list[TeamMember]:
@@ -122,8 +124,9 @@ def _group_summary(db: Session, cycle: AcademicCycle, group: Team, requirements:
     return {
         "id": group.id,
         "group_id": group.id,
-        "group_code": _group_code(cycle, group),
-        "group_name": _group_name(group, members),
+        "group_code": _group_code(db, cycle, group),
+        "group_number": visible_group_number(db, group),
+        "group_name": _group_name(db, cycle, group),
         "cycle_id": cycle.id,
         "cycle_name": cycle.display_name,
         "project": {"id": project.id, "title": project.title or f"Project {project.id}", "status": project.status, "updated_at": project.updated_at} if project else None,
@@ -141,7 +144,7 @@ def _group_summary(db: Session, cycle: AcademicCycle, group: Team, requirements:
 
 def _archive_rows(db: Session, cycle: AcademicCycle, group: Team, requirements: list[DocumentUploadRequirement], submissions: list[DocumentSubmission]) -> list[dict]:
     members = _members(db, group.id, cycle.id)
-    group_name = _group_name(group, members)
+    group_name = _group_name(db, cycle, group)
     submission_by_requirement: dict[int, DocumentSubmission] = {}
     for submission in sorted(submissions, key=lambda item: (item.updated_at, item.id), reverse=True):
         submission_by_requirement.setdefault(submission.requirement_id, submission)
@@ -175,7 +178,8 @@ def _archive_rows(db: Session, cycle: AcademicCycle, group: Team, requirements: 
             "cycle_id": cycle.id,
             "cycle_name": cycle.display_name,
             "group_id": group.id,
-            "group_code": _group_code(cycle, group),
+            "group_code": _group_code(db, cycle, group),
+            "group_number": visible_group_number(db, group),
             "group_name": group_name,
             "project_id": submission.project_id if submission else (project.id if project else None),
             "project_title": row_project.title if row_project else None,
@@ -241,7 +245,7 @@ def _group_matches_archive(archive: dict, *, search: str | None, section: str | 
 
 @router.get("/cycles")
 def archive_cycles(_: User = Depends(require_roles(*ARCHIVE_ROLES)), db: Session = Depends(get_db)):
-    cycles = db.scalars(select(AcademicCycle).order_by(AcademicCycle.id.desc())).all()
+    cycles = sort_cycles_desc(db.scalars(select(AcademicCycle)).all())
     result = []
     for cycle in cycles:
         result.append({"id": cycle.id, "code": cycle.code, "name": cycle.display_name, "display_name": cycle.display_name, "group_count": len(db.scalars(select(Team.id).where(Team.academic_cycle_id == cycle.id, Team.status != "dissolved")).all()), "requirement_count": len(db.scalars(select(DocumentUploadRequirement.id).where(DocumentUploadRequirement.academic_cycle_id == cycle.id)).all()), "submission_count": len(db.scalars(select(DocumentSubmission.id).where(DocumentSubmission.academic_cycle_id == cycle.id)).all())})

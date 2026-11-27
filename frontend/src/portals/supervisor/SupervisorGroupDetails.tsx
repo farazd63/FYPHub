@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { BackButton } from "../../ui";
 import { SupervisorDiscussion } from "./SupervisorDiscussion";
 import { shortGroupLabel } from "../../lib/displayLabels";
 
@@ -120,11 +119,11 @@ export function GroupDetailsContent({ api, data, initialTab = "overview", onTabC
   </div>;
 }
 
-export function SupervisorGroupDetails({ api, groupId, initialTab, onBack }: { api: string; groupId: number; initialTab?: GroupTab; onBack: () => void }) {
+export function SupervisorGroupDetails({ api, groupId, initialTab }: { api: string; groupId: number; initialTab?: GroupTab }) {
   const [data, setData] = useState<GroupWorkspace | null>(null), [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<GroupTab>(initialTab ?? "overview");
   const discussionOnly = activeTab === "discussion";
   const load = useCallback(async () => { try { const body = await read<GroupWorkspace>(`${api}/api/v1/supervisor/groups/${groupId}`); setData({ ...body, group: { ...body.group, name: shortGroupLabel(body.group.name, body.group.academic_cycle.name) } }); setError(""); } catch (e) { setError(e instanceof Error ? e.message : "Group could not be loaded."); } }, [api, groupId]);
   useEffect(() => { const initial = window.setTimeout(() => void load(), 0); const timer = window.setInterval(() => void load(), 10000); return () => { window.clearTimeout(initial); window.clearInterval(timer); }; }, [load]);
-  return <section className={`supervisor-page${discussionOnly ? " supervisor-page--discussion" : ""}`}><BackButton className="mb-4" onClick={onBack}>Back to assigned groups</BackButton>{error && <p role="alert">{error} <button type="button" onClick={() => void load()}>Retry</button></p>}{!data && !error && <p>Loading group details…</p>}{data && <div className={`supervisor-card supervisor-group-card${discussionOnly ? " supervisor-group-card--discussion" : ""}`}>{!discussionOnly && <div className="supervisor-group-hero"><div><span className="supervisor-section-kicker">GROUP WORKSPACE</span><h2>{data.group.name}</h2><p>{data.group.email} <span aria-hidden="true">·</span> {data.group.academic_cycle.name}</p></div><div className="supervisor-group-hero__status"><span className="supervisor-status-pill supervisor-status-pill--neutral">{data.group.status.replaceAll("_", " ")}</span><span className="supervisor-status-pill supervisor-status-pill--blue">{data.assignment?.status?.replaceAll("_", " ") || "Awaiting decision"}</span></div></div>}<GroupDetailsContent api={api} data={data} initialTab={initialTab} onTabChange={setActiveTab} /></div>}</section>;
+  return <section className={`supervisor-page${discussionOnly ? " supervisor-page--discussion" : ""}`}>{error && <p role="alert">{error} <button type="button" onClick={() => void load()}>Retry</button></p>}{!data && !error && <p>Loading group details…</p>}{data && <div className={`supervisor-card supervisor-group-card${discussionOnly ? " supervisor-group-card--discussion" : ""}`}>{!discussionOnly && <div className="supervisor-group-hero"><div><span className="supervisor-section-kicker">GROUP WORKSPACE</span><h2>{data.group.name}</h2><p>{data.group.email} <span aria-hidden="true">·</span> {data.group.academic_cycle.name}</p></div><div className="supervisor-group-hero__status"><span className="supervisor-status-pill supervisor-status-pill--neutral">{data.group.status.replaceAll("_", " ")}</span><span className="supervisor-status-pill supervisor-status-pill--blue">{data.assignment?.status?.replaceAll("_", " ") || "Awaiting decision"}</span></div></div>}<GroupDetailsContent api={api} data={data} initialTab={initialTab} onTabChange={setActiveTab} /></div>}</section>;
 }

@@ -1,4 +1,4 @@
-"""Idempotently seed three local supervisor accounts for matching demos."""
+"""Idempotently seed three local supervisor accounts for replacement-ranking demos."""
 
 from __future__ import annotations
 

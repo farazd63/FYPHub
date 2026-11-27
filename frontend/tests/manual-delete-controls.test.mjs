@@ -5,9 +5,9 @@ import { readFileSync } from "node:fs";
 const source = (name) => readFileSync(new URL(`../src/${name}`, import.meta.url), "utf8");
 
 test("manual configuration surfaces expose guarded delete controls", () => {
-  const requirements = source("AdminDocumentRequirementManagerClean.tsx");
   const capacity = source("AdminSupervisorCapacity.tsx");
   const cycles = source("AdminCycleManager.tsx");
+  const requirements = source("AdminDocumentRequirementManagerClean.tsx");
   assert.match(requirements, /request\("DELETE"/);
   assert.match(requirements, /item\.status === "DRAFT"/);
   assert.match(requirements, /Delete/);

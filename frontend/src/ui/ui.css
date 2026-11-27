@@ -191,39 +191,6 @@
 .fy-btn__label--loading {
   opacity: 0.85;
 }
-.fy-back-button {
-  display: inline-flex;
-  min-height: 2.75rem;
-  align-items: center;
-  gap: 0.55rem;
-  border: 1px solid var(--fy-border);
-  border-radius: var(--fy-radius-control);
-  background: var(--fy-surface);
-  color: var(--fy-brand);
-  padding: 0.55rem 0.95rem 0.55rem 0.75rem;
-  font-size: var(--fy-text-small);
-  font-weight: var(--fy-weight-semibold);
-  line-height: 1.25;
-  cursor: pointer;
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
-}
-.fy-back-button:hover:not(:disabled) {
-  border-color: var(--fy-brand);
-  background: var(--fy-brand-soft);
-  color: var(--fy-brand);
-  transform: translateX(-1px);
-}
-.fy-back-button:focus-visible {
-  outline: none;
-  box-shadow: var(--fy-focus-ring);
-}
-.fy-back-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
-}
-.fy-back-button__icon {
-  flex: 0 0 auto;
-}
 @keyframes fy-spin {
   to {
     transform: rotate(360deg);
@@ -231,14 +198,25 @@
 }
 
 .fy-icon-btn {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-items: center;
+  padding: 0;
   border: 1px solid transparent;
   border-radius: var(--fy-radius-control);
   background: transparent;
   color: var(--fy-text);
   cursor: pointer;
+  line-height: 1;
+  text-align: center;
+  vertical-align: middle;
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.fy-icon-btn > svg {
+  display: block;
+  flex: 0 0 auto;
+  margin: 0;
 }
 .fy-icon-btn--sm {
   width: 2rem;
@@ -295,6 +273,13 @@
 .fy-icon-btn:focus-visible {
   outline: none;
   box-shadow: var(--fy-focus-ring);
+}
+
+/* Keep table/card action clusters centered consistently across admin pages. */
+.admin-shell [aria-label^="Actions for"],
+main:has(.admin-sidebar) [aria-label^="Actions for"] {
+  align-items: center;
+  justify-content: center;
 }
 .fy-icon-btn__spinner {
   animation: fy-spin 0.8s linear infinite;
