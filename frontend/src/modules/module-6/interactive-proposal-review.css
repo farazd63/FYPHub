@@ -78,3 +78,10 @@
 .review-thread-form{display:grid;gap:.4rem}.review-thread-form textarea{width:100%;border:1px solid #d1dbe8;border-radius:.42rem;padding:.5rem;font-size:.69rem;resize:vertical}.review-thread-form button,.review-thread-actions button{display:inline-flex;align-items:center;justify-content:center;gap:.25rem;border:1px solid #6436df;border-radius:.4rem;background:#6436df;color:#fff;padding:.43rem .55rem;font-size:.65rem;font-weight:800;cursor:pointer}.review-thread-form button:disabled{cursor:not-allowed;opacity:.55}.review-thread-actions{display:flex;flex-wrap:wrap;gap:.35rem}.review-thread-actions button{border-color:#c9d4e5;background:#fff;color:#536681}
 .review-workspace__confirm-backdrop{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgb(18 29 51 / 42%);padding:1rem}.review-workspace__confirm{width:min(30rem,100%);border-radius:.75rem;background:#fff;padding:1rem;box-shadow:0 18px 60px rgb(12 26 52 / 25%)}.review-workspace__confirm h2{margin:0;color:#263b5b;font-size:.95rem}.review-workspace__confirm p{color:#526986;font-size:.75rem}.review-workspace__confirm>div{display:flex;justify-content:flex-end;gap:.4rem}.review-workspace__confirm button{border:1px solid #c9d4e5;border-radius:.4rem;background:#fff;color:#536681;padding:.45rem .6rem;font-size:.68rem;font-weight:800;cursor:pointer}.review-workspace__confirm button.is-primary{border-color:#6436df;background:#6436df;color:#fff}.review-workspace__confirm button.is-danger{border-color:#ebc6c1;color:#b34a42}
 @media (max-width:1100px){.review-workspace__header{align-items:flex-start;flex-wrap:wrap;padding:.55rem .8rem}.review-workspace__header-actions{justify-content:flex-start}.review-workspace__body{grid-template-columns:8rem minmax(20rem,1fr) 24rem}}
+
+/* Keep the review workspace inside the viewport and delegate scrolling to its
+   document, thumbnails, and feedback panels. */
+.review-workspace__body{height:0;min-height:0;flex:1 1 auto}
+.review-workspace__pages,.review-workspace__document,.review-workspace__right{min-height:0}
+.review-workspace__document{overflow:hidden}
+.review-workspace__right{overflow:hidden}

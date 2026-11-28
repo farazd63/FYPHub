@@ -8,6 +8,22 @@ body.fy-modal-open .student-content__inner {
   transform: none !important;
 }
 
+/* Portal scroll rules intentionally keep the authenticated page scrollable.
+   A modal is the exception: lock both scroll roots so the background cannot
+   move while the dialog's own panels remain usable. */
+html:has(body.fy-modal-open),
+body.fy-modal-open {
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+body.fy-modal-open #root {
+  height: 100% !important;
+  min-height: 100% !important;
+  overflow: hidden !important;
+}
+
 body.fy-modal-open .admin-shell__header,
 body.fy-modal-open .admin-sidebar,
 body.fy-modal-open .role-sidebar {
