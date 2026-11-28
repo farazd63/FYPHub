@@ -1,6 +1,6 @@
 """Application SQLAlchemy models."""
 
-from .user import User, UserRole
+from .user import User, UserRole, UserRoleAssignment
 from .institution import Institution, InstitutionDomain, InstitutionMembership, InstitutionInvitation, EmailVerificationToken
 from .academic import AcademicCycle, AcademicGroupPolicy, SupervisorCapacityPolicy
 from .team import Team, TeamMember
@@ -13,8 +13,9 @@ from .evaluation import EvaluationRecord, EvaluationAuditEvent, EvaluationCorrec
 from .dashboard_requirement import DashboardRequirement
 from .academic_deadline import AcademicDeadline, AcademicDeadlineVersion
 from .document_requirement import DocumentArchiveReviewQueue, DocumentRequirementSection, DocumentSubmission, DocumentSubmissionReviewEvent, DocumentSubmissionVersion, DocumentUploadRequirement
+from .document_review import DocumentReviewAnnotation, DocumentReviewFeedback, DocumentReviewFeedbackMessage
 
-__all__ = ["User", "UserRole", "Institution", "InstitutionDomain", "InstitutionMembership", "InstitutionInvitation", "EmailVerificationToken", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "PasswordResetToken", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion", "EvaluationRecord", "EvaluationAuditEvent", "EvaluationCorrection", "EvaluationAggregationConfig", "AcademicDeadline", "AcademicDeadlineVersion", "DashboardRequirement", "DocumentUploadRequirement", "DocumentSubmission", "DocumentSubmissionVersion", "DocumentRequirementSection", "DocumentSubmissionReviewEvent", "DocumentArchiveReviewQueue", "ArchivedProject", "ArchivedProjectDocument", "ArchivedProjectDocumentType", "ArchiveImportBatch", "ProposalComplianceSubmission", "ProposalComplianceReport", "ProposalVersionComparison"]
+__all__ = ["User", "UserRole", "UserRoleAssignment", "Institution", "InstitutionDomain", "InstitutionMembership", "InstitutionInvitation", "EmailVerificationToken", "AcademicCycle", "AcademicGroupPolicy", "SupervisorCapacityPolicy", "Team", "TeamMember", "AuthSession", "PasswordResetToken", "AdminAuditEvent", "TemplateReference", "TemplateReferenceVersion", "AcademicRuleVersion", "TemplateType", "EvaluationRubric", "EvaluationRubricVersion", "EvaluationRubricCriterion", "EvaluationRecord", "EvaluationAuditEvent", "EvaluationCorrection", "EvaluationAggregationConfig", "AcademicDeadline", "AcademicDeadlineVersion", "DashboardRequirement", "DocumentUploadRequirement", "DocumentSubmission", "DocumentSubmissionVersion", "DocumentRequirementSection", "DocumentSubmissionReviewEvent", "DocumentArchiveReviewQueue", "DocumentReviewAnnotation", "DocumentReviewFeedback", "DocumentReviewFeedbackMessage", "ArchivedProject", "ArchivedProjectDocument", "ArchivedProjectDocumentType", "ArchiveImportBatch", "ProposalComplianceSubmission", "ProposalComplianceReport", "ProposalVersionComparison"]
 
 from .reminder_rule import ReminderRule, ReminderRuleVersion
 
@@ -56,16 +57,20 @@ from .supervisor_profile import (
 )
 from .supervisor_review import (
     ProposalReviewFeedback,
+    ProposalReviewFeedbackMessage,
+    ProposalReviewFeedbackRevision,
     ProposalRevisionAssessment,
     ProposalRevisionDecision,
     ProposalRevisionMessage,
     ProposalRevisionRequest,
 )
 from .proposal_review_annotation import ProposalReviewAnnotation
+from .document_training import DocumentTrainingSession
 __all__.extend([
     "SupervisorProfile", "SupervisorExpertise", "SupervisorSkill", "SupervisorResearchInterest",
     "SupervisedProjectHistory", "SupervisorAvailability", "KnowledgeDocument",
-    "ProposalReviewFeedback", "ProposalRevisionRequest", "ProposalRevisionMessage",
+    "ProposalReviewFeedback", "ProposalReviewFeedbackMessage", "ProposalReviewFeedbackRevision", "ProposalRevisionRequest", "ProposalRevisionMessage",
     "ProposalRevisionAssessment", "ProposalRevisionDecision",
     "ProposalReviewAnnotation",
+    "DocumentTrainingSession",
 ])

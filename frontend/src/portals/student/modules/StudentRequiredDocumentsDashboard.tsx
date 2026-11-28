@@ -19,6 +19,7 @@ type Requirement = {
 type Version = { id: number; version_number: number; original_filename: string; uploaded_at: string; download_url?: string; preview_url?: string };
 type ReviewEvent = { id: number; status: string; reviewer_name?: string | null; comment?: string | null; created_at: string };
 type Submission = { id: number; status?: string; is_late?: boolean; review_comment?: string | null; reviewed_at?: string | null; uploaded_at?: string; versions: Version[]; review_history?: ReviewEvent[] };
+type TrainingSession = { id: number; title: string; description: string; requirement_title?: string | null; scheduled_at: string | null; duration_minutes: number; meeting_url: string | null; status: "SCHEDULED" | "COMPLETED" | "CANCELLED"; supervisor_name?: string };
 type GroupContext = { group_name?: string | null; academic_cycle?: string | null; project?: { title?: string | null } | null };
 type PreviewState = { url: string; title: string; page: number; pages: number; zoom: number; loading: boolean; error?: string };
 
@@ -43,6 +44,7 @@ export function StudentRequiredDocumentsDashboard({ api }: { api: string }) {
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [submissions, setSubmissions] = useState<Record<number, Submission>>({});
   const [group, setGroup] = useState<GroupContext | null>(null);
+  const [training, setTraining] = useState<TrainingSession[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState<number | null>(null);
@@ -55,15 +57,17 @@ export function StudentRequiredDocumentsDashboard({ api }: { api: string }) {
     setState("loading");
     setMessage("");
     try {
-      const [response, groupResponse] = await Promise.all([
+      const [response, groupResponse, trainingResponse] = await Promise.all([
         fetch(`${api}/api/v1/student/group/requirements`, { credentials: "include" }),
         fetch(`${api}/api/v1/student/group/me`, { credentials: "include" }),
+        fetch(`${api}/api/v1/student/group/document-training`, { credentials: "include" }),
       ]);
       const body = await response.json().catch(() => []);
       if (!response.ok) throw new Error(messageFor(response.status));
       const rows = Array.isArray(body) ? body as Requirement[] : [];
       setRequirements(rows);
       if (groupResponse.ok) setGroup(await groupResponse.json() as GroupContext);
+      if (trainingResponse.ok) setTraining(await trainingResponse.json() as TrainingSession[]);
       const loaded = await Promise.all(rows.map(async (item) => {
         const result = await fetch(`${api}/api/v1/student/group/requirements/${item.id}/submission`, { credentials: "include" });
         return [item.id, result.ok ? await result.json() as Submission : undefined] as const;
@@ -173,7 +177,8 @@ export function StudentRequiredDocumentsDashboard({ api }: { api: string }) {
   return <section aria-label="Required Documents & Uploads" className="student-documents-dashboard mt-8 rounded-2xl border border-fy-border bg-fy-surface p-6">
     <div className="flex items-start justify-between gap-4"><div><p className="student-overview__eyebrow">Student documents</p><h2 className="text-2xl font-semibold">Required Documents &amp; Uploads</h2><p className="mt-1 text-sm text-fy-text-secondary">Every requirement has its own submission and review record. Upload Video, PDF, and other requirements separately.</p></div></div>
     {state === "error" && <Alert tone="danger" title="Required documents unavailable" className="mt-4"><p className="m-0">{message}</p><div className="mt-3"><Button type="button" variant="secondary" size="sm" onClick={() => void load()}>Retry</Button></div></Alert>}
-    {(group || requirements.length > 0) && <div className="mt-4 grid gap-2 rounded-xl bg-fy-surface-muted p-4 text-sm sm:grid-cols-3"><div><span className="block text-xs uppercase tracking-wide text-fy-text-secondary">Academic cycle</span><strong>{group?.academic_cycle || (requirements[0] ? `Cycle ${requirements[0].academic_cycle_id}` : "Not detected")}</strong></div><div><span className="block text-xs uppercase tracking-wide text-fy-text-secondary">Group</span><strong>{group ? shortGroupLabel(group.group_name, group.academic_cycle) : "Not detected"}</strong></div><div><span className="block text-xs uppercase tracking-wide text-fy-text-secondary">Project</span><strong>{group?.project?.title || "Not assigned"}</strong></div></div>}
+    {(group || requirements.length > 0) && <div className="mt-4 grid gap-2 rounded-xl bg-fy-surface-muted p-4 text-sm sm:grid-cols-3"><div><span className="block text-xs uppercase tracking-wide text-fy-text-secondary">Academic cycle</span><strong>{group?.academic_cycle || (requirements[0] ? `Cycle ${requirements[0].academic_cycle_id}` : "Not detected")}</strong></div><div><span className="block text-xs uppercase tracking-wide text-fy-text-secondary">Group</span><strong>{group ? shortGroupLabel(group.group_name, group.academic_cycle) : "Not detected"}</strong></div><div><span className="block text-xs uppercase tracking-wide text-fy-text-secondary">Final project title</span><strong>{group?.project?.title || "Final title not set"}</strong></div></div>}
+    {training.length > 0 && <section className="mt-5 rounded-xl border border-blue-200 bg-blue-50/60 p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Supervisor guidance</p><h2 className="mt-1 text-lg font-semibold text-blue-950">Training &amp; document help</h2><p className="mt-1 text-sm text-blue-900/75">Your supervisor’s document-linked training sessions and explanations appear here.</p></div><span className="rounded-full border border-blue-200 bg-white px-2.5 py-1 text-xs font-semibold text-blue-700">{training.filter(item => item.status === "SCHEDULED").length} upcoming</span></div><div className="mt-4 grid gap-3">{training.map(item => <article key={item.id} className="rounded-lg border border-blue-200 bg-white p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="flex flex-wrap items-center gap-2"><strong>{item.title}</strong><span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">{item.status.replaceAll("_", " ")}</span></div><p className="mt-1 text-xs text-fy-text-secondary">{item.requirement_title || "General document guidance"}{item.scheduled_at ? ` · ${new Date(item.scheduled_at).toLocaleString()}` : " · Time to be agreed"}{item.duration_minutes ? ` · ${item.duration_minutes} min` : ""}{item.supervisor_name ? ` · ${item.supervisor_name}` : ""}</p><p className="mt-2 whitespace-pre-wrap text-sm text-fy-text-secondary">{item.description}</p>{item.meeting_url && <a href={item.meeting_url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-semibold text-fy-primary underline">Open meeting / resource</a>}</div></div></article>)}</div></section>}
     {message && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{message}</p>}
     {state === "loading" && <p className="mt-5">Loading required documents…</p>}
     {state === "ready" && !requirements.length && <p className="mt-5 rounded-lg border border-dashed p-4 text-sm">No published document requirements are currently assigned.</p>}

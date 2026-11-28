@@ -10,7 +10,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .auth import get_current_user, require_roles, utc_now, validate_mutating_origin
+from .auth import get_current_user, require_roles, user_has_role, utc_now, validate_mutating_origin
 from .database import get_db
 from .models import (
     AcademicCycle,
@@ -55,26 +55,28 @@ def _error(code: str, message: str, code_status: int = status.HTTP_409_CONFLICT)
     return HTTPException(code_status, detail={"code": code, "message": message})
 
 
-def _role_categories(role: UserRole) -> set[str]:
-    if role == UserRole.PANEL_MEMBER:
-        return PANEL_CATEGORIES
-    if role == UserRole.SUPERVISOR:
-        return SUPERVISOR_CATEGORIES
-    if role in ADMIN_ROLES:
-        return ADMIN_CATEGORIES
-    return set()
+def _role_categories_for_user(session: Session, user: User) -> set[str]:
+    categories: set[str] = set()
+    if user_has_role(session, user, UserRole.PANEL_MEMBER):
+        categories.update(PANEL_CATEGORIES)
+    if user_has_role(session, user, UserRole.SUPERVISOR):
+        categories.update(SUPERVISOR_CATEGORIES)
+    if user_has_role(session, user, UserRole.ADMIN) or user_has_role(session, user, UserRole.COORDINATOR):
+        categories.update(ADMIN_CATEGORIES)
+    return categories
 
 
 def _target_group_ids(session: Session, user: User, target_group_id: int | None = None) -> set[int]:
     if target_group_id is not None:
         return {target_group_id}
-    if user.role == UserRole.SUPERVISOR:
-        return set(session.scalars(select(SupervisorAssignment.team_id).where(SupervisorAssignment.supervisor_id == user.id, SupervisorAssignment.ended_at.is_(None))).all())
-    if user.role == UserRole.PANEL_MEMBER:
-        return set(session.scalars(select(DefenseSchedule.team_id).join(DefensePanelMember, DefensePanelMember.schedule_id == DefenseSchedule.id).where(DefensePanelMember.user_id == user.id, DefenseSchedule.status != "CANCELLED")).all())
-    if user.role in ADMIN_ROLES:
-        return set(session.scalars(select(Team.id)).all())
-    return set()
+    group_ids: set[int] = set()
+    if user_has_role(session, user, UserRole.SUPERVISOR):
+        group_ids.update(session.scalars(select(SupervisorAssignment.team_id).where(SupervisorAssignment.supervisor_id == user.id, SupervisorAssignment.ended_at.is_(None))).all())
+    if user_has_role(session, user, UserRole.PANEL_MEMBER):
+        group_ids.update(session.scalars(select(DefenseSchedule.team_id).join(DefensePanelMember, DefensePanelMember.schedule_id == DefenseSchedule.id).where(DefensePanelMember.user_id == user.id, DefenseSchedule.status != "CANCELLED")).all())
+    if user_has_role(session, user, UserRole.ADMIN) or user_has_role(session, user, UserRole.COORDINATOR):
+        group_ids.update(session.scalars(select(Team.id)).all())
+    return group_ids
 
 
 def _panel_can_access(session: Session, actor: User, group_id: int) -> bool:
@@ -86,13 +88,11 @@ def _panel_can_access(session: Session, actor: User, group_id: int) -> bool:
 
 
 def _actor_can_access_group(session: Session, actor: User, group_id: int) -> bool:
-    if actor.role in ADMIN_ROLES:
+    if user_has_role(session, actor, UserRole.ADMIN) or user_has_role(session, actor, UserRole.COORDINATOR):
         return session.scalar(select(Team.id).where(Team.id == group_id)) is not None
-    if actor.role == UserRole.SUPERVISOR:
-        return session.scalar(select(SupervisorAssignment.id).where(SupervisorAssignment.team_id == group_id, SupervisorAssignment.supervisor_id == actor.id, SupervisorAssignment.ended_at.is_(None))) is not None
-    if actor.role == UserRole.PANEL_MEMBER:
-        return _panel_can_access(session, actor, group_id)
-    return False
+    if user_has_role(session, actor, UserRole.SUPERVISOR) and session.scalar(select(SupervisorAssignment.id).where(SupervisorAssignment.team_id == group_id, SupervisorAssignment.supervisor_id == actor.id, SupervisorAssignment.ended_at.is_(None))) is not None:
+        return True
+    return user_has_role(session, actor, UserRole.PANEL_MEMBER) and _panel_can_access(session, actor, group_id)
 
 
 def _record_out(record: EvaluationRecord) -> EvaluationOut:
@@ -103,8 +103,8 @@ def _audit(session: Session, record: EvaluationRecord, actor: User, action: str,
     session.add(EvaluationAuditEvent(evaluation_id=record.id, actor_id=actor.id, action=action, previous_marks=previous, new_marks=record.obtained_marks, reason=reason, changed_values=changed or {"status": record.status, "category": record.evaluation_category}))
 
 
-def _validate_category_owner(actor: User, category: str) -> None:
-    if category not in _role_categories(actor.role):
+def _validate_category_owner(session: Session, actor: User, category: str) -> None:
+    if category not in _role_categories_for_user(session, actor):
         raise _error("category_not_owned", "Your role is not authorized to enter this evaluation category.", status.HTTP_403_FORBIDDEN)
 
 
@@ -132,7 +132,7 @@ def _assignment_out(session: Session, team: Team, categories: Iterable[str]) -> 
 def evaluation_assignments(actor: User = Depends(get_current_user), session: Session = Depends(get_db)) -> list[EvaluationAssignmentOut]:
     group_ids = _target_group_ids(session, actor)
     teams = session.scalars(select(Team).where(Team.id.in_(group_ids)).order_by(Team.id)).all() if group_ids else []
-    return [_assignment_out(session, team, _role_categories(actor.role)) for team in teams]
+    return [_assignment_out(session, team, _role_categories_for_user(session, actor)) for team in teams]
 
 
 @router.get("/evaluations/my", response_model=list[EvaluationOut])
@@ -152,7 +152,7 @@ def my_evaluations(
 
 def _save_record(session: Session, actor: User, payload: EvaluationWrite, record: EvaluationRecord | None = None) -> EvaluationRecord:
     category = payload.evaluation_category.value
-    _validate_category_owner(actor, category)
+    _validate_category_owner(session, actor, category)
     student_id, group_id = _resolve_target(session, payload)
     if group_id is not None and not _actor_can_access_group(session, actor, group_id):
         raise _error("assignment_not_authorized", "This group is not assigned to your evaluator role.", status.HTTP_403_FORBIDDEN)
@@ -163,7 +163,8 @@ def _save_record(session: Session, actor: User, payload: EvaluationWrite, record
     elif record.evaluation_category != category or record.student_id != student_id or record.group_id != group_id:
         raise _error("evaluation_target_immutable", "An existing evaluation cannot be reassigned or moved to another category.", status.HTTP_409_CONFLICT)
     if record is None:
-        record = EvaluationRecord(student_id=student_id, group_id=group_id, evaluator_id=actor.id, evaluator_role=actor.role.value, evaluation_category=category, maximum_marks=MAXIMUM_MARKS[payload.evaluation_category])
+        evaluator_role = UserRole.PANEL_MEMBER.value if category in PANEL_CATEGORIES else UserRole.SUPERVISOR.value if category in SUPERVISOR_CATEGORIES else UserRole.ADMIN.value
+        record = EvaluationRecord(student_id=student_id, group_id=group_id, evaluator_id=actor.id, evaluator_role=evaluator_role, evaluation_category=category, maximum_marks=MAXIMUM_MARKS[payload.evaluation_category])
         session.add(record)
         session.flush()
     if record.evaluator_id != actor.id:
@@ -288,8 +289,9 @@ def correct_evaluation(evaluation_id: int, payload: EvaluationCorrectionWrite, r
     session.add(EvaluationCorrection(evaluation_id=record.id, authorized_by_id=actor.id, previous_marks=previous, new_marks=payload.new_marks, reason=payload.reason))
     record.obtained_marks = payload.new_marks
     record.returned_reason = None
-    record.status = EvaluationStatus.APPROVED.value if actor.role == UserRole.ADMIN else EvaluationStatus.SUBMITTED.value
-    record.approved_at = utc_now() if actor.role == UserRole.ADMIN else None
+    is_admin = user_has_role(session, actor, UserRole.ADMIN)
+    record.status = EvaluationStatus.APPROVED.value if is_admin else EvaluationStatus.SUBMITTED.value
+    record.approved_at = utc_now() if is_admin else None
     _audit(session, record, actor, "authorized_correction", reason=payload.reason, previous=previous, changed={"previous_marks": previous, "new_marks": payload.new_marks})
     session.commit()
     session.refresh(record)
@@ -317,7 +319,7 @@ def evaluation_audit(evaluation_id: int, actor: User = Depends(get_current_user)
     record = session.get(EvaluationRecord, evaluation_id)
     if record is None:
         raise _error("evaluation_not_found", "The evaluation was not found.", status.HTTP_404_NOT_FOUND)
-    if actor.role not in ADMIN_ROLES and record.evaluator_id != actor.id:
+    if not (user_has_role(session, actor, UserRole.ADMIN) or user_has_role(session, actor, UserRole.COORDINATOR)) and record.evaluator_id != actor.id:
         raise _error("evaluation_access_denied", "You are not authorized to view this evaluation history.", status.HTTP_403_FORBIDDEN)
     rows = session.scalars(select(EvaluationAuditEvent).where(EvaluationAuditEvent.evaluation_id == evaluation_id).order_by(EvaluationAuditEvent.created_at, EvaluationAuditEvent.id)).all()
     return [{"id": row.id, "evaluation_id": row.evaluation_id, "actor_id": row.actor_id, "action": row.action, "previous_marks": row.previous_marks, "new_marks": row.new_marks, "reason": row.reason, "changed_values": row.changed_values, "created_at": row.created_at} for row in rows]
@@ -468,7 +470,7 @@ def evaluation_report(evaluation_id: int, actor: User = Depends(get_current_user
     record = session.get(EvaluationRecord, evaluation_id)
     if record is None:
         raise _error("evaluation_not_found", "The evaluation was not found.", status.HTTP_404_NOT_FOUND)
-    if actor.role not in ADMIN_ROLES and record.evaluator_id != actor.id:
+    if not (user_has_role(session, actor, UserRole.ADMIN) or user_has_role(session, actor, UserRole.COORDINATOR)) and record.evaluator_id != actor.id:
         raise _error("evaluation_access_denied", "You are not authorized to view this report.", status.HTTP_403_FORBIDDEN)
     student = session.get(User, record.student_id) if record.student_id else None
     return {"record": _record_out(record).model_dump(mode="json"), "lines": _report_lines(record, student)}
@@ -479,7 +481,7 @@ def evaluation_report_pdf(evaluation_id: int, actor: User = Depends(get_current_
     record = session.get(EvaluationRecord, evaluation_id)
     if record is None:
         raise _error("evaluation_not_found", "The evaluation was not found.", status.HTTP_404_NOT_FOUND)
-    if actor.role not in ADMIN_ROLES and record.evaluator_id != actor.id:
+    if not (user_has_role(session, actor, UserRole.ADMIN) or user_has_role(session, actor, UserRole.COORDINATOR)) and record.evaluator_id != actor.id:
         raise _error("evaluation_access_denied", "You are not authorized to download this report.", status.HTTP_403_FORBIDDEN)
     student = session.get(User, record.student_id) if record.student_id else None
     return Response(content=_simple_pdf(_report_lines(record, student)), media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="evaluation-{record.id}.pdf"'})

@@ -19,6 +19,8 @@ import { Card } from "./ui/Card";
 import { WelcomeLanding } from "./pages/WelcomeLanding";
 import { sortCyclesDesc } from "./lib/displayLabels";
 import { appPath, appPathname } from "./platform-path";
+import { pushPortalRoute, replacePortalRoute } from "./portals/shared/portal-history";
+import type { PortalMode } from "./portals/shared/PortalModeSwitcher";
 import "./auth.css";
 
 type Member = { id: string; full_name: string; email: string; registration: string };
@@ -48,6 +50,7 @@ type SafeUser = {
   email: string;
   registration_number: string | null;
   role: string;
+  roles?: string[];
   is_active: boolean;
   group_id?: number | null;
   group_email?: string | null;
@@ -63,6 +66,8 @@ type SafeUser = {
     designation?: string;
     is_active?: boolean;
   }>;
+  coordinator_academic_cycle_ids?: number[];
+  coordinator_academic_cycle_names?: string[];
 };
 type PasswordResetDeliveryStatus = {
   development_mode: boolean;
@@ -241,12 +246,43 @@ const apiFieldErrorMessage = (key: string, fallback?: string, code?: string) => 
   if (key.endsWith(".full_name")) return "Enter the member's full name.";
   return fallback ?? "Check this field.";
 };
-export const dashboardPageForRole = (role: unknown): DashboardPage | null => {
-  if (role === "ADMIN") return "admin-portal";
-  if (role === "STUDENT" || role === "SUPERVISOR" || role === "PANEL_MEMBER" || role === "COORDINATOR") return "account";
+const portalRoleModes: Record<string, PortalMode> = {
+  SUPERVISOR: "SUPERVISOR",
+  COORDINATOR: "COORDINATOR",
+  PANEL_MEMBER: "PANEL_MEMBER",
+  ADMIN: "ADMIN",
+};
+const roleValues = (user: Pick<SafeUser, "role" | "roles" | "coordinator_academic_cycle_ids">) => {
+  const values = user.roles?.length ? [...user.roles] : [user.role];
+  if (user.role === "SUPERVISOR" && user.coordinator_academic_cycle_ids?.length && !values.includes("COORDINATOR")) {
+    values.push("COORDINATOR");
+  }
+  return [...new Set(values)];
+};
+const portalModesForUser = (user: Pick<SafeUser, "role" | "roles" | "coordinator_academic_cycle_ids">): PortalMode[] =>
+  roleValues(user).flatMap((role) => portalRoleModes[role] ? [portalRoleModes[role]] : []);
+export const dashboardPageForRoles = (roles: string[]): DashboardPage | null => {
+  if (roles.includes("ADMIN") || roles.includes("PLATFORM_ADMIN")) return "admin-portal";
+  if (roles.some((role) => role === "STUDENT" || portalRoleModes[role])) return "account";
   return null;
 };
+export const dashboardPageForRole = (role: unknown): DashboardPage | null =>
+  typeof role === "string" ? dashboardPageForRoles([role]) : null;
 const isDashboardPage = (value: unknown): value is DashboardPage => value === "account" || value === "admin-portal";
+const dashboardPageForMode = (mode: PortalMode): DashboardPage => mode === "ADMIN" ? "admin-portal" : "account";
+const portalModeFromPath = (): PortalMode => {
+  const path = appPathname();
+  if (path === "/admin" || path.startsWith("/admin/")) return "ADMIN";
+  if (path === "/coordinator" || path.startsWith("/coordinator/")) return "COORDINATOR";
+  if (path === "/evaluator" || path.startsWith("/evaluator/")) return "PANEL_MEMBER";
+  return "SUPERVISOR";
+};
+const hasMultiplePortalAccess = (user: Pick<SafeUser, "role" | "roles" | "coordinator_academic_cycle_ids">) => portalModesForUser(user).length > 1;
+const portalModeForUser = (user: Pick<SafeUser, "role" | "roles" | "coordinator_academic_cycle_ids">): PortalMode => {
+  const available = portalModesForUser(user);
+  const pathMode = portalModeFromPath();
+  return available.includes(pathMode) ? pathMode : available[0] ?? "SUPERVISOR";
+};
 const publicRoute = (page: PublicPage, signupRole: LoginRole | null = null, step: 1 | 2 | 3 = 1, studentMode: StudentSignupMode | null = null): PublicRoute => {
   void signupRole;
   void studentMode;
@@ -368,6 +404,35 @@ function AuthLayout({ children, actions, compact = false, authMode, transitionin
         </div>
       </div>
     </main>
+  );
+}
+
+function PortalSelection({ user, onSelect }: { user: SafeUser; onSelect: (mode: PortalMode) => void }) {
+  const labels: Record<PortalMode, string> = {
+    SUPERVISOR: "Supervisor Portal",
+    COORDINATOR: "Coordinator Portal",
+    PANEL_MEMBER: "Evaluator Portal",
+    ADMIN: "Administrator Portal",
+  };
+  return (
+    <AuthLayout compact>
+      <div className="space-y-5">
+        <div>
+          <p className="text-sm font-semibold text-[#315fd0]">Choose a workspace</p>
+          <h1 className="mt-1 text-2xl font-bold">Where would you like to continue?</h1>
+          <p className="mt-2 text-sm leading-6 text-[#4f6470]">
+            {user.full_name}, your account has access to more than one portal. Select the workspace you want to open.
+          </p>
+        </div>
+        <div className="grid gap-3">
+          {portalModesForUser(user).map((mode) => (
+            <button key={mode} type="button" onClick={() => onSelect(mode)} className="rounded-xl border border-[#cbd6ea] bg-white p-4 text-left transition hover:border-[#315fd0] hover:bg-[#f5f8ff] focus:outline-none focus:ring-2 focus:ring-[#315fd0]/30">
+              <span className="block text-base font-bold text-[#183047]">{labels[mode]}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </AuthLayout>
   );
 }
 
@@ -536,6 +601,8 @@ export default function App() {
   const [authTransitioning, setAuthTransitioning] = useState(false);
   const authTransitionTimerRef = useRef<number | null>(null);
   const [authUser, setAuthUser] = useState<SafeUser | null>(null);
+  const [portalMode, setPortalMode] = useState<PortalMode>(portalModeFromPath);
+  const [portalSelectionRequired, setPortalSelectionRequired] = useState(false);
   const authUserRef = useRef<SafeUser | null>(null);
   useEffect(() => { authUserRef.current = authUser; }, [authUser]);
   const [authSubmitting, setAuthSubmitting] = useState(false);
@@ -560,16 +627,16 @@ export default function App() {
       "admin-portal": "FYPHub | Administrator",
       account: authUser?.role === "STUDENT"
         ? "FYPHub | Group"
-        : authUser?.role === "SUPERVISOR"
-          ? "FYPHub | Supervisor"
-          : authUser?.role === "COORDINATOR"
-            ? "FYPHub | Coordinator"
-            : authUser?.role === "PANEL_MEMBER"
-              ? "FYPHub | Evaluator"
-              : "FYPHub",
+        : portalMode === "COORDINATOR"
+          ? "FYPHub | Coordinator"
+          : portalMode === "PANEL_MEMBER"
+            ? "FYPHub | Evaluator"
+            : portalMode === "ADMIN"
+              ? "FYPHub | Administrator"
+              : "FYPHub | Supervisor",
     };
     document.title = titles[page] ?? "FYPHub";
-  }, [page, recoveryView, authUser?.role]);
+  }, [page, recoveryView, authUser?.role, portalMode]);
   const [resetToken, setResetToken] = useState(
     () => new URLSearchParams(window.location.search).get("token") ?? "",
   );
@@ -701,7 +768,7 @@ export default function App() {
         });
         if (response.ok) {
           const user = (await response.json()) as SafeUser;
-          const destination = dashboardPageForRole(user.role);
+          const destination = dashboardPageForRoles(roleValues(user));
           if (!destination || !user.is_active) {
             setAuthUser(null);
             setAuthError("Your account has no valid dashboard role. Please contact an administrator.");
@@ -709,10 +776,20 @@ export default function App() {
             return;
           }
           setAuthUser(user);
+           const currentPath = appPathname();
+           const multiplePortals = hasMultiplePortalAccess(user);
+            const explicitPortalPath = currentPath.startsWith("/supervisor") || currentPath.startsWith("/coordinator") || currentPath.startsWith("/evaluator") || currentPath.startsWith("/admin");
+           setPortalSelectionRequired(multiplePortals && !explicitPortalPath);
+            setPortalMode(portalModeForUser(user));
           setPage(destination);
           const homePath = appPath(destination === "admin-portal" ? "/admin" : "/");
-          if (appPathname() === "/login" || appPathname() === "/signup") {
-            window.history.replaceState({ fyphubNavigation: { page: destination } }, "", homePath);
+           if (currentPath === "/login" || currentPath === "/signup" || (multiplePortals && !explicitPortalPath)) {
+             const initialMode = portalModesForUser(user)[0];
+             const portalPath = multiplePortals
+               ? appPath("/choose-portal")
+               : initialMode === "ADMIN" ? appPath("/admin") : initialMode === "COORDINATOR" ? appPath("/coordinator") : initialMode === "PANEL_MEMBER" ? appPath("/evaluator") : homePath;
+             setPortalSelectionRequired(multiplePortals);
+             window.history.replaceState({ fyphubNavigation: { page: destination } }, "", portalPath);
           }
         }
       } catch {
@@ -920,7 +997,7 @@ export default function App() {
       const destination = (event.state as { fyphubNavigation?: { page?: string } } | null)?.fyphubNavigation?.page;
       if (isDashboardPage(destination)) {
         const user = authUserRef.current;
-        const permitted = user ? dashboardPageForRole(user.role) : null;
+        const permitted = user ? dashboardPageForRoles(roleValues(user)) : null;
         if (!permitted) {
           setAuthUser(null);
           publicNavigationRef.current(publicRoute("in"), "replace");
@@ -929,6 +1006,10 @@ export default function App() {
         if (destination !== permitted) {
           window.history.replaceState({ fyphubNavigation: { page: permitted } }, "", window.location.href);
         }
+        if (user) {
+          setPortalSelectionRequired(Boolean(hasMultiplePortalAccess(user) && appPathname() === "/choose-portal"));
+          setPortalMode(portalModeForUser(user));
+        } else setPortalSelectionRequired(false);
         setPage(permitted);
         return;
       }
@@ -1078,7 +1159,7 @@ export default function App() {
         return;
       }
       const loginUser = (await response.json()) as SafeUser;
-      const loginDestination = dashboardPageForRole(loginUser.role);
+      const loginDestination = dashboardPageForRoles(roleValues(loginUser));
       if (!loginDestination || !loginUser.is_active) {
         setAuthUser(null);
         setAuthError("Your account has no valid dashboard role. Please contact an administrator.");
@@ -1097,15 +1178,27 @@ export default function App() {
         return;
       }
       const confirmedUser = (await sessionResponse.json()) as SafeUser;
-      const destination = dashboardPageForRole(confirmedUser.role);
+      const destination = dashboardPageForRoles(roleValues(confirmedUser));
       if (!destination || !confirmedUser.is_active) {
         setAuthUser(null);
         setAuthError("Your account has no valid dashboard role. Please contact an administrator.");
         return;
       }
       setAuthUser(confirmedUser);
+      const multiplePortals = hasMultiplePortalAccess(confirmedUser);
+      const initialPortalMode = portalModeForUser(confirmedUser);
+      setPortalSelectionRequired(multiplePortals);
+      setPortalMode(initialPortalMode);
       setSignIn({ email: "", password: "" });
-      const homePath = appPath(destination === "admin-portal" ? "/admin" : "/");
+      const homePath = multiplePortals
+        ? appPath("/choose-portal")
+        : initialPortalMode === "ADMIN"
+          ? appPath("/admin")
+          : initialPortalMode === "COORDINATOR"
+            ? appPath("/coordinator")
+            : initialPortalMode === "PANEL_MEMBER"
+              ? appPath("/evaluator")
+              : appPath("/");
       window.history.pushState({ fyphubNavigation: { page: destination } }, "", homePath);
       setPage(destination);
     } catch {
@@ -1243,12 +1336,33 @@ export default function App() {
       });
     } finally {
       setAuthUser(null);
+      setPortalSelectionRequired(false);
+      setPortalMode("SUPERVISOR");
       setSignIn({ email: "", password: "" });
       setAuthError("");
       window.history.replaceState({ fyphubNavigation: publicRoute("in") }, "", appPath("/login"));
       navigatePublic(publicRoute("in"), "replace");
     }
   }
+
+  const selectPortal = (mode: PortalMode) => {
+    if (!authUser || !hasMultiplePortalAccess(authUser)) return;
+    setPortalSelectionRequired(false);
+    setPortalMode(mode);
+    setPage(dashboardPageForMode(mode));
+    const path = mode === "ADMIN" ? "/admin" : mode === "COORDINATOR" ? "/coordinator" : mode === "PANEL_MEMBER" ? "/evaluator" : "/supervisor";
+    replacePortalRoute(path, dashboardPageForMode(mode));
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  };
+
+  const switchPortal = (mode: PortalMode) => {
+    if (!authUser || !portalModesForUser(authUser).includes(mode)) return;
+    setPortalMode(mode);
+    setPage(dashboardPageForMode(mode));
+    const path = mode === "ADMIN" ? "/admin" : mode === "COORDINATOR" ? "/coordinator" : mode === "PANEL_MEMBER" ? "/evaluator" : "/supervisor";
+    if (appPathname() !== path) pushPortalRoute(path, dashboardPageForMode(mode));
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  };
 
   const switchAuthMode = (nextMode: AuthMode) => {
     if (authTransitioning || authMode === nextMode) return;
@@ -1275,21 +1389,22 @@ export default function App() {
       />
     );
   }
+  if (authUser && portalSelectionRequired && hasMultiplePortalAccess(authUser)) {
+    return <PortalSelection user={authUser} onSelect={selectPortal} />;
+  }
   if (page === "account" && authUser?.role === "STUDENT")
     return (
       <StudentPortal api={API} user={authUser} onLogout={() => void signOut()} />
     );
-  if (page === "account" && authUser?.role === "SUPERVISOR")
+  if (page === "account" && authUser && portalMode === "COORDINATOR" && portalModesForUser(authUser).includes("COORDINATOR"))
+    return <CoordinatorPortal api={API} user={authUser} onPortalChange={switchPortal} onLogout={() => void signOut()} />;
+  if (page === "account" && authUser && portalMode === "SUPERVISOR" && portalModesForUser(authUser).includes("SUPERVISOR"))
     return (
-      <SupervisorPortal api={API} user={authUser} onLogout={() => void signOut()} />
+      <SupervisorPortal api={API} user={authUser} onPortalChange={switchPortal} onLogout={() => void signOut()} />
     );
-  if (page === "account" && authUser?.role === "COORDINATOR")
-    return (
-      <CoordinatorPortal api={API} user={authUser} onLogout={() => void signOut()} />
-    );
-  if (page === "account" && authUser?.role === "PANEL_MEMBER")
-    return <EvaluatorPortal api={API} user={authUser} onLogout={() => void signOut()} />;
-  if ((page === "account" || page === "admin-portal") && authUser && !dashboardPageForRole(authUser.role)) {
+  if (page === "account" && authUser && portalMode === "PANEL_MEMBER" && portalModesForUser(authUser).includes("PANEL_MEMBER"))
+    return <EvaluatorPortal api={API} user={authUser} onPortalChange={switchPortal} onLogout={() => void signOut()} />;
+  if ((page === "account" || page === "admin-portal") && authUser && !dashboardPageForRoles(roleValues(authUser))) {
     return (
       <AuthLayout compact>
         <div className="space-y-4">
@@ -1402,9 +1517,9 @@ export default function App() {
         </div>
       </main>
     );
-  if (page === "admin-portal" && authUser && dashboardPageForRole(authUser.role) === "admin-portal")
+  if (page === "admin-portal" && authUser && portalMode === "ADMIN" && portalModesForUser(authUser).includes("ADMIN"))
     return (
-      <AdminPortal api={API} user={authUser} onLogout={() => void signOut()} />
+      <AdminPortal api={API} user={authUser} onPortalChange={switchPortal} onLogout={() => void signOut()} />
     );
   if (page === "first-admin")
     return (

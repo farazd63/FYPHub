@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { Pencil, Trash2, X } from "lucide-react";
 import { AdminAddButton } from "./ui/AdminAddButton";
 import { IconButton } from "./ui/IconButton";
+import { ModalPortal } from "./ui/ModalPortal";
 
 type Supervisor = { id: number; full_name: string; email: string };
 type Cycle = { id: number; academic_year: number | null; session: "FALL" | "SPRING" | null };
@@ -27,16 +28,15 @@ export function AdminSupervisorCapacity({ api }: { api: string }) {
   const [supervisorSearch, setSupervisorSearch] = useState("");
   const [cycleFilter, setCycleFilter] = useState("");
 
-  const currentYear = new Date().getFullYear();
-  const years = Array.from(new Set([...cycles.map((cycle) => cycle.academic_year).filter((year): year is number => year !== null), ...Array.from({ length: 11 }, (_, index) => currentYear - 5 + index)])).sort((a, b) => b - a);
+  const years = Array.from(new Set(cycles.map((cycle) => cycle.academic_year).filter((year): year is number => year !== null))).sort((a, b) => b - a);
   const hasRepeatedName = (person: Supervisor) => supervisors.filter((candidate) => candidate.full_name === person.full_name).length > 1;
-  const cycleOptions = useMemo(() => [...cycles].sort((left, right) => (right.academic_year ?? 0) - (left.academic_year ?? 0) || (left.session || "").localeCompare(right.session || "")), [cycles]);
+  const cycleOptions = useMemo(() => cycles.filter((cycle) => cycle.academic_year !== null && cycle.session !== null).sort((left, right) => (right.academic_year ?? 0) - (left.academic_year ?? 0) || (left.session || "").localeCompare(right.session || "")), [cycles]);
   const filteredPolicies = useMemo(() => {
     const nameQuery = supervisorSearch.trim().toLocaleLowerCase();
     const cycle = cycles.find((item) => String(item.id) === cycleFilter);
     return policies.filter((policy) => {
       const matchesName = !nameQuery || policy.supervisor_name.toLocaleLowerCase().includes(nameQuery) || policy.supervisor_email.toLocaleLowerCase().includes(nameQuery);
-      const matchesCycle = !cycle || policy.academic_cycle_id === cycle.id || (policy.academic_cycle_id === null && policy.academic_year === cycle.academic_year);
+        const matchesCycle = !cycle || policy.academic_cycle_id === cycle.id || (cycle.academic_year !== null && policy.academic_year === cycle.academic_year);
       return matchesName && matchesCycle;
     });
   }, [policies, cycles, supervisorSearch, cycleFilter]);
@@ -74,6 +74,10 @@ export function AdminSupervisorCapacity({ api }: { api: string }) {
     const maximum = Number(form.maximum_groups);
     if (!form.supervisor_id || !form.academic_year || !Number.isInteger(maximum) || maximum <= 0) {
       setMessage("Choose a supervisor and academic year, then enter a positive whole-number annual maximum.");
+      return;
+    }
+    if (!years.includes(Number(form.academic_year))) {
+      setMessage("Select an academic year that has a defined academic cycle.");
       return;
     }
     setSaving(true); setMessage("");
@@ -127,6 +131,6 @@ export function AdminSupervisorCapacity({ api }: { api: string }) {
       </div>
       {(showCreate || editing !== null) && <form onSubmit={submit} className="h-fit rounded-xl border border-[#dce4de] bg-white p-5 shadow-[0_2px_12px_rgba(36,55,70,0.035)]"><h2 className="font-bold">{editing ? "Update capacity policy" : "Add capacity policy"}</h2><p className="mt-1 text-sm text-[#60716b]">One policy per supervisor and academic year.</p><div className="mt-4 grid gap-3"><label className="grid gap-1 text-sm font-semibold">Supervisor<select required className={input} value={form.supervisor_id} onChange={(event) => setForm({ ...form, supervisor_id: event.target.value })}><option value="">Select active supervisor</option>{supervisors.map((person) => <option key={person.id} value={person.id}>{person.full_name} ({person.email}){hasRepeatedName(person) ? ` - ID ${person.id}` : ""}</option>)}</select></label><label className="grid gap-1 text-sm font-semibold">Academic year<select required className={input} value={form.academic_year} onChange={(event) => setForm({ ...form, academic_year: event.target.value })}><option value="">Select academic year</option>{years.map((year) => <option key={year} value={year}>{year}</option>)}</select></label><label className="grid gap-1 text-sm font-semibold">Annual maximum groups<input required min="1" step="1" inputMode="numeric" type="number" className={input} value={form.maximum_groups} onChange={(event) => setForm({ ...form, maximum_groups: event.target.value })} /><span className="font-normal text-[#60716b]">{form.maximum_groups && Number.isInteger(Number(form.maximum_groups)) && Number(form.maximum_groups) > 0 ? `${form.maximum_groups} maximum groups across Fall and Spring` : "Enter a positive whole number."}</span></label><div className="flex gap-3"><button disabled={saving || !form.supervisor_id || !form.academic_year || !form.maximum_groups} className="fy-btn fy-btn--primary">{saving ? "Saving..." : editing ? "Save changes" : "Save capacity"}</button>{editing && <button type="button" disabled={saving} onClick={reset} className="fy-btn fy-btn--secondary">Cancel</button>}</div></div></form>}
     </div>}
-    {confirmDelete && <div role="dialog" aria-modal="true" aria-labelledby="capacity-delete-heading" className="fixed inset-0 grid place-items-center bg-[#243746]/35 p-4"><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl"><h2 id="capacity-delete-heading" className="text-lg font-bold">Confirm capacity deletion</h2><p className="mt-2 text-sm text-[#60716b]">Delete the {confirmDelete.academic_year ?? "annual"} capacity policy for {confirmDelete.supervisor_name}?</p><div className="mt-5 flex justify-end gap-3"><button type="button" disabled={deleting !== null} onClick={() => setConfirmDelete(null)} className="rounded-lg border border-[#dce4de] px-3 py-2 text-sm font-semibold">Cancel</button><button type="button" disabled={deleting !== null} onClick={() => void remove()} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white">{deleting !== null ? "Deleting…" : "Delete"}</button></div></div></div>}
+    {confirmDelete && <ModalPortal><div role="dialog" aria-modal="true" aria-labelledby="capacity-delete-heading" className="fixed inset-0 grid place-items-center bg-[#243746]/35 p-4"><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl"><h2 id="capacity-delete-heading" className="text-lg font-bold">Confirm capacity deletion</h2><p className="mt-2 text-sm text-[#60716b]">Delete the {confirmDelete.academic_year ?? "annual"} capacity policy for {confirmDelete.supervisor_name}?</p><div className="mt-5 flex justify-end gap-3"><button type="button" disabled={deleting !== null} onClick={() => setConfirmDelete(null)} className="rounded-lg border border-[#dce4de] px-3 py-2 text-sm font-semibold">Cancel</button><button type="button" disabled={deleting !== null} onClick={() => void remove()} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white">{deleting !== null ? "Deleting…" : "Delete"}</button></div></div></div></ModalPortal>}
   </section>;
 }

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from .database import get_db
 from .config import settings
-from .models import AuthSession, Team, User, UserRole
+from .models import AcademicCycle, AuthSession, Team, User, UserRole, UserRoleAssignment
 from .security import hash_session_token
 from .tenant import ensure_access_ready, set_tenant_context
 
@@ -213,11 +213,97 @@ def get_current_user(request: Request, session: Session = Depends(get_db)) -> Us
     return user
 
 
+def coordinator_cycle_ids(session: Session, user_id: int) -> list[int]:
+    """Return the academic cycles for which this account is a coordinator."""
+    return list(session.scalars(
+        select(AcademicCycle.id)
+        .where(AcademicCycle.coordinator_id == user_id)
+        .order_by(AcademicCycle.id.desc())
+    ).all())
+
+
+def user_roles(session: Session, user: User | int) -> list[UserRole]:
+    """Return the account's selected roles with the legacy primary role first."""
+    user_id = user.id if isinstance(user, User) else user
+    primary = user.role if isinstance(user, User) else session.scalar(select(User.role).where(User.id == user_id))
+    assigned = list(session.scalars(
+        select(UserRoleAssignment.role)
+        .where(UserRoleAssignment.user_id == user_id)
+        .order_by(UserRoleAssignment.id)
+    ).all())
+    result: list[UserRole] = []
+    for role in [primary, *assigned]:
+        if role is not None and role not in result:
+            result.append(role)
+    return result
+
+
+def user_has_role(session: Session, user: User | int, role: UserRole) -> bool:
+    return role in user_roles(session, user)
+
+
+def sync_user_roles(session: Session, user: User, roles: list[UserRole]) -> None:
+    """Persist selected roles while retaining the first role for compatibility."""
+    normalized = list(dict.fromkeys(roles))
+    if not normalized:
+        raise ValueError("At least one role is required.")
+    user.role = normalized[0]
+    existing = session.scalars(select(UserRoleAssignment).where(UserRoleAssignment.user_id == user.id)).all()
+    selected = set(normalized)
+    for assignment in existing:
+        if assignment.role not in selected:
+            session.delete(assignment)
+    existing_roles = {assignment.role for assignment in existing}
+    for role in normalized:
+        if role not in existing_roles:
+            session.add(UserRoleAssignment(institution_id=user.institution_id, user_id=user.id, role=role))
+
+
+def is_coordinator_for_cycle(session: Session, user: User, cycle_id: int) -> bool:
+    """Check cycle-scoped coordinator access without changing the user's primary role."""
+    if user_has_role(session, user, UserRole.ADMIN) or user_has_role(session, user, UserRole.PLATFORM_ADMIN):
+        return True
+    return session.scalar(
+        select(AcademicCycle.id).where(
+            AcademicCycle.id == cycle_id,
+            AcademicCycle.coordinator_id == user.id,
+        )
+    ) is not None
+
+
+def require_coordinator_access(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+    request: Request = None,
+) -> User:
+    """Permit administrators, coordinators, and supervisors assigned to a cycle."""
+    allowed = user_has_role(session, current_user, UserRole.ADMIN) or user_has_role(session, current_user, UserRole.PLATFORM_ADMIN)
+    if user_has_role(session, current_user, UserRole.COORDINATOR) and coordinator_cycle_ids(session, current_user.id):
+        allowed = True
+    if user_has_role(session, current_user, UserRole.SUPERVISOR) and coordinator_cycle_ids(session, current_user.id):
+        allowed = True
+    if not allowed:
+        if request is not None:
+            log_temporary_auth_diagnostic(
+                request,
+                "coordinator_access_rejected",
+                user_id=current_user.id,
+                user_active=current_user.is_active,
+                persisted_role=current_user.role.value,
+                role_comparison="not coordinator-assigned",
+                response_status=status.HTTP_403_FORBIDDEN,
+                reason="coordinator assignment required",
+            )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Coordinator access is required.")
+    return current_user
+
+
 def require_roles(*roles: UserRole) -> Callable[[User], User]:
     """Create a dependency that permits only the listed roles after authentication."""
-    def role_guard(current_user: User = Depends(get_current_user), request: Request = None) -> User:
-        role_allowed = current_user.role in roles or (
-            UserRole.ADMIN in roles and current_user.role == UserRole.PLATFORM_ADMIN
+    def role_guard(current_user: User = Depends(get_current_user), session: Session = Depends(get_db), request: Request = None) -> User:
+        assigned_roles = set(user_roles(session, current_user))
+        role_allowed = bool(assigned_roles.intersection(roles)) or (
+            UserRole.ADMIN in roles and UserRole.PLATFORM_ADMIN in assigned_roles
         )
         if not role_allowed:
             if request is not None:

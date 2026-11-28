@@ -9,7 +9,6 @@ type GroupDetail = { id: number; name: string; group_number?: number | null; sta
 type CaseSummary = { id: number; status: string; reason: string; opened_at: string; project_title?: string | null; group?: GroupDetail | null; previous_supervisor?: { id: number; name: string } | null };
 type ProjectDetail = { title: string; submission_id: number; version: number; status: string; filename: string; uploaded_at: string; extracted_fields: Record<string, unknown> };
 type Detail = CaseSummary & { notes?: string | null; project?: ProjectDetail | null; previous_supervisor?: { id: number; name: string; email: string }; replacement_supervisor?: { id: number; name: string; email: string } | null; reassigned_at?: string | null; completed_at?: string | null; progress: { health: string; average_completion_percent: number; overdue_items: number; milestones: Array<{ id?: number; title: string; completion_percent: number; due_at?: string | null }>; tasks: Array<{ id?: number; title: string; completion_percent: number; due_at?: string | null }> }; assignment_history: Array<{ id: number; supervisor_id: number; assigned_by_id: number; started_at: string; ended_at?: string | null; end_reason?: string | null; end_notes?: string | null }> };
-type Recommendation = { rank: number; supervisor_id: number; supervisor_name: string; final_score: number; ai_score?: number; deterministic_score?: number; score_components: Record<string, number>; explanation: { reasons: string[]; gaps: string[]; related_projects: Array<{ title: string; year?: number | null }>; ai_rationale?: string; ranking_method?: string }; workload: { active_groups: number; capacity_limit: number | null; remaining_capacity: number | null } };
 
 const reasons = [
   { value: "LEFT_UNIVERSITY", label: "Left university" },
@@ -49,8 +48,6 @@ export function AdminSupervisorReplacement({ api }: { api: string }) {
   const [departureNotes, setDepartureNotes] = useState("");
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [rankingMethod, setRankingMethod] = useState("");
   const [replacementId, setReplacementId] = useState("");
   const [replacementNotes, setReplacementNotes] = useState("");
   const [message, setMessage] = useState("");
@@ -112,25 +109,12 @@ export function AdminSupervisorReplacement({ api }: { api: string }) {
   };
 
   const openCase = async (id: number) => {
-    setSelectedCaseId(id); setRecommendations([]); setReplacementId(""); setError("");
+    setSelectedCaseId(id); setReplacementId(""); setError("");
     try {
       setDetail(await read<Detail>(await fetch(`${api}/api/v1/admin/supervisor-replacements/cases/${id}`, { credentials: "include" })));
     } catch (value) {
       setError(value instanceof Error ? value.message : "The replacement case could not be loaded.");
     }
-  };
-
-  const recommend = async () => {
-    if (!selectedCaseId) return;
-    setBusy(true); setError("");
-    try {
-      const result = await read<{ results: Recommendation[]; ranking_method?: string }>(await fetch(`${api}/api/v1/admin/supervisor-replacements/cases/${selectedCaseId}/recommendations`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: "{}" }));
-      setRecommendations(result.results);
-      setRankingMethod(result.ranking_method || "");
-      setMessage("Replacement recommendations calculated from the group proposal, history, profile evidence, and capacity.");
-    } catch (value) {
-      setError(value instanceof Error ? value.message : "Replacement recommendations could not be calculated.");
-    } finally { setBusy(false); }
   };
 
   const reassign = async () => {
@@ -156,9 +140,7 @@ export function AdminSupervisorReplacement({ api }: { api: string }) {
       await load();
       setSelectedCaseId(null);
       setDetail(null);
-      setRecommendations([]);
       setReplacementId("");
-      setRankingMethod("");
     } catch (value) {
       setError(value instanceof Error ? value.message : "The case could not be completed.");
     } finally { setBusy(false); }
@@ -199,7 +181,7 @@ export function AdminSupervisorReplacement({ api }: { api: string }) {
         </div>
         <div className="grid content-start gap-5">
           <section><h3 className="font-bold">Assignment history</h3>{detail.assignment_history.length ? <div className="mt-2 grid gap-2">{detail.assignment_history.map((assignment) => <div key={assignment.id} className="rounded-lg border border-fy-border p-3 text-sm"><div className="flex items-start justify-between gap-2"><strong>Supervisor ID {assignment.supervisor_id}</strong><span className="text-xs text-fy-text-secondary">#{assignment.id}</span></div><p className="mt-1 text-fy-text-secondary">Started {dateTime(assignment.started_at)}</p><p className="text-fy-text-secondary">{assignment.ended_at ? `Ended ${dateTime(assignment.ended_at)}` : "Current assignment"}</p>{assignment.end_reason && <p className="mt-1">Reason: {formatStatus(assignment.end_reason)}</p>}{assignment.end_notes && <p className="mt-1 whitespace-pre-wrap text-fy-text-secondary">{assignment.end_notes}</p>}</div>)}</div> : <p className="mt-2 rounded-lg border border-dashed border-fy-border p-3 text-sm text-fy-text-secondary">No assignment history available.</p>}</section>
-          <section><div className="flex items-center justify-between gap-3"><h3 className="font-bold">Recommended replacement supervisors</h3>{recommendations.length > 0 && <span className="text-xs font-semibold text-fy-text-secondary">{rankingMethod === "llama3.1-assisted" ? "Llama 3.1 assisted · eligibility checked" : "Deterministic fallback"}</span>}</div><button type="button" disabled={busy || detail.status === "REASSIGNED" || detail.status === "COMPLETED"} onClick={() => void recommend()} className="mt-2 rounded-lg bg-fy-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Working..." : "Calculate recommendations"}</button>{recommendations.length > 0 && <div className="mt-3 grid gap-2">{recommendations.map((item) => <button type="button" key={item.supervisor_id} onClick={() => setReplacementId(String(item.supervisor_id))} className={`rounded-lg border p-3 text-left ${replacementId === String(item.supervisor_id) ? "border-fy-brand bg-fy-surface-muted text-fy-text" : "border-fy-border bg-fy-surface text-fy-text"}`}><div className="flex items-start justify-between gap-2"><span><strong className="block text-sm">#{item.rank} - {item.supervisor_name}</strong><small className="text-fy-text-secondary">{item.workload.active_groups} active - {item.workload.remaining_capacity ?? "capacity not configured"} remaining</small></span><b className="text-fy-brand">{item.final_score.toFixed(1)}</b></div><small className="mt-1 block text-fy-text-secondary">{item.explanation.ai_rationale || item.explanation.reasons[0]}</small></button>)}</div>}<label className="mt-3 grid gap-1 text-sm font-semibold">Manual supervisor selection<select className="rounded-lg border border-fy-border bg-fy-surface px-3 py-2" value={replacementId} onChange={(event) => setReplacementId(event.target.value)}><option value="">Choose recommended, previous, or another active supervisor</option>{availableChoices.map((item) => <option key={item.id} value={item.id}>{item.name} - {item.active_groups} active group(s){item.id === detail.previous_supervisor?.id ? " - previous supervisor" : ""}</option>)}</select></label><label className="mt-3 grid gap-1 text-sm font-semibold">Reassignment notes<textarea rows={3} value={replacementNotes} onChange={(event) => setReplacementNotes(event.target.value)} placeholder="Optional handover notes" /></label><div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={busy || !replacementId || detail.status === "REASSIGNED" || detail.status === "COMPLETED"} onClick={() => void reassign()} className="rounded-lg bg-fy-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Assign selected supervisor</button>{detail.status === "REASSIGNED" && <button type="button" disabled={busy} onClick={() => void complete()} className="rounded-lg border border-fy-brand px-3 py-2 text-sm font-semibold text-fy-brand disabled:opacity-50">Mark case completed</button>}</div></section>
+          <section><h3 className="font-bold">Assign replacement supervisor</h3><p className="mt-1 text-sm text-fy-text-secondary">Choose an active supervisor manually for this replacement case.</p><label className="mt-3 grid gap-1 text-sm font-semibold">Supervisor<select className="rounded-lg border border-fy-border bg-fy-surface px-3 py-2" value={replacementId} onChange={(event) => setReplacementId(event.target.value)}><option value="">Choose an active supervisor</option>{availableChoices.map((item) => <option key={item.id} value={item.id}>{item.name} - {item.active_groups} active group(s){item.id === detail.previous_supervisor?.id ? " - previous supervisor" : ""}</option>)}</select></label><label className="mt-3 grid gap-1 text-sm font-semibold">Reassignment notes<textarea rows={3} value={replacementNotes} onChange={(event) => setReplacementNotes(event.target.value)} placeholder="Optional handover notes" /></label><div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={busy || !replacementId || detail.status === "REASSIGNED" || detail.status === "COMPLETED"} onClick={() => void reassign()} className="rounded-lg bg-fy-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Assign selected supervisor</button>{detail.status === "REASSIGNED" && <button type="button" disabled={busy} onClick={() => void complete()} className="rounded-lg border border-fy-brand px-3 py-2 text-sm font-semibold text-fy-brand disabled:opacity-50">Mark case completed</button>}</div></section>
           {detail.notes && <section><h3 className="font-bold">Case notes</h3><p className="mt-2 whitespace-pre-wrap rounded-lg border border-fy-border p-3 text-sm text-fy-text-secondary">{detail.notes}</p></section>}
         </div>
       </div>

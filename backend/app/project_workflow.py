@@ -7,7 +7,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .auth import get_current_user, require_roles, utc_now, validate_mutating_origin
+from .auth import get_current_user, is_coordinator_for_cycle, require_coordinator_access, require_roles, user_has_role, utc_now, validate_mutating_origin
 from .database import get_db
 from .models import (
     AcademicCycle,
@@ -23,6 +23,7 @@ from .models import (
     TeamMember,
     User,
     UserRole,
+    UserRoleAssignment,
 )
 from .schemas.project_workflow import EvaluationWrite, MeetingWrite, MilestoneWrite, ResolutionWrite, ScheduleReschedule, ScheduleWrite, TaskWrite
 from .notification_service import notify, notify_admins, team_student_ids, team_supervisor_ids
@@ -51,7 +52,7 @@ def _team(session: Session, team_id: int) -> Team:
 def _is_team_member(session: Session, team: Team, user: User) -> bool:
     if team.shared_user_id == user.id:
         return True
-    if user.role != UserRole.STUDENT:
+    if not user_has_role(session, user, UserRole.STUDENT):
         return False
     if not user.registration_number:
         return False
@@ -85,10 +86,10 @@ def _notify_schedule_change(session: Session, actor: User, schedule: DefenseSche
 
 
 def _can_access_team(session: Session, team: Team, user: User, *, write: bool = False) -> bool:
-    if user.role in (UserRole.ADMIN, UserRole.COORDINATOR):
+    if user_has_role(session, user, UserRole.ADMIN) or user_has_role(session, user, UserRole.COORDINATOR):
         return True
     assignment = _assigned_supervisor(session, team.id)
-    if user.role == UserRole.SUPERVISOR:
+    if user_has_role(session, user, UserRole.SUPERVISOR):
         return assignment is not None and assignment.supervisor_id == user.id
     return _is_team_member(session, team, user)
 
@@ -229,8 +230,9 @@ def _schedule_out(session: Session, row: DefenseSchedule) -> dict:
 
 
 def _schedule_access(session: Session, row: DefenseSchedule, user: User) -> bool:
-    if user.role in (UserRole.ADMIN, UserRole.COORDINATOR): return True
-    if user.role == UserRole.PANEL_MEMBER:
+    if user_has_role(session, user, UserRole.ADMIN) or user_has_role(session, user, UserRole.COORDINATOR): return True
+    if user_has_role(session, user, UserRole.SUPERVISOR) and is_coordinator_for_cycle(session, user, row.academic_cycle_id): return True
+    if user_has_role(session, user, UserRole.PANEL_MEMBER):
         return session.scalar(select(DefensePanelMember.id).where(DefensePanelMember.schedule_id == row.id, DefensePanelMember.user_id == user.id)) is not None
     team = session.get(Team, row.team_id)
     return team is not None and _can_access_team(session, team, user)
@@ -261,7 +263,8 @@ def _check_schedule_conflicts(session: Session, payload: ScheduleWrite | Schedul
 
 def _validate_panel_members(session: Session, ids: list[int]) -> None:
     if len(set(ids)) != len(ids): raise failure("duplicate_panel_member", "Panel members must be unique.", 422)
-    if ids and len(session.scalars(select(User.id).where(User.id.in_(ids), User.role == UserRole.PANEL_MEMBER, User.is_active.is_(True))).all()) != len(ids):
+    assigned_panel_role = select(UserRoleAssignment.id).where(UserRoleAssignment.user_id == User.id, UserRoleAssignment.role == UserRole.PANEL_MEMBER).exists()
+    if ids and len(session.scalars(select(User.id).where(User.id.in_(ids), or_(User.role == UserRole.PANEL_MEMBER, assigned_panel_role), User.is_active.is_(True))).all()) != len(ids):
         raise failure("panel_member_invalid", "Every selected panel member must be an active Evaluator account.", 422)
 
 
@@ -274,10 +277,17 @@ def list_schedules(user: User = Depends(require_roles(*READ_ROLES)), academic_cy
 
 
 @router.get("/panel-schedules/options")
-def schedule_options(actor: User = Depends(require_roles(UserRole.ADMIN, UserRole.COORDINATOR)), session: Session = Depends(get_db)) -> dict:
-    teams = session.scalars(select(Team).order_by(Team.id)).all()
-    evaluators = session.scalars(select(User).where(User.role == UserRole.PANEL_MEMBER, User.is_active.is_(True)).order_by(User.full_name, User.id)).all()
-    cycles = session.scalars(select(AcademicCycle).order_by(AcademicCycle.id.desc())).all()
+def schedule_options(actor: User = Depends(require_coordinator_access), session: Session = Depends(get_db)) -> dict:
+    team_statement = select(Team).order_by(Team.id)
+    cycle_statement = select(AcademicCycle).order_by(AcademicCycle.id.desc())
+    if user_has_role(session, actor, UserRole.SUPERVISOR) and not (user_has_role(session, actor, UserRole.ADMIN) or user_has_role(session, actor, UserRole.PLATFORM_ADMIN)):
+        cycle_ids = select(AcademicCycle.id).where(AcademicCycle.coordinator_id == actor.id)
+        team_statement = team_statement.where(Team.academic_cycle_id.in_(cycle_ids))
+        cycle_statement = cycle_statement.where(AcademicCycle.coordinator_id == actor.id)
+    teams = session.scalars(team_statement).all()
+    assigned_panel_role = select(UserRoleAssignment.id).where(UserRoleAssignment.user_id == User.id, UserRoleAssignment.role == UserRole.PANEL_MEMBER).exists()
+    evaluators = session.scalars(select(User).where(or_(User.role == UserRole.PANEL_MEMBER, assigned_panel_role), User.is_active.is_(True)).order_by(User.full_name, User.id)).all()
+    cycles = session.scalars(cycle_statement).all()
     return {"teams": [{"id": team.id, "academic_cycle_id": team.academic_cycle_id, "name": visible_group_name(session, team), "group_name": visible_group_name(session, team), "group_number": visible_group_number(session, team)} for team in teams], "evaluators": [{"id": user.id, "name": user.full_name, "email": user.email} for user in evaluators], "cycles": [{"id": cycle.id, "name": cycle.display_name} for cycle in cycles]}
 
 
@@ -290,11 +300,12 @@ def schedule_detail(schedule_id: int, user: User = Depends(require_roles(*READ_R
 
 
 @router.post("/panel-schedules", status_code=201)
-def create_schedule(payload: ScheduleWrite, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN, UserRole.COORDINATOR)), session: Session = Depends(get_db)) -> dict:
+def create_schedule(payload: ScheduleWrite, request: Request, actor: User = Depends(require_coordinator_access), session: Session = Depends(get_db)) -> dict:
     validate_mutating_origin(request)
     team = _team(session, payload.team_id)
     if team.academic_cycle_id != payload.academic_cycle_id: raise failure("cycle_mismatch", "Team does not belong to the selected academic cycle.", 422)
     if session.get(AcademicCycle, payload.academic_cycle_id) is None: raise failure("cycle_not_found", "Academic cycle was not found.", 404)
+    if not is_coordinator_for_cycle(session, actor, payload.academic_cycle_id): raise failure("cycle_forbidden", "You are not assigned as coordinator for this academic cycle.", 403)
     _validate_panel_members(session, payload.panel_member_ids); _check_schedule_conflicts(session, payload)
     row = DefenseSchedule(team_id=team.id, academic_cycle_id=payload.academic_cycle_id, created_by_id=actor.id, start_at=_utc(payload.start_at), end_at=_utc(payload.end_at), room=payload.room, online_link=payload.online_link)
     session.add(row); session.flush()
@@ -306,10 +317,11 @@ def create_schedule(payload: ScheduleWrite, request: Request, actor: User = Depe
 
 
 @router.patch("/panel-schedules/{schedule_id}")
-def reschedule(schedule_id: int, payload: ScheduleReschedule, request: Request, actor: User = Depends(require_roles(UserRole.ADMIN, UserRole.COORDINATOR)), session: Session = Depends(get_db)) -> dict:
+def reschedule(schedule_id: int, payload: ScheduleReschedule, request: Request, actor: User = Depends(require_coordinator_access), session: Session = Depends(get_db)) -> dict:
     validate_mutating_origin(request)
     row = session.get(DefenseSchedule, schedule_id)
     if row is None: raise failure("schedule_not_found", "Defense schedule was not found.", 404)
+    if not is_coordinator_for_cycle(session, actor, row.academic_cycle_id): raise failure("cycle_forbidden", "You are not assigned as coordinator for this academic cycle.", 403)
     previous_panel_ids = _panel_member_ids(session, row.id)
     write = ScheduleWrite(team_id=row.team_id, academic_cycle_id=row.academic_cycle_id, panel_member_ids=payload.panel_member_ids or list(session.scalars(select(DefensePanelMember.user_id).where(DefensePanelMember.schedule_id == row.id)).all()), start_at=payload.start_at, end_at=payload.end_at, room=payload.room, online_link=payload.online_link)
     _validate_panel_members(session, write.panel_member_ids); _check_schedule_conflicts(session, write, schedule_id=row.id)
@@ -371,7 +383,7 @@ def resolve_evaluation(evaluation_id: int, payload: ResolutionWrite, request: Re
     validate_mutating_origin(request)
     row = session.get(PanelEvaluation, evaluation_id)
     if row is None: raise failure("evaluation_not_found", "Evaluation was not found.", 404)
-    if actor.role not in (UserRole.ADMIN, UserRole.COORDINATOR):
+    if not (user_has_role(session, actor, UserRole.ADMIN) or user_has_role(session, actor, UserRole.COORDINATOR)):
         if payload.status != "RECHECK_REQUESTED" or not _evaluation_access(session, row, actor): raise HTTPException(403, detail="Only the assigned team or authorized reviewer may request a recheck.")
     row.status = payload.status; row.resolution_note = payload.note.strip()
     schedule = session.get(DefenseSchedule, row.schedule_id)

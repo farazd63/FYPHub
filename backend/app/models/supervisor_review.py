@@ -20,24 +20,65 @@ class ProposalReviewFeedback(Base):
     __table_args__ = (
         Index("ix_proposal_review_feedback_submission", "submission_id", "created_at"),
         Index("ix_proposal_review_feedback_team_status", "team_id", "publication_status"),
+        Index("ix_proposal_review_feedback_institution_id", "institution_id"),
+        UniqueConstraint("submission_id", "marker_number", name="uq_proposal_review_feedback_submission_marker"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id", ondelete="RESTRICT"), nullable=False)
     submission_id: Mapped[int] = mapped_column(ForeignKey("proposal_compliance_submissions.id", ondelete="RESTRICT"), nullable=False)
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    marker_number: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     feedback_level: Mapped[str] = mapped_column(String(24), nullable=False, server_default="FULL_PROPOSAL")
     feedback_type: Mapped[str] = mapped_column(String(32), nullable=False, server_default="GENERAL_COMMENT")
+    correction_action: Mapped[str] = mapped_column(String(24), nullable=False, server_default="NONE")
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     suggested_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     selected_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     location: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    destination_location: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    expected_outcome: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_mandatory: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    priority: Mapped[str] = mapped_column(String(16), nullable=False, server_default="MEDIUM")
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    workflow_status: Mapped[str] = mapped_column(String(24), nullable=False, server_default="OPEN")
     publication_status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="PUBLISHED")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    institution_id: Mapped[int | None] = mapped_column(ForeignKey("institutions.id", ondelete="SET NULL"), nullable=True)
+
+
+class ProposalReviewFeedbackMessage(Base):
+    __tablename__ = "proposal_review_feedback_messages"
+    __table_args__ = (
+        Index("ix_proposal_review_feedback_messages_feedback_created", "feedback_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    feedback_id: Mapped[int] = mapped_column(ForeignKey("proposal_review_feedback.id", ondelete="CASCADE"), nullable=False)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ProposalReviewFeedbackRevision(Base):
+    __tablename__ = "proposal_review_feedback_revisions"
+    __table_args__ = (
+        Index("ix_proposal_review_feedback_revisions_feedback_created", "feedback_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    feedback_id: Mapped[int] = mapped_column(ForeignKey("proposal_review_feedback.id", ondelete="CASCADE"), nullable=False)
+    actor_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    change_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    before_state: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    after_state: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class ProposalRevisionRequest(Base):

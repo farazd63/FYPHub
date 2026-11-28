@@ -14,7 +14,7 @@ from sqlalchemy import and_, case, desc, func, or_, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from .auth import get_current_user, require_roles, utc_now, validate_mutating_origin
+from .auth import get_current_user, is_coordinator_for_cycle, require_coordinator_access, require_roles, utc_now, validate_mutating_origin
 from .academic_cycle_lifecycle import close_expired_cycle, close_expired_cycles
 from .cycle_ordering import sort_cycles_desc
 from .collaboration_channels import ensure_collaboration_channel
@@ -1380,9 +1380,19 @@ def coordinator_monitor(
     status_filter: str | None = Query(None, alias="status"),
     from_date: datetime | None = Query(None),
     to_date: datetime | None = Query(None),
-    _: User = Depends(require_roles(UserRole.COORDINATOR)),
+    actor: User = Depends(require_coordinator_access),
     session: Session = Depends(get_db),
 ):
+    if actor.role == UserRole.SUPERVISOR:
+        assigned_cycle_ids = set(
+            session.scalars(select(AcademicCycle.id).where(AcademicCycle.coordinator_id == actor.id)).all()
+        )
+        if academic_cycle_id is not None and academic_cycle_id not in assigned_cycle_ids:
+            raise failure("cycle_forbidden", "You are not assigned as coordinator for this academic cycle.", status.HTTP_403_FORBIDDEN)
+        if academic_cycle_id is None:
+            rows = _monitor_statement(session, cycle_id=None, supervisor_id=supervisor_id, status_filter=status_filter, from_date=from_date, to_date=to_date)
+            rows = [row for row in rows if row.academic_cycle_id in assigned_cycle_ids]
+            return [_out(session, row) for row in rows]
     rows = _monitor_statement(session, cycle_id=academic_cycle_id, supervisor_id=supervisor_id, status_filter=status_filter, from_date=from_date, to_date=to_date)
     return [_out(session, row) for row in rows]
 
@@ -1398,6 +1408,7 @@ def read_request(
     team = _team_for_student(session, actor) if actor.role == UserRole.STUDENT else None
     allowed = (
         actor.role in (UserRole.ADMIN, UserRole.COORDINATOR)
+        or (actor.role == UserRole.SUPERVISOR and is_coordinator_for_cycle(session, actor, row.academic_cycle_id))
         or (actor.role == UserRole.SUPERVISOR and row.supervisor_id == actor.id)
         or (actor.role == UserRole.STUDENT and (row.requester_user_id == actor.id or (team is not None and row.team_id == team.id)))
     )

@@ -5,7 +5,7 @@ from ..database import Base
 
 class AcademicCycle(Base):
     __tablename__="academic_cycles"
-    __table_args__=(CheckConstraint("code = upper(btrim(code)) AND code <> ''",name="ck_academic_cycles_code_normalized"),CheckConstraint("display_name = btrim(display_name) AND display_name <> ''",name="ck_academic_cycles_display_name_nonblank"),CheckConstraint("academic_year IS NULL OR academic_year BETWEEN 1900 AND 2200",name="ck_academic_cycles_year_valid"),CheckConstraint("session IS NULL OR session IN ('FALL','SPRING')",name="ck_academic_cycles_session_valid"),Index("uq_academic_cycles_code_normalized",text("lower(code)"),unique=True),Index("uq_academic_cycles_year_session", "academic_year", "session", unique=True, postgresql_where=text("academic_year IS NOT NULL AND session IS NOT NULL")),Index("uq_academic_cycles_coordinator_id", "coordinator_id", unique=True))
+    __table_args__=(CheckConstraint("code = upper(btrim(code)) AND code <> ''",name="ck_academic_cycles_code_normalized"),CheckConstraint("display_name = btrim(display_name) AND display_name <> ''",name="ck_academic_cycles_display_name_nonblank"),CheckConstraint("academic_year IS NULL OR academic_year BETWEEN 1900 AND 2200",name="ck_academic_cycles_year_valid"),CheckConstraint("session IS NULL OR session IN ('FALL','SPRING')",name="ck_academic_cycles_session_valid"),Index("uq_academic_cycles_code_normalized",text("lower(code)"),unique=True),Index("uq_academic_cycles_year_session", "academic_year", "session", unique=True, postgresql_where=text("academic_year IS NOT NULL AND session IS NOT NULL")))
     id:Mapped[int]=mapped_column(primary_key=True)
     code:Mapped[str]=mapped_column(String(100),nullable=False)
     display_name:Mapped[str]=mapped_column(String(255),nullable=False)

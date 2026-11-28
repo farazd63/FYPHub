@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import desc, or_, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from .ai_provider import run_ai_json
@@ -28,6 +28,8 @@ from .models import (
     ProposalRevisionMessage,
     ProposalRevisionRequest,
     ProposalReviewFeedback,
+    ProposalReviewFeedbackMessage,
+    ProposalReviewFeedbackRevision,
     ProposalReviewAnnotation,
     SupervisorAssignment,
     Team,
@@ -50,6 +52,7 @@ ACTIVE_REVISION_STATUSES = {
     "REOPENED",
     "CHANGES_REQUIRED",
 }
+FEEDBACK_ACTIONS = {"NONE", "REMOVE", "REPLACE", "ADD", "MOVE", "REWRITE", "EXPAND", "CORRECT", "FORMATTING"}
 
 
 class FeedbackWrite(BaseModel):
@@ -57,13 +60,43 @@ class FeedbackWrite(BaseModel):
 
     submission_id: int = Field(gt=0)
     feedback_level: Literal["PARAGRAPH", "SECTION", "MODULE", "FULL_PROPOSAL"] = "FULL_PROPOSAL"
-    feedback_type: Literal["GENERAL_COMMENT", "EDITING_SUGGESTION", "FORMAL_REVISION", "CLARIFICATION_REQUEST"] = "GENERAL_COMMENT"
+    feedback_type: Literal["GENERAL_COMMENT", "CORRECTION", "EDITING_SUGGESTION", "FORMAL_REVISION", "FORMAL_REVISION_REQUEST", "CLARIFICATION_REQUEST"] = "GENERAL_COMMENT"
+    correction_action: Literal["NONE", "REMOVE", "REPLACE", "ADD", "MOVE", "REWRITE", "EXPAND", "CORRECT", "FORMATTING"] = "NONE"
     title: str = Field(min_length=1, max_length=255)
     content: str = Field(min_length=1, max_length=12000)
     suggested_text: str | None = Field(default=None, max_length=12000)
     selected_text: str | None = Field(default=None, max_length=12000)
     location: dict[str, Any] = Field(default_factory=dict)
+    destination_location: dict[str, Any] | None = None
+    expected_outcome: str | None = Field(default=None, max_length=12000)
+    is_mandatory: bool = False
+    priority: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] = "MEDIUM"
+    due_at: datetime | None = None
     publish: bool = True
+
+
+class FeedbackUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    content: str | None = Field(default=None, min_length=1, max_length=12000)
+    feedback_level: Literal["PARAGRAPH", "SECTION", "MODULE", "FULL_PROPOSAL"] | None = None
+    feedback_type: Literal["GENERAL_COMMENT", "CORRECTION", "EDITING_SUGGESTION", "FORMAL_REVISION", "FORMAL_REVISION_REQUEST", "CLARIFICATION_REQUEST"] | None = None
+    correction_action: Literal["NONE", "REMOVE", "REPLACE", "ADD", "MOVE", "REWRITE", "EXPAND", "CORRECT", "FORMATTING"] | None = None
+    suggested_text: str | None = Field(default=None, max_length=12000)
+    selected_text: str | None = Field(default=None, max_length=12000)
+    location: dict[str, Any] | None = None
+    destination_location: dict[str, Any] | None = None
+    expected_outcome: str | None = Field(default=None, max_length=12000)
+    is_mandatory: bool | None = None
+    priority: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] | None = None
+    due_at: datetime | None = None
+
+
+class FeedbackMessageWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    body: str = Field(min_length=1, max_length=12000)
 
 
 class AnnotationWrite(BaseModel):
@@ -199,22 +232,77 @@ def _is_overdue(row: ProposalRevisionRequest) -> bool:
     return bool(row.due_at and row.due_at < datetime.now(timezone.utc) and row.status not in {"ACCEPTED", "WITHDRAWN"})
 
 
+def _feedback_message_out(session: Session, row: ProposalReviewFeedbackMessage) -> dict[str, Any]:
+    sender = session.get(User, row.sender_id)
+    return {
+        "id": row.id,
+        "sender_id": row.sender_id,
+        "sender_name": sender.full_name if sender else "User",
+        "body": row.body,
+        "created_at": row.created_at,
+    }
+
+
+def _feedback_messages(session: Session, feedback_id: int) -> list[dict[str, Any]]:
+    rows = session.scalars(
+        select(ProposalReviewFeedbackMessage)
+        .where(ProposalReviewFeedbackMessage.feedback_id == feedback_id, ProposalReviewFeedbackMessage.deleted_at.is_(None))
+        .order_by(ProposalReviewFeedbackMessage.created_at, ProposalReviewFeedbackMessage.id)
+    ).all()
+    return [_feedback_message_out(session, row) for row in rows]
+
+
+def _feedback_state(row: ProposalReviewFeedback) -> dict[str, Any]:
+    return {
+        "marker_number": row.marker_number,
+        "feedback_level": row.feedback_level,
+        "feedback_type": row.feedback_type,
+        "correction_action": row.correction_action,
+        "title": row.title,
+        "content": row.content,
+        "suggested_text": row.suggested_text,
+        "selected_text": row.selected_text,
+        "location": row.location or {},
+        "destination_location": row.destination_location or {},
+        "expected_outcome": row.expected_outcome,
+        "is_mandatory": row.is_mandatory,
+        "priority": row.priority,
+        "due_at": row.due_at.isoformat() if row.due_at else None,
+        "workflow_status": row.workflow_status,
+        "publication_status": row.publication_status,
+    }
+
+
+def _record_feedback_revision(session: Session, actor: User, row: ProposalReviewFeedback, before: dict[str, Any], change_type: str = "UPDATED") -> None:
+    session.add(ProposalReviewFeedbackRevision(feedback_id=row.id, actor_id=actor.id, change_type=change_type, before_state=before, after_state=_feedback_state(row)))
+
+
 def _feedback_out(session: Session, row: ProposalReviewFeedback) -> dict[str, Any]:
     author = session.get(User, row.author_id)
     return {
         "id": row.id,
         "submission_id": row.submission_id,
         "author": {"id": row.author_id, "name": author.full_name if author else "Supervisor"},
+        "marker_number": row.marker_number,
         "feedback_level": row.feedback_level,
         "feedback_type": row.feedback_type,
+        "correction_action": row.correction_action,
         "title": row.title,
         "content": row.content,
         "suggested_text": row.suggested_text,
         "selected_text": row.selected_text,
         "location": row.location or {},
+        "destination_location": row.destination_location or {},
+        "expected_outcome": row.expected_outcome,
+        "is_mandatory": row.is_mandatory,
+        "priority": row.priority,
+        "due_at": row.due_at,
+        "workflow_status": row.workflow_status,
         "publication_status": row.publication_status,
         "created_at": row.created_at,
+        "updated_at": row.updated_at,
         "published_at": row.published_at,
+        "messages": _feedback_messages(session, row.id),
     }
 
 
@@ -303,6 +391,15 @@ def _require_request(session: Session, actor: User, revision_id: int, *, supervi
     row = session.get(ProposalRevisionRequest, revision_id)
     if row is None or not _can_access_team(session, actor, row.team_id, supervisor_write=supervisor_write):
         raise _error("revision_not_found", "The revision request was not found.", 404)
+    return row
+
+
+def _require_feedback(session: Session, actor: User, feedback_id: int, *, supervisor_write: bool = False) -> ProposalReviewFeedback:
+    row = session.get(ProposalReviewFeedback, feedback_id)
+    if row is None or not _can_access_team(session, actor, row.team_id, supervisor_write=supervisor_write):
+        raise _error("feedback_not_found", "The feedback item was not found.", 404)
+    if actor.role == UserRole.STUDENT and row.publication_status != "PUBLISHED":
+        raise _error("feedback_not_found", "The feedback item was not found.", 404)
     return row
 
 
@@ -425,6 +522,15 @@ def group_review(team_id: int, actor: User = Depends(get_current_user), session:
     return _team_out(session, team)
 
 
+@router.get("/proposals/{submission_id}/feedback")
+def proposal_feedback(submission_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    submission = _annotation_submission(session, actor, submission_id)
+    query = select(ProposalReviewFeedback).where(ProposalReviewFeedback.submission_id == submission.id).order_by(desc(ProposalReviewFeedback.created_at), desc(ProposalReviewFeedback.id))
+    if actor.role == UserRole.STUDENT:
+        query = query.where(ProposalReviewFeedback.publication_status == "PUBLISHED")
+    return [_feedback_out(session, row) for row in session.scalars(query).all()]
+
+
 @router.get("/revision-requests")
 def list_revision_requests(actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
     query = select(ProposalRevisionRequest).order_by(desc(ProposalRevisionRequest.created_at))
@@ -452,8 +558,19 @@ def create_feedback(payload: FeedbackWrite, request: Request, actor: User = Depe
     if submission is None:
         raise _error("submission_not_found", "The proposal version was not found.", 404)
     _require_team_access(session, actor, submission.team_id, supervisor_write=True)
+    title = payload.title.strip()
+    content = payload.content.strip()
+    if payload.feedback_type in {"FORMAL_REVISION", "FORMAL_REVISION_REQUEST"}:
+        if not (payload.expected_outcome or "").strip():
+            raise _error("expected_outcome_required", "Formal revision feedback must include the expected outcome.", 422)
+    if payload.correction_action in {"REPLACE", "REWRITE"} and not (payload.suggested_text or "").strip():
+        raise _error("replacement_required", "Add suggested replacement text for a replace or rewrite correction.", 422)
+    if payload.correction_action == "MOVE" and not payload.destination_location:
+        raise _error("destination_required", "Add a destination location for a move correction.", 422)
+    mandatory = bool(payload.is_mandatory or payload.feedback_type in {"FORMAL_REVISION", "FORMAL_REVISION_REQUEST"})
     now = utc_now() if payload.publish else None
-    row = ProposalReviewFeedback(team_id=submission.team_id, submission_id=submission.id, author_id=actor.id, feedback_level=payload.feedback_level, feedback_type=payload.feedback_type, title=payload.title.strip(), content=payload.content.strip(), suggested_text=payload.suggested_text.strip() if payload.suggested_text else None, selected_text=payload.selected_text.strip() if payload.selected_text else None, location=payload.location, publication_status="PUBLISHED" if payload.publish else "DRAFT", published_at=now)
+    marker_number = (session.scalar(select(func.max(ProposalReviewFeedback.marker_number)).where(ProposalReviewFeedback.submission_id == submission.id)) or 0) + 1
+    row = ProposalReviewFeedback(team_id=submission.team_id, submission_id=submission.id, author_id=actor.id, marker_number=marker_number, feedback_level=payload.feedback_level, feedback_type=payload.feedback_type, correction_action=payload.correction_action, title=title, content=content, suggested_text=payload.suggested_text.strip() if payload.suggested_text else None, selected_text=payload.selected_text.strip() if payload.selected_text else None, location=payload.location, destination_location=payload.destination_location, expected_outcome=payload.expected_outcome.strip() if payload.expected_outcome else None, is_mandatory=mandatory, priority=payload.priority, due_at=payload.due_at, workflow_status="OPEN", publication_status="PUBLISHED" if payload.publish else "DRAFT", published_at=now)
     session.add(row)
     session.flush()
     if payload.publish:
@@ -461,6 +578,100 @@ def create_feedback(payload: FeedbackWrite, request: Request, actor: User = Depe
     session.commit()
     session.refresh(row)
     return _feedback_out(session, row)
+
+
+@router.patch("/feedback/{feedback_id}")
+def update_feedback(feedback_id: int, payload: FeedbackUpdate, request: Request, actor: User = Depends(require_roles(UserRole.SUPERVISOR, UserRole.ADMIN, UserRole.PLATFORM_ADMIN)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    row = _require_feedback(session, actor, feedback_id, supervisor_write=True)
+    before = _feedback_state(row)
+    changes = payload.model_dump(exclude_unset=True)
+    if "title" in changes:
+        row.title = changes["title"].strip()
+    if "content" in changes:
+        row.content = changes["content"].strip()
+    for key in ("feedback_level", "feedback_type", "correction_action", "suggested_text", "selected_text", "location", "destination_location", "expected_outcome", "is_mandatory", "priority", "due_at"):
+        if key in changes:
+            value = changes[key]
+            setattr(row, key, value.strip() if isinstance(value, str) else value)
+    if row.feedback_type in {"FORMAL_REVISION", "FORMAL_REVISION_REQUEST"}:
+        row.is_mandatory = True
+        if not (row.expected_outcome or "").strip():
+            raise _error("expected_outcome_required", "Formal revision feedback must include the expected outcome.", 422)
+    if row.correction_action in {"REPLACE", "REWRITE"} and not (row.suggested_text or "").strip():
+        raise _error("replacement_required", "Add suggested replacement text for a replace or rewrite correction.", 422)
+    if row.correction_action == "MOVE" and not row.destination_location:
+        raise _error("destination_required", "Add a destination location for a move correction.", 422)
+    _record_feedback_revision(session, actor, row, before)
+    session.commit()
+    session.refresh(row)
+    return _feedback_out(session, row)
+
+
+@router.post("/feedback/{feedback_id}/publish")
+def publish_feedback(feedback_id: int, request: Request, actor: User = Depends(require_roles(UserRole.SUPERVISOR, UserRole.ADMIN, UserRole.PLATFORM_ADMIN)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    row = _require_feedback(session, actor, feedback_id, supervisor_write=True)
+    row.publication_status = "PUBLISHED"
+    row.published_at = utc_now()
+    row.withdrawn_at = None
+    notify_team_students(session, row.team_id, kind="UPDATE", title="New supervisor proposal feedback", message=f"{actor.full_name} published feedback: {row.title}.", path=f"/student/supervisor-review?submission={row.submission_id}&feedback={row.id}", team_id=row.team_id, submission_id=row.submission_id, feedback_id=row.id)
+    session.commit()
+    session.refresh(row)
+    return _feedback_out(session, row)
+
+
+@router.post("/feedback/{feedback_id}/withdraw")
+def withdraw_feedback(feedback_id: int, request: Request, actor: User = Depends(require_roles(UserRole.SUPERVISOR, UserRole.ADMIN, UserRole.PLATFORM_ADMIN)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    row = _require_feedback(session, actor, feedback_id, supervisor_write=True)
+    row.publication_status = "WITHDRAWN"
+    row.withdrawn_at = utc_now()
+    session.commit()
+    session.refresh(row)
+    return _feedback_out(session, row)
+
+
+@router.post("/feedback/{feedback_id}/addressed")
+def address_feedback(feedback_id: int, request: Request, actor: User = Depends(require_roles(UserRole.STUDENT)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    row = _require_feedback(session, actor, feedback_id)
+    row.workflow_status = "ADDRESSED"
+    notify_team_supervisors(session, row.team_id, kind="UPDATE", title="Student marked feedback addressed", message=f"{actor.full_name} marked feedback '{row.title}' as addressed.", path=f"/supervisor/groups/{row.team_id}?tab=documents", team_id=row.team_id, submission_id=row.submission_id, feedback_id=row.id)
+    session.commit()
+    session.refresh(row)
+    return _feedback_out(session, row)
+
+
+@router.post("/feedback/{feedback_id}/verify")
+def verify_feedback(feedback_id: int, request: Request, actor: User = Depends(require_roles(UserRole.SUPERVISOR, UserRole.ADMIN, UserRole.PLATFORM_ADMIN)), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    row = _require_feedback(session, actor, feedback_id, supervisor_write=True)
+    row.workflow_status = "VERIFIED"
+    session.commit()
+    session.refresh(row)
+    return _feedback_out(session, row)
+
+
+@router.get("/feedback/{feedback_id}/messages")
+def feedback_messages(feedback_id: int, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    row = _require_feedback(session, actor, feedback_id)
+    return _feedback_messages(session, row.id)
+
+
+@router.post("/feedback/{feedback_id}/messages", status_code=status.HTTP_201_CREATED)
+def create_feedback_message(feedback_id: int, payload: FeedbackMessageWrite, request: Request, actor: User = Depends(get_current_user), session: Session = Depends(get_db)):
+    validate_mutating_origin(request)
+    row = _require_feedback(session, actor, feedback_id)
+    message = ProposalReviewFeedbackMessage(feedback_id=row.id, sender_id=actor.id, body=payload.body.strip())
+    session.add(message)
+    if actor.role == UserRole.STUDENT:
+        notify_team_supervisors(session, row.team_id, kind="MESSAGE", title="Student replied to proposal feedback", message=f"{actor.full_name} replied to '{row.title}'.", path=f"/supervisor/groups/{row.team_id}?tab=documents", team_id=row.team_id, submission_id=row.submission_id, feedback_id=row.id)
+    else:
+        notify_team_students(session, row.team_id, kind="MESSAGE", title="Supervisor replied to proposal feedback", message=f"{actor.full_name} replied to '{row.title}'.", path=f"/student/supervisor-review?submission={row.submission_id}&feedback={row.id}", team_id=row.team_id, submission_id=row.submission_id, feedback_id=row.id)
+    session.commit()
+    session.refresh(message)
+    return _feedback_message_out(session, message)
 
 
 @router.post("/revision-requests", status_code=status.HTTP_201_CREATED)
@@ -496,7 +707,7 @@ def create_message(revision_id: int, payload: RevisionMessageWrite, request: Req
     message = ProposalRevisionMessage(revision_request_id=row.id, sender_id=actor.id, body=payload.body.strip())
     session.add(message)
     if actor.role == UserRole.STUDENT:
-        notify_team_supervisors(session, row.team_id, kind="MESSAGE", title=f"New message on {row.revision_code}", message=f"{actor.full_name} sent a message about {row.title}.", path=f"/supervisor/review?revision={row.id}", revision_id=row.id, revision_code=row.revision_code)
+        notify_team_supervisors(session, row.team_id, kind="MESSAGE", title=f"New message on {row.revision_code}", message=f"{actor.full_name} sent a message about {row.title}.", path=f"/supervisor/groups/{row.team_id}?tab=documents", revision_id=row.id, revision_code=row.revision_code)
     else:
         notify_team_students(session, row.team_id, kind="MESSAGE", title=f"Supervisor replied on {row.revision_code}", message=f"{actor.full_name} replied about {row.title}.", path=f"/student/supervisor-review?revision={row.id}", revision_id=row.id, revision_code=row.revision_code)
     session.commit()
@@ -514,7 +725,7 @@ def submit_revision(revision_id: int, payload: RevisionSubmissionWrite, request:
     row.latest_submission_id = submission.id
     row.student_explanation = payload.explanation.strip()
     row.status = "AI_ASSESSMENT_PENDING"
-    notify_team_supervisors(session, row.team_id, kind="UPDATE", title="Proposal revision submitted", message=f"{actor.full_name} submitted {submission.title} v{submission.version} for {row.revision_code}.", path=f"/supervisor/review?revision={row.id}", revision_id=row.id, revision_code=row.revision_code)
+    notify_team_supervisors(session, row.team_id, kind="UPDATE", title="Proposal revision submitted", message=f"{actor.full_name} submitted {submission.title} v{submission.version} for {row.revision_code}.", path=f"/supervisor/groups/{row.team_id}?tab=documents", revision_id=row.id, revision_code=row.revision_code)
     session.commit()
     session.refresh(row)
     return _request_out(session, row, detail=True)
@@ -671,10 +882,20 @@ def update_annotation(annotation_id: int, payload: AnnotationWrite, request: Req
     _require_team_access(session, actor, row.team_id, supervisor_write=True)
     if payload.submission_id != row.submission_id:
         raise _error("submission_scope_mismatch", "An annotation cannot be moved to another proposal version.", 422)
+    if payload.feedback_id:
+        feedback = session.get(ProposalReviewFeedback, payload.feedback_id)
+        if feedback is None or feedback.team_id != row.team_id or feedback.submission_id != row.submission_id:
+            raise _error("feedback_scope_mismatch", "The selected feedback does not belong to this proposal version.", 422)
+    if payload.revision_request_id:
+        revision = session.get(ProposalRevisionRequest, payload.revision_request_id)
+        if revision is None or revision.team_id != row.team_id:
+            raise _error("revision_scope_mismatch", "The revision request does not belong to this proposal.", 422)
     for key in ("annotation_type", "page_number", "geometry", "drawing", "selected_text", "content", "suggested_text", "color", "stroke_width"):
         setattr(row, key, getattr(payload, key))
     if row.publication_status != "PUBLISHED" and payload.publication_status == "PUBLISHED":
         row.published_at = utc_now()
+    row.feedback_id = payload.feedback_id
+    row.revision_request_id = payload.revision_request_id
     row.publication_status = payload.publication_status
     session.commit()
     session.refresh(row)

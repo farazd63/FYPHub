@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import CheckConstraint, DateTime, Enum as SqlEnum, Index, String, func, text
+from sqlalchemy import CheckConstraint, DateTime, Enum as SqlEnum, ForeignKey, Index, String, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from ..database import Base
@@ -75,3 +75,24 @@ class User(Base):
             return None
         normalized = value.strip().upper()
         return normalized or None
+
+
+class UserRoleAssignment(Base):
+    """Roles granted to an account in addition to its legacy primary role."""
+
+    __tablename__ = "user_role_assignments"
+    __table_args__ = (
+        UniqueConstraint("user_id", "role", name="uq_user_role_assignments_user_role"),
+        Index("ix_user_role_assignments_user_id", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    institution_id: Mapped[int | None] = mapped_column(
+        ForeignKey("institutions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        SqlEnum(UserRole, name="user_role", native_enum=True, create_constraint=False),
+        nullable=False,
+    )

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { StatusBadge } from "./ui";
-import { groupDisplayLabel, sortCyclesDesc, sortGroupsDesc } from "./lib/displayLabels";
+import { ModalPortal } from "./ui/ModalPortal";
+import { groupDisplayLabel, sortCyclesDesc } from "./lib/displayLabels";
 
 type Cycle = {
   id: number;
@@ -17,6 +18,7 @@ type Member = {
   registration_number: string;
   email: string | null;
   designation?: string;
+  is_creator?: boolean;
   is_active?: boolean;
 };
 type Group = {
@@ -80,6 +82,8 @@ type GroupArchive = {
     registration_number?: string | null;
     email?: string | null;
     designation?: string | null;
+    is_creator?: boolean;
+    is_active?: boolean;
   }>;
   supervisor?: { name?: string | null } | null;
   requirements: Requirement[];
@@ -90,6 +94,9 @@ type MemberForm = {
   full_name: string;
   registration_number: string;
   email: string;
+};
+type MemberEditForm = MemberForm & {
+  designation: "LEADER" | "MEMBER";
 };
 type CollaborationCredential = {
   member_id: number;
@@ -143,8 +150,48 @@ const activeMemberCount = (group: Group) =>
 const groupCapacity = (group: Group) =>
   group.max_group_size ?? group.group_policy?.max_group_size ?? null;
 
+const naturalAscending = (left: string, right: string) =>
+  left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+
+const groupNumberForSort = (group: Group) => {
+  const explicitNumber = Number(group.group_number);
+  if (Number.isFinite(explicitNumber)) return explicitNumber;
+  const parsedNumber = group.group_name.match(/(?:group|team)\s+(\d+)/i)?.[1];
+  return parsedNumber ? Number(parsedNumber) : Number.POSITIVE_INFINITY;
+};
+
+const sortGroupsAscending = (groups: readonly Group[]) =>
+  [...groups].sort((left, right) =>
+    groupNumberForSort(left) - groupNumberForSort(right) ||
+    naturalAscending(left.group_name, right.group_name) ||
+    left.id - right.id,
+  );
+
+type SortableMember = {
+  id: number;
+  registration_number?: string | null;
+  full_name?: string | null;
+  name?: string | null;
+};
+
+function sortMembersAscending<T extends SortableMember>(members: readonly T[]) {
+  return [...members].sort((left, right) => {
+    const leftRegistration = left.registration_number?.trim() || "";
+    const rightRegistration = right.registration_number?.trim() || "";
+    if (leftRegistration && !rightRegistration) return -1;
+    if (!leftRegistration && rightRegistration) return 1;
+    return (
+      naturalAscending(leftRegistration, rightRegistration) ||
+      naturalAscending(left.full_name || left.name || "", right.full_name || right.name || "") ||
+      left.id - right.id
+    );
+  });
+}
+
 export function groupsForCycle(groups: Group[], selectedCycleId: number) {
-  return sortGroupsDesc(groups.filter((group) => group.academic_cycle_id === selectedCycleId));
+  return sortGroupsAscending(
+    groups.filter((group) => group.academic_cycle_id === selectedCycleId),
+  );
 }
 
 export function AdminStudentGroups({ api }: { api: string }) {
@@ -177,6 +224,11 @@ export function AdminStudentGroups({ api }: { api: string }) {
   });
   const [memberError, setMemberError] = useState("");
   const [memberBusy, setMemberBusy] = useState(false);
+  const [memberManagerTarget, setMemberManagerTarget] = useState<Group | null>(null);
+  const [memberDrafts, setMemberDrafts] = useState<Record<number, MemberEditForm>>({});
+  const [memberSaveBusyId, setMemberSaveBusyId] = useState<number | null>(null);
+  const [memberRemoveBusyId, setMemberRemoveBusyId] = useState<number | null>(null);
+  const [memberManagerError, setMemberManagerError] = useState("");
   const [collaborationCredentials, setCollaborationCredentials] = useState<CollaborationCredentialsResponse | null>(null);
   const [collaborationState, setCollaborationState] = useState<LoadState>("idle");
   const [collaborationError, setCollaborationError] = useState("");
@@ -424,6 +476,135 @@ export function AdminStudentGroups({ api }: { api: string }) {
     setMemberForm({ full_name: "", registration_number: "", email: "" });
   };
 
+  const memberEditDraft = (member: Member): MemberEditForm => ({
+    full_name: member.full_name,
+    registration_number: member.registration_number,
+    email: member.email || "",
+    designation: member.designation === "LEADER" ? "LEADER" : "MEMBER",
+  });
+
+  const openMemberManager = (group: Group) => {
+    const activeMembers = group.members.filter((member) => member.is_active !== false);
+    setMemberManagerTarget(group);
+    setMemberManagerError("");
+    setMemberDrafts(
+      Object.fromEntries(
+        activeMembers.map((member) => [member.id, memberEditDraft(member)]),
+      ) as Record<number, MemberEditForm>,
+    );
+  };
+
+  const closeMemberManager = () => {
+    setMemberManagerTarget(null);
+    setMemberManagerError("");
+    setMemberSaveBusyId(null);
+    setMemberRemoveBusyId(null);
+  };
+
+  const applyMemberUpdates = (groupId: number, updates: Member[]) => {
+    const updateById = new Map(updates.map((member) => [member.id, member]));
+    const applyToGroup = (group: Group) =>
+      group.id !== groupId
+        ? group
+        : {
+            ...group,
+            members: group.members.map((member) => updateById.get(member.id) || member),
+            member_count: group.members.filter(
+              (member) => (updateById.get(member.id) || member).is_active !== false,
+            ).length,
+          };
+    setGroups((current) => current.map(applyToGroup));
+    setMemberManagerTarget((current) => (current ? applyToGroup(current) : current));
+    setArchive((current) => {
+      if (!current || current.group_id !== groupId) return current;
+      return {
+        ...current,
+        members: current.members.map((member) => {
+          const update = updateById.get(member.id);
+          return update
+            ? {
+                ...member,
+                name: update.full_name,
+                registration_number: update.registration_number,
+                email: update.email,
+                designation: update.designation,
+                is_creator: update.is_creator,
+                is_active: update.is_active,
+              }
+            : member;
+        }),
+      };
+    });
+    setMemberDrafts((current) => {
+      const next = { ...current };
+      updates.forEach((member) => {
+        next[member.id] = memberEditDraft(member);
+      });
+      return next;
+    });
+  };
+
+  const saveMember = async (memberId: number) => {
+    if (!memberManagerTarget || memberSaveBusyId !== null || memberRemoveBusyId !== null) return;
+    const draft = memberDrafts[memberId];
+    if (!draft) return;
+    setMemberSaveBusyId(memberId);
+    setMemberManagerError("");
+    try {
+      const response = await fetch(
+        `${api}/api/v1/admin/student-groups/${memberManagerTarget.id}/members/${memberId}`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(draft),
+        },
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(errorText(body, "The group member could not be updated."));
+      const updates = Array.isArray(body.updated_members)
+        ? (body.updated_members as Member[])
+        : [body.member as Member];
+      applyMemberUpdates(memberManagerTarget.id, updates);
+      setCollaborationReload((value) => value + 1);
+      setNotice(`${body.member?.full_name || draft.full_name} was updated in the group.`);
+    } catch (error) {
+      setMemberManagerError(
+        error instanceof Error ? error.message : "The group member could not be updated.",
+      );
+    } finally {
+      setMemberSaveBusyId(null);
+    }
+  };
+
+  const removeMember = async (member: Member) => {
+    if (!memberManagerTarget || memberRemoveBusyId !== null || memberSaveBusyId !== null) return;
+    if (!window.confirm(`Remove ${member.full_name} from ${groupDisplayLabel(memberManagerTarget, selectedCycle)}? Their historical submissions will be kept, but they will no longer be an active group member.`)) return;
+    setMemberRemoveBusyId(member.id);
+    setMemberManagerError("");
+    try {
+      const response = await fetch(
+        `${api}/api/v1/admin/student-groups/${memberManagerTarget.id}/members/${member.id}`,
+        { method: "DELETE", credentials: "include" },
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(errorText(body, "The group member could not be removed."));
+      const updates = [body.member as Member];
+      if (body.promoted_member) updates.push(body.promoted_member as Member);
+      applyMemberUpdates(memberManagerTarget.id, updates);
+      setCollaborationReload((value) => value + 1);
+      setNotice(`${member.full_name} was removed from the group. Historical records were kept.`);
+    } catch (error) {
+      setMemberManagerError(
+        error instanceof Error ? error.message : "The group member could not be removed.",
+      );
+    } finally {
+      setMemberRemoveBusyId(null);
+    }
+  };
+
   const addMember = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!memberTarget || memberBusy) return;
@@ -474,6 +655,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
           : current,
       );
       setMemberTarget(null);
+      setCollaborationReload((value) => value + 1);
       setNotice(
         `${member.full_name} was added to the group. Portal access remains under the group account.`,
       );
@@ -731,11 +913,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
           </div>
           <div
             aria-label="Student groups and selected group details"
-            className={`grid items-start gap-4 ${
-              selectedGroup
-                ? "lg:grid-cols-[minmax(17rem,0.8fr)_minmax(0,1.55fr)]"
-                : ""
-            }`}
+            className="grid items-start gap-4"
           >
             {groupState === "loading" && (
               <div className="rounded-xl border border-fy-border bg-fy-surface p-5 text-sm text-fy-text-secondary">
@@ -755,11 +933,14 @@ export function AdminStudentGroups({ api }: { api: string }) {
                 No FYP groups are available in the selected cycle.
               </div>
             )}
-            {groupState === "ready" && groups.length > 0 && (
+            {groupState === "ready" && groups.length > 0 && !selectedGroup && (
             <div className="grid gap-4">
               {groups.map((group) => {
                 const count = activeMemberCount(group);
                 const capacity = groupCapacity(group);
+                const activeMembers = sortMembersAscending(
+                  group.members.filter((member) => member.is_active !== false),
+                );
                 const canAddMember =
                   group.is_active && capacity !== null && count < capacity;
                 return (
@@ -820,13 +1001,13 @@ export function AdminStudentGroups({ api }: { api: string }) {
                             <th className="px-2 py-2">Registration</th>
                             <th className="px-2 py-2">Email</th>
                             <th className="px-2 py-2">Role</th>
-                            <th className="px-2 py-2">Project Title</th>
+                            <th className="px-2 py-2">Final Project Title</th>
                             <th className="px-2 py-2">Supervisor</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-fy-border">
-                          {group.members.length ? (
-                            group.members.map((member) => (
+                          {activeMembers.length ? (
+                            activeMembers.map((member) => (
                               <tr key={member.id}>
                                 <td className="px-2 py-2 font-semibold">
                                   {member.full_name}
@@ -844,7 +1025,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                                 </td>
                                 <td className="px-2 py-2">
                                   {group.project?.title?.trim() ||
-                                    "Not assigned"}
+                                    "Final title not set"}
                                 </td>
                                 <td className="px-2 py-2">
                                   {group.supervisor?.name?.trim() ||
@@ -935,7 +1116,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
             {selectedGroup && (
             <section
               aria-labelledby="selected-group-heading"
-              className="min-w-0 rounded-xl border border-fy-border bg-fy-surface p-5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
+              className="min-w-0 rounded-xl border border-fy-border bg-fy-surface p-5"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -953,6 +1134,13 @@ export function AdminStudentGroups({ api }: { api: string }) {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openMemberManager(selectedGroup)}
+                    className="rounded-lg border border-fy-border px-3 py-2 text-sm font-semibold text-fy-brand"
+                  >
+                    Edit members
+                  </button>
                   {groupCapacity(selectedGroup) !== null &&
                     activeMemberCount(selectedGroup) <
                       (groupCapacity(selectedGroup) ?? 0) &&
@@ -1017,12 +1205,15 @@ export function AdminStudentGroups({ api }: { api: string }) {
                       </p>
                     </div>
                   </div>
-                  <h3 className="mt-6 text-lg font-bold text-fy-text">
-                    Members
-                  </h3>
+                  <h3 className="mt-6 text-lg font-bold text-fy-text">Members</h3>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    {archive.members.length ? (
-                      archive.members.map((member) => (
+                    {sortMembersAscending(
+                      archive.members.filter((member) => member.is_active !== false),
+                    ).length ? (
+                      sortMembersAscending(
+                        archive.members.filter((member) => member.is_active !== false),
+                      )
+                        .map((member) => (
                         <div
                           key={member.id}
                           className="rounded-lg border border-fy-border px-3 py-2"
@@ -1034,7 +1225,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                             {member.email || "No email"}
                           </p>
                         </div>
-                      ))
+                        ))
                     ) : (
                       <p className="text-sm text-fy-text-secondary">
                         No members assigned.
@@ -1045,7 +1236,6 @@ export function AdminStudentGroups({ api }: { api: string }) {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <h3 id="collaboration-credentials-heading" className="text-lg font-bold text-fy-text">Pending collaboration password resets</h3>
-                        <p className="mt-1 max-w-2xl text-sm text-fy-text-secondary">Members create and verify their own collaboration identity password in the Student portal. This admin area is restricted to requested resets only.</p>
                       </div>
                     </div>
                     {collaborationState === "loading" && <p className="mt-3 text-sm text-fy-text-secondary">Loading collaboration credential status...</p>}
@@ -1146,17 +1336,18 @@ export function AdminStudentGroups({ api }: { api: string }) {
         </section>
       )}
       {approvalTarget && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="group-approval-heading"
-          className="fixed inset-0 z-50 grid place-items-center bg-[#243746]/35 p-4"
-        >
-          <form
-            onSubmit={approveGroup}
-            className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+        <ModalPortal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="group-approval-heading"
+            className="fixed inset-0 z-50 grid place-items-center bg-[#243746]/35 p-4"
           >
-            <p className="text-xs font-bold uppercase tracking-wide text-fy-text-secondary">
+            <form
+              onSubmit={approveGroup}
+              className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+            >
+            <p className="hidden text-xs font-bold uppercase tracking-wide text-fy-text-secondary">
               Group signup review
             </p>
             <h2
@@ -1167,11 +1358,6 @@ export function AdminStudentGroups({ api }: { api: string }) {
                 ? "Refresh automatic group name"
                 : "Approve group access"}
             </h2>
-            <p className="mt-2 text-sm text-fy-text-secondary">
-              {approvalTarget.is_active
-                ? "The official name is regenerated from the academic cycle session and group number."
-                : "The official name is generated automatically from the academic cycle session and group number. The shared group account stays unable to log in until you approve it."}
-            </p>
             <div className="mt-5 rounded-lg border border-fy-border bg-fy-surface px-3 py-3 text-sm">
               <span className="block text-xs font-bold uppercase tracking-wide text-fy-text-secondary">Automatic group name</span>
               <strong className="mt-1 block text-fy-text">{groupDisplayLabel(approvalTarget, selectedCycle)}</strong>
@@ -1205,31 +1391,26 @@ export function AdminStudentGroups({ api }: { api: string }) {
                     : "Approve group"}
               </button>
             </div>
-          </form>
-        </div>
+            </form>
+          </div>
+        </ModalPortal>
       )}
       {confirm && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="group-confirm-heading"
-          className="fixed inset-0 z-50 grid place-items-center bg-[#243746]/35 p-4"
-        >
-          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+        <ModalPortal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="group-confirm-heading"
+            className="fixed inset-0 z-50 grid place-items-center bg-[#243746]/35 p-4"
+          >
+            <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
             <h2 id="group-confirm-heading" className="text-lg font-bold">
               {confirm.action === "delete"
-                ? "Confirm permanent deletion"
+                ? `Delete ${groupDisplayLabel(confirm.group, selectedCycle)}`
                 : confirm.action === "reject"
-                  ? "Reject group signup"
-                  : "Confirm deactivation"}
+                  ? `Reject ${groupDisplayLabel(confirm.group, selectedCycle)}`
+                  : `Deactivate ${groupDisplayLabel(confirm.group, selectedCycle)}`}
             </h2>
-            <p className="mt-2 text-sm text-[#60716b]">
-              {confirm.action === "delete"
-                ? `Permanently delete ${groupDisplayLabel(confirm.group, selectedCycle)}? This cannot be undone.`
-                : confirm.action === "reject"
-                  ? `Reject ${groupDisplayLabel(confirm.group, selectedCycle)}'s signup? The group will not be able to log in.`
-                  : `Deactivate ${groupDisplayLabel(confirm.group, selectedCycle)}?`}
-            </p>
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
@@ -1248,23 +1429,180 @@ export function AdminStudentGroups({ api }: { api: string }) {
                 {busy ? "Saving…" : "Confirm"}
               </button>
             </div>
+            </div>
           </div>
-        </div>
+        </ModalPortal>
+      )}
+      {memberManagerTarget && (
+        <ModalPortal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-members-heading"
+            className="fixed inset-0 z-50 grid place-items-center bg-[#243746]/35 p-4"
+          >
+            <div className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="hidden text-xs font-bold uppercase tracking-wide text-fy-text-secondary">
+                  Group member management
+                </p>
+                <h2 id="edit-members-heading" className="mt-1 text-xl font-bold text-fy-text">
+                  Edit members in {groupDisplayLabel(memberManagerTarget, selectedCycle)}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={closeMemberManager}
+                disabled={memberSaveBusyId !== null || memberRemoveBusyId !== null}
+                className="rounded-lg border border-fy-border px-3 py-2 text-sm font-semibold"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-5 overflow-x-auto rounded-lg border border-fy-border">
+              <table className="min-w-[960px] w-full text-left text-sm">
+                <thead className="border-b border-fy-border bg-fy-surface-muted text-xs uppercase tracking-wide text-fy-text-secondary">
+                  <tr>
+                    <th className="px-3 py-3">Full name</th>
+                    <th className="px-3 py-3">Registration</th>
+                    <th className="px-3 py-3">Email</th>
+                    <th className="px-3 py-3">Role</th>
+                    <th className="px-3 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-fy-border">
+                  {sortMembersAscending(
+                    memberManagerTarget.members.filter((member) => member.is_active !== false),
+                  ).length ? (
+                    sortMembersAscending(
+                      memberManagerTarget.members.filter((member) => member.is_active !== false),
+                    )
+                      .map((member) => {
+                        const draft = memberDrafts[member.id] || memberEditDraft(member);
+                        const rowBusy = memberSaveBusyId === member.id || memberRemoveBusyId === member.id;
+                        return (
+                          <tr key={member.id}>
+                            <td className="px-3 py-3">
+                              <input
+                                value={draft.full_name}
+                                onChange={(event) => setMemberDrafts((current) => ({ ...current, [member.id]: { ...draft, full_name: event.target.value } }))}
+                                className="w-full min-w-44 rounded-lg border border-fy-border bg-fy-surface px-3 py-2 outline-none focus:border-fy-brand focus:ring-2 focus:ring-fy-brand/20"
+                                aria-label={`Full name for ${member.full_name}`}
+                              />
+                            </td>
+                            <td className="px-3 py-3">
+                              <input
+                                value={draft.registration_number}
+                                onChange={(event) => setMemberDrafts((current) => ({ ...current, [member.id]: { ...draft, registration_number: event.target.value } }))}
+                                className="w-full min-w-36 rounded-lg border border-fy-border bg-fy-surface px-3 py-2 outline-none focus:border-fy-brand focus:ring-2 focus:ring-fy-brand/20"
+                                aria-label={`Registration number for ${member.full_name}`}
+                              />
+                            </td>
+                            <td className="px-3 py-3">
+                              <input
+                                type="email"
+                                value={draft.email}
+                                onChange={(event) => setMemberDrafts((current) => ({ ...current, [member.id]: { ...draft, email: event.target.value } }))}
+                                className="w-full min-w-56 rounded-lg border border-fy-border bg-fy-surface px-3 py-2 outline-none focus:border-fy-brand focus:ring-2 focus:ring-fy-brand/20"
+                                aria-label={`Email for ${member.full_name}`}
+                              />
+                            </td>
+                            <td className="px-3 py-3">
+                              <select
+                                value={draft.designation}
+                                onChange={(event) => setMemberDrafts((current) => ({ ...current, [member.id]: { ...draft, designation: event.target.value as MemberEditForm["designation"] } }))}
+                                className="rounded-lg border border-fy-border bg-fy-surface px-3 py-2 outline-none focus:border-fy-brand focus:ring-2 focus:ring-fy-brand/20"
+                                aria-label={`Role for ${member.full_name}`}
+                              >
+                                <option value="LEADER">Leader</option>
+                                <option value="MEMBER">Member</option>
+                              </select>
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void saveMember(member.id)}
+                                  disabled={rowBusy || memberSaveBusyId !== null || memberRemoveBusyId !== null}
+                                  className="rounded-lg bg-fy-brand px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                                >
+                                  {memberSaveBusyId === member.id ? "Saving..." : "Save changes"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void removeMember(member)}
+                                  disabled={rowBusy || memberSaveBusyId !== null || memberRemoveBusyId !== null || memberManagerTarget.members.filter((item) => item.is_active !== false).length <= 1}
+                                  title={memberManagerTarget.members.filter((item) => item.is_active !== false).length <= 1 ? "A group must keep at least one active member." : "Remove this member from the group"}
+                                  className="rounded-lg border border-fy-danger px-3 py-2 text-xs font-semibold text-fy-danger disabled:opacity-50"
+                                >
+                                  {memberRemoveBusyId === member.id ? "Removing..." : "Remove member"}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-4 text-fy-text-secondary">
+                        No active members are assigned to this group.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {memberManagerError && (
+              <p role="alert" className="mt-4 rounded-lg bg-fy-danger-soft px-3 py-2 text-sm text-fy-danger">
+                {memberManagerError}
+              </p>
+            )}
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              {memberManagerTarget.is_active &&
+                groupCapacity(memberManagerTarget) !== null &&
+                activeMemberCount(memberManagerTarget) < (groupCapacity(memberManagerTarget) ?? 0) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const group = memberManagerTarget;
+                      closeMemberManager();
+                      openAddMember(group);
+                    }}
+                    disabled={memberSaveBusyId !== null || memberRemoveBusyId !== null}
+                    className="rounded-lg bg-fy-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    Add new member
+                  </button>
+                )}
+              <button
+                type="button"
+                onClick={closeMemberManager}
+                disabled={memberSaveBusyId !== null || memberRemoveBusyId !== null}
+                className="rounded-lg border border-fy-border px-4 py-2 text-sm font-semibold"
+              >
+                Done
+              </button>
+            </div>
+            </div>
+          </div>
+        </ModalPortal>
       )}
       {memberTarget && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="add-member-heading"
-          className="fixed inset-0 z-50 grid place-items-center bg-[#243746]/35 p-4"
-        >
-          <form
-            onSubmit={addMember}
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
+        <ModalPortal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-member-heading"
+            className="fixed inset-0 z-50 grid place-items-center bg-[#243746]/35 p-4"
           >
+            <form
+              onSubmit={addMember}
+              className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
+            >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-fy-text-secondary">
+                <p className="hidden text-xs font-bold uppercase tracking-wide text-fy-text-secondary">
                   Group member details
                 </p>
                 <h2
@@ -1273,7 +1611,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                 >
                   Add member to {groupDisplayLabel(memberTarget, selectedCycle)}
                 </h2>
-                <p className="mt-2 text-sm text-fy-text-secondary">
+                <p className="hidden mt-2 text-sm text-fy-text-secondary">
                   Add the member’s details within the cycle limit. The group is
                   the only portal account.
                 </p>
@@ -1315,7 +1653,7 @@ export function AdminStudentGroups({ api }: { api: string }) {
                 {memberError}
               </p>
             )}
-            <div className="mt-5 rounded-lg bg-fy-brand-soft px-3 py-3 text-xs text-fy-text-secondary">
+            <div className="hidden mt-5 rounded-lg bg-fy-brand-soft px-3 py-3 text-xs text-fy-text-secondary">
                The group still uses one shared portal account, but every member
                gets a separate collaboration password from the panel above.
             </div>
@@ -1336,8 +1674,9 @@ export function AdminStudentGroups({ api }: { api: string }) {
                 {memberBusy ? "Adding member…" : "Add member to group"}
               </button>
             </div>
-          </form>
-        </div>
+            </form>
+          </div>
+        </ModalPortal>
       )}
     </section>
   );

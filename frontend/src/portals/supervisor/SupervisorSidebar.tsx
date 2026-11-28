@@ -3,7 +3,6 @@ import { RoleSidebar, SidebarIcon, type RoleSidebarItem } from "../shared/RoleSi
 export const supervisorNav: readonly RoleSidebarItem[] = [
   { id: "overview", label: "Overview", icon: <SidebarIcon name="overview" />, section: "Workspace" },
   { id: "requests", label: "Supervisor Requests", icon: <SidebarIcon name="requests" />, section: "Requests & Review" },
-  { id: "review", label: "Proposal Review", icon: <SidebarIcon name="review" />, section: "Requests & Review" },
   { id: "assigned", label: "Assigned Students & Teams", icon: <SidebarIcon name="people" />, section: "Supervision" },
   { id: "capacity", label: "Supervisor Capacity", icon: <SidebarIcon name="capacity" />, section: "Supervision" },
   { id: "history", label: "Decision History", icon: <SidebarIcon name="history" />, section: "History & Communication" },

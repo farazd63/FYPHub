@@ -10,12 +10,13 @@ if str(BACKEND_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIRECTORY))
 
 from app.database import Base, engine  # noqa: E402
-from app.models import SupervisorAssignment, ReminderRule, ReminderRuleVersion, AcademicCycle, AcademicDeadline, AcademicDeadlineVersion, AcademicGroupPolicy, SupervisorCapacityPolicy, AuthSession, PasswordResetToken, EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion, Team, TeamMember, User, SupervisorRequest, SupervisorRequestDocument, SupervisorRequestStatusHistory, ProposalReference, ProposalReferenceDocument, SupervisorRequestMessage, ArchivedProject, ArchivedProjectDocument, DocumentUploadRequirement, DocumentSubmission, DocumentSubmissionVersion, DocumentRequirementSection, DocumentSubmissionReviewEvent, DocumentArchiveReviewQueue  # noqa: F401, E402
+from app.models import SupervisorAssignment, ReminderRule, ReminderRuleVersion, AcademicCycle, AcademicDeadline, AcademicDeadlineVersion, AcademicGroupPolicy, SupervisorCapacityPolicy, AuthSession, PasswordResetToken, EvaluationRubric, EvaluationRubricCriterion, EvaluationRubricVersion, Team, TeamMember, User, SupervisorRequest, SupervisorRequestDocument, SupervisorRequestStatusHistory, ProposalReference, ProposalReferenceDocument, SupervisorRequestMessage, ArchivedProject, ArchivedProjectDocument, DocumentUploadRequirement, DocumentSubmission, DocumentSubmissionVersion, DocumentRequirementSection, DocumentSubmissionReviewEvent, DocumentArchiveReviewQueue, DocumentReviewAnnotation, DocumentReviewFeedback, DocumentReviewFeedbackMessage  # noqa: F401, E402
 from app.models import ProjectMilestone, ProjectTask, SupervisionMeeting, DefenseSchedule, DefensePanelMember, PanelEvaluation, PanelEvaluationScore, ProposalAIReviewRun, ProposalComplianceSubmission, ProposalComplianceReport, ProposalVersionComparison, StudentAIConversation, StudentAIMessage  # noqa: F401, E402
 from app.models import Announcement, AnnouncementRead  # noqa: F401, E402
 from app.models import Institution, InstitutionDomain, InstitutionMembership, InstitutionInvitation, EmailVerificationToken  # noqa: F401, E402
-from app.models import ProposalReviewFeedback, ProposalRevisionRequest, ProposalRevisionMessage, ProposalRevisionAssessment, ProposalRevisionDecision  # noqa: F401, E402
+from app.models import ProposalReviewFeedback, ProposalReviewFeedbackMessage, ProposalReviewFeedbackRevision, ProposalRevisionRequest, ProposalRevisionMessage, ProposalRevisionAssessment, ProposalRevisionDecision  # noqa: F401, E402
 from app.models import ProposalReviewAnnotation  # noqa: F401, E402
+from app.models import DocumentTrainingSession  # noqa: F401, E402
 
 config = context.config
 target_metadata = Base.metadata

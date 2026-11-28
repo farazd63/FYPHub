@@ -6,7 +6,7 @@ from zipfile import BadZipFile, ZipFile
 from io import BytesIO
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, Response
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from .auth import get_current_user, require_roles, validate_mutating_origin
@@ -85,21 +85,48 @@ def _visible(req, user, db=None):
 
 def _supervisor_can_review(row, req, user, db):
     """Allow a supervisor to review only submissions from their active group."""
-    if user.role not in (UserRole.SUPERVISOR, UserRole.COORDINATOR) or row.group_id is None or req is None:
+    if user.role not in (UserRole.SUPERVISOR, UserRole.COORDINATOR) or req is None:
+        return False
+    group = db.get(Team, row.group_id) if row.group_id is not None else None
+    if group is None:
+        student = db.get(User, row.student_id)
+        group = _submission_group(row, db, req.academic_cycle_id) if student is not None else None
+    if group is None:
         return False
     assigned = db.scalar(select(SupervisorAssignment.id).where(
-        SupervisorAssignment.team_id == row.group_id,
+        SupervisorAssignment.team_id == group.id,
         SupervisorAssignment.supervisor_id == user.id,
         SupervisorAssignment.ended_at.is_(None),
     )) is not None
     if assigned:
         return True
     return db.scalar(select(SupervisorRequest.id).where(
-        SupervisorRequest.team_id == row.group_id,
+        SupervisorRequest.team_id == group.id,
         SupervisorRequest.supervisor_id == user.id,
         SupervisorRequest.academic_cycle_id == req.academic_cycle_id,
         SupervisorRequest.status.in_(["SUBMITTED", "CHANGES_REQUESTED"]),
     )) is not None
+
+
+def _submission_group(row, db, academic_cycle_id=None):
+    if row.group_id is not None:
+        return db.get(Team, row.group_id)
+    student = db.get(User, row.student_id)
+    if student is None:
+        return None
+    if academic_cycle_id is None:
+        return _student_group(student, db)
+    member_match = select(TeamMember.id).where(
+        TeamMember.team_id == Team.id,
+        TeamMember.academic_cycle_id == Team.academic_cycle_id,
+        TeamMember.is_active.is_(True),
+        or_(TeamMember.registration_number == student.registration_number, TeamMember.university_email == student.email),
+    ).exists()
+    return db.scalar(select(Team).where(
+        Team.status != "dissolved",
+        Team.academic_cycle_id == academic_cycle_id,
+        or_(Team.shared_user_id == student.id, member_match),
+    ).order_by(Team.id).limit(1))
 
 
 REVIEW_TRANSITIONS = {
@@ -355,9 +382,23 @@ async def upload(requirement_id: int, file: UploadFile = File(...), _: object = 
     # Keep one shared group submission per requirement. The requirement ID is
     # intentionally part of this lookup, so a Video upload can never become a
     # version of a PDF, report, or any other requirement in the same cycle.
-    row = db.scalar(select(DocumentSubmission).where(DocumentSubmission.requirement_id == req.id, DocumentSubmission.group_id == group.id).order_by(DocumentSubmission.updated_at.desc(), DocumentSubmission.id.desc()).limit(1))
+    row = db.scalar(select(DocumentSubmission).where(
+        DocumentSubmission.requirement_id == req.id,
+        or_(
+            DocumentSubmission.group_id == group.id,
+            and_(DocumentSubmission.group_id.is_(None), DocumentSubmission.student_id == actor.id),
+        ),
+    ).order_by(DocumentSubmission.updated_at.desc(), DocumentSubmission.id.desc()).limit(1))
     if row is None: row = DocumentSubmission(requirement_id=req.id, student_id=actor.id, group_id=group.id, academic_cycle_id=req.academic_cycle_id, project_id=project.id, requirement_section_id=req.section_id, uploaded_by_id=actor.id, status="UPLOADED", is_late=late); db.add(row); db.flush()
-    else: row.status = "UPLOADED"; row.is_late = row.is_late or late; row.project_id = row.project_id or project.id; row.requirement_section_id = row.requirement_section_id or req.section_id
+    else:
+        row.group_id = group.id
+        row.status = "UPLOADED"
+        row.review_comment = None
+        row.reviewed_by_id = None
+        row.reviewed_at = None
+        row.is_late = row.is_late or late
+        row.project_id = row.project_id or project.id
+        row.requirement_section_id = row.requirement_section_id or req.section_id
     row.uploaded_by_id = actor.id
     previous = db.scalar(select(DocumentSubmissionVersion.version_number).where(DocumentSubmissionVersion.submission_id == row.id).order_by(DocumentSubmissionVersion.version_number.desc())) or 0
     stored = f"document-requirements/{req.id}/{actor.id}/{token_hex(16)}.{suffix}"
@@ -471,7 +512,7 @@ def preview(submission_id: int, version_id: int, actor: User = Depends(get_curre
         return Response(content=rendered.content, media_type=rendered.media_type, headers=headers)
     return FileResponse(path, media_type=version.mime_type, headers=headers)
 
-def _review(requirement_id, submission_id, decision, comment, actor, db):
+def _review(requirement_id, submission_id, decision, comment, actor, db, version_id=None):
     req = db.get(DocumentUploadRequirement, requirement_id); row = db.get(DocumentSubmission, submission_id)
     if not req or not row or row.requirement_id != req.id: raise HTTPException(404, "Submission not found.")
     cycle = db.get(AcademicCycle, req.academic_cycle_id)
@@ -479,28 +520,33 @@ def _review(requirement_id, submission_id, decision, comment, actor, db):
     if close_expired_cycle(db, cycle, commit=True) or not cycle.registration_open:
         raise HTTPException(409, "This academic cycle is closed; document acceptance is no longer available.")
     if not _supervisor_can_review(row, req, actor, db): raise HTTPException(403, "Only the assigned supervisor can review this document.")
+    comment = comment.strip() if comment else None
+    if decision in {"RESUBMISSION_REQUIRED", "REJECTED"} and not comment:
+        raise HTTPException(422, "Feedback is required when requesting changes or rejecting a document.")
+    latest_version = db.scalar(select(DocumentSubmissionVersion).where(DocumentSubmissionVersion.submission_id == row.id).order_by(DocumentSubmissionVersion.version_number.desc()).limit(1))
+    if version_id is not None and (latest_version is None or latest_version.id != version_id):
+        raise HTTPException(409, "This review is stale because a newer submission version is available. Reopen the latest version.")
     _ensure_review_transition(row.status, decision)
     row.status = decision; row.review_comment = comment; row.reviewed_by_id = actor.id; row.reviewed_at = _now()
-    latest_version = db.scalar(select(DocumentSubmissionVersion).where(DocumentSubmissionVersion.submission_id == row.id).order_by(DocumentSubmissionVersion.version_number.desc()).limit(1))
     db.add(DocumentSubmissionReviewEvent(submission_id=row.id, version_id=latest_version.id if latest_version else None, status=decision, reviewer_id=actor.id, comment=comment, created_at=row.reviewed_at))
-    group = db.get(Team, row.group_id) if row.group_id is not None else None
+    group = _submission_group(row, db, req.academic_cycle_id)
     group_label = visible_group_name(db, group) if group else "your group"
     decision_labels = {"ACCEPTED": "Document accepted", "UNDER_REVIEW": "Document under review", "REJECTED": "Document rejected", "RESUBMISSION_REQUIRED": "Document changes requested"}
     decision_messages = {"ACCEPTED": "was accepted", "UNDER_REVIEW": "is now under review", "REJECTED": "was rejected", "RESUBMISSION_REQUIRED": "needs changes before it can be accepted"}
-    review_payload = {"requirement_id": req.id, "submission_id": row.id, "version_id": latest_version.id if latest_version else None, "group_id": row.group_id, "cycle_id": req.academic_cycle_id, "status": decision}
+    review_payload = {"requirement_id": req.id, "submission_id": row.id, "version_id": latest_version.id if latest_version else None, "group_id": group.id if group else row.group_id, "cycle_id": req.academic_cycle_id, "status": decision}
     review_message = f"Your document '{req.title}' {decision_messages.get(decision, 'was updated')}.{f' Comment: {comment.strip()}' if comment else ''}"
-    notify(db, {row.student_id} | (team_student_ids(db, row.group_id) if row.group_id is not None else set()), kind=f"DOCUMENT_SUBMISSION_{decision}", title=decision_labels.get(decision, "Document review updated"), message=review_message, path=f"/student/documents?requirement_id={req.id}&focus=requirement", exclude={actor.id}, **review_payload)
-    if row.group_id is not None:
-        notify(db, team_supervisor_ids(db, row.group_id), kind=f"DOCUMENT_SUBMISSION_{decision}", title=decision_labels.get(decision, "Document review updated"), message=f"Your review of '{req.title}' for {group_label} was recorded as {decision.replace('_', ' ').lower()}.", path=f"/supervisor/groups/{row.group_id}?tab=documents", exclude={actor.id}, **review_payload)
+    notify(db, {row.student_id} | (team_student_ids(db, group.id) if group is not None else set()), kind=f"DOCUMENT_SUBMISSION_{decision}", title=decision_labels.get(decision, "Document review updated"), message=review_message, path=f"/student/documents?requirement_id={req.id}&focus=requirement", exclude={actor.id}, **review_payload)
+    if group is not None:
+        notify(db, team_supervisor_ids(db, group.id), kind=f"DOCUMENT_SUBMISSION_{decision}", title=decision_labels.get(decision, "Document review updated"), message=f"Your review of '{req.title}' for {group_label} was recorded as {decision.replace('_', ' ').lower()}.", path=f"/supervisor/groups/{group.id}?tab=documents", exclude={actor.id}, **review_payload)
     notify_admins(db, kind=f"DOCUMENT_SUBMISSION_{decision}", title=decision_labels.get(decision, "Document review updated"), message=f"{actor.full_name} marked '{req.title}' for {group_label} as {decision.replace('_', ' ').lower()}.", path="/admin/document-requirements", exclude={actor.id}, **review_payload)
     _audit(db, actor, "document_submission_" + decision.lower(), row.id, {"status": decision}, row.student_id); db.commit(); db.refresh(row); return _submission_out(row, db, include_student_hidden=True)
 
 @router.post("/{requirement_id}/submissions/{submission_id}/approve", response_model=SubmissionOut)
-def approve(requirement_id:int, submission_id:int, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "ACCEPTED", None, actor, db)
+def approve(requirement_id:int, submission_id:int, comment:str|None=None, version_id:int|None=None, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "ACCEPTED", comment, actor, db, version_id)
 @router.post("/{requirement_id}/submissions/{submission_id}/under-review", response_model=SubmissionOut)
-def under_review(requirement_id:int, submission_id:int, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "UNDER_REVIEW", None, actor, db)
+def under_review(requirement_id:int, submission_id:int, comment:str|None=None, version_id:int|None=None, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "UNDER_REVIEW", comment, actor, db, version_id)
 @router.post("/{requirement_id}/submissions/{submission_id}/reject", response_model=SubmissionOut)
-def reject(requirement_id:int, submission_id:int, comment:str|None=None, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "REJECTED", comment, actor, db)
+def reject(requirement_id:int, submission_id:int, comment:str|None=None, version_id:int|None=None, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "REJECTED", comment, actor, db, version_id)
 @router.post("/{requirement_id}/submissions/{submission_id}/request-replacement", response_model=SubmissionOut)
 @router.post("/{requirement_id}/submissions/{submission_id}/request-changes", response_model=SubmissionOut)
-def replacement(requirement_id:int, submission_id:int, comment:str|None=None, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "RESUBMISSION_REQUIRED", comment, actor, db)
+def replacement(requirement_id:int, submission_id:int, comment:str|None=None, version_id:int|None=None, _: object=Depends(validate_mutating_origin), actor:User=Depends(get_current_user), db:Session=Depends(get_db)): return _review(requirement_id, submission_id, "RESUBMISSION_REQUIRED", comment, actor, db, version_id)

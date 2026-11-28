@@ -4,20 +4,20 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .auth import require_roles
+from .auth import coordinator_cycle_ids, require_coordinator_access, user_has_role
 from .database import get_db
 from .models import AcademicCycle, AdminAuditEvent, EvaluationRubric, EvaluationRubricVersion, SupervisorAssignment, SupervisorCapacityPolicy, TemplateReference, TemplateReferenceVersion, User, UserRole
 
 router = APIRouter(prefix="/api/v1/coordinator", tags=["coordinator-operations"])
-COORDINATOR_ROLES = (UserRole.ADMIN, UserRole.COORDINATOR)
 
 
 @router.get("/supervisor-capacity")
-def supervisor_capacity(_: User = Depends(require_roles(*COORDINATOR_ROLES)), session: Session = Depends(get_db)):
+def supervisor_capacity(actor: User = Depends(require_coordinator_access), session: Session = Depends(get_db)):
+    statement = select(SupervisorCapacityPolicy, User, AcademicCycle).join(User, User.id == SupervisorCapacityPolicy.supervisor_id).outerjoin(AcademicCycle, AcademicCycle.id == SupervisorCapacityPolicy.academic_cycle_id)
+    if user_has_role(session, actor, UserRole.SUPERVISOR) and not user_has_role(session, actor, UserRole.ADMIN):
+        statement = statement.where(AcademicCycle.id.in_(coordinator_cycle_ids(session, actor.id)))
     rows = session.execute(
-        select(SupervisorCapacityPolicy, User, AcademicCycle)
-        .join(User, User.id == SupervisorCapacityPolicy.supervisor_id)
-        .outerjoin(AcademicCycle, AcademicCycle.id == SupervisorCapacityPolicy.academic_cycle_id)
+        statement
         .order_by(SupervisorCapacityPolicy.academic_year, User.full_name, User.id)
     ).all()
     result = []
@@ -27,8 +27,8 @@ def supervisor_capacity(_: User = Depends(require_roles(*COORDINATOR_ROLES)), se
         spring_assigned = sum(1 for assignment, cycle_session in assignments if (assignment.session or cycle_session) == "SPRING")
         assigned = len(assignments)
         remaining = max(policy.max_group_capacity - assigned, 0)
-        eligible = user.is_active and user.role in (UserRole.SUPERVISOR, UserRole.COORDINATOR)
-        if eligible and user.role == UserRole.COORDINATOR:
+        eligible = user.is_active and (user_has_role(session, user, UserRole.SUPERVISOR) or user_has_role(session, user, UserRole.COORDINATOR))
+        if eligible and user_has_role(session, user, UserRole.COORDINATOR) and not user_has_role(session, user, UserRole.SUPERVISOR):
             eligible = cycle is not None and cycle.coordinator_id == user.id
         status = "INACTIVE" if not eligible else "OVER_CAPACITY" if assigned > policy.max_group_capacity else "FULL" if assigned == policy.max_group_capacity else "NEARLY_FULL" if assigned * 100 >= policy.max_group_capacity * 80 else "AVAILABLE"
         result.append({
@@ -52,7 +52,7 @@ def supervisor_capacity(_: User = Depends(require_roles(*COORDINATOR_ROLES)), se
 
 
 @router.get("/audit-history")
-def audit_history(_: User = Depends(require_roles(*COORDINATOR_ROLES)), session: Session = Depends(get_db)):
+def audit_history(_: User = Depends(require_coordinator_access), session: Session = Depends(get_db)):
     rows = session.scalars(select(AdminAuditEvent).order_by(AdminAuditEvent.created_at.desc(), AdminAuditEvent.id.desc()).limit(100)).all()
     return [{
         "id": event.id,
@@ -65,7 +65,7 @@ def audit_history(_: User = Depends(require_roles(*COORDINATOR_ROLES)), session:
 
 
 @router.get("/proposal-templates")
-def proposal_templates(_: User = Depends(require_roles(*COORDINATOR_ROLES)), session: Session = Depends(get_db)):
+def proposal_templates(_: User = Depends(require_coordinator_access), session: Session = Depends(get_db)):
     active = select(TemplateReferenceVersion.template_reference_id, TemplateReferenceVersion.id.label("version_id")).where(TemplateReferenceVersion.is_active.is_(True)).subquery()
     rows = session.execute(
         select(TemplateReferenceVersion, TemplateReference)
@@ -77,7 +77,7 @@ def proposal_templates(_: User = Depends(require_roles(*COORDINATOR_ROLES)), ses
 
 
 @router.get("/evaluation-criteria")
-def evaluation_criteria(_: User = Depends(require_roles(*COORDINATOR_ROLES)), session: Session = Depends(get_db)):
+def evaluation_criteria(_: User = Depends(require_coordinator_access), session: Session = Depends(get_db)):
     latest = select(EvaluationRubricVersion.rubric_id, func.max(EvaluationRubricVersion.version_number).label("version")).group_by(EvaluationRubricVersion.rubric_id).subquery()
     rows = session.scalars(select(EvaluationRubricVersion).join(latest, (latest.c.rubric_id == EvaluationRubricVersion.rubric_id) & (latest.c.version == EvaluationRubricVersion.version_number)).order_by(EvaluationRubricVersion.rubric_id)).all()
     return [{"id": row.rubric_id, "name": row.name, "description": row.description, "version": row.version_number} for row in rows]

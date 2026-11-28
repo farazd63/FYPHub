@@ -31,3 +31,14 @@ test("group signup names are assigned during admin approval", () => {
   assert.match(source, /Reject group signup/);
   assert.match(source, /The group will not be able to log in/);
 });
+
+test("admin group details can edit, add, and remove members", () => {
+  assert.match(source, />Edit members<|Edit members in/);
+  assert.match(source, /Update a member(?:&apos;|')s name, registration number, email, or role/);
+  assert.match(source, /student-groups\/\$\{memberManagerTarget\.id\}\/members\/\$\{memberId\}/);
+  assert.match(source, /method: "PATCH"/);
+  assert.match(source, /method: "DELETE"/);
+  assert.match(source, /Remove member/);
+  assert.match(source, /Add new member/);
+  assert.match(source, /Historical submissions and collaboration messages stay available/);
+});

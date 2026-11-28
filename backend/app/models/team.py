@@ -10,6 +10,7 @@ class Team(Base):
  academic_cycle_id:Mapped[int]=mapped_column(ForeignKey("academic_cycles.id"),nullable=False)
  group_number:Mapped[int | None]=mapped_column(Integer,nullable=True)
  group_name:Mapped[str | None]=mapped_column(String(255),nullable=True)
+ final_project_title:Mapped[str | None]=mapped_column(String(255),nullable=True)
  shared_user_id:Mapped[int]=mapped_column(ForeignKey("users.id"),nullable=False,unique=True)
  status:Mapped[str]=mapped_column(String(16),nullable=False,default="forming",server_default="forming")
  supervision_status:Mapped[str]=mapped_column(String(24),nullable=False,default="ACTIVE",server_default="ACTIVE")

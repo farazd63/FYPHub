@@ -14,11 +14,35 @@ body.fy-modal-open .role-sidebar {
   pointer-events: none !important;
 }
 
+/* Inline legacy dialogs still need to escape the isolated content pane while
+   they are being migrated to ModalPortal. Raise the pane's complete stacking
+   context above the navigation rail so its viewport scrim can cover the rail. */
+body.fy-modal-open .admin-shell__body,
+body.fy-modal-open .student-body {
+  position: relative !important;
+  z-index: 1001 !important;
+}
+
+body.fy-modal-open .admin-shell__content,
+body.fy-modal-open .student-content,
+body.fy-modal-open .portal-content {
+  z-index: 1002 !important;
+  overflow: visible !important;
+}
+
+/* ModalPortal is a direct child of body. Keep its stacking context above the
+   authenticated shell, whose content panes are raised while a dialog is open
+   for legacy inline dialogs. */
+.modal-portal-root {
+  position: relative;
+  z-index: 2000;
+}
+
 :where(
   [role="dialog"][aria-modal="true"].fixed.inset-0,
   .fixed.inset-0[role="presentation"]:has(> [role="dialog"][aria-modal="true"])
 ) {
-  z-index: 1000 !important;
+  z-index: 2001 !important;
 }
 
 :where([role="dialog"][aria-modal="true"]:not(.portal-document-preview)) {
@@ -31,5 +55,5 @@ body.fy-modal-open .role-sidebar {
 }
 
 .fy-modal {
-  z-index: 1000;
+  z-index: 2001;
 }

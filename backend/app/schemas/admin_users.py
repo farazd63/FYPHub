@@ -1,8 +1,9 @@
 """Strict, safe contracts for ADMIN-only account management."""
 
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from ..models import UserRole
 from ..security import validate_full_name, validate_password
@@ -16,8 +17,12 @@ class AdminUserResponse(BaseModel):
     email: str
     registration_number: str | None
     role: UserRole
+    roles: list[UserRole] = Field(default_factory=list)
     is_active: bool
     created_at: datetime
+    coordinator_academic_cycle_ids: list[int] = Field(default_factory=list)
+    coordinator_academic_cycle_names: list[str] = Field(default_factory=list)
+    # Kept for clients that still read the former single-cycle response fields.
     coordinator_academic_cycle_id: int | None = None
     coordinator_academic_cycle_name: str | None = None
     verification_token: str | None = None
@@ -38,8 +43,11 @@ class AdminUserCreate(BaseModel):
     full_name: str
     email: EmailStr
     password: str
-    role: UserRole
+    role: UserRole | None = None
+    roles: list[UserRole] = Field(default_factory=list)
     registration_number: str | None = None
+    coordinator_academic_cycle_ids: list[int] = Field(default_factory=list)
+    # Backward-compatible input for older clients; it is folded into the list.
     coordinator_academic_cycle_id: int | None = None
 
     @field_validator("email", mode="before")
@@ -73,12 +81,25 @@ class AdminUserCreate(BaseModel):
 
     @model_validator(mode="after")
     def student_has_registration(self) -> "AdminUserCreate":
+        selected_roles = list(dict.fromkeys(self.roles))
+        if self.role is not None and self.role not in selected_roles:
+            selected_roles.insert(0, self.role)
+        if not selected_roles:
+            raise ValueError("Select at least one account role.")
+        self.roles = selected_roles
+        self.role = selected_roles[0]
+        cycle_ids = list(dict.fromkeys(self.coordinator_academic_cycle_ids))
+        if self.coordinator_academic_cycle_id is not None and self.coordinator_academic_cycle_id not in cycle_ids:
+            cycle_ids.append(self.coordinator_academic_cycle_id)
+        self.coordinator_academic_cycle_ids = cycle_ids
+        if UserRole.STUDENT in selected_roles and len(selected_roles) > 1:
+            raise ValueError("STUDENT accounts cannot have additional roles.")
         if self.role == UserRole.STUDENT and self.registration_number is None:
             raise ValueError("registration_number is required for STUDENT accounts.")
-        if self.role == UserRole.COORDINATOR and self.coordinator_academic_cycle_id is None:
-            raise ValueError("coordinator_academic_cycle_id is required for COORDINATOR accounts.")
-        if self.role != UserRole.COORDINATOR and self.coordinator_academic_cycle_id is not None:
-            raise ValueError("coordinator_academic_cycle_id is only valid for COORDINATOR accounts.")
+        if UserRole.COORDINATOR in selected_roles and not cycle_ids:
+            raise ValueError("coordinator_academic_cycle_ids is required for COORDINATOR accounts.")
+        if UserRole.COORDINATOR not in selected_roles and cycle_ids:
+            raise ValueError("Coordinator cycles require the COORDINATOR role.")
         return self
 
 
@@ -90,7 +111,10 @@ class AdminUserUpdate(BaseModel):
     full_name: str
     email: EmailStr
     registration_number: str | None = None
-    role: UserRole
+    role: UserRole | None = None
+    roles: list[UserRole] = Field(default_factory=list)
+    coordinator_academic_cycle_ids: list[int] = Field(default_factory=list)
+    # Backward-compatible input for older clients; it is folded into the list.
     coordinator_academic_cycle_id: int | None = None
 
     @field_validator("email", mode="before")
@@ -115,18 +139,45 @@ class AdminUserUpdate(BaseModel):
 
     @model_validator(mode="after")
     def student_has_registration(self) -> "AdminUserUpdate":
+        selected_roles = list(dict.fromkeys(self.roles))
+        if self.role is not None and self.role not in selected_roles:
+            selected_roles.insert(0, self.role)
+        if not selected_roles:
+            raise ValueError("Select at least one account role.")
+        self.roles = selected_roles
+        self.role = selected_roles[0]
+        cycle_ids = list(dict.fromkeys(self.coordinator_academic_cycle_ids))
+        if self.coordinator_academic_cycle_id is not None and self.coordinator_academic_cycle_id not in cycle_ids:
+            cycle_ids.append(self.coordinator_academic_cycle_id)
+        self.coordinator_academic_cycle_ids = cycle_ids
+        if UserRole.STUDENT in selected_roles and len(selected_roles) > 1:
+            raise ValueError("STUDENT accounts cannot have additional roles.")
         if self.role == UserRole.STUDENT and self.registration_number is None:
             raise ValueError("registration_number is required for STUDENT accounts.")
-        if self.role == UserRole.COORDINATOR and self.coordinator_academic_cycle_id is None:
-            raise ValueError("coordinator_academic_cycle_id is required for COORDINATOR accounts.")
-        if self.role != UserRole.COORDINATOR and self.coordinator_academic_cycle_id is not None:
-            raise ValueError("coordinator_academic_cycle_id is only valid for COORDINATOR accounts.")
+        if UserRole.COORDINATOR in selected_roles and not cycle_ids:
+            raise ValueError("coordinator_academic_cycle_ids is required for COORDINATOR accounts.")
+        if UserRole.COORDINATOR not in selected_roles and cycle_ids:
+            raise ValueError("Coordinator cycles require the COORDINATOR role.")
         return self
 
 
 class AdminUserRoleChange(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    role: UserRole
+    role: UserRole | None = None
+    roles: list[UserRole] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def normalize_roles(self) -> "AdminUserRoleChange":
+        selected_roles = list(dict.fromkeys(self.roles))
+        if self.role is not None and self.role not in selected_roles:
+            selected_roles.insert(0, self.role)
+        if not selected_roles:
+            raise ValueError("Select at least one account role.")
+        if UserRole.STUDENT in selected_roles and len(selected_roles) > 1:
+            raise ValueError("STUDENT accounts cannot have additional roles.")
+        self.roles = selected_roles
+        self.role = selected_roles[0]
+        return self
 
 
 class AdminUserStatusChange(BaseModel):
@@ -184,6 +235,12 @@ class AdminStudentGroupMemberCreate(BaseModel):
         if not normalized or len(normalized) > 100:
             raise ValueError("registration_number must be between 1 and 100 characters.")
         return normalized
+
+
+class AdminStudentGroupMemberUpdate(AdminStudentGroupMemberCreate):
+    """Editable identity fields for an active member of an admin-managed group."""
+
+    designation: Literal["LEADER", "MEMBER"] | None = None
 
 
 class AdminStudentGroupApproval(BaseModel):

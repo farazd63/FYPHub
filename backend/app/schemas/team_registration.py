@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from ..models import UserRole
 from ..security import validate_full_name, validate_registration_number
@@ -150,4 +150,20 @@ class StudentGroupRegistrationRequest(BaseModel):
         normalized = " ".join(value.split())
         if not normalized or len(normalized) > 255:
             raise ValueError("group_name must be between 1 and 255 characters.")
+        return normalized
+
+
+class StudentFinalProjectTitleUpdate(BaseModel):
+    """The group's manually confirmed title, separate from its proposal title."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    final_project_title: str = Field(max_length=255)
+
+    @field_validator("final_project_title")
+    @classmethod
+    def normalized_final_project_title(cls, value: str) -> str:
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("final_project_title must not be empty.")
         return normalized

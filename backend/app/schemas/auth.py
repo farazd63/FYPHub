@@ -122,6 +122,7 @@ class CurrentUserResponse(BaseModel):
     email: str
     registration_number: str | None
     role: UserRole
+    roles: list[UserRole] = Field(default_factory=list)
     is_active: bool
     institution_id: int | None = None
     email_verified: bool = False
@@ -133,5 +134,7 @@ class CurrentUserResponse(BaseModel):
     academic_cycle: str | None = None
     group_status: str | None = None
     members: list[dict[str, object]] = Field(default_factory=list)
+    coordinator_academic_cycle_ids: list[int] = Field(default_factory=list)
+    coordinator_academic_cycle_names: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
